@@ -8,11 +8,15 @@
 
 ただし、最初から音声・常時起動・完全自動化を目指すのではなく、まずは テキストチャットMVP として検証する。
 
+なお、このAIは医療的な診断・治療を目的とするものではない。ただし、生活AIとしての使いやすさを高めるために、ADHD的な困りごとである「忘れる」「始められない」「優先順位が決められない」「脱線後に戻れない」にも配慮した設計にする。
+
 ---
 
 ## 2. 基本方針
 
 このAIは、単語トリガー型のBotではなく、意図理解型の会話AI として設計する。
+
+また、生活AIとしての回答は、単に情報を多く返すのではなく、必要に応じて「今やる1個」「次にやる1個」「後で見ればよいもの」に整理して返す。特に、予定・タスク・リマインダーが多い場合は、一覧をそのまま出すだけでなく、ユーザーが次に動きやすい形へ要約する。
 
 例えば、
 
@@ -77,6 +81,7 @@ MVPの目的
 * 過去ログを検索できるか
 * 会話ログを保存できるか
 * 返答が自然か
+* 予定やタスクを、次に動きやすい形へ整理できるか
 * 記憶設計が破綻しないか
 
 MVPでやること
@@ -90,6 +95,9 @@ MVPでやること
 * 会話ログ保存
 * 日次要約作成
 * 朝ブリーフィング生成
+* 今日の「最初の一手」提案
+* 中断後の作業復帰サポート
+* 夜の引き継ぎメモ作成
 
 MVPでまだやらないこと
 
@@ -101,6 +109,9 @@ MVPでまだやらないこと
 * 自動タスク作成
 * TimeTree直接連携
 * 完全自律エージェント化
+* 大量のタスク自動生成
+* ユーザーを監視・管理するような通知設計
+* 完璧な生活改善スコアリング
 
 ---
 
@@ -196,6 +207,12 @@ save_memory(content, type)
 覚えるべき情報を保存する
 create_daily_summary(date)
 その日の会話・作業・タスクを要約する
+suggest_next_action(context)
+予定・タスク・リマインダー・過去ログをもとに、今やる最小の一手を提案する
+create_handoff_note(date)
+明日の自分が再開できるように、途中の作業・次の一手・注意点をまとめる
+restore_context(query)
+中断後に、直前まで何をしていたか、次に何をすればよいかを復元する
 ```
 
 ---
@@ -208,7 +225,7 @@ Backend
 FastAPI
 Python
 SQLite
-Ollama
+LM Studio
 Chroma
 Markdown / Obsidian
 ```
@@ -233,15 +250,15 @@ Electron
 LLM
 
 ```text
-Ollama
+LM Studio
 ```
 
 用途別にモデルを分ける可能性あり。
 
 ```text
-通常会話：軽めのローカルLLM
+通常会話：LM Studio上の軽めのローカルLLM
 ツール判断：JSON出力が安定するモデル
-要約処理：少し強めのモデル
+要約処理：LM Studio上の少し強めのモデル
 難しい推論：必要時のみ外部API
 ```
 
@@ -253,7 +270,7 @@ Ollama
 personal-ai-assistant/
   backend/
     main.py
-    llm_client.py
+    lmstudio_client.py
     router_agent.py
     response_agent.py
     config.py
@@ -304,14 +321,22 @@ daily_summaries
 - tomorrow_hint
 - mood_or_energy
 - created_at
-memories
+handoff_notes
 - id
-- type
-- content
-- confidence
-- source_conversation_id
-- active
+- date
+- current_project
+- stopped_at
+- next_action
+- blockers
 - created_at
+focus_sessions
+- id
+- started_at
+- ended_at
+- task_title
+- status
+- interruption_note
+- next_action
 tasks_cache
 - id
 - source
@@ -373,7 +398,7 @@ Phase 0：設計
 Phase 1：テキストチャットMVP
 
 * FastAPIサーバー
-* Ollama接続
+* LM Studio接続
 * 簡易Webチャット
 * 会話ログ保存
 * ツール呼び出しの基本実装
@@ -392,6 +417,9 @@ Phase 3：記憶機能
 * 長期記憶候補抽出
 * Markdown出力
 * ChromaによるRAG検索
+* 作業復帰用のハンドオフメモ作成
+* 「今やる1個」を返す next action 生成
+* 中断後に前の文脈へ戻る restore context 機能
 
 Phase 4：デスクトップアプリ化
 
@@ -436,6 +464,8 @@ Phase 6：補助連携
 を必要に応じて参照し、
 自然な文章で今日の行動方針を返せる。
 
+このとき、単にタスク一覧を返すのではなく、「今やる1個」「次にやる1個」「後で見ればよいもの」に整理して返せることを重視する。
+
 さらに、
 
 「昨日何してたっけ？」
@@ -451,6 +481,7 @@ Phase 6：補助連携
 * 単語トリガー型ではなく、意図理解型AIにする
 * 最初はテキストチャットMVP
 * 本体はローカルAI Core Server
+* ローカルLLM基盤はLM Studioを使用する
 * UIは後から差し替え可能にする
 * Discord常設は本命にしない
 * 最初からアプリ化しない
@@ -459,6 +490,9 @@ Phase 6：補助連携
 * TimeTree直接連携は後回し
 * Notion / SQLite / Markdown / Chromaを中心に記憶設計する
 * 音声化はMVP検証後に行う
+* 生活AIとして、忘れても戻れる・中断しても復帰できる設計を重視する
+* AIは大量の情報を渡すのではなく、必要に応じて次に取る行動を小さく絞る
+* AIはユーザーを管理する存在ではなく、横にいる補助輪として振る舞う
 
 ---
 
@@ -496,6 +530,18 @@ Phase 6：補助連携
 
 この検証が通れば、開発を本格化する。
 
+4. 生活補助としての返答方針の検証
+
+以下の発話で、AIが情報を増やしすぎず、次の行動へ整理できるか確認する。
+
+```text
+今日やること多すぎる
+何から始めればいい？
+さっき何してたっけ？
+途中で止まってた作業に戻りたい
+明日の自分に引き継ぎたい
+```
+
 ---
 
 ## 15. 最終イメージ
@@ -516,3 +562,5 @@ Apple Remindersには未完了が2件あるよ。（Mac環境の場合）
 目指すものは、ただのチャットBotではなく、
 
 自分の生活・制作・予定・記憶を横断して支えてくれる、ローカル常駐のPersonal AI Assistant。
+
+そのうえで、忘れても戻れる、中断しても再開できる、タスクが多くても次の一手に変換できる生活補助AIを目指す。
