@@ -1,64 +1,94 @@
 """
-TimeTree iCal バックアップスクリプト
+TimeTree 毎日バックアップスクリプト
 
-TimeTree の iCal URL からスケジュールを取得し、
+timetree-exporter CLI を使って TimeTree のスケジュールを取得し、
 SQLite と Markdown に保存する。
 
 使い方:
     python tools/timetree_backup.py
 
-環境変数:
-    TIMETREE_ICAL_URL  - TimeTree の iCal URL (webcal:// または https://)
+必要な環境変数:
+    TIMETREE_EMAIL          - TimeTree アカウントのメールアドレス
+    TIMETREE_PASSWORD       - TimeTree アカウントのパスワード
+    TIMETREE_CALENDAR_CODE  - エクスポートするカレンダーのコード
 
-iCal URL の取得方法:
-    TimeTree → カレンダー設定 → 同期設定 → iCal リンクをコピー
+カレンダーコードの確認方法:
+    timetree-exporter -e your@email.com
+    （ログイン後にカレンダー一覧が表示される）
 """
 
 import os
 import sqlite3
+import subprocess
 import sys
+import tempfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from urllib.request import urlopen
-from urllib.error import URLError
 
 try:
     from icalendar import Calendar
 except ImportError:
     print("ERROR: icalendar パッケージが必要です。")
-    print("       pip install icalendar")
+    print("       pip install icalendar timetree-exporter")
     sys.exit(1)
 
-# --- パス設定 ---
 ROOT = Path(__file__).parent.parent
 DB_PATH = ROOT / "storage" / "app.db"
 LOGS_DIR = ROOT / "storage" / "logs"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_ical_url() -> str:
-    url = os.environ.get("TIMETREE_ICAL_URL", "")
-    if not url:
+def get_env() -> tuple[str, str, str]:
+    email = os.environ.get("TIMETREE_EMAIL", "")
+    password = os.environ.get("TIMETREE_PASSWORD", "")
+    calendar_code = os.environ.get("TIMETREE_CALENDAR_CODE", "")
+
+    missing = [k for k, v in {
+        "TIMETREE_EMAIL": email,
+        "TIMETREE_PASSWORD": password,
+        "TIMETREE_CALENDAR_CODE": calendar_code,
+    }.items() if not v]
+
+    if missing:
         raise ValueError(
-            "環境変数 TIMETREE_ICAL_URL が設定されていません。\n"
-            "TimeTree → カレンダー設定 → 同期設定 → iCal リンクを設定してください。\n"
-            "例: export TIMETREE_ICAL_URL='webcal://timetreeapp.com/...'"
+            f"環境変数が設定されていません: {', '.join(missing)}\n"
+            "カレンダーコードの確認: timetree-exporter -e your@email.com"
         )
-    # webcal:// → https:// に変換
-    return url.replace("webcal://", "https://")
+    return email, password, calendar_code
 
 
-def fetch_ical(url: str) -> Calendar:
+def export_ical(email: str, password: str, calendar_code: str) -> bytes:
+    """timetree-exporter を呼び出して .ics データを返す。"""
+    with tempfile.NamedTemporaryFile(suffix=".ics", delete=False) as f:
+        tmp_path = f.name
+
+    env = os.environ.copy()
+    env["TIMETREE_PASSWORD"] = password
+
     try:
-        with urlopen(url, timeout=30) as resp:
-            data = resp.read()
-    except URLError as e:
-        raise RuntimeError(f"iCal の取得に失敗しました: {e}") from e
-    return Calendar.from_ical(data)
+        result = subprocess.run(
+            [
+                sys.executable, "-m", "timetree_exporter",
+                "-e", email,
+                "-c", calendar_code,
+                "-o", tmp_path,
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"timetree-exporter が失敗しました (code {result.returncode}):\n"
+                f"{result.stderr.strip()}"
+            )
+        return Path(tmp_path).read_bytes()
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
 
 
 def parse_dt(dt_val) -> datetime | None:
-    """icalendar の日時/日付を UTC aware datetime に変換する。"""
     if dt_val is None:
         return None
     if isinstance(dt_val, datetime):
@@ -70,38 +100,32 @@ def parse_dt(dt_val) -> datetime | None:
     return None
 
 
-def extract_events(cal: Calendar) -> list[dict]:
+def extract_events(ical_bytes: bytes) -> list[dict]:
+    cal = Calendar.from_ical(ical_bytes)
     events = []
     for component in cal.walk():
         if component.name != "VEVENT":
             continue
 
-        uid = str(component.get("UID", ""))
-        title = str(component.get("SUMMARY", "（タイトルなし）"))
-        location = str(component.get("LOCATION", "") or "")
-        description = str(component.get("DESCRIPTION", "") or "")
-
         start = parse_dt(component.get("DTSTART").dt if component.get("DTSTART") else None)
+        if start is None:
+            continue
+
         end = parse_dt(component.get("DTEND").dt if component.get("DTEND") else None)
         updated = parse_dt(
             component.get("LAST-MODIFIED").dt if component.get("LAST-MODIFIED") else None
         )
 
-        if start is None:
-            continue
-
-        events.append(
-            {
-                "external_id": uid,
-                "source": "timetree",
-                "title": title,
-                "start_time": start.isoformat(),
-                "end_time": end.isoformat() if end else None,
-                "location": location,
-                "description": description,
-                "updated_at": (updated or datetime.now(timezone.utc)).isoformat(),
-            }
-        )
+        events.append({
+            "external_id": str(component.get("UID", "")),
+            "source": "timetree",
+            "title": str(component.get("SUMMARY", "（タイトルなし）")),
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat() if end else None,
+            "location": str(component.get("LOCATION", "") or ""),
+            "description": str(component.get("DESCRIPTION", "") or ""),
+            "updated_at": (updated or datetime.now(timezone.utc)).isoformat(),
+        })
 
     return sorted(events, key=lambda e: e["start_time"])
 
@@ -109,8 +133,7 @@ def extract_events(cal: Calendar) -> list[dict]:
 def save_to_sqlite(events: list[dict]) -> int:
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
-    cur.execute(
-        """
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS calendar_events_cache (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             source      TEXT,
@@ -122,12 +145,9 @@ def save_to_sqlite(events: list[dict]) -> int:
             external_id TEXT UNIQUE,
             updated_at  TEXT
         )
-        """
-    )
-    upserted = 0
+    """)
     for ev in events:
-        cur.execute(
-            """
+        cur.execute("""
             INSERT INTO calendar_events_cache
                 (source, title, start_time, end_time, location, description, external_id, updated_at)
             VALUES
@@ -139,20 +159,16 @@ def save_to_sqlite(events: list[dict]) -> int:
                 location    = excluded.location,
                 description = excluded.description,
                 updated_at  = excluded.updated_at
-            """,
-            ev,
-        )
-        upserted += 1
+        """, ev)
     con.commit()
     con.close()
-    return upserted
+    return len(events)
 
 
 def save_to_markdown(events: list[dict], target_date: date) -> Path:
-    """対象日（デフォルト: 今日 ± 7日）のイベントを日次ログに追記する。"""
+    import re
     log_path = LOGS_DIR / f"{target_date.isoformat()}.md"
 
-    # 対象日のイベントだけ抽出
     day_start = datetime(target_date.year, target_date.month, target_date.day, tzinfo=timezone.utc)
     day_end = day_start + timedelta(days=1)
     day_events = [
@@ -180,13 +196,10 @@ def save_to_markdown(events: list[dict], target_date: date) -> Path:
     lines.append("")
     block = "\n".join(lines)
 
-    # 既存ファイルに同じセクションがあれば上書き、なければ追記
     if log_path.exists():
         existing = log_path.read_text(encoding="utf-8")
         header = f"## TimeTree スケジュール ({target_date.isoformat()})"
         if header in existing:
-            # セクションを置換
-            import re
             pattern = rf"(## TimeTree スケジュール \({re.escape(target_date.isoformat())}\).*?)(?=\n## |\Z)"
             existing = re.sub(pattern, block.rstrip(), existing, flags=re.DOTALL)
             log_path.write_text(existing, encoding="utf-8")
@@ -202,27 +215,25 @@ def save_to_markdown(events: list[dict], target_date: date) -> Path:
 def main() -> None:
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] TimeTree バックアップ開始")
 
-    url = get_ical_url()
-    print(f"iCal URL: {url[:40]}...")
+    email, password, calendar_code = get_env()
+    print(f"アカウント: {email} / カレンダーコード: {calendar_code}")
 
-    cal = fetch_ical(url)
-    events = extract_events(cal)
+    print("timetree-exporter を実行中...")
+    ical_bytes = export_ical(email, password, calendar_code)
+
+    events = extract_events(ical_bytes)
     print(f"取得したイベント数: {len(events)}")
 
     saved = save_to_sqlite(events)
     print(f"SQLite に保存: {saved} 件 ({DB_PATH})")
 
-    # 今日 ± 7日分のMarkdownを更新
     today = date.today()
     for delta in range(-7, 8):
         target = today + timedelta(days=delta)
         path = save_to_markdown(events, target)
-        day_events_count = sum(
-            1 for ev in events
-            if ev["start_time"].startswith(target.isoformat())
-        )
-        if day_events_count > 0:
-            print(f"Markdown 更新: {path.name} ({day_events_count} 件)")
+        day_count = sum(1 for ev in events if ev["start_time"].startswith(target.isoformat()))
+        if day_count > 0:
+            print(f"Markdown 更新: {path.name} ({day_count} 件)")
 
     print("完了")
 
