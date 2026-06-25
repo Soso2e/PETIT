@@ -87,3 +87,11 @@ def recent_conversations(limit: int = 20) -> list[dict[str, Any]]:
             (limit,),
         ).fetchall()
     return [dict(r) for r in reversed(rows)]
+
+
+def all_memory() -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, created_at, type, content FROM memory ORDER BY id ASC"
+        ).fetchall()
+    return [dict(r) for r in rows]

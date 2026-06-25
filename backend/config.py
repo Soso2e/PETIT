@@ -25,6 +25,15 @@ LM_TIMEOUT = float(os.getenv("PETIT_LM_TIMEOUT", "120"))
 # Agent
 MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "5"))
 
+# Embeddings (for RAG search via LM Studio)
+# Load a dedicated embedding model in LM Studio (e.g. nomic-embed-text, bge-m3)
+EMBED_BASE_URL = os.getenv("PETIT_EMBED_BASE_URL", LM_BASE_URL)
+EMBED_MODEL = os.getenv("PETIT_EMBED_MODEL", "nomic-embed-text")
+EMBED_TIMEOUT = float(os.getenv("PETIT_EMBED_TIMEOUT", "30"))
+
+# ChromaDB persistent path
+CHROMA_PATH = Path(os.getenv("PETIT_CHROMA_PATH", STORAGE_DIR / "chroma"))
+
 # Notion
 NOTION_API_KEY = os.getenv("NOTION_API_KEY", "")
 NOTION_TASKS_DB_ID = os.getenv("NOTION_TASKS_DB_ID", "")
