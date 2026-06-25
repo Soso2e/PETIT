@@ -1,8 +1,8 @@
 """Task tools.
 
-MVP reads/writes a local SQLite task cache. The Concept calls for Notion as a
-source later; when that lands, it can populate tasks_cache (source='notion')
-and this tool keeps working unchanged.
+Reads/writes a local SQLite task cache (tasks_cache). Notion sync populates
+this cache with source='notion'; local tasks use source='local'. Both are
+returned by get_tasks so the LLM gets a unified view.
 """
 from __future__ import annotations
 
@@ -11,11 +11,23 @@ from typing import Any
 from .. import db
 from .registry import tool
 
+# Imported lazily to avoid circular import at module load time.
+_notion_sync = None
+
+
+def _try_notion_sync() -> None:
+    """Silently sync from Notion if configured. Import lazily to avoid circular deps."""
+    global _notion_sync
+    if _notion_sync is None:
+        from .notion import sync_if_configured  # noqa: PLC0415
+        _notion_sync = sync_if_configured
+    _notion_sync()
+
 
 @tool(
     name="get_tasks",
     description=(
-        "保存されているタスク一覧を取得する。"
+        "タスク一覧を取得する。Notion が設定されていれば自動で最新データを取得する。"
         "「今日のタスク教えて」「やること何があったっけ」のような発話で使う。"
     ),
     parameters={
@@ -30,6 +42,8 @@ from .registry import tool
     },
 )
 def get_tasks(status: str | None = None, limit: int = 20) -> dict[str, Any]:
+    _try_notion_sync()
+
     sql = "SELECT id, source, title, status, due_date, priority FROM tasks_cache"
     params: list[Any] = []
     if status:

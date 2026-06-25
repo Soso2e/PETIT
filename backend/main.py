@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from . import agent, config, db, lmstudio_client, tools
 from .lmstudio_client import LMStudioError
+from .notion_client import NotionError
 
 app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
 
@@ -40,6 +41,10 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "tools": tools.registered_names(),
         "lm_studio": lmstudio_client.health(),
+        "notion": {
+            "configured": config.notion_configured(),
+            "db_id": config.NOTION_TASKS_DB_ID[:8] + "…" if config.NOTION_TASKS_DB_ID else None,
+        },
     }
 
 
