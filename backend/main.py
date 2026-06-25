@@ -15,7 +15,7 @@ from pydantic import BaseModel
 import logging
 import threading
 
-from . import agent, chroma_client, config, db, lmstudio_client, markdown_export, scheduler, tools
+from . import agent, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -137,6 +137,12 @@ def summarize() -> dict[str, Any]:
 @app.get("/api/summaries")
 def summaries(limit: int = 20) -> dict[str, Any]:
     return {"summaries": db.recent_summaries(limit=limit)}
+
+
+@app.get("/api/proactive")
+def proactive_opener() -> dict[str, Any]:
+    """A line PETIT says first when the user opens the app (talks proactively)."""
+    return proactive.generate_opener()
 
 
 @app.get("/api/conversations")
