@@ -1,0 +1,118 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --user: #2563eb;
+  --assistant: #232733;
+  --text: #e6e8ec;
+  --muted: #8b93a7;
+  --ok: #22c55e;
+  --bad: #ef4444;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", Meiryo, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  max-width: 760px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #222633;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+}
+
+.status {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #222633;
+  color: var(--muted);
+}
+.status--ok { color: var(--ok); }
+.status--bad { color: var(--bad); }
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.msg { display: flex; }
+.msg--user { justify-content: flex-end; }
+.msg--assistant { justify-content: flex-start; }
+
+.bubble {
+  max-width: 78%;
+  padding: 11px 14px;
+  border-radius: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg--user .bubble { background: var(--user); color: #fff; border-bottom-right-radius: 4px; }
+.msg--assistant .bubble { background: var(--assistant); border-bottom-left-radius: 4px; }
+
+.bubble--error { background: #3a1d22; color: #fca5a5; }
+
+.tools {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.composer {
+  display: flex;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid #222633;
+}
+
+.input {
+  flex: 1;
+  resize: none;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #2a2f3d;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  max-height: 160px;
+}
+.input:focus { outline: none; border-color: var(--user); }
+
+.send {
+  background: var(--user);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0 20px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.send:disabled { opacity: 0.5; cursor: default; }
+
+.typing { color: var(--muted); font-style: italic; }

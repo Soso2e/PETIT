@@ -1,0 +1,84 @@
+"""A tiny tool registry.
+
+Register a tool with the @tool decorator. Each tool declares an OpenAI-style
+JSON-schema for its parameters and a handler that takes keyword arguments and
+returns a JSON-serialisable result.
+"""
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import Any, Callable
+
+Handler = Callable[..., Any]
+
+
+@dataclass
+class Tool:
+    name: str
+    description: str
+    parameters: dict[str, Any]
+    handler: Handler
+
+
+_REGISTRY: dict[str, Tool] = {}
+
+
+def tool(name: str, description: str, parameters: dict[str, Any]) -> Callable[[Handler], Handler]:
+    """Decorator that registers a function as a callable tool."""
+
+    def decorator(func: Handler) -> Handler:
+        _REGISTRY[name] = Tool(name=name, description=description, parameters=parameters, handler=func)
+        return func
+
+    return decorator
+
+
+def registered_names() -> list[str]:
+    return sorted(_REGISTRY.keys())
+
+
+def openai_tools_schema() -> list[dict[str, Any]]:
+    """Return the tool list in the format the chat completions API expects."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.parameters,
+            },
+        }
+        for t in _REGISTRY.values()
+    ]
+
+
+def dispatch(name: str, arguments: dict[str, Any] | str | None) -> str:
+    """Execute a tool by name and return a string result for the LLM.
+
+    Arguments may arrive as a JSON string (as tool calls do) or a dict.
+    Errors are returned as text rather than raised, so the agent loop can
+    feed them back to the model.
+    """
+    tool_obj = _REGISTRY.get(name)
+    if tool_obj is None:
+        return f"[error] unknown tool: {name}"
+
+    if isinstance(arguments, str):
+        try:
+            arguments = json.loads(arguments) if arguments.strip() else {}
+        except json.JSONDecodeError:
+            return f"[error] could not parse arguments for {name}: {arguments!r}"
+    if arguments is None:
+        arguments = {}
+
+    try:
+        result = tool_obj.handler(**arguments)
+    except TypeError as exc:
+        return f"[error] bad arguments for {name}: {exc}"
+    except Exception as exc:  # noqa: BLE001 - surface tool errors to the model
+        return f"[error] {name} failed: {exc}"
+
+    if isinstance(result, str):
+        return result
+    return json.dumps(result, ensure_ascii=False, default=str)

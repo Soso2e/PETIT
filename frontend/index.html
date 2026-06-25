@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PETIT — Personal AI Assistant</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>PETIT</h1>
+      <span id="status" class="status status--unknown">接続確認中…</span>
+    </header>
+
+    <main id="messages" class="messages">
+      <div class="msg msg--assistant">
+        <div class="bubble">こんにちは。PETIT です。今日のタスクや予定、覚えておきたいことなど、なんでも話しかけてください。</div>
+      </div>
+    </main>
+
+    <form id="chat-form" class="composer">
+      <textarea id="input" class="input" rows="1" placeholder="メッセージを入力（Enterで送信 / Shift+Enterで改行）"></textarea>
+      <button id="send" type="submit" class="send">送信</button>
+    </form>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

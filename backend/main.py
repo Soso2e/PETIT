@@ -1,0 +1,133 @@
+"""FastAPI application: chat API + static frontend.
+
+Run with:  uvicorn backend.main:app --reload
+or:        python -m backend.main
+"""
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+import logging
+import threading
+
+from . import agent, chroma_client, config, db, lmstudio_client, tools
+from .lmstudio_client import LMStudioError
+from .notion_client import NotionError
+
+log = logging.getLogger(__name__)
+
+app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    db.init_db()
+    # Sync existing SQLite data into Chroma in background (best-effort)
+    threading.Thread(target=_chroma_sync, daemon=True).start()
+
+
+def _chroma_sync() -> None:
+    """Index existing memory + conversations into Chroma on first startup."""
+    try:
+        mem_rows = db.all_memory()
+        conv_rows = db.recent_conversations(limit=500)
+        counts = chroma_client.sync_from_sqlite(mem_rows, conv_rows)
+        if any(counts.values()):
+            log.info("Chroma sync: %s", counts)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Chroma startup sync skipped: %s", exc)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[dict[str, str]] | None = None
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    used_tools: list[dict[str, Any]] = []
+    error: str | None = None
+
+
+@app.get("/api/health")
+def health() -> dict[str, Any]:
+    try:
+        mem_count = chroma_client._collection("petit_memory").count()
+        conv_count = chroma_client._collection("petit_conversations").count()
+        rag_info: dict[str, Any] = {
+            "available": True,
+            "embed_model": config.EMBED_MODEL,
+            "indexed": {"memory": mem_count, "conversations": conv_count},
+        }
+    except Exception:  # noqa: BLE001
+        rag_info = {"available": False, "embed_model": config.EMBED_MODEL}
+
+    return {
+        "status": "ok",
+        "tools": tools.registered_names(),
+        "lm_studio": lmstudio_client.health(),
+        "notion": {
+            "configured": config.notion_configured(),
+            "db_id": config.NOTION_TASKS_DB_ID[:8] + "…" if config.NOTION_TASKS_DB_ID else None,
+        },
+        "rag": rag_info,
+    }
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(req: ChatRequest) -> ChatResponse:
+    message = (req.message or "").strip()
+    if not message:
+        return ChatResponse(reply="", error="メッセージが空です。")
+
+    try:
+        result = agent.run(message, history=req.history)
+    except LMStudioError as exc:
+        return ChatResponse(reply="", error=str(exc))
+
+    conv_id = db.save_conversation(
+        user_text=message,
+        assistant_text=result["reply"],
+        used_tools=", ".join(t["name"] for t in result["used_tools"]) or None,
+    )
+    # Index the conversation turn into Chroma (best-effort)
+    chroma_client.add(
+        "petit_conversations",
+        doc_id=f"conv_{conv_id}",
+        text=f"ユーザー: {message}\nPETIT: {result['reply']}",
+        metadata={"timestamp": db.now_iso()},
+    )
+    return ChatResponse(reply=result["reply"], used_tools=result["used_tools"])
+
+
+@app.get("/api/conversations")
+def conversations(limit: int = 20) -> dict[str, Any]:
+    return {"conversations": db.recent_conversations(limit=limit)}
+
+
+# --- Static frontend ---------------------------------------------------------
+# Mount assets under /static and serve index.html at the root.
+if config.FRONTEND_DIR.exists():
+    app.mount("/static", StaticFiles(directory=config.FRONTEND_DIR), name="static")
+
+    @app.get("/")
+    def index() -> Any:
+        index_file = config.FRONTEND_DIR / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        return JSONResponse({"detail": "frontend not built"}, status_code=404)
+
+
+def main() -> None:
+    import uvicorn
+
+    uvicorn.run("backend.main:app", host=config.HOST, port=config.PORT, reload=False)
+
+
+if __name__ == "__main__":
+    main()
