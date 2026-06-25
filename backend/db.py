@@ -28,6 +28,18 @@ CREATE TABLE IF NOT EXISTS memory (
     content    TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS summaries (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at   TEXT NOT NULL,
+    kind         TEXT NOT NULL DEFAULT 'interval',  -- interval | daily
+    period_start TEXT,
+    period_end   TEXT,
+    last_conv_id INTEGER NOT NULL DEFAULT 0,
+    conv_count   INTEGER NOT NULL DEFAULT 0,
+    summary      TEXT NOT NULL,
+    facts        TEXT  -- JSON-encoded list of extracted durable facts/tasks
+);
+
 CREATE TABLE IF NOT EXISTS tasks_cache (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     source      TEXT NOT NULL DEFAULT 'local',
@@ -95,3 +107,52 @@ def all_memory() -> list[dict[str, Any]]:
             "SELECT id, created_at, type, content FROM memory ORDER BY id ASC"
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# --- Summaries ---------------------------------------------------------------
+
+def last_summarized_conv_id() -> int:
+    """Highest conversation id that has already been folded into a summary."""
+    with get_connection() as conn:
+        row = conn.execute("SELECT MAX(last_conv_id) AS m FROM summaries").fetchone()
+    return int(row["m"]) if row and row["m"] is not None else 0
+
+
+def conversations_after(conv_id: int, limit: int = 500) -> list[dict[str, Any]]:
+    """Conversation turns newer than conv_id, oldest first (chronological)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, timestamp, user_text, assistant_text, used_tools "
+            "FROM conversations WHERE id > ? ORDER BY id ASC LIMIT ?",
+            (conv_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def save_summary(
+    summary: str,
+    facts: str | None,
+    kind: str,
+    period_start: str | None,
+    period_end: str | None,
+    last_conv_id: int,
+    conv_count: int,
+) -> int:
+    with get_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO summaries "
+            "(created_at, kind, period_start, period_end, last_conv_id, conv_count, summary, facts) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (now_iso(), kind, period_start, period_end, last_conv_id, conv_count, summary, facts),
+        )
+        return int(cur.lastrowid)
+
+
+def recent_summaries(limit: int = 20) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, created_at, kind, period_start, period_end, conv_count, summary, facts "
+            "FROM summaries ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in reversed(rows)]

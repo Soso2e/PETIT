@@ -70,10 +70,11 @@ def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
     # --- Semantic search (RAG) ---
     mem_results = chroma_client.query("petit_memory", query, n_results=limit)
     conv_results = chroma_client.query("petit_conversations", query, n_results=limit)
+    sum_results = chroma_client.query("petit_summaries", query, n_results=limit)
 
     # Use semantic results only if at least one collection actually returned matches.
     # None = embedding failed (LM Studio down); [] = no matches or empty collection.
-    has_semantic = bool(mem_results) or bool(conv_results)
+    has_semantic = bool(mem_results) or bool(conv_results) or bool(sum_results)
 
     if has_semantic:
         memories = [
@@ -93,12 +94,22 @@ def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
             }
             for r in (conv_results or [])
         ]
+        summaries = [
+            {
+                "summary": r["document"],
+                "created_at": r["metadata"].get("created_at", ""),
+                "kind": r["metadata"].get("kind", "interval"),
+                "relevance": round(1 - r["distance"], 3),
+            }
+            for r in (sum_results or [])
+        ]
         return {
             "query": query,
             "search_type": "semantic",
             "memories": memories,
             "conversations": conversations,
-            "found": len(memories) + len(conversations),
+            "summaries": summaries,
+            "found": len(memories) + len(conversations) + len(summaries),
         }
 
     # --- Fallback: SQLite LIKE search ---
@@ -114,6 +125,11 @@ def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
             "WHERE user_text LIKE ? OR assistant_text LIKE ? ORDER BY id DESC LIMIT ?",
             (like, like, limit),
         ).fetchall()
+        sum_rows = conn.execute(
+            "SELECT id, created_at, kind, summary FROM summaries "
+            "WHERE summary LIKE ? OR facts LIKE ? ORDER BY id DESC LIMIT ?",
+            (like, like, limit),
+        ).fetchall()
 
     memories = [
         {"content": r["content"], "created_at": r["created_at"], "type": r["type"]}
@@ -126,11 +142,31 @@ def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
         }
         for r in conv_rows
     ]
+    summaries = [
+        {"summary": r["summary"], "created_at": r["created_at"], "kind": r["kind"]}
+        for r in sum_rows
+    ]
     return {
         "query": query,
         "search_type": "keyword",
         "note": "embedding モデルが利用不可のためキーワード検索にフォールバックしました。",
         "memories": memories,
         "conversations": conversations,
-        "found": len(memories) + len(conversations),
+        "summaries": summaries,
+        "found": len(memories) + len(conversations) + len(summaries),
     }
+
+
+@tool(
+    name="summarize_now",
+    description=(
+        "これまでの未整理の会話を今すぐまとめて長期記憶に蓄積する。"
+        "「ここまでの話まとめておいて」「今の状況を記録して」のような発話で使う。"
+    ),
+    parameters={"type": "object", "properties": {}},
+)
+def summarize_now() -> dict[str, Any]:
+    # Imported lazily to avoid a circular import (summarizer -> tools 経由)
+    from .. import summarizer
+
+    return summarizer.summarize_pending(kind="interval")

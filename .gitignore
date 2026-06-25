@@ -14,6 +14,8 @@ storage/*.db
 storage/logs/
 storage/memory/
 storage/chroma/
+storage/AI_Daily/
+storage/AI_Memory/
 
 # OS / editor
 .DS_Store

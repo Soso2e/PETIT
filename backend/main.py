@@ -15,7 +15,7 @@ from pydantic import BaseModel
 import logging
 import threading
 
-from . import agent, chroma_client, config, db, lmstudio_client, tools
+from . import agent, chroma_client, config, db, lmstudio_client, markdown_export, scheduler, tools
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -29,6 +29,15 @@ def _startup() -> None:
     db.init_db()
     # Sync existing SQLite data into Chroma in background (best-effort)
     threading.Thread(target=_chroma_sync, daemon=True).start()
+    # Autonomous summarizer: fold conversations into memory every N hours
+    if config.AUTO_SUMMARY_ENABLED:
+        scheduler.get_scheduler().start()
+
+
+@app.on_event("shutdown")
+def _shutdown() -> None:
+    if config.AUTO_SUMMARY_ENABLED:
+        scheduler.get_scheduler().stop()
 
 
 def _chroma_sync() -> None:
@@ -76,6 +85,12 @@ def health() -> dict[str, Any]:
             "db_id": config.NOTION_TASKS_DB_ID[:8] + "…" if config.NOTION_TASKS_DB_ID else None,
         },
         "rag": rag_info,
+        "auto_summary": {
+            "enabled": config.AUTO_SUMMARY_ENABLED,
+            "interval_hours": config.SUMMARY_INTERVAL_HOURS,
+            "summaries": len(db.recent_summaries(limit=1000)),
+        },
+        "markdown": markdown_export.status(),
     }
 
 
@@ -90,10 +105,11 @@ def chat(req: ChatRequest) -> ChatResponse:
     except LMStudioError as exc:
         return ChatResponse(reply="", error=str(exc))
 
+    used_tools_str = ", ".join(t["name"] for t in result["used_tools"]) or None
     conv_id = db.save_conversation(
         user_text=message,
         assistant_text=result["reply"],
-        used_tools=", ".join(t["name"] for t in result["used_tools"]) or None,
+        used_tools=used_tools_str,
     )
     # Index the conversation turn into Chroma (best-effort)
     chroma_client.add(
@@ -102,7 +118,25 @@ def chat(req: ChatRequest) -> ChatResponse:
         text=f"ユーザー: {message}\nPETIT: {result['reply']}",
         metadata={"timestamp": db.now_iso()},
     )
+    # Mirror the turn into the Obsidian daily note (human-readable副本, best-effort)
+    markdown_export.append_conversation_turn(
+        user_text=message,
+        assistant_text=result["reply"],
+        used_tools=used_tools_str,
+        timestamp=db.now_iso(),
+    )
     return ChatResponse(reply=result["reply"], used_tools=result["used_tools"])
+
+
+@app.post("/api/summarize")
+def summarize() -> dict[str, Any]:
+    """Manually trigger a summarization pass (otherwise runs on the scheduler)."""
+    return scheduler.get_scheduler().run_once()
+
+
+@app.get("/api/summaries")
+def summaries(limit: int = 20) -> dict[str, Any]:
+    return {"summaries": db.recent_summaries(limit=limit)}
 
 
 @app.get("/api/conversations")

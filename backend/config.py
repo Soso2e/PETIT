@@ -10,6 +10,11 @@ STORAGE_DIR = Path(os.getenv("PETIT_STORAGE_DIR", BASE_DIR / "storage"))
 DB_PATH = Path(os.getenv("PETIT_DB_PATH", STORAGE_DIR / "app.db"))
 FRONTEND_DIR = BASE_DIR / "frontend"
 
+# Markdown (Obsidian) export — human-readable / re-usable副本
+# AI が検索する正本は SQLite / Chroma 側。md は人が読む・育てる用。
+AI_DAILY_DIR = Path(os.getenv("PETIT_AI_DAILY_DIR", STORAGE_DIR / "AI_Daily"))
+AI_MEMORY_DIR = Path(os.getenv("PETIT_AI_MEMORY_DIR", STORAGE_DIR / "AI_Memory"))
+
 # Server
 HOST = os.getenv("PETIT_HOST", "127.0.0.1")
 PORT = int(os.getenv("PETIT_PORT", "8000"))
@@ -24,6 +29,13 @@ LM_TIMEOUT = float(os.getenv("PETIT_LM_TIMEOUT", "120"))
 
 # Agent
 MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "5"))
+
+# Autonomous summarization (background scheduler)
+# 何時間おきに会話を自動でまとめて蓄積するか。2〜3時間 / 1日 などを想定。
+AUTO_SUMMARY_ENABLED = os.getenv("PETIT_AUTO_SUMMARY_ENABLED", "1") not in ("0", "false", "False")
+SUMMARY_INTERVAL_HOURS = float(os.getenv("PETIT_SUMMARY_INTERVAL_HOURS", "3"))
+# この件数未満の未処理会話しかなければ要約をスキップする（無駄なLLM呼び出し回避）
+SUMMARY_MIN_CONVERSATIONS = int(os.getenv("PETIT_SUMMARY_MIN_CONVERSATIONS", "1"))
 
 # Embeddings (for RAG search via LM Studio)
 # Load a dedicated embedding model in LM Studio (e.g. nomic-embed-text, bge-m3)
