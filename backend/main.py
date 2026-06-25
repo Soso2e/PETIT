@@ -12,9 +12,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agent, config, db, lmstudio_client, tools
+import logging
+import threading
+
+from . import agent, chroma_client, config, db, lmstudio_client, tools
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
+
+log = logging.getLogger(__name__)
 
 app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
 
@@ -22,6 +27,20 @@ app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
 @app.on_event("startup")
 def _startup() -> None:
     db.init_db()
+    # Sync existing SQLite data into Chroma in background (best-effort)
+    threading.Thread(target=_chroma_sync, daemon=True).start()
+
+
+def _chroma_sync() -> None:
+    """Index existing memory + conversations into Chroma on first startup."""
+    try:
+        mem_rows = db.all_memory()
+        conv_rows = db.recent_conversations(limit=500)
+        counts = chroma_client.sync_from_sqlite(mem_rows, conv_rows)
+        if any(counts.values()):
+            log.info("Chroma sync: %s", counts)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Chroma startup sync skipped: %s", exc)
 
 
 class ChatRequest(BaseModel):
@@ -37,6 +56,17 @@ class ChatResponse(BaseModel):
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
+    try:
+        mem_count = chroma_client._collection("petit_memory").count()
+        conv_count = chroma_client._collection("petit_conversations").count()
+        rag_info: dict[str, Any] = {
+            "available": True,
+            "embed_model": config.EMBED_MODEL,
+            "indexed": {"memory": mem_count, "conversations": conv_count},
+        }
+    except Exception:  # noqa: BLE001
+        rag_info = {"available": False, "embed_model": config.EMBED_MODEL}
+
     return {
         "status": "ok",
         "tools": tools.registered_names(),
@@ -45,6 +75,7 @@ def health() -> dict[str, Any]:
             "configured": config.notion_configured(),
             "db_id": config.NOTION_TASKS_DB_ID[:8] + "…" if config.NOTION_TASKS_DB_ID else None,
         },
+        "rag": rag_info,
     }
 
 
@@ -59,10 +90,17 @@ def chat(req: ChatRequest) -> ChatResponse:
     except LMStudioError as exc:
         return ChatResponse(reply="", error=str(exc))
 
-    db.save_conversation(
+    conv_id = db.save_conversation(
         user_text=message,
         assistant_text=result["reply"],
         used_tools=", ".join(t["name"] for t in result["used_tools"]) or None,
+    )
+    # Index the conversation turn into Chroma (best-effort)
+    chroma_client.add(
+        "petit_conversations",
+        doc_id=f"conv_{conv_id}",
+        text=f"ユーザー: {message}\nPETIT: {result['reply']}",
+        metadata={"timestamp": db.now_iso()},
     )
     return ChatResponse(reply=result["reply"], used_tools=result["used_tools"])
 
