@@ -25,5 +25,19 @@ LM_TIMEOUT = float(os.getenv("PETIT_LM_TIMEOUT", "120"))
 # Agent
 MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "5"))
 
+# Notion
+NOTION_API_KEY = os.getenv("NOTION_API_KEY", "")
+NOTION_TASKS_DB_ID = os.getenv("NOTION_TASKS_DB_ID", "")
+# Property names in your Notion DB (customize if your DB uses different names)
+NOTION_PROP_TITLE = os.getenv("NOTION_PROP_TITLE", "名前")
+NOTION_PROP_STATUS = os.getenv("NOTION_PROP_STATUS", "ステータス")
+NOTION_PROP_DUE = os.getenv("NOTION_PROP_DUE", "期日")
+NOTION_PROP_PRIORITY = os.getenv("NOTION_PROP_PRIORITY", "優先度")
+
+
+def notion_configured() -> bool:
+    return bool(NOTION_API_KEY and NOTION_TASKS_DB_ID)
+
+
 # Ensure storage exists
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
