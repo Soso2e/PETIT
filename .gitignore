@@ -6,6 +6,9 @@ venv/
 env/
 *.egg-info/
 
+# Secrets
+.env
+
 # Runtime data
 storage/*.db
 storage/logs/
