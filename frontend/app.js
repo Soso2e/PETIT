@@ -118,6 +118,24 @@ inputEl.addEventListener("input", () => {
   inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
 });
 
+// On load, let PETIT speak first — fetch a proactive opener from the backend.
+async function loadOpener() {
+  try {
+    const res = await fetch("/api/proactive");
+    const data = await res.json();
+    if (data && data.message) {
+      const greeting = document.getElementById("greeting");
+      const bubble = greeting && greeting.querySelector(".bubble");
+      if (bubble) bubble.textContent = data.message;
+      // Seed history so the model has continuity with its own opener.
+      history.push({ role: "assistant", content: data.message });
+    }
+  } catch (e) {
+    // Keep the static greeting if the opener can't be fetched.
+  }
+}
+
 checkHealth();
 setInterval(checkHealth, 15000);
+loadOpener();
 inputEl.focus();
