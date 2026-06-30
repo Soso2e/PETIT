@@ -49,11 +49,17 @@ CHROMA_PATH = Path(os.getenv("PETIT_CHROMA_PATH", STORAGE_DIR / "chroma"))
 # Notion
 NOTION_API_KEY = os.getenv("NOTION_API_KEY", "")
 NOTION_TASKS_DB_ID = os.getenv("NOTION_TASKS_DB_ID", "")
-# Property names in your Notion DB (customize if your DB uses different names)
-NOTION_PROP_TITLE = os.getenv("NOTION_PROP_TITLE", "名前")
-NOTION_PROP_STATUS = os.getenv("NOTION_PROP_STATUS", "ステータス")
-NOTION_PROP_DUE = os.getenv("NOTION_PROP_DUE", "期日")
+# Property names in your Notion task DB (customize if your DB uses different names)
+NOTION_PROP_TITLE = os.getenv("NOTION_PROP_TITLE", "name")
+NOTION_PROP_STATUS = os.getenv("NOTION_PROP_STATUS", "Status")
+NOTION_PROP_DUE = os.getenv("NOTION_PROP_DUE", "Date")
 NOTION_PROP_PRIORITY = os.getenv("NOTION_PROP_PRIORITY", "優先度")
+NOTION_PROP_CATEGORY = os.getenv("NOTION_PROP_CATEGORY", "Category")
+NOTION_PROP_REASON = os.getenv("NOTION_PROP_REASON", "reason")
+NOTION_PROP_DONE = os.getenv("NOTION_PROP_DONE", "Done")
+
+NOTION_DEFAULT_STATUS = os.getenv("NOTION_DEFAULT_STATUS", "Yet")
+NOTION_DONE_STATUS = os.getenv("NOTION_DONE_STATUS", "Done")
 
 
 def notion_configured() -> bool:
