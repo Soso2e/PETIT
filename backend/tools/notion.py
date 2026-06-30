@@ -30,15 +30,39 @@ def _upsert_tasks(tasks: list[dict[str, Any]]) -> int:
             ).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE tasks_cache SET title=?, status=?, due_date=?, priority=?, updated_at=? "
+                    "UPDATE tasks_cache SET title=?, status=?, due_date=?, priority=?, "
+                    "category=?, reason=?, url=?, done_date=?, updated_at=? "
                     "WHERE external_id=?",
-                    (t["title"], t["status"], t["due_date"], t["priority"], now, t["external_id"]),
+                    (
+                        t["title"],
+                        t["status"],
+                        t["due_date"],
+                        t["priority"],
+                        t.get("category"),
+                        t.get("reason"),
+                        t.get("url"),
+                        t.get("done_date"),
+                        now,
+                        t["external_id"],
+                    ),
                 )
             else:
                 conn.execute(
-                    "INSERT INTO tasks_cache (source, title, status, due_date, priority, external_id, updated_at) "
-                    "VALUES ('notion', ?, ?, ?, ?, ?, ?)",
-                    (t["title"], t["status"], t["due_date"], t["priority"], t["external_id"], now),
+                    "INSERT INTO tasks_cache "
+                    "(source, title, status, due_date, priority, category, reason, external_id, url, done_date, updated_at) "
+                    "VALUES ('notion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        t["title"],
+                        t["status"],
+                        t["due_date"],
+                        t["priority"],
+                        t.get("category"),
+                        t.get("reason"),
+                        t["external_id"],
+                        t.get("url"),
+                        t.get("done_date"),
+                        now,
+                    ),
                 )
     return len(tasks)
 
