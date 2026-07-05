@@ -47,7 +47,8 @@ storage/   SQLite などの実行時データ（git 管理外）
 
 - `save_memory` / `search_memory` — 記憶の保存・検索
 - `get_tasks` / `add_task` — タスクの取得・追加（ローカル DB）
-- `get_schedule` — 予定の取得（ローカル DB）
+- `get_schedule` / `add_schedule` — 予定の取得・追加（ローカル DB）
+- `create_daily_briefing` — 予定・タスク・最近の流れから朝ブリーフィングを作成
 
 LM Studio が未起動でもサーバーは落ちず、UI 上にエラーを表示します。
 
