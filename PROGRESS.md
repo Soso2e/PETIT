@@ -7,8 +7,8 @@
 - TimeTree バックアップ: `tools/timetree_backup.py` 実装済みだが本番 E2E 未検証（実認証情報待ち）。カレンダーコード確認は初回だけ対話実行が必要（`timetree-exporter -e your@email.com`）。
 - Notion / RAG: 実装済み。LM Studio・Notion 実接続での動作確認は未確認。
 - 自律要約 / 記憶注入 / 能動的な opener: 実装済み。実 LM Studio での口調・記憶想起・要約品質は未確認。
-- 次にやること: 実 `.env` で TimeTree を E2E 確認 → launchd（Mac）/ cron（Linux）で毎日自動実行を有効化。実 LM Studio で PETIT の会話品質も確認する。
-
+- ニュース / 天気 / バックグラウンドキュー: 実装済み。ツール登録・SQLite キュー・ワーカーモック・外部 API 疎通（ニュース1件、東京天気）は確認済み。LM Studio 経由の意図選択は未確認。
+- 次にやること: 実 `.env` で TimeTree を E2E 確認 → launchd（Mac）/ cron（Linux）で毎日自動実行を有効化。実 LM Studio で PETIT の会話品質とキュー選択も確認する。
 ## 履歴
 
 変更を加えるたびに1行追記する（追記専用・既存行は触らない）。時刻は UTC。
@@ -24,3 +24,6 @@
 | 2026-06-25 | 18:28 | #7 | 「人間っぽく喋る」実装: recall.py で毎ターン関連記憶+直近要約を注入、proactive.py + /api/proactive で開いた瞬間の話しかけ、agent.py の相棒口調プロンプト、フロントの opener 表示を追加。`claude/autonomous-conversation-md-db-tlyat4` ブランチ。 |
 | 2026-07-05 | 07:43 | #8 | ローカル予定追加ツール `add_schedule` を実装。`calendar_events_cache` に予定を保存し、`get_schedule` で取得できることをテスト用DBで確認。README のツール一覧を更新。 |
 | 2026-07-05 | 07:49 | #9 | 朝ブリーフィング実装: `briefing.py`、`/api/briefing`、`create_daily_briefing` ツールを追加。予定・未完了タスク・直近要約から「今やる1個」を含むブリーフィングを生成し、LM Studio 不通時は定型文へフォールバック。 |
+| 2026-07-06 | 03:13 | #10 | ニュース/天気ツールと SQLite バックグラウンドキューを実装。ツール登録・構文・ワーカーモック・外部 API 疎通を確認、LM Studio 経由の意図選択は未確認。 |
+| 2026-07-08 | 08:09 | #11 | PETIT 用ローカルLLM要件を調査・整理。コード変更なし、実モデル検証は未実施。 |
+

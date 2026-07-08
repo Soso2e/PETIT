@@ -61,7 +61,17 @@ CREATE TABLE IF NOT EXISTS calendar_events_cache (
     description TEXT,
     updated_at  TEXT NOT NULL
 );
-"""
+CREATE TABLE IF NOT EXISTS jobs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    type        TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'queued',
+    input_json  TEXT NOT NULL DEFAULT '{}',
+    result_text TEXT,
+    error       TEXT,
+    delivered   INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);"""
 
 
 def now_iso() -> str:
@@ -156,3 +166,72 @@ def recent_summaries(limit: int = 20) -> list[dict[str, Any]]:
             (limit,),
         ).fetchall()
     return [dict(r) for r in reversed(rows)]
+# --- Background jobs ---------------------------------------------------------
+
+def create_job(job_type: str, input_json: str) -> int:
+    ts = now_iso()
+    with get_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO jobs (type, status, input_json, created_at, updated_at) "
+            "VALUES (?, 'queued', ?, ?, ?)",
+            (job_type, input_json, ts, ts),
+        )
+        return int(cur.lastrowid)
+
+
+def claim_next_job() -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id, type, input_json FROM jobs "
+            "WHERE status = 'queued' ORDER BY id ASC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return None
+        updated = conn.execute(
+            "UPDATE jobs SET status = 'running', updated_at = ? "
+            "WHERE id = ? AND status = 'queued'",
+            (now_iso(), row["id"]),
+        ).rowcount
+        if not updated:
+            return None
+        return dict(row)
+
+
+def finish_job(job_id: int, result_text: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE jobs SET status = 'done', result_text = ?, error = NULL, updated_at = ? "
+            "WHERE id = ?",
+            (result_text, now_iso(), job_id),
+        )
+
+
+def fail_job(job_id: int, error: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE jobs SET status = 'failed', error = ?, updated_at = ? WHERE id = ?",
+            (error, now_iso(), job_id),
+        )
+
+
+def undelivered_jobs(limit: int = 10) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, type, status, result_text, error, created_at, updated_at "
+            "FROM jobs WHERE delivered = 0 AND status IN ('done', 'failed') "
+            "ORDER BY id ASC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_jobs_delivered(job_ids: list[int]) -> None:
+    if not job_ids:
+        return
+    placeholders = ",".join("?" for _ in job_ids)
+    with get_connection() as conn:
+        conn.execute(
+            f"UPDATE jobs SET delivered = 1, updated_at = ? WHERE id IN ({placeholders})",
+            [now_iso(), *job_ids],
+        )
+

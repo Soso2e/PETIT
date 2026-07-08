@@ -15,7 +15,7 @@ from pydantic import BaseModel
 import logging
 import threading
 
-from . import agent, briefing, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools
+from . import agent, briefing, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -32,12 +32,14 @@ def _startup() -> None:
     # Autonomous summarizer: fold conversations into memory every N hours
     if config.AUTO_SUMMARY_ENABLED:
         scheduler.get_scheduler().start()
+    worker.get_worker().start()
 
 
 @app.on_event("shutdown")
 def _shutdown() -> None:
     if config.AUTO_SUMMARY_ENABLED:
         scheduler.get_scheduler().stop()
+    worker.get_worker().stop()
 
 
 def _chroma_sync() -> None:
@@ -154,6 +156,12 @@ def daily_briefing(date: str | None = None) -> dict[str, Any]:
 @app.get("/api/conversations")
 def conversations(limit: int = 20) -> dict[str, Any]:
     return {"conversations": db.recent_conversations(limit=limit)}
+@app.get("/api/jobs")
+def jobs(limit: int = 10, mark_delivered: bool = True) -> dict[str, Any]:
+    rows = db.undelivered_jobs(limit=limit)
+    if mark_delivered:
+        db.mark_jobs_delivered([int(row["id"]) for row in rows])
+    return {"jobs": rows}
 
 
 # --- Static frontend ---------------------------------------------------------
@@ -177,3 +185,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

@@ -46,6 +46,26 @@ function setTyping(on) {
   }
 }
 
+
+async function pollJobs() {
+  try {
+    const res = await fetch("/api/jobs?limit=10&mark_delivered=true");
+    const data = await res.json();
+    for (const job of data.jobs || []) {
+      if (job.status === "done") {
+        const text = job.result_text || "調べ終わったけど、結果が空でした。";
+        addMessage("assistant", "調べ終わったよ。\n" + text);
+        history.push({ role: "assistant", content: text });
+      } else if (job.status === "failed") {
+        const text = "調べものが失敗しました: " + (job.error || "unknown error");
+        addMessage("assistant", text, { error: true });
+        history.push({ role: "assistant", content: text });
+      }
+    }
+  } catch (e) {
+    // Background job polling should not interrupt chat.
+  }
+}
 async function checkHealth() {
   try {
     const res = await fetch("/api/health");
@@ -137,5 +157,7 @@ async function loadOpener() {
 
 checkHealth();
 setInterval(checkHealth, 15000);
+setInterval(pollJobs, 3000);
 loadOpener();
 inputEl.focus();
+
