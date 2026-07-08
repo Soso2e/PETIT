@@ -65,6 +65,18 @@ CREATE TABLE IF NOT EXISTS calendar_events_cache (
     description TEXT,
     updated_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS handoff_notes (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at      TEXT NOT NULL,
+    current_project TEXT,
+    stopped_at      TEXT,
+    next_action     TEXT NOT NULL,
+    blockers        TEXT,
+    note            TEXT,
+    source          TEXT NOT NULL DEFAULT 'manual'
+);
+
 CREATE TABLE IF NOT EXISTS jobs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     type        TEXT NOT NULL,
@@ -205,6 +217,20 @@ def save_handoff_note(
             "(created_at, current_project, stopped_at, next_action, blockers, note, source) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (now_iso(), current_project, stopped_at, next_action, blockers, note, source),
+        )
+        return int(cur.lastrowid)
+
+
+def recent_handoff_notes(limit: int = 5) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, created_at, current_project, stopped_at, next_action, blockers, note, source "
+            "FROM handoff_notes ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in reversed(rows)]
+
+
 # --- Background jobs ---------------------------------------------------------
 
 def create_job(job_type: str, input_json: str) -> int:

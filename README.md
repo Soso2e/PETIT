@@ -53,14 +53,13 @@ storage/   SQLite などの実行時データ（git 管理外）
 ## 現在使えるツール
 
 - `save_memory` / `search_memory` — 記憶の保存・検索
-- `get_tasks` / `create_task` / `complete_task` — タスクの取得・作成・完了
+- `get_tasks` / `create_task` / `complete_task` — タスクの取得・作成・完了（Notion 設定時は連携）
 - `add_task` — ローカル DB だけに保存する旧タスク追加ツール
-- `get_schedule` — 予定の取得（ローカル DB）
 - `create_handoff_note` / `restore_context` — 中断時の引き継ぎ・復帰
 - `summarize_now` — 未整理の会話を手動要約
-- `get_tasks` / `add_task` — タスクの取得・追加（ローカル DB）
 - `get_schedule` / `add_schedule` — 予定の取得・追加（ローカル DB）
 - `create_daily_briefing` — 予定・タスク・最近の流れから朝ブリーフィングを作成
+- `get_weather` / `search_news` / `start_background_research` — 天気・ニュース取得とバックグラウンド調査キュー
 
 LM Studio が未起動でもサーバーは落ちず、UI 上にエラーを表示します。
 
