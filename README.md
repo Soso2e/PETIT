@@ -42,10 +42,22 @@ storage/   SQLite などの実行時データ（git 管理外）
 | `PETIT_LM_BASE_URL` | `http://localhost:1234/v1` | LM Studio のエンドポイント |
 | `PETIT_LM_MODEL` | `local-model` | 使用モデル名（LM Studio 上の id） |
 | `PETIT_HOST` / `PETIT_PORT` | `127.0.0.1` / `8000` | サーバーの待受 |
+| `NOTION_API_KEY` | なし | Notion インテグレーションの API キー |
+| `NOTION_TASKS_DB_ID` | なし | タスクDBのID |
+| `NOTION_PROP_TITLE` | `name` | タスク名プロパティ |
+| `NOTION_PROP_DUE` | `Date` | 期限/日時プロパティ |
+| `NOTION_PROP_STATUS` | `Status` | 状態プロパティ |
+| `NOTION_PROP_PRIORITY` | `Priority` | 優先度プロパティ |
+| `NOTION_PROP_CATEGORY` | `Category` | 分類プロパティ |
 
 ## 現在使えるツール
 
 - `save_memory` / `search_memory` — 記憶の保存・検索
+- `get_tasks` / `create_task` / `complete_task` — タスクの取得・作成・完了
+- `add_task` — ローカル DB だけに保存する旧タスク追加ツール
+- `get_schedule` — 予定の取得（ローカル DB）
+- `create_handoff_note` / `restore_context` — 中断時の引き継ぎ・復帰
+- `summarize_now` — 未整理の会話を手動要約
 - `get_tasks` / `add_task` — タスクの取得・追加（ローカル DB）
 - `get_schedule` / `add_schedule` — 予定の取得・追加（ローカル DB）
 - `create_daily_briefing` — 予定・タスク・最近の流れから朝ブリーフィングを作成
