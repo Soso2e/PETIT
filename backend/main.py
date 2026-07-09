@@ -1,4 +1,4 @@
-"""FastAPI application: chat API + static frontend.
+﻿"""FastAPI application: chat API + static frontend.
 
 Run with:  uvicorn backend.main:app --reload
 or:        python -m backend.main
@@ -15,7 +15,7 @@ from pydantic import BaseModel
 import logging
 import threading
 
-from . import agent, briefing, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, worker
+from . import agent, briefing, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -43,13 +43,14 @@ def _shutdown() -> None:
 
 
 def _chroma_sync() -> None:
-    """Index existing memory + conversations into Chroma on first startup."""
+    """Index SQLite memory, conversations, and configured Obsidian vaults."""
     try:
         mem_rows = db.all_memory()
         conv_rows = db.recent_conversations(limit=500)
         counts = chroma_client.sync_from_sqlite(mem_rows, conv_rows)
-        if any(counts.values()):
-            log.info("Chroma sync: %s", counts)
+        vault_counts = vault_indexer.index_configured_vaults()
+        if any(counts.values()) or vault_counts.get("chunks"):
+            log.info("Chroma sync: %s vault=%s", counts, vault_counts)
     except Exception as exc:  # noqa: BLE001
         log.debug("Chroma startup sync skipped: %s", exc)
 
@@ -70,10 +71,11 @@ def health() -> dict[str, Any]:
     try:
         mem_count = chroma_client._collection("petit_memory").count()
         conv_count = chroma_client._collection("petit_conversations").count()
+        vault_count = chroma_client._collection("petit_vault").count()
         rag_info: dict[str, Any] = {
             "available": True,
             "embed_model": config.EMBED_MODEL,
-            "indexed": {"memory": mem_count, "conversations": conv_count},
+            "indexed": {"memory": mem_count, "conversations": conv_count, "vault": vault_count},
         }
     except Exception:  # noqa: BLE001
         rag_info = {"available": False, "embed_model": config.EMBED_MODEL}
@@ -93,6 +95,7 @@ def health() -> dict[str, Any]:
             "summaries": len(db.recent_summaries(limit=1000)),
         },
         "markdown": markdown_export.status(),
+        "obsidian_vault": vault_indexer.status(),
     }
 
 
@@ -140,6 +143,10 @@ def summarize() -> dict[str, Any]:
 def summaries(limit: int = 20) -> dict[str, Any]:
     return {"summaries": db.recent_summaries(limit=limit)}
 
+@app.post("/api/vault/sync")
+def sync_obsidian_vault(max_files: int | None = None) -> dict[str, Any]:
+    return vault_indexer.index_configured_vaults(max_files=max_files)
+
 
 @app.get("/api/proactive")
 def proactive_opener() -> dict[str, Any]:
@@ -185,5 +192,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

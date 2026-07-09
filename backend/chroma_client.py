@@ -1,4 +1,4 @@
-"""ChromaDB vector store client for PETIT RAG search.
+﻿"""ChromaDB vector store client for PETIT RAG search.
 
 Design:
 - Persistent store at storage/chroma/
@@ -83,6 +83,16 @@ def add(collection_name: str, doc_id: str, text: str, metadata: dict[str, Any] |
         log.debug("Chroma add failed (%s): %s", collection_name, exc)
         return False
 
+
+def delete_where(collection_name: str, where: dict[str, Any]) -> bool:
+    """Delete documents matching metadata filters. Returns False on any error."""
+    try:
+        col = _collection(collection_name)
+        col.delete(where=where)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Chroma delete failed (%s): %s", collection_name, exc)
+        return False
 
 def query(
     collection_name: str,

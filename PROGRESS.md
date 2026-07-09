@@ -6,6 +6,7 @@
 
 - TimeTree バックアップ: `tools/timetree_backup.py` 実装済みだが本番 E2E 未検証（実認証情報待ち）。カレンダーコード確認は初回だけ対話実行が必要（`timetree-exporter -e your@email.com`）。
 - Notion / RAG / 自律要約 / 記憶注入 / 能動的な opener: 実装済み。実 LM Studio・Notion 接続での動作品質は未確認。
+- Obsidian vault RAG: ault_indexer / petit_vault / sync_obsidian_vault 実装済み。一時vaultのキーワード検索は確認済み。実vault + embedding索引化は未確認。
 - Notion タスク作成・完了更新: 実装済み。一時DBでローカル fallback は確認済み。実 Notion DB への作成/完了更新は未確認。
 - 引き継ぎ / 中断復帰: 実装済み。一時DBで create_handoff_note / restore_context の最小動作は確認済み。実会話での使い勝手は未確認。
 - ニュース / 天気 / バックグラウンドキュー: 実装済み。ツール登録・SQLite キュー・ワーカーモック・外部 API 疎通（ニュース1件、東京天気）は確認済み。LM Studio 経由の意図選択は未確認。
@@ -33,3 +34,8 @@
 | 2026-07-08 | 07:47 | #12 | 朝の初回会話向け実装状況を確認。`create_daily_briefing` / `/api/briefing` は実装済み、天気統合・起床時刻記録・初回おはよう判定は未実装。 |
 | 2026-07-08 | 08:29 | #13 | マージ後のコンフリクト解消結果を確認し、`backend/db.py` の構文破損、ツール import 重複、README / PROGRESS の重複記載を修正。構文・一時DBで最小動作を確認。 |
 
+| 2026-07-09 | 18:18 | #14 | 会話ログからパーソナルデータを作る設計方針を確認。コード変更なし、SQLite/Chroma をAI用正本、Markdown を人間用副本、Notion は公開・手動編集用に分ける案を整理。 |
+| 2026-07-09 | 18:22 | #15 | 既存 Obsidian vault を参照するRAG化方針を確認。コード変更なし、外部Markdownは読み込み用インデックス、会話由来の新情報はSQLite正本とMarkdown副本に追記する案を整理。 |
+| 2026-07-09 | 18:23 | #16 | Markdown の脳みそは既存 Obsidian vault に統一する方針を確認。SQLite は構造化正本、Chroma は検索インデックス、Markdown は vault 内のPETIT領域へ集約する案に更新。 |
+
+| 2026-07-09 | 18:34 | #17 | 既存 Obsidian vault をPETITのMarkdown脳として扱うRAG連携を実装。`vault_indexer`、`petit_vault`、`sync_obsidian_vault`、`/api/vault/sync`、vault配下Markdown出力設定を追加。一時vaultでキーワード検索を確認、実vault + embedding索引化は未確認。 |

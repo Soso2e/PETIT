@@ -1,4 +1,4 @@
-"""The agent loop: intent understanding + tool execution.
+﻿"""The agent loop: intent understanding + tool execution.
 
 Flow (per Concept.md section 7):
   user message -> LLM decides intent -> may emit tool_calls -> we run tools ->
@@ -29,7 +29,7 @@ SYSTEM_PROMPT = """あなたは「PETIT」という名前の、ユーザー専�
 記憶について:
 - あなたは会話を通じてユーザーの情報（好み・作業中の内容・決定事項）を蓄積していく。
 - システムから渡される「PETITが覚えていること」は、あなた自身の記憶として自然に扱う。
-- さらに過去を思い出す必要があるときは search_memory で検索する。
+- さらに過去を思い出す必要があるときは search_memory で検索する。search_memory は会話記憶だけでなく、設定済みの Obsidian vault も検索対象に含む。
 - 「これ覚えておいて」なら save_memory、「ここまでの話まとめて」なら summarize_now を使う。
 - 会話は数時間おきに自動でまとまるため、毎回手動保存しなくてよい。
 

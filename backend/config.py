@@ -1,4 +1,4 @@
-"""Configuration for PETIT. All values can be overridden via environment variables."""
+﻿"""Configuration for PETIT. All values can be overridden via environment variables."""
 from __future__ import annotations
 
 import os
@@ -10,10 +10,29 @@ STORAGE_DIR = Path(os.getenv("PETIT_STORAGE_DIR", BASE_DIR / "storage"))
 DB_PATH = Path(os.getenv("PETIT_DB_PATH", STORAGE_DIR / "app.db"))
 FRONTEND_DIR = BASE_DIR / "frontend"
 
+
+def _path_from_env(name: str, default: Path) -> Path:
+    value = os.getenv(name, "").strip().strip('"')
+    return Path(value) if value else default
+
+
+def _path_list_from_env(name: str) -> list[Path]:
+    value = os.getenv(name, "").strip()
+    if not value:
+        return []
+    return [Path(part.strip().strip('"')) for part in value.split(os.pathsep) if part.strip()]
+
+
+# Existing Obsidian vaults that PETIT can use as its Markdown brain.
+# Windows uses ';' as the separator: C:\VaultA;D:\VaultB
+OBSIDIAN_VAULT_DIRS = _path_list_from_env("PETIT_OBSIDIAN_VAULT_DIRS")
+PETIT_VAULT_SUBDIR = os.getenv("PETIT_VAULT_SUBDIR", "PETIT").strip().strip("/\\") or "PETIT"
+PETIT_VAULT_ROOT = OBSIDIAN_VAULT_DIRS[0] / PETIT_VAULT_SUBDIR if OBSIDIAN_VAULT_DIRS else STORAGE_DIR
+
 # Markdown (Obsidian) export — human-readable / re-usable副本
 # AI が検索する正本は SQLite / Chroma 側。md は人が読む・育てる用。
-AI_DAILY_DIR = Path(os.getenv("PETIT_AI_DAILY_DIR", STORAGE_DIR / "AI_Daily"))
-AI_MEMORY_DIR = Path(os.getenv("PETIT_AI_MEMORY_DIR", STORAGE_DIR / "AI_Memory"))
+AI_DAILY_DIR = _path_from_env("PETIT_AI_DAILY_DIR", PETIT_VAULT_ROOT / "Daily" if OBSIDIAN_VAULT_DIRS else STORAGE_DIR / "AI_Daily")
+AI_MEMORY_DIR = _path_from_env("PETIT_AI_MEMORY_DIR", PETIT_VAULT_ROOT / "Memory" if OBSIDIAN_VAULT_DIRS else STORAGE_DIR / "AI_Memory")
 
 # Server
 HOST = os.getenv("PETIT_HOST", "127.0.0.1")
