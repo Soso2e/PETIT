@@ -72,15 +72,16 @@ PORT = int(os.getenv("PETIT_PORT", "8000"))
 # LM Studio default local server: http://localhost:1234/v1
 LM_BASE_URL = os.getenv("PETIT_LM_BASE_URL", "http://localhost:1234/v1")
 LM_API_KEY = os.getenv("PETIT_LM_API_KEY", "lm-studio")  # LM Studio ignores the key
-LM_MODEL = os.getenv("PETIT_LM_MODEL", "local-model")
+LM_MODEL = os.getenv("PETIT_LM_MODEL", "local-model").strip() or "local-model"
 LM_TEMPERATURE = float(os.getenv("PETIT_LM_TEMPERATURE", "0.7"))
 LM_TIMEOUT = float(os.getenv("PETIT_LM_TIMEOUT", "120"))
-CHAT_MODEL = os.getenv("PETIT_CHAT_MODEL", LM_MODEL)
-AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", CHAT_MODEL)  # compatibility only
+CHAT_MODEL = os.getenv("PETIT_CHAT_MODEL", LM_MODEL).strip() or LM_MODEL
+AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", CHAT_MODEL).strip() or CHAT_MODEL
 AGENT_MESSAGE_CHARS = int(os.getenv("PETIT_AGENT_MESSAGE_CHARS", "280"))
 AGENT_HISTORY_CHARS = int(os.getenv("PETIT_AGENT_HISTORY_CHARS", "1800"))
 DEFER_AGENT_JOBS = False  # compatibility only; deferred agent turns are disabled
-LIGHT_MAX_TOKENS = int(os.getenv("PETIT_LIGHT_MAX_TOKENS", "100"))
+LIGHT_MAX_TOKENS = int(os.getenv("PETIT_LIGHT_MAX_TOKENS", "512"))
+ENABLE_THINKING = os.getenv("PETIT_ENABLE_THINKING", "0") not in ("0", "false", "False")
 
 # Agent
 MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "2"))

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .. import calendar_sync, db
+from .. import calendar_providers, calendar_sync, db
 from .registry import tool
 
 
@@ -42,7 +42,7 @@ def get_schedule(date: str | None = None) -> dict[str, Any]:
 @tool(
     name="add_schedule",
     description=(
-        "新しい予定をローカルに追加する。"
+        "新しい予定をPETITのローカル予定へ追加する。ICS/Google Calendar本体には書き込まない。"
         "「明日15時に歯医者を予定に入れて」のような発話で使う。"
         "start_time / end_time は ISO 形式または YYYY-MM-DD HH:MM 形式。"
     ),
@@ -54,9 +54,15 @@ def get_schedule(date: str | None = None) -> dict[str, Any]:
             "end_time": {"type": "string", "description": "終了日時。任意。"},
             "location": {"type": "string", "description": "場所。任意。"},
             "description": {"type": "string", "description": "メモ。任意。"},
+            "destination": {
+                "type": "string",
+                "description": "書き込み先。現在はlocalのみ。将来google_calendarアダプターを追加可能。",
+                "default": "local",
+            },
         },
         "required": ["title", "start_time"],
     },
+    requires_confirmation=True,
 )
 def add_schedule(
     title: str,
@@ -64,6 +70,7 @@ def add_schedule(
     end_time: str | None = None,
     location: str | None = None,
     description: str | None = None,
+    destination: str = "local",
 ) -> dict[str, Any]:
     title = title.strip()
     start_time = start_time.strip()
@@ -72,24 +79,14 @@ def add_schedule(
     if not start_time:
         return {"added": False, "error": "start_time is required"}
 
-    with db.get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO calendar_events_cache "
-            "(source, title, start_time, end_time, location, description, updated_at) "
-            "VALUES ('local', ?, ?, ?, ?, ?, ?)",
-            (title, start_time, end_time, location, description, db.now_iso()),
-        )
-        event_id = int(cur.lastrowid)
-
-    return {
-        "added": True,
-        "id": event_id,
-        "title": title,
-        "start_time": start_time,
-        "end_time": end_time,
-        "location": location,
-        "description": description,
-    }
+    return calendar_providers.add_event(
+        destination=destination,
+        title=title,
+        start_time=start_time,
+        end_time=end_time,
+        location=location,
+        description=description,
+    )
 
 
 @tool(

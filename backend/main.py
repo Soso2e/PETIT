@@ -10,13 +10,15 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import logging
+import json
 import threading
 import time
+from uuid import uuid4
 
-from . import agent, briefing, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, vault_indexer, worker
+from . import agent, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -59,13 +61,31 @@ def _chroma_sync() -> None:
 class ChatRequest(BaseModel):
     message: str
     history: list[dict[str, str]] | None = None
+    request_id: str | None = None
+
+
+class PendingAction(BaseModel):
+    approval_id: str
+    name: str
+    arguments: dict[str, Any]
 
 
 class ChatResponse(BaseModel):
     reply: str
-    used_tools: list[dict[str, Any]] = []
+    used_tools: list[dict[str, Any]] = Field(default_factory=list)
     error: str | None = None
     model_route: dict[str, Any] | None = None
+    request_id: str | None = None
+    pending_actions: list[PendingAction] = Field(default_factory=list)
+
+
+class ActionDecision(BaseModel):
+    approved: bool
+
+
+_pending_actions: dict[str, dict[str, Any]] = {}
+_pending_actions_lock = threading.Lock()
+_PENDING_ACTION_TTL_SECONDS = 600
 
 
 @app.get("/api/health")
@@ -106,6 +126,8 @@ def health() -> dict[str, Any]:
             **calendar_sync.status(),
             "cached_events": calendar_cached,
             "google_calendar_connected_to_petit": calendar_sync.configured(),
+            "read_adapter": "ics",
+            "write_providers": calendar_providers.available(),
         },
         "model_routing": {
             "chat_model": config.CHAT_MODEL,
@@ -116,46 +138,119 @@ def health() -> dict[str, Any]:
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
+    request_id = (req.request_id or "").strip() or uuid4().hex
     message = (req.message or "").strip()
     if not message:
-        return ChatResponse(reply="", error="メッセージが空です。")
+        return ChatResponse(reply="", error="メッセージが空です。", request_id=request_id)
 
     started = time.monotonic()
     try:
         result = agent.run(message, history=req.history)
     except LMStudioError as exc:
-        return ChatResponse(reply="", error=str(exc))
+        return ChatResponse(reply="", error=str(exc), request_id=request_id)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("chat failed request_id=%s", request_id)
+        return ChatResponse(reply="", error=f"内部処理に失敗しました（{type(exc).__name__}）。", request_id=request_id)
     elapsed_ms = max(0, round((time.monotonic() - started) * 1000))
     model_route = dict(result.get("model_route") or {})
     model_route["elapsed_ms"] = elapsed_ms
 
-    used_tools_str = ", ".join(t["name"] for t in result["used_tools"]) or None
-    conv_id = db.save_conversation(
-        user_text=message,
-        assistant_text=result["reply"],
-        used_tools=used_tools_str,
-    )
-    threading.Thread(
-        target=_persist_chat_artifacts,
-        args=(conv_id, message, result["reply"], used_tools_str),
-        daemon=True,
-    ).start()
+    used_tools = result.get("used_tools") or []
+    used_tools_str = ", ".join(t["name"] for t in used_tools) or None
+    reply = (result.get("reply") or "").strip()
+    pending_actions = _register_pending_actions(result.get("pending_actions") or [])
+    if not reply:
+        return ChatResponse(
+            reply="",
+            error="返答を生成できませんでした。もう一度短く言い換えてください。",
+            model_route=model_route,
+            request_id=request_id,
+        )
+    if result.get("persist", True):
+        conv_id = db.save_conversation(
+            user_text=message,
+            assistant_text=reply,
+            used_tools=used_tools_str,
+        )
+        threading.Thread(
+            target=_persist_chat_artifacts,
+            args=(conv_id, message, reply, used_tools_str),
+            daemon=True,
+        ).start()
     return ChatResponse(
-        reply=result["reply"],
-        used_tools=result["used_tools"],
+        reply=reply,
+        used_tools=used_tools,
         model_route=model_route,
+        request_id=request_id,
+        pending_actions=pending_actions,
     )
+
+
+def _register_pending_actions(actions: list[dict[str, Any]]) -> list[PendingAction]:
+    now = time.monotonic()
+    registered: list[PendingAction] = []
+    with _pending_actions_lock:
+        expired = [key for key, value in _pending_actions.items() if now - value["created_at"] > _PENDING_ACTION_TTL_SECONDS]
+        for key in expired:
+            _pending_actions.pop(key, None)
+        for action in actions:
+            approval_id = uuid4().hex
+            value = {
+                "name": str(action["name"]),
+                "arguments": dict(action.get("arguments") or {}),
+                "created_at": now,
+            }
+            _pending_actions[approval_id] = value
+            registered.append(PendingAction(approval_id=approval_id, name=value["name"], arguments=value["arguments"]))
+    return registered
+
+
+@app.post("/api/actions/{approval_id}", response_model=ChatResponse)
+def decide_action(approval_id: str, decision: ActionDecision) -> ChatResponse:
+    with _pending_actions_lock:
+        action = _pending_actions.pop(approval_id, None)
+    if action is None or time.monotonic() - action["created_at"] > _PENDING_ACTION_TTL_SECONDS:
+        return ChatResponse(reply="", error="確認待ち操作が見つからないか、期限切れです。")
+    if not decision.approved:
+        return ChatResponse(reply="書き込みをキャンセルしました。")
+
+    result = tools.dispatch(action["name"], action["arguments"])
+    if _tool_result_failed(result):
+        return ChatResponse(reply="", error=f"書き込みに失敗しました。{_short_tool_result(result)}")
+    return ChatResponse(
+        reply=f"確認された内容を実行しました。\n{_short_tool_result(result)}",
+        used_tools=[{"name": action["name"], "arguments": action["arguments"]}],
+    )
+
+
+def _tool_result_failed(result: str) -> bool:
+    if result.startswith("[error]"):
+        return True
+    try:
+        data = json.loads(result)
+    except json.JSONDecodeError:
+        return False
+    return isinstance(data, dict) and (
+        bool(data.get("error"))
+        or any(data.get(key) is False for key in ("ok", "created", "completed", "added", "saved", "updated"))
+    )
+
+
+def _short_tool_result(result: str) -> str:
+    return result if len(result) <= 600 else result[:600] + "…"
 
 
 def _persist_chat_artifacts(conv_id: int, message: str, reply: str, used_tools: str | None) -> None:
     """Best-effort side effects that must not block chat responses."""
     timestamp = db.now_iso()
-    chroma_client.add(
-        "petit_conversations",
-        doc_id=f"conv_{conv_id}",
-        text=f"ユーザー: {message}\nPETIT: {reply}",
-        metadata={"timestamp": timestamp},
-    )
+    # Casual chat is stored as history but does not trigger RAG embedding.
+    if used_tools:
+        chroma_client.add(
+            "petit_conversations",
+            doc_id=f"conv_{conv_id}",
+            text=f"ユーザー: {message}\nPETIT: {reply}",
+            metadata={"timestamp": timestamp},
+        )
     markdown_export.append_conversation_turn(
         user_text=message,
         assistant_text=reply,

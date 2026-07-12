@@ -99,9 +99,13 @@ def summarize_pending(kind: str = "interval", min_conversations: int | None = No
         return {"summarized": False, "reason": "lm_unavailable", "error": str(exc)}
 
     raw = (message.get("content") or "").strip()
+    if not raw:
+        return {"summarized": False, "reason": "empty_model_response"}
     parsed = _extract_json(raw)
 
     summary_text = str(parsed.get("summary", "")).strip() or raw[:500]
+    if not summary_text:
+        return {"summarized": False, "reason": "empty_summary"}
     facts = _as_str_list(parsed.get("facts"))
     wip = _as_str_list(parsed.get("work_in_progress"))
     all_facts = facts + [f"作業中: {w}" for w in wip]

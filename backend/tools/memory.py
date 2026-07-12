@@ -30,6 +30,7 @@ from .registry import tool
         },
         "required": ["content"],
     },
+    requires_confirmation=True,
 )
 def save_memory(content: str, type: str = "note") -> dict[str, Any]:
     now = db.now_iso()
@@ -188,6 +189,7 @@ def search_memory(query: str, limit: int = 8, include_vault: bool = True) -> dic
         "「ここまでの話まとめておいて」「今の状況を記録して」のような発話で使う。"
     ),
     parameters={"type": "object", "properties": {}},
+    requires_confirmation=True,
 )
 def summarize_now() -> dict[str, Any]:
     # Imported lazily to avoid a circular import (summarizer -> tools 経由)

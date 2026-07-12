@@ -88,6 +88,8 @@ def _run_agent_followup(payload: dict[str, Any]) -> str:
     result = agent.run(message, history=history, allow_defer=False)
     used_tools_str = ", ".join(t["name"] for t in result["used_tools"]) or None
     reply = result["reply"]
+    if not reply.strip():
+        return ""
     conv_id = db.save_conversation(
         user_text=f"[follow-up] {message}",
         assistant_text=reply,

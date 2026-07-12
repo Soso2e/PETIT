@@ -24,6 +24,7 @@ from .registry import tool
         },
         "required": ["next_action"],
     },
+    requires_confirmation=True,
 )
 def create_handoff_note(
     next_action: str,
