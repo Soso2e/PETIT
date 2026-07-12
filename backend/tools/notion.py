@@ -9,11 +9,15 @@ needs to call one tool.
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from .. import config, db
 from ..notion_client import NotionError, query_database
 from .registry import tool
+
+_last_sync_monotonic: float | None = None
+
 
 
 def _upsert_tasks(tasks: list[dict[str, Any]]) -> int:
@@ -30,27 +34,62 @@ def _upsert_tasks(tasks: list[dict[str, Any]]) -> int:
             ).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE tasks_cache SET title=?, status=?, due_date=?, priority=?, updated_at=? "
+                    "UPDATE tasks_cache SET title=?, status=?, due_date=?, priority=?, "
+                    "category=?, reason=?, url=?, done_date=?, updated_at=? "
                     "WHERE external_id=?",
-                    (t["title"], t["status"], t["due_date"], t["priority"], now, t["external_id"]),
+                    (
+                        t["title"],
+                        t["status"],
+                        t["due_date"],
+                        t["priority"],
+                        t.get("category"),
+                        t.get("reason"),
+                        t.get("url"),
+                        t.get("done_date"),
+                        now,
+                        t["external_id"],
+                    ),
                 )
             else:
                 conn.execute(
-                    "INSERT INTO tasks_cache (source, title, status, due_date, priority, external_id, updated_at) "
-                    "VALUES ('notion', ?, ?, ?, ?, ?, ?)",
-                    (t["title"], t["status"], t["due_date"], t["priority"], t["external_id"], now),
+                    "INSERT INTO tasks_cache "
+                    "(source, title, status, due_date, priority, category, reason, external_id, url, done_date, updated_at) "
+                    "VALUES ('notion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        t["title"],
+                        t["status"],
+                        t["due_date"],
+                        t["priority"],
+                        t.get("category"),
+                        t.get("reason"),
+                        t["external_id"],
+                        t.get("url"),
+                        t.get("done_date"),
+                        now,
+                    ),
                 )
     return len(tasks)
 
 
-def sync_if_configured() -> dict[str, Any] | None:
-    """Run a Notion sync silently. Returns a result dict or None if not configured."""
+def sync_if_configured(force: bool = False) -> dict[str, Any] | None:
+    """Refresh Notion with a short TTL so normal chat does not hammer the API."""
+    global _last_sync_monotonic
     if not config.notion_configured():
         return None
+    now = time.monotonic()
+    if (
+        not force
+        and _last_sync_monotonic is not None
+        and now - _last_sync_monotonic < config.NOTION_SYNC_TTL_SECONDS
+    ):
+        with db.get_connection() as conn:
+            cached_count = int(conn.execute("SELECT COUNT(*) FROM tasks_cache WHERE source = 'notion'").fetchone()[0])
+        return {"synced": cached_count, "source": "notion", "cached": True}
     try:
         tasks = query_database()
         count = _upsert_tasks(tasks)
-        return {"synced": count, "source": "notion"}
+        _last_sync_monotonic = now
+        return {"synced": count, "source": "notion", "cached": False}
     except NotionError as exc:
         return {"synced": 0, "error": str(exc)}
 
@@ -65,7 +104,8 @@ def sync_if_configured() -> dict[str, Any] | None:
     parameters={"type": "object", "properties": {}},
 )
 def sync_notion_tasks() -> dict[str, Any]:
-    if not config.notion_configured():
+    result = sync_if_configured(force=True)
+    if result is None:
         return {
             "synced": 0,
             "error": (
@@ -73,9 +113,6 @@ def sync_notion_tasks() -> dict[str, Any]:
                 "環境変数 NOTION_API_KEY と NOTION_TASKS_DB_ID を設定してください。"
             ),
         }
-    try:
-        tasks = query_database()
-        count = _upsert_tasks(tasks)
-        return {"synced": count, "source": "notion", "message": f"{count} 件のタスクを同期しました。"}
-    except NotionError as exc:
-        return {"synced": 0, "error": str(exc)}
+    if result.get("error"):
+        return result
+    return {**result, "message": f"{result.get('synced', 0)} 件のタスクを同期しました。"}

@@ -1,4 +1,4 @@
-"""ChromaDB vector store client for PETIT RAG search.
+﻿"""ChromaDB vector store client for PETIT RAG search.
 
 Design:
 - Persistent store at storage/chroma/
@@ -12,6 +12,10 @@ Design:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+import time
+import threading
+from collections import OrderedDict
 from typing import Any
 
 import chromadb
@@ -22,6 +26,16 @@ from . import config
 
 log = logging.getLogger(__name__)
 
+
+@dataclass
+class EmbeddingStats:
+    requests: int = 0
+    inputs: int = 0
+    last_elapsed_ms: int | None = None
+
+
+_embedding_stats = EmbeddingStats()
+
 # ---------------------------------------------------------------------------
 # Custom embedding function — calls LM Studio /v1/embeddings
 # ---------------------------------------------------------------------------
@@ -30,23 +44,43 @@ class LMStudioEmbeddingFunction(EmbeddingFunction):
     """Thin wrapper around LM Studio's OpenAI-compatible embeddings endpoint."""
 
     def __call__(self, input: list[str]) -> Embeddings:  # type: ignore[override]
-        url = f"{config.EMBED_BASE_URL.rstrip('/')}/embeddings"
-        payload = {"model": config.EMBED_MODEL, "input": input}
-        headers = {"Authorization": f"Bearer {config.LM_API_KEY}"}
-        resp = httpx.post(url, json=payload, headers=headers, timeout=config.EMBED_TIMEOUT)
-        resp.raise_for_status()
-        data = resp.json()
-        # OpenAI format: {"data": [{"index": 0, "embedding": [...]}, ...]}
-        return [item["embedding"] for item in sorted(data["data"], key=lambda x: x["index"])]
+        # Serialize cache misses so concurrent identical requests share one call.
+        with _embedding_lock:
+            cached = [_embedding_cache.get(text) for text in input]
+            missing = list(dict.fromkeys(text for text, value in zip(input, cached) if value is None))
+            if not missing:
+                return [value for value in cached if value is not None]
+            url = f"{config.EMBED_BASE_URL.rstrip('/')}/embeddings"
+            payload = {"model": config.EMBED_MODEL, "input": missing}
+            headers = {"Authorization": f"Bearer {config.LM_API_KEY}"}
+            start = time.monotonic()
+            resp = httpx.post(url, json=payload, headers=headers, timeout=config.EMBED_TIMEOUT)
+            resp.raise_for_status()
+            _embedding_stats.requests += 1
+            _embedding_stats.inputs += len(missing)
+            _embedding_stats.last_elapsed_ms = max(0, round((time.monotonic() - start) * 1000))
+            data = resp.json()
+            # OpenAI format: {"data": [{"index": 0, "embedding": [...]}, ...]}
+            for item in sorted(data["data"], key=lambda x: x["index"]):
+                text = missing[item["index"]]
+                _embedding_cache[text] = item["embedding"]
+                _embedding_cache.move_to_end(text)
+            while len(_embedding_cache) > _EMBEDDING_CACHE_SIZE:
+                _embedding_cache.popitem(last=False)
+            return [_embedding_cache[text] for text in input]
 
 
 _embedding_fn = LMStudioEmbeddingFunction()
+_embedding_cache: OrderedDict[str, list[float]] = OrderedDict()
+_embedding_lock = threading.Lock()
+_EMBEDDING_CACHE_SIZE = 128
 
 # ---------------------------------------------------------------------------
 # Client & collections (lazy init)
 # ---------------------------------------------------------------------------
 
 _client: chromadb.ClientAPI | None = None
+_embedding_unavailable_until = 0.0
 
 
 def _get_client() -> chromadb.ClientAPI:
@@ -69,18 +103,59 @@ def _collection(name: str) -> chromadb.Collection:
 # Public helpers
 # ---------------------------------------------------------------------------
 
+def _embedding_available() -> bool:
+    return time.monotonic() >= _embedding_unavailable_until
+
+
+def _mark_embedding_unavailable() -> None:
+    global _embedding_unavailable_until
+    _embedding_unavailable_until = time.monotonic() + config.EMBED_RETRY_SECONDS
+
+
 def add(collection_name: str, doc_id: str, text: str, metadata: dict[str, Any] | None = None) -> bool:
     """Embed and upsert a single document. Returns False on any error (LLM down etc.)."""
+    return add_many(collection_name, [(doc_id, text, metadata or {})]) == 1
+
+
+def add_many(collection_name: str, docs: list[tuple[str, str, dict[str, Any]]]) -> int:
+    """Embed and upsert documents in one Chroma call. Returns indexed count."""
+    if not _embedding_available():
+        return 0
+    if not docs:
+        return 0
     try:
         col = _collection(collection_name)
         col.upsert(
-            ids=[doc_id],
-            documents=[text],
-            metadatas=[metadata or {}],
+            ids=[doc_id for doc_id, _, _ in docs],
+            documents=[text for _, text, _ in docs],
+            metadatas=[metadata for _, _, metadata in docs],
         )
-        return True
+        return len(docs)
     except Exception as exc:  # noqa: BLE001
         log.debug("Chroma add failed (%s): %s", collection_name, exc)
+        _mark_embedding_unavailable()
+        return 0
+
+
+def delete_where(collection_name: str, where: dict[str, Any]) -> bool:
+    """Delete documents matching metadata filters. Returns False on any error."""
+    try:
+        col = _collection(collection_name)
+        col.delete(where=where)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Chroma delete failed (%s): %s", collection_name, exc)
+        return False
+
+def delete_ids(collection_name: str, ids: list[str]) -> bool:
+    """Delete documents by id. Empty input is a successful no-op."""
+    if not ids:
+        return True
+    try:
+        _collection(collection_name).delete(ids=ids)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Chroma delete ids failed (%s): %s", collection_name, exc)
         return False
 
 
@@ -93,6 +168,8 @@ def query(
 
     Each result: {id, document, distance, metadata}
     """
+    if not _embedding_available():
+        return None
     try:
         col = _collection(collection_name)
         # Don't query an empty collection — ChromaDB raises if n_results > count
@@ -115,6 +192,7 @@ def query(
         return out
     except Exception as exc:  # noqa: BLE001
         log.debug("Chroma query failed (%s): %s", collection_name, exc)
+        _mark_embedding_unavailable()
         return None
 
 
@@ -124,28 +202,39 @@ def sync_from_sqlite(memory_rows: list[dict[str, Any]], conv_rows: list[dict[str
     Skips gracefully if embeddings are unavailable.
     Returns counts of indexed items per collection.
     """
-    mem_count = 0
-    conv_count = 0
-
-    for row in memory_rows:
-        ok = add(
-            "petit_memory",
-            doc_id=f"mem_{row['id']}",
-            text=row["content"],
-            metadata={"type": row.get("type", "note"), "created_at": row.get("created_at", "")},
+    mem_docs = [
+        (
+            f"mem_{row['id']}",
+            row["content"],
+            {"type": row.get("type", "note"), "created_at": row.get("created_at", "")},
         )
-        if ok:
-            mem_count += 1
-
-    for row in conv_rows:
-        text = f"ユーザー: {row['user_text']}\nPETIT: {row['assistant_text']}"
-        ok = add(
-            "petit_conversations",
-            doc_id=f"conv_{row['id']}",
-            text=text,
-            metadata={"timestamp": row.get("timestamp", "")},
+        for row in memory_rows
+    ]
+    conv_docs = [
+        (
+            f"conv_{row['id']}",
+            f"ユーザー: {row['user_text']}\nPETIT: {row['assistant_text']}",
+            {"timestamp": row.get("timestamp", "")},
         )
-        if ok:
-            conv_count += 1
+        for row in conv_rows
+    ]
 
-    return {"memory": mem_count, "conversations": conv_count}
+    return {
+        "memory": add_many("petit_memory", mem_docs),
+        "conversations": add_many("petit_conversations", conv_docs),
+    }
+
+
+def embedding_stats() -> dict[str, int | None]:
+    return {
+        "requests": _embedding_stats.requests,
+        "inputs": _embedding_stats.inputs,
+        "last_elapsed_ms": _embedding_stats.last_elapsed_ms,
+    }
+
+
+def reset_embedding_stats() -> None:
+    _embedding_stats.requests = 0
+    _embedding_stats.inputs = 0
+    _embedding_stats.last_elapsed_ms = None
+    _embedding_cache.clear()

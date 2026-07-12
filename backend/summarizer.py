@@ -93,15 +93,19 @@ def summarize_pending(kind: str = "interval", min_conversations: int | None = No
 
     try:
         # temperature low for stable JSON
-        message = chat_completion(messages, tools=None, temperature=0.2)
+        message = chat_completion(messages, tools=None, temperature=0.2, model=config.AGENT_MODEL)
     except LMStudioError as exc:
         log.info("Summarization skipped (LM Studio unavailable): %s", exc)
         return {"summarized": False, "reason": "lm_unavailable", "error": str(exc)}
 
     raw = (message.get("content") or "").strip()
+    if not raw:
+        return {"summarized": False, "reason": "empty_model_response"}
     parsed = _extract_json(raw)
 
     summary_text = str(parsed.get("summary", "")).strip() or raw[:500]
+    if not summary_text:
+        return {"summarized": False, "reason": "empty_summary"}
     facts = _as_str_list(parsed.get("facts"))
     wip = _as_str_list(parsed.get("work_in_progress"))
     all_facts = facts + [f"作業中: {w}" for w in wip]

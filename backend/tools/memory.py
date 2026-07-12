@@ -1,14 +1,14 @@
 """Memory tools: save and search notes the user wants PETIT to remember.
 
 search_memory uses ChromaDB semantic search (RAG) when LM Studio embeddings
-are available, and falls back to SQLite LIKE search transparently.
+are available, and falls back to SQLite / Markdown keyword search transparently.
 save_memory writes to SQLite (source of truth) and also indexes into Chroma.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from .. import chroma_client, db
+from .. import chroma_client, db, vault_indexer
 from .registry import tool
 
 
@@ -30,6 +30,7 @@ from .registry import tool
         },
         "required": ["content"],
     },
+    requires_confirmation=True,
 )
 def save_memory(content: str, type: str = "note") -> dict[str, Any]:
     now = db.now_iso()
@@ -54,7 +55,7 @@ def save_memory(content: str, type: str = "note") -> dict[str, Any]:
 @tool(
     name="search_memory",
     description=(
-        "過去に保存した記憶や会話ログを意味的に検索する（RAG）。"
+        "過去に保存した記憶・会話ログ・要約・Obsidian vaultを意味的に検索する（RAG）。"
         "「昨日何してたっけ？」「前に話した○○」「○○について覚えてる？」のような発話で使う。"
     ),
     parameters={
@@ -62,19 +63,29 @@ def save_memory(content: str, type: str = "note") -> dict[str, Any]:
         "properties": {
             "query": {"type": "string", "description": "検索したい内容・質問"},
             "limit": {"type": "integer", "description": "最大件数", "default": 8},
+            "include_vault": {
+                "type": "boolean",
+                "description": "既存Obsidian vaultも検索対象に含めるか",
+                "default": True,
+            },
         },
         "required": ["query"],
     },
 )
-def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
+def search_memory(query: str, limit: int = 8, include_vault: bool = True) -> dict[str, Any]:
     # --- Semantic search (RAG) ---
     mem_results = chroma_client.query("petit_memory", query, n_results=limit)
     conv_results = chroma_client.query("petit_conversations", query, n_results=limit)
     sum_results = chroma_client.query("petit_summaries", query, n_results=limit)
+    vault_results = (
+        chroma_client.query(vault_indexer.COLLECTION_NAME, query, n_results=limit)
+        if include_vault
+        else []
+    )
 
     # Use semantic results only if at least one collection actually returned matches.
     # None = embedding failed (LM Studio down); [] = no matches or empty collection.
-    has_semantic = bool(mem_results) or bool(conv_results) or bool(sum_results)
+    has_semantic = bool(mem_results) or bool(conv_results) or bool(sum_results) or bool(vault_results)
 
     if has_semantic:
         memories = [
@@ -103,16 +114,28 @@ def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
             }
             for r in (sum_results or [])
         ]
+        vault_notes = [
+            {
+                "text": r["document"],
+                "source_path": r["metadata"].get("source_path", ""),
+                "relative_path": r["metadata"].get("relative_path", ""),
+                "heading": r["metadata"].get("heading", ""),
+                "modified_at": r["metadata"].get("modified_at", ""),
+                "relevance": round(1 - r["distance"], 3),
+            }
+            for r in (vault_results or [])
+        ]
         return {
             "query": query,
             "search_type": "semantic",
             "memories": memories,
             "conversations": conversations,
             "summaries": summaries,
-            "found": len(memories) + len(conversations) + len(summaries),
+            "vault_notes": vault_notes,
+            "found": len(memories) + len(conversations) + len(summaries) + len(vault_notes),
         }
 
-    # --- Fallback: SQLite LIKE search ---
+    # --- Fallback: SQLite LIKE search + Markdown keyword search ---
     like = f"%{query}%"
     with db.get_connection() as conn:
         mem_rows = conn.execute(
@@ -146,6 +169,7 @@ def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
         {"summary": r["summary"], "created_at": r["created_at"], "kind": r["kind"]}
         for r in sum_rows
     ]
+    vault_notes = vault_indexer.keyword_search(query, limit=limit) if include_vault else []
     return {
         "query": query,
         "search_type": "keyword",
@@ -153,7 +177,8 @@ def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
         "memories": memories,
         "conversations": conversations,
         "summaries": summaries,
-        "found": len(memories) + len(conversations) + len(summaries),
+        "vault_notes": vault_notes,
+        "found": len(memories) + len(conversations) + len(summaries) + len(vault_notes),
     }
 
 
@@ -164,9 +189,30 @@ def search_memory(query: str, limit: int = 8) -> dict[str, Any]:
         "「ここまでの話まとめておいて」「今の状況を記録して」のような発話で使う。"
     ),
     parameters={"type": "object", "properties": {}},
+    requires_confirmation=True,
 )
 def summarize_now() -> dict[str, Any]:
     # Imported lazily to avoid a circular import (summarizer -> tools 経由)
     from .. import summarizer
 
     return summarizer.summarize_pending(kind="interval")
+
+
+@tool(
+    name="sync_obsidian_vault",
+    description=(
+        "設定済みの既存Obsidian vaultを読み直し、MarkdownノートをRAG検索用にChromaへ索引化する。"
+        "vaultにノートを追加・編集した後、すぐPETITに反映したいときに使う。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "max_files": {
+                "type": "integer",
+                "description": "今回同期する最大Markdownファイル数。未指定なら設定値を使う。",
+            }
+        },
+    },
+)
+def sync_obsidian_vault(max_files: int | None = None) -> dict[str, Any]:
+    return vault_indexer.index_configured_vaults(max_files=max_files)

@@ -9,7 +9,7 @@ const statusEl = document.getElementById("status");
 // In-memory conversation history sent back to the model for context.
 const history = [];
 
-function addMessage(role, text, { tools, error } = {}) {
+function addMessage(role, text, { tools, error, actions } = {}) {
   const wrap = document.createElement("div");
   wrap.className = `msg msg--${role}`;
 
@@ -25,9 +25,44 @@ function addMessage(role, text, { tools, error } = {}) {
     bubble.appendChild(t);
   }
 
+  if (actions && actions.length) {
+    const controls = document.createElement("div");
+    controls.className = "action-confirm";
+    const approve = document.createElement("button");
+    approve.type = "button";
+    approve.textContent = "実行する";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "キャンセル";
+    controls.append(approve, cancel);
+    bubble.appendChild(controls);
+    approve.addEventListener("click", () => decideAction(actions[0].approval_id, true, controls));
+    cancel.addEventListener("click", () => decideAction(actions[0].approval_id, false, controls));
+  }
+
   messagesEl.appendChild(wrap);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return bubble;
+}
+
+async function decideAction(approvalId, approved, controls) {
+  for (const button of controls.querySelectorAll("button")) button.disabled = true;
+  try {
+    const res = await fetch(`/api/actions/${approvalId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approved }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      addMessage("assistant", "⚠️ " + data.error, { error: true });
+      return;
+    }
+    addMessage("assistant", data.reply, { tools: data.used_tools });
+    history.push({ role: "assistant", content: data.reply });
+  } catch (e) {
+    addMessage("assistant", "⚠️ 確認操作に失敗しました: " + e.message, { error: true });
+  }
 }
 
 function setTyping(on) {
@@ -46,6 +81,26 @@ function setTyping(on) {
   }
 }
 
+
+async function pollJobs() {
+  try {
+    const res = await fetch("/api/jobs?limit=10&mark_delivered=true");
+    const data = await res.json();
+    for (const job of data.jobs || []) {
+      if (job.status === "done") {
+        const text = job.result_text || "調べ終わったけど、結果が空でした。";
+        addMessage("assistant", "調べ終わったよ。\n" + text);
+        history.push({ role: "assistant", content: text });
+      } else if (job.status === "failed") {
+        const text = "調べものが失敗しました: " + (job.error || "unknown error");
+        addMessage("assistant", text, { error: true });
+        history.push({ role: "assistant", content: text });
+      }
+    }
+  } catch (e) {
+    // Background job polling should not interrupt chat.
+  }
+}
 async function checkHealth() {
   try {
     const res = await fetch("/api/health");
@@ -65,8 +120,8 @@ async function checkHealth() {
 }
 
 async function sendMessage(text) {
+  const requestId = crypto.randomUUID();
   addMessage("user", text);
-  history.push({ role: "user", content: text });
 
   setTyping(true);
   sendEl.disabled = true;
@@ -75,16 +130,22 @@ async function sendMessage(text) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history: history.slice(0, -1) }),
+      body: JSON.stringify({ message: text, history, request_id: requestId }),
     });
     const data = await res.json();
     setTyping(false);
 
+    if (data.request_id !== requestId) {
+      throw new Error("応答のrequest IDが一致しません");
+    }
     if (data.error) {
       addMessage("assistant", "⚠️ " + data.error, { error: true });
     } else {
-      addMessage("assistant", data.reply, { tools: data.used_tools });
-      history.push({ role: "assistant", content: data.reply });
+      history.push({ role: "user", content: text });
+      if (data.reply) {
+        addMessage("assistant", data.reply, { tools: data.used_tools, actions: data.pending_actions });
+        history.push({ role: "assistant", content: data.reply });
+      }
     }
   } catch (e) {
     setTyping(false);
@@ -136,6 +197,8 @@ async function loadOpener() {
 }
 
 checkHealth();
-setInterval(checkHealth, 15000);
+setInterval(checkHealth, 60000);
+setInterval(pollJobs, 3000);
 loadOpener();
 inputEl.focus();
+

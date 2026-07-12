@@ -14,7 +14,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from . import db
+from . import briefing, db
 from .lmstudio_client import LMStudioError, chat_completion
 
 log = logging.getLogger(__name__)
@@ -51,6 +51,19 @@ def _context_block() -> tuple[str, list[str]]:
 def generate_opener() -> dict[str, Any]:
     """Generate one proactive opening line. Never raises."""
     tod = _time_of_day()
+    if tod == "朝":
+        daily = briefing.create_daily_briefing()
+        return {
+            "message": daily["message"],
+            "kind": "morning_briefing",
+            "time_of_day": tod,
+            "sources": {
+                "tasks": len(daily.get("tasks", [])),
+                "events": len(daily.get("events", [])),
+                "notion_sync": daily.get("notion_sync"),
+                "calendar": daily.get("calendar_source_status"),
+            },
+        }
     latest, wip = _context_block()
 
     context_lines = [f"今は{tod}。"]
