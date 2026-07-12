@@ -2,7 +2,7 @@
 
 Importing this package registers all built-in tools.
 """
-from . import briefing, context, memory, notion, schedule, tasks  # noqa: F401  (import for side-effect registration)
+from . import briefing, context, current_time, memory, notion, schedule, tasks  # noqa: F401  (import for side-effect registration)
 from .. import web_tools  # noqa: F401  (register web/news/weather tools)
 from .registry import dispatch, openai_tools_schema, registered_names
 

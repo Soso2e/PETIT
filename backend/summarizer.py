@@ -93,7 +93,7 @@ def summarize_pending(kind: str = "interval", min_conversations: int | None = No
 
     try:
         # temperature low for stable JSON
-        message = chat_completion(messages, tools=None, temperature=0.2)
+        message = chat_completion(messages, tools=None, temperature=0.2, model=config.AGENT_MODEL)
     except LMStudioError as exc:
         log.info("Summarization skipped (LM Studio unavailable): %s", exc)
         return {"summarized": False, "reason": "lm_unavailable", "error": str(exc)}

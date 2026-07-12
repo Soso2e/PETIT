@@ -124,7 +124,7 @@ def _parse_page(page: dict[str, Any]) -> dict[str, Any]:
     priority = _extract_select(props.get(config.NOTION_PROP_PRIORITY))
     categories = _extract_multi_select(props.get(config.NOTION_PROP_CATEGORY))
     reason = _extract_text(props.get(config.NOTION_PROP_REASON))
-    done = _extract_date(props.get(config.NOTION_PROP_DONE))
+    done = _extract_date(props.get(config.NOTION_PROP_DONE_DATE))
     return {
         "external_id": page.get("id", ""),
         "title": title,
@@ -191,7 +191,7 @@ def _task_properties(
     if reason is not None:
         props[config.NOTION_PROP_REASON] = _rich_text_prop(reason)
     if done_date is not None:
-        props[config.NOTION_PROP_DONE] = _date_prop(done_date)
+        props[config.NOTION_PROP_DONE_DATE] = _date_prop(done_date)
     return props
 
 

@@ -1,4 +1,4 @@
-﻿"""Configuration for PETIT. All values can be overridden via environment variables."""
+"""Configuration for PETIT. All values can be overridden via environment variables."""
 from __future__ import annotations
 
 import os
@@ -6,6 +6,29 @@ from pathlib import Path
 
 # Project paths
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_project_env() -> None:
+    """Load simple KEY=VALUE entries from the project .env if present."""
+    env_file = BASE_DIR / ".env"
+    if not env_file.is_file():
+        return
+    for raw_line in env_file.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        key, separator, value = line.partition("=")
+        if not separator or not key.strip():
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        os.environ.setdefault(key.strip(), value)
+
+
+_load_project_env()
 STORAGE_DIR = Path(os.getenv("PETIT_STORAGE_DIR", BASE_DIR / "storage"))
 DB_PATH = Path(os.getenv("PETIT_DB_PATH", STORAGE_DIR / "app.db"))
 FRONTEND_DIR = BASE_DIR / "frontend"
@@ -21,6 +44,13 @@ def _path_list_from_env(name: str) -> list[Path]:
     if not value:
         return []
     return [Path(part.strip().strip('"')) for part in value.split(os.pathsep) if part.strip()]
+
+
+def _list_from_env(name: str) -> list[str]:
+    value = os.getenv(name, "").strip()
+    if not value:
+        return []
+    return [part.strip().strip('"') for part in value.split(os.pathsep) if part.strip()]
 
 
 # Existing Obsidian vaults that PETIT can use as its Markdown brain.
@@ -45,6 +75,11 @@ LM_API_KEY = os.getenv("PETIT_LM_API_KEY", "lm-studio")  # LM Studio ignores the
 LM_MODEL = os.getenv("PETIT_LM_MODEL", "local-model")
 LM_TEMPERATURE = float(os.getenv("PETIT_LM_TEMPERATURE", "0.7"))
 LM_TIMEOUT = float(os.getenv("PETIT_LM_TIMEOUT", "120"))
+CHAT_MODEL = os.getenv("PETIT_CHAT_MODEL", LM_MODEL)
+AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", LM_MODEL)
+AGENT_MESSAGE_CHARS = int(os.getenv("PETIT_AGENT_MESSAGE_CHARS", "280"))
+AGENT_HISTORY_CHARS = int(os.getenv("PETIT_AGENT_HISTORY_CHARS", "1800"))
+DEFER_AGENT_JOBS = os.getenv("PETIT_DEFER_AGENT_JOBS", "1") not in ("0", "false", "False")
 
 # Agent
 MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "5"))
@@ -61,6 +96,7 @@ SUMMARY_MIN_CONVERSATIONS = int(os.getenv("PETIT_SUMMARY_MIN_CONVERSATIONS", "1"
 EMBED_BASE_URL = os.getenv("PETIT_EMBED_BASE_URL", LM_BASE_URL)
 EMBED_MODEL = os.getenv("PETIT_EMBED_MODEL", "nomic-embed-text")
 EMBED_TIMEOUT = float(os.getenv("PETIT_EMBED_TIMEOUT", "30"))
+EMBED_RETRY_SECONDS = float(os.getenv("PETIT_EMBED_RETRY_SECONDS", "60"))
 
 # ChromaDB persistent path
 CHROMA_PATH = Path(os.getenv("PETIT_CHROMA_PATH", STORAGE_DIR / "chroma"))
@@ -75,10 +111,19 @@ NOTION_PROP_DUE = os.getenv("NOTION_PROP_DUE", "Date")
 NOTION_PROP_PRIORITY = os.getenv("NOTION_PROP_PRIORITY", "Priority")
 NOTION_PROP_CATEGORY = os.getenv("NOTION_PROP_CATEGORY", "Category")
 NOTION_PROP_REASON = os.getenv("NOTION_PROP_REASON", "reason")
-NOTION_PROP_DONE = os.getenv("NOTION_PROP_DONE", "Done")
+NOTION_PROP_DONE_DATE = os.getenv("NOTION_PROP_DONE_DATE", os.getenv("NOTION_PROP_DONE", "Done"))
+# Backward-compatible alias for code or local .env files using the old name.
+NOTION_PROP_DONE = NOTION_PROP_DONE_DATE
 
 NOTION_DEFAULT_STATUS = os.getenv("NOTION_DEFAULT_STATUS", "Yet")
 NOTION_DONE_STATUS = os.getenv("NOTION_DONE_STATUS", "Done")
+NOTION_SYNC_TTL_SECONDS = float(os.getenv("NOTION_SYNC_TTL_SECONDS", "300"))
+
+# Calendar read-only sync.
+# Google Calendar can expose private iCal/ICS URLs; local .ics files are also accepted.
+CALENDAR_ICS_URLS = _list_from_env("PETIT_CALENDAR_ICS_URLS")
+CALENDAR_ICS_FILES = _path_list_from_env("PETIT_CALENDAR_ICS_FILES")
+CALENDAR_SYNC_TTL_SECONDS = float(os.getenv("PETIT_CALENDAR_SYNC_TTL_SECONDS", "300"))
 
 
 def notion_configured() -> bool:

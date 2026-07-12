@@ -4,14 +4,17 @@
 
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書きしてよい。
 
+- プロダクトの軸は `PETIT_AS_JARVIS`。最終形はスマホとPCの両方から使える音声中心の常駐アシスタントで、現状はテキストチャットMVPを土台にしている。
 - TimeTree バックアップ: `tools/timetree_backup.py` 実装済みだが本番 E2E 未検証（実認証情報待ち）。カレンダーコード確認は初回だけ対話実行が必要（`timetree-exporter -e your@email.com`）。
-- Notion / RAG / 自律要約 / 記憶注入 / 能動的な opener: 実装済み。実 LM Studio・Notion 接続での動作品質は未確認。
-- Obsidian vault RAG: ault_indexer / petit_vault / sync_obsidian_vault 実装済み。一時vaultのキーワード検索は確認済み。実vault + embedding索引化は未確認。
-- Notion タスク作成・完了更新: 実装済み。一時DBでローカル fallback は確認済み。実 Notion DB への作成/完了更新は未確認。
-- 引き継ぎ / 中断復帰: 実装済み。一時DBで create_handoff_note / restore_context の最小動作は確認済み。実会話での使い勝手は未確認。
-- ニュース / 天気 / バックグラウンドキュー: 実装済み。ツール登録・SQLite キュー・ワーカーモック・外部 API 疎通（ニュース1件、東京天気）は確認済み。LM Studio 経由の意図選択は未確認。
-- 朝の初回会話: `create_daily_briefing` / `/api/briefing` は実装済み。天気統合・起床時刻記録・初回おはよう判定は未実装。
-- 次にやること: 実 `.env` で Notion タスク作成/完了更新を E2E 確認 → TimeTree を E2E 確認 → 実 LM Studio で PETIT の会話品質・ブリーフィング・キュー選択を確認 → 必要なら launchd（Mac）/ cron（Linux）で毎日自動実行を有効化。
+- Notion: PETIT本体から実タスクDB 124件の読み取りとSQLite同期を確認済み。計画系会話と朝ブリーフィングは読み取り同期を通り、5分TTLで再利用する。作成・完了更新の実Notion書き込みE2Eは未確認。
+- BRAIN / RAG: 実vault 290チャンクを確認。Embedding停止時でも自然な日本語質問から関連ノートを順位付き検索して会話へ少数件注入できる。`_private`・添付・内部設定は索引対象外。実Embedding検索はLM Studio停止中のため未確認。
+- 能動支援: 予定・優先順位・期限などの相談でNotionタスクと予定キャッシュを自動収集し、朝のopenerはブリーフィングを返す。外部サービスへの書き込みは明示確認後のみ。
+- 二モデル構成: 会話モデルとエージェントモデルのルーター、長文・ツール・複雑処理の判定、エージェント回答を会話モデルで整える受け渡しを実装。現在の`.env`では両方とも `qwen/qwen3.5-9b` へフォールバックしており、別モデルでの実動作は未確認。
+- 応答速度改善: `PETIT_DEFER_AGENT_JOBS=1` の場合、読み取り系の重い相談は軽量モデルで先に短く返し、`agent_followup` Job 完了後に追加返答する。標準テストは確認済み、実LM Studio + ブラウザでの体感確認は未確認。
+- Google Calendar: Codex側コネクタの認証はPETITへ共有されないため、PETIT側は `PETIT_CALENDAR_ICS_URLS` / `PETIT_CALENDAR_ICS_FILES` からICSを読み取る同期アダプターを実装済み。サンプルICSで単体確認済み、実Google非公開iCal URLでの同期E2Eは未確認。
+- LM Studio: `/v1/models` は到達可能でモデル一覧を取得できる。tool実行後の再問い合わせは、LM Studioの一部Jinjaテンプレートで `role: tool` を処理できないため、ツール結果をユーザーfollow-upとして返す互換形式へ変更済み。構文と単体テスト8件は確認済み。実モデルでの「調べて」系最小実行はReadTimeoutで完走未確認、ブラウザ会話E2Eも未確認。
+- 次にやること: LM Studio側で会話モデル/エージェントモデルの応答速度とロード状態を確認 → PETITを再起動してブラウザ会話E2E → Google Calendarの非公開iCal URLまたはエクスポートICSを設定して `/api/calendar/sync` E2E → 週次レビュー／停滞プロジェクト検出を追加。
+
 ## 履歴
 
 変更を加えるたびに1行追記する（追記専用・既存行は触らない）。時刻は UTC。
@@ -39,3 +42,15 @@
 | 2026-07-09 | 18:23 | #16 | Markdown の脳みそは既存 Obsidian vault に統一する方針を確認。SQLite は構造化正本、Chroma は検索インデックス、Markdown は vault 内のPETIT領域へ集約する案に更新。 |
 
 | 2026-07-09 | 18:34 | #17 | 既存 Obsidian vault をPETITのMarkdown脳として扱うRAG連携を実装。`vault_indexer`、`petit_vault`、`sync_obsidian_vault`、`/api/vault/sync`、vault配下Markdown出力設定を追加。一時vaultでキーワード検索を確認、実vault + embedding索引化は未確認。 |
+| 2026-07-10 | 09:12 | #18 | 現在時刻取得の実装状況を確認。現状は `agent.py` で日付のみ注入、正確な現在時刻取得ツールは未実装。コード変更なし。 |
+| 2026-07-10 | 09:14 | #19 | `get_current_time` ツールを追加し、現在時刻・日付を聞かれたら使うよう agent ルールと README を更新。構文・ツール登録・実行を確認。 |
+
+| 2026-07-12 | 18:44 | #20 | NotionタスクDBの`.env`設定を更新し、完了日プロパティ`DoneDate`をコード・サンプル設定・READMEへ反映。実Notion E2Eは未確認。 |
+| 2026-07-12 | 18:49 | #21 | プロジェクトルートの`.env`をPETIT起動時に自動読込する処理を追加。明示的なOS環境変数を優先。構文と設定読込のスモーク確認済み。 |
+| 2026-07-11 | 19:31 | #22 | LM Studioの実エンドポイントを確認し、`.env` の `PETIT_LM_BASE_URL` に `/v1` を追加。モデル一覧取得と単純なチャット応答を確認済み。PETITブラウザ画面での再確認は未実施。 |
+| 2026-07-12 | 05:50 | #23 | 専用アシスタント環境を再監査・再構築。BRAIN関連検索と自動注入、Notion状況同期/TTL、朝ブリーフィング、二モデルルーティング/受け渡し、Embedding障害時保護、連携状態可視化を実装。単体4件・実Notion読取・実vault検索を確認、Google Calendar本体同期と実LM会話は未確認。 |
+
+| 2026-07-12 | 13:38 | #24 | PETIT_AS_JARVIS を最終像として明示し、スマホ利用とPC常駐を含む音声中心アシスタントへコンセプト表現を調整。 |
+| 2026-07-12 | 13:56 | #25 | Google Calendar向けICS読み取り同期を実装。`sync_calendar`ツール、`/api/calendar/sync`、朝ブリーフィング/状況注入への同期、README/.env例、単体テストを追加。実Google iCal URLでのE2Eは未確認。 |
+| 2026-07-12 | 17:09 | #26 | 軽量モデル即答 + `agent_followup` Job追記を実装。読み取り系の重い相談を遅延実行できるようにし、構文確認と標準 unittest 7件を確認。実LM Studio + ブラウザ体感は未確認。 |
+| 2026-07-12 | 17:28 | #27 | LM StudioのJinjaテンプレート互換性対策として、tool実行結果を`role: tool`ではなくユーザーfollow-up形式で再投入するよう修正。構文確認と標準 unittest 8件は確認済み、実モデル完走はReadTimeoutで未確認。 |

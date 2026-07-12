@@ -53,10 +53,13 @@ def get_worker() -> JobWorker:
 def _process_job(job: dict[str, Any]) -> None:
     job_id = int(job["id"])
     try:
-        if job["type"] != "background_research":
-            raise ValueError(f"unknown job type: {job['type']}")
         payload = json.loads(job.get("input_json") or "{}")
-        result = _run_background_research(payload)
+        if job["type"] == "background_research":
+            result = _run_background_research(payload)
+        elif job["type"] == "agent_followup":
+            result = _run_agent_followup(payload)
+        else:
+            raise ValueError(f"unknown job type: {job['type']}")
         db.finish_job(job_id, result)
     except Exception as exc:  # noqa: BLE001
         db.fail_job(job_id, str(exc))
@@ -72,3 +75,34 @@ def _run_background_research(payload: dict[str, Any]) -> str:
     query = payload.get("query") or payload.get("location") or "最新ニュース"
     result = web_sources.search_news(str(query), int(payload.get("limit") or 5))
     return web_sources.format_news(result)
+
+
+def _run_agent_followup(payload: dict[str, Any]) -> str:
+    message = str(payload.get("message") or "").strip()
+    history = payload.get("history") or []
+    if not message:
+        raise ValueError("agent_followup requires message")
+
+    from . import agent, chroma_client, markdown_export
+
+    result = agent.run(message, history=history, allow_defer=False)
+    used_tools_str = ", ".join(t["name"] for t in result["used_tools"]) or None
+    reply = result["reply"]
+    conv_id = db.save_conversation(
+        user_text=f"[follow-up] {message}",
+        assistant_text=reply,
+        used_tools=used_tools_str,
+    )
+    chroma_client.add(
+        "petit_conversations",
+        doc_id=f"conv_{conv_id}",
+        text=f"ユーザー: {message}\nPETIT追加: {reply}",
+        metadata={"timestamp": db.now_iso(), "kind": "agent_followup"},
+    )
+    markdown_export.append_conversation_turn(
+        user_text=f"[follow-up] {message}",
+        assistant_text=reply,
+        used_tools=used_tools_str,
+        timestamp=db.now_iso(),
+    )
+    return reply

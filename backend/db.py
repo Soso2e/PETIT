@@ -103,7 +103,8 @@ def get_connection() -> sqlite3.Connection:
 
 def init_db() -> None:
     Path(config.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    with get_connection() as conn:
+    conn = get_connection()
+    try:
         conn.executescript(SCHEMA)
         _ensure_columns(
             conn,
@@ -115,6 +116,9 @@ def init_db() -> None:
                 "done_date": "TEXT",
             },
         )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:

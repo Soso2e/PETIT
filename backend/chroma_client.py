@@ -12,6 +12,7 @@ Design:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import chromadb
@@ -47,6 +48,7 @@ _embedding_fn = LMStudioEmbeddingFunction()
 # ---------------------------------------------------------------------------
 
 _client: chromadb.ClientAPI | None = None
+_embedding_unavailable_until = 0.0
 
 
 def _get_client() -> chromadb.ClientAPI:
@@ -69,8 +71,19 @@ def _collection(name: str) -> chromadb.Collection:
 # Public helpers
 # ---------------------------------------------------------------------------
 
+def _embedding_available() -> bool:
+    return time.monotonic() >= _embedding_unavailable_until
+
+
+def _mark_embedding_unavailable() -> None:
+    global _embedding_unavailable_until
+    _embedding_unavailable_until = time.monotonic() + config.EMBED_RETRY_SECONDS
+
+
 def add(collection_name: str, doc_id: str, text: str, metadata: dict[str, Any] | None = None) -> bool:
     """Embed and upsert a single document. Returns False on any error (LLM down etc.)."""
+    if not _embedding_available():
+        return False
     try:
         col = _collection(collection_name)
         col.upsert(
@@ -81,6 +94,7 @@ def add(collection_name: str, doc_id: str, text: str, metadata: dict[str, Any] |
         return True
     except Exception as exc:  # noqa: BLE001
         log.debug("Chroma add failed (%s): %s", collection_name, exc)
+        _mark_embedding_unavailable()
         return False
 
 
@@ -94,6 +108,18 @@ def delete_where(collection_name: str, where: dict[str, Any]) -> bool:
         log.debug("Chroma delete failed (%s): %s", collection_name, exc)
         return False
 
+def delete_ids(collection_name: str, ids: list[str]) -> bool:
+    """Delete documents by id. Empty input is a successful no-op."""
+    if not ids:
+        return True
+    try:
+        _collection(collection_name).delete(ids=ids)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Chroma delete ids failed (%s): %s", collection_name, exc)
+        return False
+
+
 def query(
     collection_name: str,
     text: str,
@@ -103,6 +129,8 @@ def query(
 
     Each result: {id, document, distance, metadata}
     """
+    if not _embedding_available():
+        return None
     try:
         col = _collection(collection_name)
         # Don't query an empty collection — ChromaDB raises if n_results > count
@@ -125,6 +153,7 @@ def query(
         return out
     except Exception as exc:  # noqa: BLE001
         log.debug("Chroma query failed (%s): %s", collection_name, exc)
+        _mark_embedding_unavailable()
         return None
 
 

@@ -1,4 +1,4 @@
-﻿"""FastAPI application: chat API + static frontend.
+"""FastAPI application: chat API + static frontend.
 
 Run with:  uvicorn backend.main:app --reload
 or:        python -m backend.main
@@ -15,7 +15,7 @@ from pydantic import BaseModel
 import logging
 import threading
 
-from . import agent, briefing, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, vault_indexer, worker
+from . import agent, briefing, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -64,6 +64,7 @@ class ChatResponse(BaseModel):
     reply: str
     used_tools: list[dict[str, Any]] = []
     error: str | None = None
+    model_route: dict[str, Any] | None = None
 
 
 @app.get("/api/health")
@@ -79,6 +80,9 @@ def health() -> dict[str, Any]:
         }
     except Exception:  # noqa: BLE001
         rag_info = {"available": False, "embed_model": config.EMBED_MODEL}
+
+    with db.get_connection() as conn:
+        calendar_cached = int(conn.execute("SELECT COUNT(*) FROM calendar_events_cache").fetchone()[0])
 
     return {
         "status": "ok",
@@ -96,6 +100,15 @@ def health() -> dict[str, Any]:
         },
         "markdown": markdown_export.status(),
         "obsidian_vault": vault_indexer.status(),
+        "calendar": {
+            **calendar_sync.status(),
+            "cached_events": calendar_cached,
+            "google_calendar_connected_to_petit": calendar_sync.configured(),
+        },
+        "model_routing": {
+            "chat_model": config.CHAT_MODEL,
+            "agent_model": config.AGENT_MODEL,
+        },
     }
 
 
@@ -130,7 +143,11 @@ def chat(req: ChatRequest) -> ChatResponse:
         used_tools=used_tools_str,
         timestamp=db.now_iso(),
     )
-    return ChatResponse(reply=result["reply"], used_tools=result["used_tools"])
+    return ChatResponse(
+        reply=result["reply"],
+        used_tools=result["used_tools"],
+        model_route=result.get("model_route"),
+    )
 
 
 @app.post("/api/summarize")
@@ -158,6 +175,12 @@ def proactive_opener() -> dict[str, Any]:
 def daily_briefing(date: str | None = None) -> dict[str, Any]:
     """Daily briefing: schedule + tasks + recent memory -> one next action."""
     return briefing.create_daily_briefing(date)
+
+
+@app.post("/api/calendar/sync")
+def sync_calendar(force: bool = True) -> dict[str, Any]:
+    """Read configured calendar sources into the local schedule cache."""
+    return calendar_sync.sync_if_configured(force=force)
 
 
 @app.get("/api/conversations")

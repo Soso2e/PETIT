@@ -7,10 +7,11 @@ Flow (per Concept.md section 7):
 from __future__ import annotations
 
 from datetime import date
+import json
 from typing import Any
 
-from . import config, recall, tools
-from .lmstudio_client import chat_completion
+from . import config, db, model_router, recall, situation, tools
+from .lmstudio_client import LMStudioError, chat_completion
 
 SYSTEM_PROMPT = """あなたは「PETIT」という名前の、ユーザー専用のパーソナルアシスタントです。
 ユーザーの相棒として、横にいる人間のように自然に話します。
@@ -41,8 +42,12 @@ SYSTEM_PROMPT = """あなたは「PETIT」という名前の、ユーザー専�
 - 「どこまでやったっけ」「続きに戻りたい」「復帰したい」なら restore_context を使う。
 
 ルール:
-- 雑談や挨拶にはツールを使わず自然に応答する。
-- タスク・予定・記憶・ニュース・天気に関する具体的な要求があるときだけツールを呼ぶ。
+- 明示されなくても、回答がユーザーの状況・過去の判断・進行中プロジェクトに依存するなら、BRAIN・タスク・予定を確認する。
+- 単純な雑談には不要なツールを使わない。ただし朝の挨拶や「何をすればいい？」は状況確認が必要な相談として扱う。
+- 会話から未記録の約束、期限、決定、次の行動を見つけたら、勝手に書き込まず「タスク／記録にする？」と短く提案する。
+- カレンダー、Notion、メールなど外部サービスへの追加・更新・削除は、ユーザーの明示的な確認後にだけ行う。
+- ツール・長文・複数段階の判断はエージェントモデル、短い会話は会話モデルで処理される。
+- 「今何時？」「今日何日？」「今の時間」のように現在時刻・日付を聞かれたら get_current_time を使う。
 - 天気やニュースをすぐ答えるときは get_weather / search_news を使う。
 - 「調べておいて」「分かったら教えて」「会話を続けながら調べたい」意図なら start_background_research を使い、まず短く受け付けたことを返す。
 - ツールの結果は日本語で分かりやすく、会話の流れで伝える。
@@ -50,55 +55,168 @@ SYSTEM_PROMPT = """あなたは「PETIT」という名前の、ユーザー専�
 """
 
 
-def _build_messages(user_message: str, history: list[dict[str, str]] | None) -> list[dict[str, Any]]:
+def _build_messages(
+    user_message: str,
+    history: list[dict[str, str]] | None,
+    *,
+    include_context: bool = True,
+) -> list[dict[str, Any]]:
     today = date.today().isoformat()
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": SYSTEM_PROMPT + f"\n\n今日の日付: {today}"},
     ]
-    # Always-on memory: inject what PETIT remembers that's relevant to this turn.
-    recall_block = recall.build_recall_block(user_message)
-    if recall_block:
-        messages.append({"role": "system", "content": recall_block})
+    if include_context:
+        # Agent turns can spend time collecting context. Simple chat stays fast.
+        recall_block = recall.build_recall_block(user_message)
+        situation_block = situation.build_context_block(user_message)
+        if situation_block:
+            messages.append({"role": "system", "content": situation_block})
+        if recall_block:
+            messages.append({"role": "system", "content": recall_block})
     if history:
         messages.extend(history)
     messages.append({"role": "user", "content": user_message})
     return messages
 
 
-def run(user_message: str, history: list[dict[str, str]] | None = None) -> dict[str, Any]:
+def _present_agent_reply(reply: str, route: dict[str, Any]) -> str:
+    """Let the chat model present agent output without changing its substance."""
+    if not reply or route["kind"] != "agent" or config.CHAT_MODEL == route["model"]:
+        return reply
+    try:
+        message = chat_completion(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "あなたはPETITの会話・つなぎ担当。エージェントの回答を自然で読みやすい日本語に整える。"
+                        "事実、数値、警告、未確認事項、次の行動は削除・変更しない。新しい事実を足さない。"
+                    ),
+                },
+                {"role": "user", "content": reply},
+            ],
+            tools=None,
+            model=config.CHAT_MODEL,
+            temperature=0.5,
+        )
+    except LMStudioError:
+        return reply
+    presented = (message.get("content") or "").strip()
+    if presented:
+        route["presented_by"] = config.CHAT_MODEL
+        return presented
+    return reply
+
+
+def _quick_deferred_reply(user_message: str, history: list[dict[str, str]] | None) -> str:
+    message = chat_completion(
+        [
+            {
+                "role": "system",
+                "content": (
+                    "あなたはPETITの軽量会話担当。ユーザーの相談にまず短く返す。"
+                    "詳しい確認はバックグラウンドで続く前提で、1〜2文だけ返す。"
+                    "未確認の事実やデータは断定しない。"
+                ),
+            },
+            *(history or [])[-6:],
+            {"role": "user", "content": user_message},
+        ],
+        tools=None,
+        model=config.CHAT_MODEL,
+        temperature=0.6,
+    )
+    reply = (message.get("content") or "").strip()
+    return reply or "先に短く返すね。詳しい確認は裏で続けて、分かったら追加で出す。"
+
+
+def _build_tool_result_message(user_message: str, results: list[dict[str, str]]) -> dict[str, str]:
+    lines = [
+        "以下は、元のユーザー発話に対してPython側で実行したツール結果です。",
+        f"元のユーザー発話: {user_message}",
+        "この結果を使って、ユーザーへ自然な日本語で返答してください。",
+    ]
+    for item in results:
+        lines.extend(
+            [
+                "",
+                f"ツール: {item['name']}",
+                f"引数: {item['arguments']}",
+                f"結果: {item['content']}",
+            ]
+        )
+    return {"role": "user", "content": "\n".join(lines)}
+
+
+def _queue_agent_followup(user_message: str, history: list[dict[str, str]] | None) -> int:
+    payload = {"message": user_message, "history": history or []}
+    return db.create_job("agent_followup", json.dumps(payload, ensure_ascii=False))
+
+
+def run(
+    user_message: str,
+    history: list[dict[str, str]] | None = None,
+    *,
+    allow_defer: bool = True,
+) -> dict[str, Any]:
     """Run one turn. Returns {reply, used_tools}.
 
     May raise LMStudioError if the model backend is unreachable; the caller
     is expected to translate that into a friendly response.
     """
-    messages = _build_messages(user_message, history)
+    route = model_router.choose(user_message, history)
+    if config.DEFER_AGENT_JOBS and allow_defer and model_router.can_defer(user_message, route):
+        job_id = _queue_agent_followup(user_message, history)
+        quick_reply = _quick_deferred_reply(user_message, history)
+        return {
+            "reply": quick_reply,
+            "used_tools": [{"name": "agent_followup", "arguments": json.dumps({"job_id": job_id})}],
+            "model_route": {
+                **route,
+                "deferred": True,
+                "job_id": job_id,
+                "presented_by": config.CHAT_MODEL,
+            },
+        }
+
+    messages = _build_messages(user_message, history, include_context=route["kind"] == "agent")
     tool_schema = tools.openai_tools_schema()
+    active_tools = tool_schema if route["kind"] == "agent" else None
     used_tools: list[dict[str, Any]] = []
 
     for _ in range(config.MAX_TOOL_ITERATIONS):
-        message = chat_completion(messages, tools=tool_schema)
+        message = chat_completion(messages, tools=active_tools, model=route["model"])
         tool_calls = message.get("tool_calls") or []
 
         if not tool_calls:
-            return {"reply": (message.get("content") or "").strip(), "used_tools": used_tools}
+            reply = _present_agent_reply((message.get("content") or "").strip(), route)
+            return {
+                "reply": reply,
+                "used_tools": used_tools,
+                "model_route": route,
+            }
 
-        # Record the assistant's tool-call turn, then execute each call.
-        messages.append(message)
+        tool_results: list[dict[str, str]] = []
         for call in tool_calls:
             fn = call.get("function", {})
             name = fn.get("name", "")
             args = fn.get("arguments", "{}")
             result = tools.dispatch(name, args)
             used_tools.append({"name": name, "arguments": args})
-            messages.append(
+            tool_results.append(
                 {
-                    "role": "tool",
-                    "tool_call_id": call.get("id", name),
                     "name": name,
+                    "arguments": args,
                     "content": result,
                 }
             )
+        messages.append(_build_tool_result_message(user_message, tool_results))
 
     # Ran out of iterations: ask the model for a final answer without tools.
-    final = chat_completion(messages, tools=None)
-    return {"reply": (final.get("content") or "").strip(), "used_tools": used_tools}
+    final = chat_completion(messages, tools=None, model=route["model"])
+    reply = _present_agent_reply((final.get("content") or "").strip(), route)
+    return {
+        "reply": reply,
+        "used_tools": used_tools,
+        "model_route": route,
+    }

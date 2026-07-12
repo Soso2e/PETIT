@@ -10,7 +10,7 @@ from datetime import date as date_type
 from datetime import datetime
 from typing import Any
 
-from . import db
+from . import calendar_sync, db
 from .lmstudio_client import LMStudioError, chat_completion
 
 log = logging.getLogger(__name__)
@@ -28,6 +28,8 @@ _SYSTEM = """あなたはユーザー専用アシスタント「PETIT」。
 def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
     """Create a compact daily briefing for target_date (YYYY-MM-DD)."""
     day = target_date or date_type.today().isoformat()
+    notion_sync = _sync_notion()
+    calendar_sync_status = calendar_sync.sync_if_configured()
     events = _events_for(day)
     tasks = _open_tasks(day)
     summaries = db.recent_summaries(limit=2)
@@ -38,6 +40,9 @@ def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
         "tasks": tasks,
         "recent_summaries": summaries,
         "next_action": next_action,
+        "notion_sync": notion_sync,
+        "calendar_sync": calendar_sync_status,
+        "calendar_source_status": _calendar_source_status(events, calendar_sync_status),
     }
 
     try:
@@ -72,7 +77,7 @@ def _open_tasks(day: str, limit: int = 8) -> list[dict[str, Any]]:
     with db.get_connection() as conn:
         rows = conn.execute(
             "SELECT id, source, title, status, due_date, priority FROM tasks_cache "
-            "WHERE lower(status) NOT IN ('done', '完了') "
+            "WHERE lower(status) NOT IN ('done', 'cancelled', 'chancel', '完了') "
             "AND (due_date IS NULL OR due_date <= ?) "
             "ORDER BY (due_date IS NULL), due_date ASC, "
             "CASE lower(priority) WHEN 'high' THEN 0 WHEN 'mid' THEN 1 WHEN 'medium' THEN 1 ELSE 2 END "
@@ -80,6 +85,24 @@ def _open_tasks(day: str, limit: int = 8) -> list[dict[str, Any]]:
             (day, limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def _sync_notion() -> dict[str, Any] | None:
+    """Refresh the read cache before building a briefing."""
+    try:
+        from .tools.notion import sync_if_configured
+
+        return sync_if_configured()
+    except Exception as exc:  # noqa: BLE001
+        return {"synced": 0, "error": type(exc).__name__}
+
+
+def _calendar_source_status(events: list[dict[str, Any]], sync_status: dict[str, Any]) -> str:
+    if sync_status.get("configured"):
+        if sync_status.get("errors") and not sync_status.get("synced"):
+            return "sync_failed_or_empty"
+        return "synced" if events else "synced_empty"
+    return "cached" if events else "not_synced_or_empty"
 
 
 def _pick_next_action(
@@ -106,7 +129,7 @@ def _format_context(context: dict[str, Any]) -> str:
         place = f" @ {event['location']}" if event.get("location") else ""
         lines.append(f"- {time} {event['title']}{place}")
     if not context["events"]:
-        lines.append("- なし")
+        lines.append("- キャッシュ0件（Googleカレンダー未同期の可能性があるため『予定なし』とは断定しない）")
 
     lines.append("未完了タスク:")
     for task in context["tasks"][:8]:

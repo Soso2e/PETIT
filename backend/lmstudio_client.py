@@ -16,6 +16,7 @@ def chat_completion(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
     temperature: float | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Call the chat completions endpoint and return the first choice's message.
 
@@ -24,7 +25,7 @@ def chat_completion(
     """
     url = f"{config.LM_BASE_URL.rstrip('/')}/chat/completions"
     payload: dict[str, Any] = {
-        "model": config.LM_MODEL,
+        "model": model or config.CHAT_MODEL,
         "messages": messages,
         "temperature": config.LM_TEMPERATURE if temperature is None else temperature,
         "stream": False,

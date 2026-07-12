@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .. import db
+from .. import calendar_sync, db
 from .registry import tool
 
 
@@ -26,6 +26,7 @@ from .registry import tool
     },
 )
 def get_schedule(date: str | None = None) -> dict[str, Any]:
+    sync_status = calendar_sync.sync_if_configured()
     sql = "SELECT id, source, title, start_time, end_time, location FROM calendar_events_cache"
     params: list[Any] = []
     if date:
@@ -35,7 +36,7 @@ def get_schedule(date: str | None = None) -> dict[str, Any]:
     with db.get_connection() as conn:
         rows = conn.execute(sql, params).fetchall()
     events = [dict(r) for r in rows]
-    return {"date": date, "count": len(events), "events": events}
+    return {"date": date, "count": len(events), "events": events, "calendar_sync": sync_status}
 
 
 @tool(
@@ -89,3 +90,20 @@ def add_schedule(
         "location": location,
         "description": description,
     }
+
+
+@tool(
+    name="sync_calendar",
+    description=(
+        "設定済みのGoogle Calendar iCal/ICS URLまたはローカル.icsファイルから、"
+        "予定キャッシュを読み取り専用で同期する。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "force": {"type": "boolean", "description": "TTLを無視して再同期するか。既定はtrue。"},
+        },
+    },
+)
+def sync_calendar(force: bool = True) -> dict[str, Any]:
+    return calendar_sync.sync_if_configured(force=force)
