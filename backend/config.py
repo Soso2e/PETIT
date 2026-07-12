@@ -76,13 +76,14 @@ LM_MODEL = os.getenv("PETIT_LM_MODEL", "local-model")
 LM_TEMPERATURE = float(os.getenv("PETIT_LM_TEMPERATURE", "0.7"))
 LM_TIMEOUT = float(os.getenv("PETIT_LM_TIMEOUT", "120"))
 CHAT_MODEL = os.getenv("PETIT_CHAT_MODEL", LM_MODEL)
-AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", LM_MODEL)
+AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", CHAT_MODEL)  # compatibility only
 AGENT_MESSAGE_CHARS = int(os.getenv("PETIT_AGENT_MESSAGE_CHARS", "280"))
 AGENT_HISTORY_CHARS = int(os.getenv("PETIT_AGENT_HISTORY_CHARS", "1800"))
-DEFER_AGENT_JOBS = os.getenv("PETIT_DEFER_AGENT_JOBS", "1") not in ("0", "false", "False")
+DEFER_AGENT_JOBS = False  # compatibility only; deferred agent turns are disabled
+LIGHT_MAX_TOKENS = int(os.getenv("PETIT_LIGHT_MAX_TOKENS", "100"))
 
 # Agent
-MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "5"))
+MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "2"))
 
 # Autonomous summarization (background scheduler)
 # 何時間おきに会話を自動でまとめて蓄積するか。2〜3時間 / 1日 などを想定。

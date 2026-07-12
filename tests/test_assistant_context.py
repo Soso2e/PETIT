@@ -45,7 +45,7 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertEqual(calls[0], {"tools": None, "model": "chat-test"})
         recall.assert_not_called()
 
-    def test_agent_model_receives_tools(self) -> None:
+    def test_explicit_request_receives_only_related_tools(self) -> None:
         calls = []
 
         def fake_chat(messages, tools=None, temperature=None, model=None):
@@ -61,11 +61,12 @@ class ModelRoutingTests(unittest.TestCase):
             patch.object(agent.situation, "build_context_block", return_value=""),
         ):
             result = agent.run("今日のタスクを確認して")
-        self.assertEqual(result["model_route"]["kind"], "agent")
-        self.assertEqual(calls[0]["model"], "agent-test")
+        self.assertEqual(result["model_route"]["kind"], "chat")
+        self.assertEqual(calls[0]["model"], "chat-test")
         self.assertTrue(calls[0]["tools"])
-        self.assertEqual(calls[1], {"tools": None, "model": "chat-test"})
-        self.assertEqual(result["model_route"]["presented_by"], "chat-test")
+        names = {item["function"]["name"] for item in calls[0]["tools"]}
+        self.assertEqual(names, {"get_tasks"})
+        self.assertEqual(len(calls), 1)
 
     def test_tool_results_are_returned_as_user_followup_for_lmstudio_templates(self) -> None:
         calls = []
@@ -102,10 +103,10 @@ class ModelRoutingTests(unittest.TestCase):
         second_messages = calls[1]["messages"]
         self.assertFalse(any(message.get("role") == "tool" for message in second_messages))
         self.assertEqual(second_messages[-1]["role"], "user")
-        self.assertIn("元のユーザー発話: AIについて調べて", second_messages[-1]["content"])
+        self.assertIn("元の発話: AIについて調べて", second_messages[-1]["content"])
         self.assertIn("ツール: search_news", second_messages[-1]["content"])
 
-    def test_deferable_agent_turn_queues_followup(self) -> None:
+    def test_deferable_agent_turn_is_not_queued(self) -> None:
         calls = []
 
         def fake_chat(messages, tools=None, temperature=None, model=None):
@@ -117,15 +118,12 @@ class ModelRoutingTests(unittest.TestCase):
             patch.object(config, "AGENT_MODEL", "agent-test"),
             patch.object(config, "DEFER_AGENT_JOBS", True),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
-            patch.object(agent, "_queue_agent_followup", return_value=123),
         ):
             result = agent.run("今日のタスクを確認して")
 
-        self.assertEqual(calls, [{"tools": None, "model": "chat-test"}])
-        self.assertEqual(result["model_route"]["kind"], "agent")
-        self.assertTrue(result["model_route"]["deferred"])
-        self.assertEqual(result["model_route"]["job_id"], 123)
-        self.assertEqual(result["used_tools"][0]["name"], "agent_followup")
+        self.assertEqual(calls[0]["model"], "chat-test")
+        self.assertFalse(result["model_route"].get("deferred", False))
+        self.assertNotEqual(result["used_tools"][0]["name"] if result["used_tools"] else None, "agent_followup")
 
 
 class VaultSearchTests(unittest.TestCase):

@@ -1,59 +1,22 @@
-﻿"""The agent loop: intent understanding + tool execution.
+"""Minimal conversation flow for PETIT.
 
-Flow (per Concept.md section 7):
-  user message -> LLM decides intent -> may emit tool_calls -> we run tools ->
-  feed results back -> LLM produces a natural-language reply.
+The default path is deliberately boring: one chat-model call, a short prompt,
+and only the last five conversation turns.  Retrieval and situation gathering
+are opt-in through explicit tool routing.
 """
 from __future__ import annotations
 
-from datetime import date
 import json
 from typing import Any
 
-from . import config, db, model_router, recall, situation, tools
+from . import config, db, recall, situation, tools  # recall/situation kept import-compatible; never used for chat
 from .lmstudio_client import LMStudioError, chat_completion
 
-SYSTEM_PROMPT = """あなたは「PETIT」という名前の、ユーザー専用のパーソナルアシスタントです。
-ユーザーの相棒として、横にいる人間のように自然に話します。
-
-話し方（人間味）:
-- 友達のように、砕けすぎず堅すぎない口調で話す。一人称は「私」。
-- 短く返す。聞かれていないことまで長々と説明しない。1〜3文が基本。
-- 相槌・共感・軽い感情のリアクションを入れる（「いいね」「お、進んだね」「それは大変だったね」など）。
-- 覚えていることがあれば自然に織り込む（「そういえば昨日の○○、どうなった？」）。ただし記憶を一覧で読み上げない。
-- 機械的な箇条書きの羅列は避ける。タスクが多いときだけ整理する。
-
-有能さ（ここは崩さない）:
-- 情報を全部出すのではなく、必要なら「今やる1個」「次」「後で」に絞って次に動きやすくする。
-- ユーザーを管理・指図するのではなく、補助輪として支える。
-
-記憶について:
-- あなたは会話を通じてユーザーの情報（好み・作業中の内容・決定事項）を蓄積していく。
-- システムから渡される「PETITが覚えていること」は、あなた自身の記憶として自然に扱う。
-- さらに過去を思い出す必要があるときは search_memory で検索する。search_memory は会話記憶だけでなく、設定済みの Obsidian vault も検索対象に含む。
-- 「これ覚えておいて」なら save_memory、「ここまでの話まとめて」なら summarize_now を使う。
-- 会話は数時間おきに自動でまとまるため、毎回手動保存しなくてよい。
-
-タスク・復帰:
-- 「○○をタスクにして」「明日○○やる」なら create_task を使う。分類が明らかなら Category を入れる。
-  分類が曖昧でユーザーが分類を重視していそうなら、無理に決めず短く確認する。
-- 「終わった」「完了にして」なら complete_task を使う。対象が曖昧なら候補を確認する。
-- 「ここまで引き継ぎ」「中断する」「明日再開できるように」なら create_handoff_note を使う。
-- 「どこまでやったっけ」「続きに戻りたい」「復帰したい」なら restore_context を使う。
-
-ルール:
-- 明示されなくても、回答がユーザーの状況・過去の判断・進行中プロジェクトに依存するなら、BRAIN・タスク・予定を確認する。
-- 単純な雑談には不要なツールを使わない。ただし朝の挨拶や「何をすればいい？」は状況確認が必要な相談として扱う。
-- 会話から未記録の約束、期限、決定、次の行動を見つけたら、勝手に書き込まず「タスク／記録にする？」と短く提案する。
-- カレンダー、Notion、メールなど外部サービスへの追加・更新・削除は、ユーザーの明示的な確認後にだけ行う。
-- ツール・長文・複数段階の判断はエージェントモデル、短い会話は会話モデルで処理される。
-- 「今何時？」「今日何日？」「今の時間」のように現在時刻・日付を聞かれたら get_current_time を使う。
-- 天気やニュースをすぐ答えるときは get_weather / search_news を使う。
-- 「調べておいて」「分かったら教えて」「会話を続けながら調べたい」意図なら start_background_research を使い、まず短く受け付けたことを返す。
-- ツールの結果は日本語で分かりやすく、会話の流れで伝える。
-- 分からないことは正直に、でも相棒らしく伝える。
-"""
-
+SYSTEM_PROMPT = (
+    "あなたはPETIT。ユーザー専用の相棒です。自然で短い日本語で答えてください。"
+    "聞かれていない情報や長い説明は足さず、通常は1〜3文で返してください。"
+    "ツール結果がある場合だけ、その事実を使って答えてください。"
+)
 
 _NAME_PREFIXES = ("petit", "PETIT", "Petit", "プチ", "ぺち")
 _GREETING_REPLIES = {
@@ -66,206 +29,143 @@ _GREETING_REPLIES = {
     "やっほー": "やっほー。どうした？",
     "やほ": "やほ。どうした？",
     "ただいま": "おかえり。何からやる？",
-    "おつかれ": "おつかれさま。少し整理する？",
-    "お疲れ": "おつかれさま。少し整理する？",
+    "おつかれ": "おつかれさま。少し休もう。",
+    "お疲れ": "おつかれさま。少し休もう。",
     "おやすみ": "おやすみ。今日はここまでにしよう。",
 }
 
+# Only these tools can enter an ordinary chat request.  Search/summary/RAG
+# tools are never selected implicitly.
+_TOOL_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("get_current_time", ("今何時", "現在時刻", "今の時間", "今日何日", "日付")),
+    ("get_tasks", ("タスク", "やること", "todo", "やる事")),
+    ("get_schedule", ("予定", "カレンダー", "明日何ある", "今日何ある")),
+    ("search_memory", ("過去", "記憶", "覚えてる", "どこまで", "前に", "思い出")),
+    ("save_memory", ("覚えておいて", "記憶して", "記録して")),
+    ("summarize_now", ("まとめて", "要約して")),
+    ("get_weather", ("天気", "気温")),
+    ("search_news", ("ニュース", "最新情報")),
+    ("start_background_research", ("調べておいて", "調査して")),
+    ("create_daily_briefing", ("朝のブリーフィング", "最初の一手")),
+    ("restore_context", ("復帰", "続きに戻", "中断から")),
+    ("create_handoff_note", ("引き継ぎ", "中断する")),
+    ("create_task", ("タスクにして", "タスクを作", "追加して")),
+    ("complete_task", ("完了にして", "終わった", "タスクを完了")),
+    ("add_schedule", ("予定を入", "予定に追加")),
+    ("sync_notion_tasks", ("notionを同期", "Notionを同期")),
+    ("sync_calendar", ("カレンダーを同期", "予定を同期")),
+    ("sync_obsidian_vault", ("vaultを同期", "再インデックス")),
+)
 
-def _compact_for_intent(text: str) -> str:
+
+def _compact(text: str) -> str:
     return "".join(ch for ch in text.strip() if ch.isalnum() or ch in ("ー", "疲"))
 
 
 def _instant_reply(user_message: str) -> dict[str, Any] | None:
-    """Return app-side replies for turns where waiting on an LLM hurts UX."""
-    compact = _compact_for_intent(user_message)
-    if not compact:
-        return None
+    compact = _compact(user_message)
     for name in _NAME_PREFIXES:
         if compact.startswith(name):
             compact = compact[len(name):]
         if compact.endswith(name):
-            compact = compact[: -len(name)]
+            compact = compact[:-len(name)]
     reply = _GREETING_REPLIES.get(compact)
     if reply is None:
         return None
-    return {
-        "reply": reply,
-        "used_tools": [],
-        "model_route": {
-            "kind": "instant",
-            "model": None,
-            "reasons": ["instant_greeting"],
-        },
-    }
+    return {"reply": reply, "used_tools": [], "model_route": {"kind": "instant", "model": None, "reasons": ["instant_greeting"]}}
 
 
-def _build_messages(
-    user_message: str,
-    history: list[dict[str, str]] | None,
-    *,
-    include_context: bool = True,
-) -> list[dict[str, Any]]:
-    today = date.today().isoformat()
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT + f"\n\n今日の日付: {today}"},
+def _recent_history(history: list[dict[str, str]] | None) -> list[dict[str, str]]:
+    """Keep five user/assistant exchanges (never system or tool context)."""
+    clean = [
+        {"role": item.get("role", "user"), "content": str(item.get("content", ""))}
+        for item in (history or [])
+        if item.get("role") in {"user", "assistant"} and item.get("content")
     ]
-    if include_context:
-        # Agent turns can spend time collecting context. Simple chat stays fast.
-        recall_block = recall.build_recall_block(user_message)
-        situation_block = situation.build_context_block(user_message)
-        if situation_block:
-            messages.append({"role": "system", "content": situation_block})
-        if recall_block:
-            messages.append({"role": "system", "content": recall_block})
-    if history:
-        messages.extend(history)
-    messages.append({"role": "user", "content": user_message})
-    return messages
+    return clean[-10:]
 
 
-def _present_agent_reply(reply: str, route: dict[str, Any]) -> str:
-    """Let the chat model present agent output without changing its substance."""
-    if not reply or route["kind"] != "agent" or config.CHAT_MODEL == route["model"]:
-        return reply
+def _related_tool_names(message: str) -> list[str]:
+    text = message.casefold()
+    names: list[str] = []
+    for name, signals in _TOOL_SIGNALS:
+        if any(signal.casefold() in text for signal in signals):
+            names.append(name)
+    # A read request should not accidentally expose write tools just because
+    # both contain the word "task".
+    if "get_tasks" in names and any(x in text for x in ("作って", "追加", "完了", "終わった")):
+        names.remove("get_tasks")
+    if "get_schedule" in names and "入" in text:
+        names.remove("get_schedule")
+    return names
+
+
+def _selected_schemas(names: list[str]) -> list[dict[str, Any]]:
+    allowed = set(names)
+    return [item for item in tools.openai_tools_schema() if item["function"]["name"] in allowed]
+
+
+def _format_direct_time(result: str) -> str | None:
     try:
-        message = chat_completion(
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "あなたはPETITの会話・つなぎ担当。エージェントの回答を自然で読みやすい日本語に整える。"
-                        "事実、数値、警告、未確認事項、次の行動は削除・変更しない。新しい事実を足さない。"
-                    ),
-                },
-                {"role": "user", "content": reply},
-            ],
-            tools=None,
-            model=config.CHAT_MODEL,
-            temperature=0.5,
-        )
-    except LMStudioError:
-        return reply
-    presented = (message.get("content") or "").strip()
-    if presented:
-        route["presented_by"] = config.CHAT_MODEL
-        return presented
-    return reply
+        data = json.loads(result)
+    except json.JSONDecodeError:
+        return None
+    if not data.get("ok"):
+        return None
+    return f"今は {data['time']} です（{data['date']}・{data['weekday']}、{data['timezone']}）。"
 
 
-def _quick_deferred_reply(user_message: str, history: list[dict[str, str]] | None) -> str:
-    message = chat_completion(
-        [
-            {
-                "role": "system",
-                "content": (
-                    "あなたはPETITの軽量会話担当。ユーザーの相談にまず短く返す。"
-                    "詳しい確認はバックグラウンドで続く前提で、1〜2文だけ返す。"
-                    "未確認の事実やデータは断定しない。"
-                ),
-            },
-            *(history or [])[-6:],
-            {"role": "user", "content": user_message},
-        ],
-        tools=None,
-        model=config.CHAT_MODEL,
-        temperature=0.6,
-    )
-    reply = (message.get("content") or "").strip()
-    return reply or "先に短く返すね。詳しい確認は裏で続けて、分かったら追加で出す。"
-
-
-def _build_tool_result_message(user_message: str, results: list[dict[str, str]]) -> dict[str, str]:
-    lines = [
-        "以下は、元のユーザー発話に対してPython側で実行したツール結果です。",
-        f"元のユーザー発話: {user_message}",
-        "この結果を使って、ユーザーへ自然な日本語で返答してください。",
-    ]
+def _tool_result_message(user_message: str, results: list[dict[str, str]]) -> dict[str, str]:
+    lines = [f"元の発話: {user_message}", "Python側で実行した結果を使って、短く自然に答えてください。"]
     for item in results:
-        lines.extend(
-            [
-                "",
-                f"ツール: {item['name']}",
-                f"引数: {item['arguments']}",
-                f"結果: {item['content']}",
-            ]
-        )
+        lines.append(f"\nツール: {item['name']}\n結果: {item['content']}")
     return {"role": "user", "content": "\n".join(lines)}
 
 
-def _queue_agent_followup(user_message: str, history: list[dict[str, str]] | None) -> int:
-    payload = {"message": user_message, "history": history or []}
-    return db.create_job("agent_followup", json.dumps(payload, ensure_ascii=False))
-
-
-def run(
-    user_message: str,
-    history: list[dict[str, str]] | None = None,
-    *,
-    allow_defer: bool = True,
-) -> dict[str, Any]:
-    """Run one turn. Returns {reply, used_tools}.
-
-    May raise LMStudioError if the model backend is unreachable; the caller
-    is expected to translate that into a friendly response.
-    """
+def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow_defer: bool = True) -> dict[str, Any]:
+    del allow_defer  # Kept for worker/API compatibility; deferred chat is removed.
     instant = _instant_reply(user_message)
     if instant is not None:
         return instant
 
-    route = model_router.choose(user_message, history)
-    if config.DEFER_AGENT_JOBS and allow_defer and model_router.can_defer(user_message, route):
-        job_id = _queue_agent_followup(user_message, history)
-        quick_reply = _quick_deferred_reply(user_message, history)
-        return {
-            "reply": quick_reply,
-            "used_tools": [{"name": "agent_followup", "arguments": json.dumps({"job_id": job_id})}],
-            "model_route": {
-                **route,
-                "deferred": True,
-                "job_id": job_id,
-                "presented_by": config.CHAT_MODEL,
-            },
-        }
+    tool_names = _related_tool_names(user_message)
+    # Current time is deterministic and does not need an LLM at all.
+    if tool_names == ["get_current_time"]:
+        raw = tools.dispatch("get_current_time", {})
+        direct = _format_direct_time(raw)
+        if direct:
+            return {"reply": direct, "used_tools": [{"name": "get_current_time", "arguments": "{}"}], "model_route": {"kind": "direct", "model": None}}
 
-    messages = _build_messages(user_message, history, include_context=route["kind"] == "agent")
-    tool_schema = tools.openai_tools_schema()
-    active_tools = tool_schema if route["kind"] == "agent" else None
+    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.extend(_recent_history(history))
+    messages.append({"role": "user", "content": user_message})
+    selected_tools = _selected_schemas(tool_names)
     used_tools: list[dict[str, Any]] = []
 
-    for _ in range(config.MAX_TOOL_ITERATIONS):
-        message = chat_completion(messages, tools=active_tools, model=route["model"])
+    # One call for normal chat. Explicit tool requests may need one additional
+    # call to phrase the tool result; they still never receive unrelated tools.
+    for _ in range(min(config.MAX_TOOL_ITERATIONS, 2)):
+        message = chat_completion(
+            messages,
+            tools=selected_tools or None,
+            model=config.CHAT_MODEL,
+        )
         tool_calls = message.get("tool_calls") or []
-
         if not tool_calls:
-            reply = _present_agent_reply((message.get("content") or "").strip(), route)
             return {
-                "reply": reply,
+                "reply": (message.get("content") or "").strip(),
                 "used_tools": used_tools,
-                "model_route": route,
+                "model_route": {"kind": "chat", "model": config.CHAT_MODEL, "tools": tool_names},
             }
-
-        tool_results: list[dict[str, str]] = []
+        results: list[dict[str, str]] = []
         for call in tool_calls:
-            fn = call.get("function", {})
-            name = fn.get("name", "")
-            args = fn.get("arguments", "{}")
+            function = call.get("function", {})
+            name = function.get("name", "")
+            args = function.get("arguments", "{}")
             result = tools.dispatch(name, args)
             used_tools.append({"name": name, "arguments": args})
-            tool_results.append(
-                {
-                    "name": name,
-                    "arguments": args,
-                    "content": result,
-                }
-            )
-        messages.append(_build_tool_result_message(user_message, tool_results))
+            results.append({"name": name, "content": result})
+        messages.append(_tool_result_message(user_message, results))
+        selected_tools = []
 
-    # Ran out of iterations: ask the model for a final answer without tools.
-    final = chat_completion(messages, tools=None, model=route["model"])
-    reply = _present_agent_reply((final.get("content") or "").strip(), route)
-    return {
-        "reply": reply,
-        "used_tools": used_tools,
-        "model_route": route,
-    }
+    return {"reply": "確認した結果を短くまとめられませんでした。", "used_tools": used_tools, "model_route": {"kind": "chat", "model": config.CHAT_MODEL, "tools": tool_names}}

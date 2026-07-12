@@ -45,11 +45,8 @@ storage/   SQLite などの実行時データ（git 管理外）
 |------|--------|------|
 | `PETIT_LM_BASE_URL` | `http://localhost:1234/v1` | LM Studio のエンドポイント |
 | `PETIT_LM_MODEL` | `local-model` | 使用モデル名（LM Studio 上の id） |
-| `PETIT_CHAT_MODEL` | `PETIT_LM_MODEL` | 短い会話・自然文整形に使う軽量モデル |
-| `PETIT_AGENT_MODEL` | `PETIT_LM_MODEL` | ツール利用・長文・複雑判断に使うモデル |
-| `PETIT_AGENT_MESSAGE_CHARS` | `280` | 長文としてエージェントへ送る文字数 |
-| `PETIT_AGENT_HISTORY_CHARS` | `1800` | 長い会話履歴としてエージェントへ送る文字数 |
-| `PETIT_DEFER_AGENT_JOBS` | `1` | 読み取り系の重い相談を軽量モデル即答 + Job追記にする |
+| `PETIT_CHAT_MODEL` | `PETIT_LM_MODEL` | 通常会話とツール結果の返答に使う常駐モデル |
+| `PETIT_LIGHT_MAX_TOKENS` | `100` | 軽量回答の最大生成量 |
 | `PETIT_HOST` / `PETIT_PORT` | `127.0.0.1` / `8000` | サーバーの待受 |
 | `PETIT_OBSIDIAN_VAULT_DIRS` | なし | RAG検索対象にする既存Obsidian vault。Windowsは`;`区切りで複数指定 |
 | `PETIT_VAULT_SUBDIR` | `PETIT` | PETITがMarkdownを書き込むvault内サブディレクトリ |
@@ -81,11 +78,13 @@ storage/   SQLite などの実行時データ（git 管理外）
 - `get_current_time` — 現在の日付・時刻を取得
 - `get_weather` / `search_news` / `start_background_research` — 天気・ニュース取得とバックグラウンド調査キュー
 
-## 状況を自動参照する仕組み
+## 会話処理の最小フロー
 
-PETITは、相談が予定・優先順位・期限に関係すると判断した場合、Notionを読み取り同期し、
-タスクと予定キャッシュを会話へ自動注入します。BRAINは毎回全文を渡さず、質問に関連する
-少数のノートだけを意味検索またはローカル順位付き検索で参照します。
+通常の雑談は、短いsystem prompt・直近5会話・ユーザー発話だけを渡し、会話モデルを1回だけ呼びます。
+ツール、RAG、Embedding、Notion/カレンダー同期、要約は実行しません。現在時刻はルールベースで直接取得します。
+明確なタスク・予定・検索などだけ、発話に関係するツール定義を絞って渡します。
+会話のEmbeddingとMarkdown出力は応答後のバックグラウンド処理です。
+Embeddingは同一テキストをプロセス内キャッシュで重複送信せず、Vaultはチャンク内容が変わったファイルだけ再Embeddingします。
 
 Google CalendarのCodex/MCP接続はPETITプロセスへ自動共有されません。PETIT側で読むには
 `PETIT_CALENDAR_ICS_URLS` にGoogle Calendarの非公開iCal URLを設定するか、`PETIT_CALENDAR_ICS_FILES`

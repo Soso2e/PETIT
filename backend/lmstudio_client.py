@@ -17,6 +17,7 @@ def chat_completion(
     tools: list[dict[str, Any]] | None = None,
     temperature: float | None = None,
     model: str | None = None,
+    max_tokens: int | None = None,
 ) -> dict[str, Any]:
     """Call the chat completions endpoint and return the first choice's message.
 
@@ -33,6 +34,7 @@ def chat_completion(
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
+    payload["max_tokens"] = max_tokens if max_tokens is not None else config.LIGHT_MAX_TOKENS
 
     headers = {"Authorization": f"Bearer {config.LM_API_KEY}"}
 
