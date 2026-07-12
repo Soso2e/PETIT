@@ -83,6 +83,18 @@ body {
   margin-top: 6px;
 }
 
+.action-confirm { display: flex; gap: 8px; margin-top: 10px; }
+.action-confirm button {
+  border: 1px solid #3b4254;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #2f6fed;
+  color: #fff;
+  cursor: pointer;
+}
+.action-confirm button:last-child { background: transparent; }
+.action-confirm button:disabled { opacity: 0.5; cursor: default; }
+
 .composer {
   display: flex;
   gap: 10px;

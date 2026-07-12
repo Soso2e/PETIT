@@ -40,7 +40,7 @@ def _try_notion_sync() -> None:
         "properties": {
             "status": {
                 "type": "string",
-                "description": "絞り込むステータス（例: todo, doing, done）。省略で全件。",
+                "description": "絞り込むステータス。省略で未完了のみ、allで全件。",
             },
             "limit": {"type": "integer", "description": "最大件数", "default": 20},
         },
@@ -54,9 +54,12 @@ def get_tasks(status: str | None = None, limit: int = 20) -> dict[str, Any]:
         "FROM tasks_cache"
     )
     params: list[Any] = []
-    if status:
+    if status and status.casefold() != "all":
         sql += " WHERE status = ?"
         params.append(status)
+    elif not status:
+        sql += " WHERE status != ?"
+        params.append(config.NOTION_DONE_STATUS)
     sql += " ORDER BY (due_date IS NULL), due_date ASC LIMIT ?"
     params.append(limit)
     with db.get_connection() as conn:
@@ -80,6 +83,7 @@ def get_tasks(status: str | None = None, limit: int = 20) -> dict[str, Any]:
         },
         "required": ["title"],
     },
+    requires_confirmation=True,
 )
 def add_task(title: str, due_date: str | None = None, priority: str | None = None) -> dict[str, Any]:
     with db.get_connection() as conn:
@@ -121,6 +125,7 @@ def add_task(title: str, due_date: str | None = None, priority: str | None = Non
         },
         "required": ["title"],
     },
+    requires_confirmation=True,
 )
 def create_task(
     title: str,
@@ -149,14 +154,11 @@ def create_task(
                 "category_source": category_source,
             }
         except NotionError as exc:
-            local = _create_local_task(title, due_date, priority, category, reason)
             return {
-                "created": True,
-                "source": "local",
-                "fallback_from": "notion",
-                "notion_error": str(exc),
-                "task": local,
-                "category_source": category_source,
+                "created": False,
+                "source": "notion",
+                "error": str(exc),
+                "message": "Notionへの作成に失敗したため、ローカルへ代替保存していません。",
             }
 
     local = _create_local_task(title, due_date, priority, category, reason)
@@ -172,18 +174,26 @@ def create_task(
     parameters={
         "type": "object",
         "properties": {
-            "task_id": {"type": "integer", "description": "PETIT のローカルキャッシュID。任意。"},
-            "title_query": {"type": "string", "description": "タスク名の一部。task_id 不明時に使う。"},
+            "task_id": {"type": "integer", "description": "PETIT のローカルキャッシュ数値ID。任意。"},
+            "external_id": {"type": "string", "description": "NotionページUUID。分かる場合だけ使う。"},
+            "title_query": {"type": "string", "description": "ユーザーがタスク名を指定した場合は、その名前をここへ入れる。"},
             "done_date": {"type": "string", "description": "完了日 YYYY-MM-DD。省略時は今日。"},
         },
     },
+    requires_confirmation=True,
 )
 def complete_task(
-    task_id: int | None = None,
+    task_id: int | str | None = None,
+    external_id: str | None = None,
     title_query: str | None = None,
     done_date: str | None = None,
 ) -> dict[str, Any]:
-    task = _find_task(task_id=task_id, title_query=title_query)
+    if isinstance(task_id, str) and not task_id.isdigit():
+        external_id = external_id or task_id
+        task_id = None
+    elif isinstance(task_id, str):
+        task_id = int(task_id)
+    task = _find_task(task_id=task_id, external_id=external_id, title_query=title_query)
     if task is None:
         candidates = _find_task_candidates(title_query) if title_query else []
         return {
@@ -323,11 +333,14 @@ def _cache_task(task: dict[str, Any], source: str) -> int:
         return int(cur.lastrowid)
 
 
-def _find_task(task_id: int | None, title_query: str | None) -> dict[str, Any] | None:
+def _find_task(task_id: int | None, external_id: str | None, title_query: str | None) -> dict[str, Any] | None:
     _try_notion_sync()
     with db.get_connection() as conn:
         if task_id is not None:
             row = conn.execute("SELECT * FROM tasks_cache WHERE id = ?", (task_id,)).fetchone()
+            return dict(row) if row else None
+        if external_id:
+            row = conn.execute("SELECT * FROM tasks_cache WHERE external_id = ?", (external_id,)).fetchone()
             return dict(row) if row else None
         if title_query:
             rows = _find_task_rows(conn, title_query, limit=2)

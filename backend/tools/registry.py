@@ -19,16 +19,29 @@ class Tool:
     description: str
     parameters: dict[str, Any]
     handler: Handler
+    requires_confirmation: bool = False
 
 
 _REGISTRY: dict[str, Tool] = {}
 
 
-def tool(name: str, description: str, parameters: dict[str, Any]) -> Callable[[Handler], Handler]:
+def tool(
+    name: str,
+    description: str,
+    parameters: dict[str, Any],
+    *,
+    requires_confirmation: bool = False,
+) -> Callable[[Handler], Handler]:
     """Decorator that registers a function as a callable tool."""
 
     def decorator(func: Handler) -> Handler:
-        _REGISTRY[name] = Tool(name=name, description=description, parameters=parameters, handler=func)
+        _REGISTRY[name] = Tool(
+            name=name,
+            description=description,
+            parameters=parameters,
+            handler=func,
+            requires_confirmation=requires_confirmation,
+        )
         return func
 
     return decorator
@@ -36,6 +49,23 @@ def tool(name: str, description: str, parameters: dict[str, Any]) -> Callable[[H
 
 def registered_names() -> list[str]:
     return sorted(_REGISTRY.keys())
+
+
+def requires_confirmation(name: str) -> bool:
+    tool_obj = _REGISTRY.get(name)
+    return bool(tool_obj and tool_obj.requires_confirmation)
+
+
+def parse_arguments(name: str, arguments: dict[str, Any] | str | None) -> dict[str, Any]:
+    if isinstance(arguments, str):
+        try:
+            parsed = json.loads(arguments) if arguments.strip() else {}
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"could not parse arguments for {name}") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError(f"arguments for {name} must be an object")
+        return parsed
+    return dict(arguments or {})
 
 
 def openai_tools_schema() -> list[dict[str, Any]]:
@@ -64,13 +94,10 @@ def dispatch(name: str, arguments: dict[str, Any] | str | None) -> str:
     if tool_obj is None:
         return f"[error] unknown tool: {name}"
 
-    if isinstance(arguments, str):
-        try:
-            arguments = json.loads(arguments) if arguments.strip() else {}
-        except json.JSONDecodeError:
-            return f"[error] could not parse arguments for {name}: {arguments!r}"
-    if arguments is None:
-        arguments = {}
+    try:
+        arguments = parse_arguments(name, arguments)
+    except ValueError as exc:
+        return f"[error] {exc}"
 
     try:
         result = tool_obj.handler(**arguments)

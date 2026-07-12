@@ -14,9 +14,10 @@ tasks, schedule, and recent conversation, and propose a concrete next action.
   are excluded from indexing.
 - Notion: canonical editable task list. Relevant planning turns perform a
   read-only sync into SQLite before reasoning.
-- Google Calendar: authoritative calendar outside PETIT, but not yet connected
-  to the PETIT process. PETIT currently reads `calendar_events_cache` and must
-  say when an empty cache is not proof of an empty calendar.
+- Google Calendar: authoritative calendar outside PETIT. PETIT can import a
+  configured private iCal/ICS URL read-only into `calendar_events_cache`.
+  Writes currently target only PETIT's local calendar provider; Google Calendar
+  API/OAuth writes are not implemented.
 - SQLite: local structured cache and PETIT-owned state.
 - Chroma: replaceable search index, never the canonical knowledge source.
 
@@ -30,8 +31,8 @@ tasks, schedule, and recent conversation, and propose a concrete next action.
    context.
 5. Let the selected model use tools if it is an agent turn.
 6. Return a short answer with a next action when useful.
-7. Suggest task or record candidates from the conversation, but do not write to
-   external services without explicit confirmation.
+7. Convert write tool calls into an expiring preview. Execute the exact stored
+   arguments once only after the user presses the confirmation button.
 
 ## Model routing
 
@@ -48,8 +49,8 @@ valid.
 
 ## Current limitations
 
-- Google Calendar's Codex/MCP login is isolated from PETIT. A read-only calendar
-  sync adapter with its own OAuth or export source is still required.
+- Google Calendar's Codex/MCP login is isolated from PETIT. ICS read import is
+  available, but a Google Calendar API/OAuth write provider is still required.
 - Live model quality depends on both configured LM Studio models being loaded and
   the embedding endpoint being available.
 - Stalled-project detection is currently evidence-based retrieval and task
@@ -59,6 +60,7 @@ valid.
 ## Safe extension points
 
 - Add read-only source adapters that normalize into SQLite caches.
+- Register calendar write providers behind `backend/calendar_providers.py`.
 - Add source freshness timestamps and stale-data warnings.
 - Add a weekly review that compares active BRAIN projects, Notion tasks, and
   calendar commitments.

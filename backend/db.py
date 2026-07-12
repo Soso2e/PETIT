@@ -12,6 +12,16 @@ from typing import Any
 
 from . import config
 
+
+class _ClosingConnection(sqlite3.Connection):
+    """Commit/rollback like sqlite3's context manager, then close reliably."""
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> bool:
+        try:
+            return bool(super().__exit__(exc_type, exc, traceback))
+        finally:
+            self.close()
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,7 +105,7 @@ def now_iso() -> str:
 
 
 def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(config.DB_PATH)
+    conn = sqlite3.connect(config.DB_PATH, factory=_ClosingConnection)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

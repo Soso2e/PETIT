@@ -6,14 +6,16 @@
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。最終形はスマホとPCの両方から使える音声中心の常駐アシスタントで、現状はテキストチャットMVPを土台にしている。
 - TimeTree バックアップ: `tools/timetree_backup.py` 実装済みだが本番 E2E 未検証（実認証情報待ち）。カレンダーコード確認は初回だけ対話実行が必要（`timetree-exporter -e your@email.com`）。
-- Notion: PETIT本体から実タスクDB 124件の読み取りとSQLite同期を確認済み。計画系会話と朝ブリーフィングは読み取り同期を通り、5分TTLで再利用する。作成・完了更新の実Notion書き込みE2Eは未確認。
-- BRAIN / RAG: 実vault 290チャンクを確認。Embedding停止時でも自然な日本語質問から関連ノートを順位付き検索して会話へ少数件注入できる。`_private`・添付・内部設定は索引対象外。実Embedding検索はLM Studio停止中のため未確認。
-- 能動支援: 予定・優先順位・期限などの相談でNotionタスクと予定キャッシュを自動収集し、朝のopenerはブリーフィングを返す。外部サービスへの書き込みは明示確認後のみ。
+- Notion: 実タスクDBの未完了取得、確認画面を経由した作成・完了更新を実ブラウザ + LM StudioでE2E確認済み。Notion失敗時はローカルへ代替保存しない。
+- BRAIN / RAG: 実vaultの限定検索と、対象ファイル・追記内容の確認後に既存Markdownへ追記するE2Eを確認済み。`_private`・除外フォルダ・Vault外・Markdown以外は編集拒否し、変更後は該当ノートを再索引化する。
+- 能動支援: 「今日何からやる？」では未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理する。雑談ではツール・RAG・Embeddingを動かさない。
+- 書き込み確認: Notion、ローカル予定、長期記憶、引き継ぎ、BRAINの書き込みツールは10分有効のプレビューへ変換し、ブラウザの「実行する」確認後に同一引数を1回だけ実行する。
 - 二モデル構成: 会話モデルとエージェントモデルのルーター、長文・ツール・複雑処理の判定、エージェント回答を会話モデルで整える受け渡しを実装。現在の`.env`では両方とも `qwen/qwen3.5-9b` へフォールバックしており、別モデルでの実動作は未確認。
-- 応答速度改善: 通常会話は短いsystem prompt・直近5会話・会話モデル1回に固定し、RAG、Embedding、状況取得、要約、ツール定義を実行しない。時刻はルールベースで直接取得し、その他は発話関連ツールだけを選択する。会話Embedding/Markdownは応答後のバックグラウンド処理、同一Embedding入力はプロセス内キャッシュ、Vaultは変更チャンクのみ再Embedding。構文・標準テスト12件・LLM/RAG/状況取得回数のモック計測を確認済み、実LM Studio + ブラウザでの体感確認は未確認。
-- Google Calendar: Codex側コネクタの認証はPETITへ共有されないため、PETIT側は `PETIT_CALENDAR_ICS_URLS` / `PETIT_CALENDAR_ICS_FILES` からICSを読み取る同期アダプターを実装済み。サンプルICSで単体確認済み、実Google非公開iCal URLでの同期E2Eは未確認。
-- LM Studio: `/v1/models` は到達可能でモデル一覧を取得できる。tool実行後の再問い合わせは、LM Studioの一部Jinjaテンプレートで `role: tool` を処理できないため、ツール結果をユーザーfollow-upとして返す互換形式へ変更済み。構文と単体テスト8件は確認済み。実モデルでの「調べて」系最小実行はReadTimeoutで完走未確認、ブラウザ会話E2Eも未確認。
-- 次にやること: PETITを再起動してブラウザで雑談・時刻・タスク取得のE2Eを確認 → Google Calendarの非公開iCal URLまたはエクスポートICSを設定して `/api/calendar/sync` E2E → 週次レビュー／停滞プロジェクト検出を追加。
+- 応答速度改善: 通常会話は9B用の`CHAT_MODEL`・短いsystem prompt・直近5会話・LM Studio 1回に固定し、ツール・RAG・Embeddingを実行しない。空回答、LM Studio/内部エラー、ツール失敗はSQLite・Markdown・Embeddingへ保存しない。実ブラウザで雑談・時刻・天気・各連携の応答を確認済み。
+- 軽量回答上限: `PETIT_LIGHT_MAX_TOKENS` を 512 に変更済み。`PETIT_ENABLE_THINKING=0` と `.env.example` に反映済み。実LM Studio応答のreasoning tokens 0は未確認。
+- Calendar: ICSは読み取り専用同期、`add_schedule`はPETITローカル予定への書き込みとして分離。ローカル予定の確認付き追加・再取得は実ブラウザE2E済み。実Google非公開iCal URLは未設定のため同期E2E未確認。将来のGoogle書き込みはprovider境界へ追加する。
+- LM Studio: `/v1/models` と `qwen/qwen3.5-9b` の実会話・tool callingを確認済み。空の`PETIT_AGENT_MODEL`は会話モデルへフォールバックする。別の27Bエージェントモデル構成は未確認。
+- 次にやること: Google Calendarの非公開iCal URLまたはエクスポートICSを設定して `/api/calendar/sync` E2E → 27Bエージェントモデルを設定して同じE2Eケースを再測定 → 週次レビュー／停滞プロジェクト検出を追加。
 
 ## 履歴
 
@@ -58,3 +60,6 @@
 | 2026-07-12 | 18:32 | #29 | BRAIN/vault同期のEmbedding重複対策を実装。同期開始時のダミー検索Embeddingを廃止し、チャンク `content_hash` 比較・変更分バッチUpsert・削除差分処理・Embedding統計/単調時計計測を追加。構文確認、標準 unittest 12件、モック計測を確認。実LM Studio + ブラウザ体感は未確認。 |
 | 2026-07-12 | 18:45 | #30 | Git運用ルールを更新。Codexは検証済みの作業単位を原則随時コミットし、Pushは明示依頼時のみ行う方針を `AGENTS.md` に追記。 |
 | 2026-07-12 | 19:01 | #31 | 会話処理を最小化。通常会話を会話モデル1回・直近5会話・短いsystem promptへ固定し、関連ツール限定、時刻の直接ルーティング、Embedding重複キャッシュ、軽量回答100トークン、遅延フォローアップ停止を実装。構文・標準テスト12件・モック計測を確認、実ブラウザE2Eは未確認。 |
+| 2026-07-12 | 19:08 | #32 | `PETIT_LIGHT_MAX_TOKENS` の既定値を 512 に変更し、README の設定表も更新。設定反映のみで実動作は未確認。 |
+| 2026-07-12 | 19:23 | #33 | 通常会話を9B/Thinking OFF/LLM 1回へ統一し、関連ツール限定の27B経路、空回答再試行、messages user検証、空回答保存抑止、request ID、healthキャッシュ、Embedding重複ロックを実装。標準テスト15件・compileall・diffチェックを確認、実LM Studio + ブラウザE2Eは未確認。 |
+| 2026-07-12 | 20:11 | #34 | 動作確認済み: 意図別の限定取得、書き込み承認キュー、BRAIN安全編集、Calendar read/write分離、失敗保存抑止を実装。標準テスト30件と実ブラウザ+LM Studioで雑談/時刻/天気/Notion取得・作成・完了/BRAIN検索・追記/予定取得・追加をE2E確認。実Google ICSと別27Bモデルは未確認。 |

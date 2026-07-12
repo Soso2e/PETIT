@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 import time
+import threading
 from collections import OrderedDict
 from typing import Any
 
@@ -43,32 +44,35 @@ class LMStudioEmbeddingFunction(EmbeddingFunction):
     """Thin wrapper around LM Studio's OpenAI-compatible embeddings endpoint."""
 
     def __call__(self, input: list[str]) -> Embeddings:  # type: ignore[override]
-        cached = [_embedding_cache.get(text) for text in input]
-        missing = list(dict.fromkeys(text for text, value in zip(input, cached) if value is None))
-        if not missing:
-            return [value for value in cached if value is not None]
-        url = f"{config.EMBED_BASE_URL.rstrip('/')}/embeddings"
-        payload = {"model": config.EMBED_MODEL, "input": missing}
-        headers = {"Authorization": f"Bearer {config.LM_API_KEY}"}
-        start = time.monotonic()
-        resp = httpx.post(url, json=payload, headers=headers, timeout=config.EMBED_TIMEOUT)
-        resp.raise_for_status()
-        _embedding_stats.requests += 1
-        _embedding_stats.inputs += len(missing)
-        _embedding_stats.last_elapsed_ms = max(0, round((time.monotonic() - start) * 1000))
-        data = resp.json()
-        # OpenAI format: {"data": [{"index": 0, "embedding": [...]}, ...]}
-        for item in sorted(data["data"], key=lambda x: x["index"]):
-            text = missing[item["index"]]
-            _embedding_cache[text] = item["embedding"]
-            _embedding_cache.move_to_end(text)
-        while len(_embedding_cache) > _EMBEDDING_CACHE_SIZE:
-            _embedding_cache.popitem(last=False)
-        return [_embedding_cache[text] for text in input]
+        # Serialize cache misses so concurrent identical requests share one call.
+        with _embedding_lock:
+            cached = [_embedding_cache.get(text) for text in input]
+            missing = list(dict.fromkeys(text for text, value in zip(input, cached) if value is None))
+            if not missing:
+                return [value for value in cached if value is not None]
+            url = f"{config.EMBED_BASE_URL.rstrip('/')}/embeddings"
+            payload = {"model": config.EMBED_MODEL, "input": missing}
+            headers = {"Authorization": f"Bearer {config.LM_API_KEY}"}
+            start = time.monotonic()
+            resp = httpx.post(url, json=payload, headers=headers, timeout=config.EMBED_TIMEOUT)
+            resp.raise_for_status()
+            _embedding_stats.requests += 1
+            _embedding_stats.inputs += len(missing)
+            _embedding_stats.last_elapsed_ms = max(0, round((time.monotonic() - start) * 1000))
+            data = resp.json()
+            # OpenAI format: {"data": [{"index": 0, "embedding": [...]}, ...]}
+            for item in sorted(data["data"], key=lambda x: x["index"]):
+                text = missing[item["index"]]
+                _embedding_cache[text] = item["embedding"]
+                _embedding_cache.move_to_end(text)
+            while len(_embedding_cache) > _EMBEDDING_CACHE_SIZE:
+                _embedding_cache.popitem(last=False)
+            return [_embedding_cache[text] for text in input]
 
 
 _embedding_fn = LMStudioEmbeddingFunction()
 _embedding_cache: OrderedDict[str, list[float]] = OrderedDict()
+_embedding_lock = threading.Lock()
 _EMBEDDING_CACHE_SIZE = 128
 
 # ---------------------------------------------------------------------------
