@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend import agent, config, model_router, vault_indexer
 
@@ -14,8 +14,19 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertEqual(model_router.choose("a" * (config.AGENT_MESSAGE_CHARS + 1))["kind"], "agent")
 
         self.assertEqual(model_router.choose("今何時？")["kind"], "agent")
+
+    def test_greeting_returns_without_model_call(self) -> None:
+        with patch.object(agent, "chat_completion") as fake_chat:
+            result = agent.run("PETITこんばんわ")
+
+        fake_chat.assert_not_called()
+        self.assertEqual(result["model_route"]["kind"], "instant")
+        self.assertEqual(result["model_route"]["reasons"], ["instant_greeting"])
+        self.assertIn("こんばんは", result["reply"])
+
     def test_chat_model_does_not_receive_tools(self) -> None:
         calls = []
+        recall = Mock(return_value="")
 
         def fake_chat(messages, tools=None, temperature=None, model=None):
             calls.append({"tools": tools, "model": model})
@@ -26,12 +37,13 @@ class ModelRoutingTests(unittest.TestCase):
             patch.object(config, "AGENT_MODEL", "agent-test"),
             patch.object(config, "DEFER_AGENT_JOBS", False),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
-            patch.object(agent.recall, "build_recall_block", return_value=""),
+            patch.object(agent.recall, "build_recall_block", recall),
             patch.object(agent.situation, "build_context_block", return_value=""),
         ):
-            result = agent.run("やっほー")
+            result = agent.run("最近どう？")
         self.assertEqual(result["model_route"]["kind"], "chat")
         self.assertEqual(calls[0], {"tools": None, "model": "chat-test"})
+        recall.assert_not_called()
 
     def test_agent_model_receives_tools(self) -> None:
         calls = []
@@ -139,6 +151,60 @@ class VaultSearchTests(unittest.TestCase):
         self.assertEqual(rows[0]["relative_path"], str(Path("20_Projects") / "PETIT構成.md"))
         self.assertIn("_private", vault_indexer.EXCLUDED_DIR_NAMES)
         self.assertIn("_attachments", vault_indexer.EXCLUDED_DIR_NAMES)
+
+    def test_vault_sync_does_not_probe_with_embedding_query(self) -> None:
+        with (
+            patch.object(config, "OBSIDIAN_VAULT_DIRS", [Path("vault")]),
+            patch.object(Path, "exists", return_value=True),
+            patch.object(Path, "is_dir", return_value=True),
+            patch.object(vault_indexer, "_purge_excluded_chunks", return_value=0),
+            patch.object(vault_indexer, "_iter_markdown_files", return_value=[]),
+            patch.object(vault_indexer.chroma_client, "query") as query,
+        ):
+            result = vault_indexer.index_configured_vaults()
+
+        query.assert_not_called()
+        self.assertEqual(result["chunks"], 0)
+
+    def test_vault_index_batches_changed_chunks(self) -> None:
+        root = Path("vault")
+        path = root / "note.md"
+        chunks = [("A", "first chunk"), ("B", "second chunk")]
+
+        with (
+            patch.object(vault_indexer, "_read_text", return_value="ignored"),
+            patch.object(vault_indexer, "_chunk_markdown", return_value=chunks),
+            patch.object(vault_indexer, "_existing_file_chunks", return_value={}),
+            patch.object(vault_indexer, "_modified_at", return_value="2026-07-12T00:00:00+00:00"),
+            patch.object(vault_indexer.chroma_client, "delete_ids", return_value=True),
+            patch.object(vault_indexer.chroma_client, "add_many", return_value=2) as add_many,
+        ):
+            result = vault_indexer._index_file(root, path)
+
+        self.assertEqual(result, {"indexed": 2, "skipped": 0, "deleted": 0})
+        add_many.assert_called_once()
+        docs = add_many.call_args.args[1]
+        self.assertEqual(len(docs), 2)
+        self.assertTrue(all("content_hash" in doc[2] for doc in docs))
+
+    def test_vault_index_skips_unchanged_chunk_hashes(self) -> None:
+        root = Path("vault")
+        path = root / "note.md"
+        chunk = "unchanged chunk"
+        doc_id = vault_indexer._doc_id(root, path, 0)
+        existing = {doc_id: {"content_hash": vault_indexer._content_hash(chunk)}}
+
+        with (
+            patch.object(vault_indexer, "_read_text", return_value="ignored"),
+            patch.object(vault_indexer, "_chunk_markdown", return_value=[("A", chunk)]),
+            patch.object(vault_indexer, "_existing_file_chunks", return_value=existing),
+            patch.object(vault_indexer.chroma_client, "delete_ids", return_value=True),
+            patch.object(vault_indexer.chroma_client, "add_many", return_value=0) as add_many,
+        ):
+            result = vault_indexer._index_file(root, path)
+
+        self.assertEqual(result, {"indexed": 0, "skipped": 1, "deleted": 0})
+        add_many.assert_called_once_with(vault_indexer.COLLECTION_NAME, [])
 
 
 if __name__ == "__main__":

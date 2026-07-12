@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 import logging
 import threading
+import time
 
 from . import agent, briefing, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
@@ -77,6 +78,7 @@ def health() -> dict[str, Any]:
             "available": True,
             "embed_model": config.EMBED_MODEL,
             "indexed": {"memory": mem_count, "conversations": conv_count, "vault": vault_count},
+            "embedding_stats": chroma_client.embedding_stats(),
         }
     except Exception:  # noqa: BLE001
         rag_info = {"available": False, "embed_model": config.EMBED_MODEL}
@@ -118,10 +120,14 @@ def chat(req: ChatRequest) -> ChatResponse:
     if not message:
         return ChatResponse(reply="", error="メッセージが空です。")
 
+    started = time.monotonic()
     try:
         result = agent.run(message, history=req.history)
     except LMStudioError as exc:
         return ChatResponse(reply="", error=str(exc))
+    elapsed_ms = max(0, round((time.monotonic() - started) * 1000))
+    model_route = dict(result.get("model_route") or {})
+    model_route["elapsed_ms"] = elapsed_ms
 
     used_tools_str = ", ".join(t["name"] for t in result["used_tools"]) or None
     conv_id = db.save_conversation(
@@ -129,24 +135,32 @@ def chat(req: ChatRequest) -> ChatResponse:
         assistant_text=result["reply"],
         used_tools=used_tools_str,
     )
-    # Index the conversation turn into Chroma (best-effort)
-    chroma_client.add(
-        "petit_conversations",
-        doc_id=f"conv_{conv_id}",
-        text=f"ユーザー: {message}\nPETIT: {result['reply']}",
-        metadata={"timestamp": db.now_iso()},
-    )
-    # Mirror the turn into the Obsidian daily note (human-readable副本, best-effort)
-    markdown_export.append_conversation_turn(
-        user_text=message,
-        assistant_text=result["reply"],
-        used_tools=used_tools_str,
-        timestamp=db.now_iso(),
-    )
+    threading.Thread(
+        target=_persist_chat_artifacts,
+        args=(conv_id, message, result["reply"], used_tools_str),
+        daemon=True,
+    ).start()
     return ChatResponse(
         reply=result["reply"],
         used_tools=result["used_tools"],
-        model_route=result.get("model_route"),
+        model_route=model_route,
+    )
+
+
+def _persist_chat_artifacts(conv_id: int, message: str, reply: str, used_tools: str | None) -> None:
+    """Best-effort side effects that must not block chat responses."""
+    timestamp = db.now_iso()
+    chroma_client.add(
+        "petit_conversations",
+        doc_id=f"conv_{conv_id}",
+        text=f"ユーザー: {message}\nPETIT: {reply}",
+        metadata={"timestamp": timestamp},
+    )
+    markdown_export.append_conversation_turn(
+        user_text=message,
+        assistant_text=reply,
+        used_tools=used_tools,
+        timestamp=timestamp,
     )
 
 

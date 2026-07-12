@@ -44,19 +44,12 @@ def index_configured_vaults(max_files: int | None = None) -> dict[str, Any]:
     limit = max_files if max_files is not None else MAX_FILES_PER_SYNC
     files_seen = 0
     chunks_indexed = 0
+    chunks_skipped = 0
+    chunks_deleted = 0
     failed = 0
     vaults = [str(path) for path in config.OBSIDIAN_VAULT_DIRS]
 
-    _purge_excluded_chunks()
-    if chroma_client.query(COLLECTION_NAME, "PETIT vault sync", n_results=1) is None:
-        return {
-            "configured": True,
-            "vaults": vaults,
-            "files": 0,
-            "chunks": 0,
-            "failed": 0,
-            "embedding_unavailable": True,
-        }
+    chunks_deleted += _purge_excluded_chunks()
     for vault_root in config.OBSIDIAN_VAULT_DIRS:
         root = vault_root.expanduser()
         if not root.exists() or not root.is_dir():
@@ -71,12 +64,17 @@ def index_configured_vaults(max_files: int | None = None) -> dict[str, Any]:
                     "vaults": vaults,
                     "files": files_seen,
                     "chunks": chunks_indexed,
+                    "skipped": chunks_skipped,
+                    "deleted": chunks_deleted,
                     "failed": failed,
                     "limited": True,
                 }
             files_seen += 1
             try:
-                chunks_indexed += _index_file(root, path)
+                file_counts = _index_file(root, path)
+                chunks_indexed += file_counts["indexed"]
+                chunks_skipped += file_counts["skipped"]
+                chunks_deleted += file_counts["deleted"]
             except Exception as exc:  # noqa: BLE001
                 log.debug("Vault index skipped %s: %s", path, exc)
                 failed += 1
@@ -86,6 +84,8 @@ def index_configured_vaults(max_files: int | None = None) -> dict[str, Any]:
         "vaults": vaults,
         "files": files_seen,
         "chunks": chunks_indexed,
+        "skipped": chunks_skipped,
+        "deleted": chunks_deleted,
         "failed": failed,
         "limited": False,
     }
@@ -156,37 +156,70 @@ def _iter_markdown_files(root: Path):
         yield path
 
 
-def _index_file(root: Path, path: Path) -> int:
+def _index_file(root: Path, path: Path) -> dict[str, int]:
     text = _read_text(path)
     if not text.strip():
-        return 0
+        deleted = _delete_existing_file_chunks(path)
+        return {"indexed": 0, "skipped": 0, "deleted": deleted}
 
-    # Remove stale chunks for this file before upserting current chunks.
-    chroma_client.delete_where(COLLECTION_NAME, {"source_path": str(path)})
-
-    count = 0
+    existing = _existing_file_chunks(path)
+    current_ids: set[str] = set()
+    docs: list[tuple[str, str, dict[str, Any]]] = []
+    skipped = 0
     for chunk_index, (heading, chunk) in enumerate(_chunk_markdown(text)):
         clean = chunk.strip()
         if not clean:
             continue
-        ok = chroma_client.add(
-            COLLECTION_NAME,
-            doc_id=_doc_id(root, path, chunk_index),
-            text=clean,
-            metadata={
-                "source": "obsidian_vault",
-                "vault_root": str(root),
-                "source_path": str(path),
-                "relative_path": _relative_path(root, path),
-                "heading": heading,
-                "modified_at": _modified_at(path),
-                "chunk_index": chunk_index,
-                "indexed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            },
+        doc_id = _doc_id(root, path, chunk_index)
+        current_ids.add(doc_id)
+        content_hash = _content_hash(clean)
+        if existing.get(doc_id, {}).get("content_hash") == content_hash:
+            skipped += 1
+            continue
+        docs.append(
+            (
+                doc_id,
+                clean,
+                {
+                    "source": "obsidian_vault",
+                    "vault_root": str(root),
+                    "source_path": str(path),
+                    "relative_path": _relative_path(root, path),
+                    "heading": heading,
+                    "modified_at": _modified_at(path),
+                    "chunk_index": chunk_index,
+                    "content_hash": content_hash,
+                    "indexed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                },
+            )
         )
-        if ok:
-            count += 1
-    return count
+
+    stale_ids = [doc_id for doc_id in existing if doc_id not in current_ids]
+    deleted = len(stale_ids) if chroma_client.delete_ids(COLLECTION_NAME, stale_ids) else 0
+    indexed = chroma_client.add_many(COLLECTION_NAME, docs)
+    return {"indexed": indexed, "skipped": skipped, "deleted": deleted}
+
+
+def _existing_file_chunks(path: Path) -> dict[str, dict[str, Any]]:
+    try:
+        data = chroma_client._collection(COLLECTION_NAME).get(
+            where={"source_path": str(path)},
+            include=["metadatas"],
+        )
+    except Exception:  # noqa: BLE001
+        return {}
+    return {
+        str(doc_id): (metadata or {})
+        for doc_id, metadata in zip(data.get("ids") or [], data.get("metadatas") or [])
+    }
+
+
+def _delete_existing_file_chunks(path: Path) -> int:
+    existing = _existing_file_chunks(path)
+    ids = list(existing)
+    if chroma_client.delete_ids(COLLECTION_NAME, ids):
+        return len(ids)
+    return 0
 
 
 def _chunk_markdown(text: str) -> list[tuple[str, str]]:
@@ -244,6 +277,10 @@ def _modified_at(path: Path) -> str:
 def _doc_id(root: Path, path: Path, chunk_index: int) -> str:
     raw = f"{root.resolve()}|{_relative_path(root, path).lower()}|{chunk_index}"
     return "vault_" + hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def _content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _snippet(text: str, index: int, radius: int = 360) -> str:

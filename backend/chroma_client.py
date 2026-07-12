@@ -12,6 +12,7 @@ Design:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 import time
 from typing import Any
 
@@ -22,6 +23,16 @@ from chromadb import EmbeddingFunction, Embeddings
 from . import config
 
 log = logging.getLogger(__name__)
+
+
+@dataclass
+class EmbeddingStats:
+    requests: int = 0
+    inputs: int = 0
+    last_elapsed_ms: int | None = None
+
+
+_embedding_stats = EmbeddingStats()
 
 # ---------------------------------------------------------------------------
 # Custom embedding function — calls LM Studio /v1/embeddings
@@ -34,8 +45,12 @@ class LMStudioEmbeddingFunction(EmbeddingFunction):
         url = f"{config.EMBED_BASE_URL.rstrip('/')}/embeddings"
         payload = {"model": config.EMBED_MODEL, "input": input}
         headers = {"Authorization": f"Bearer {config.LM_API_KEY}"}
+        start = time.monotonic()
         resp = httpx.post(url, json=payload, headers=headers, timeout=config.EMBED_TIMEOUT)
         resp.raise_for_status()
+        _embedding_stats.requests += 1
+        _embedding_stats.inputs += len(input)
+        _embedding_stats.last_elapsed_ms = max(0, round((time.monotonic() - start) * 1000))
         data = resp.json()
         # OpenAI format: {"data": [{"index": 0, "embedding": [...]}, ...]}
         return [item["embedding"] for item in sorted(data["data"], key=lambda x: x["index"])]
@@ -82,20 +97,27 @@ def _mark_embedding_unavailable() -> None:
 
 def add(collection_name: str, doc_id: str, text: str, metadata: dict[str, Any] | None = None) -> bool:
     """Embed and upsert a single document. Returns False on any error (LLM down etc.)."""
+    return add_many(collection_name, [(doc_id, text, metadata or {})]) == 1
+
+
+def add_many(collection_name: str, docs: list[tuple[str, str, dict[str, Any]]]) -> int:
+    """Embed and upsert documents in one Chroma call. Returns indexed count."""
     if not _embedding_available():
-        return False
+        return 0
+    if not docs:
+        return 0
     try:
         col = _collection(collection_name)
         col.upsert(
-            ids=[doc_id],
-            documents=[text],
-            metadatas=[metadata or {}],
+            ids=[doc_id for doc_id, _, _ in docs],
+            documents=[text for _, text, _ in docs],
+            metadatas=[metadata for _, _, metadata in docs],
         )
-        return True
+        return len(docs)
     except Exception as exc:  # noqa: BLE001
         log.debug("Chroma add failed (%s): %s", collection_name, exc)
         _mark_embedding_unavailable()
-        return False
+        return 0
 
 
 def delete_where(collection_name: str, where: dict[str, Any]) -> bool:
@@ -163,28 +185,38 @@ def sync_from_sqlite(memory_rows: list[dict[str, Any]], conv_rows: list[dict[str
     Skips gracefully if embeddings are unavailable.
     Returns counts of indexed items per collection.
     """
-    mem_count = 0
-    conv_count = 0
-
-    for row in memory_rows:
-        ok = add(
-            "petit_memory",
-            doc_id=f"mem_{row['id']}",
-            text=row["content"],
-            metadata={"type": row.get("type", "note"), "created_at": row.get("created_at", "")},
+    mem_docs = [
+        (
+            f"mem_{row['id']}",
+            row["content"],
+            {"type": row.get("type", "note"), "created_at": row.get("created_at", "")},
         )
-        if ok:
-            mem_count += 1
-
-    for row in conv_rows:
-        text = f"ユーザー: {row['user_text']}\nPETIT: {row['assistant_text']}"
-        ok = add(
-            "petit_conversations",
-            doc_id=f"conv_{row['id']}",
-            text=text,
-            metadata={"timestamp": row.get("timestamp", "")},
+        for row in memory_rows
+    ]
+    conv_docs = [
+        (
+            f"conv_{row['id']}",
+            f"ユーザー: {row['user_text']}\nPETIT: {row['assistant_text']}",
+            {"timestamp": row.get("timestamp", "")},
         )
-        if ok:
-            conv_count += 1
+        for row in conv_rows
+    ]
 
-    return {"memory": mem_count, "conversations": conv_count}
+    return {
+        "memory": add_many("petit_memory", mem_docs),
+        "conversations": add_many("petit_conversations", conv_docs),
+    }
+
+
+def embedding_stats() -> dict[str, int | None]:
+    return {
+        "requests": _embedding_stats.requests,
+        "inputs": _embedding_stats.inputs,
+        "last_elapsed_ms": _embedding_stats.last_elapsed_ms,
+    }
+
+
+def reset_embedding_stats() -> None:
+    _embedding_stats.requests = 0
+    _embedding_stats.inputs = 0
+    _embedding_stats.last_elapsed_ms = None

@@ -10,7 +10,7 @@
 - BRAIN / RAG: 実vault 290チャンクを確認。Embedding停止時でも自然な日本語質問から関連ノートを順位付き検索して会話へ少数件注入できる。`_private`・添付・内部設定は索引対象外。実Embedding検索はLM Studio停止中のため未確認。
 - 能動支援: 予定・優先順位・期限などの相談でNotionタスクと予定キャッシュを自動収集し、朝のopenerはブリーフィングを返す。外部サービスへの書き込みは明示確認後のみ。
 - 二モデル構成: 会話モデルとエージェントモデルのルーター、長文・ツール・複雑処理の判定、エージェント回答を会話モデルで整える受け渡しを実装。現在の`.env`では両方とも `qwen/qwen3.5-9b` へフォールバックしており、別モデルでの実動作は未確認。
-- 応答速度改善: `PETIT_DEFER_AGENT_JOBS=1` の場合、読み取り系の重い相談は軽量モデルで先に短く返し、`agent_followup` Job 完了後に追加返答する。標準テストは確認済み、実LM Studio + ブラウザでの体感確認は未確認。
+- 応答速度改善: 純粋な挨拶（例: `PETITこんばんわ`）はLLMを呼ばずアプリ側で即答する。雑談系チャットではBRAIN検索を行わない。BRAIN/vault同期はダミー検索Embeddingと未変更チャンク再Embeddingを廃止し、`content_hash` 比較で変更チャンクのみバッチUpsertする。会話保存後のChroma/Markdown反映はレスポンス後のバックグラウンド処理へ分離済み。構文・標準テスト・差分同期モック計測は確認済み、実LM Studio + ブラウザでの体感確認は未確認。
 - Google Calendar: Codex側コネクタの認証はPETITへ共有されないため、PETIT側は `PETIT_CALENDAR_ICS_URLS` / `PETIT_CALENDAR_ICS_FILES` からICSを読み取る同期アダプターを実装済み。サンプルICSで単体確認済み、実Google非公開iCal URLでの同期E2Eは未確認。
 - LM Studio: `/v1/models` は到達可能でモデル一覧を取得できる。tool実行後の再問い合わせは、LM Studioの一部Jinjaテンプレートで `role: tool` を処理できないため、ツール結果をユーザーfollow-upとして返す互換形式へ変更済み。構文と単体テスト8件は確認済み。実モデルでの「調べて」系最小実行はReadTimeoutで完走未確認、ブラウザ会話E2Eも未確認。
 - 次にやること: LM Studio側で会話モデル/エージェントモデルの応答速度とロード状態を確認 → PETITを再起動してブラウザ会話E2E → Google Calendarの非公開iCal URLまたはエクスポートICSを設定して `/api/calendar/sync` E2E → 週次レビュー／停滞プロジェクト検出を追加。
@@ -54,3 +54,5 @@
 | 2026-07-12 | 13:56 | #25 | Google Calendar向けICS読み取り同期を実装。`sync_calendar`ツール、`/api/calendar/sync`、朝ブリーフィング/状況注入への同期、README/.env例、単体テストを追加。実Google iCal URLでのE2Eは未確認。 |
 | 2026-07-12 | 17:09 | #26 | 軽量モデル即答 + `agent_followup` Job追記を実装。読み取り系の重い相談を遅延実行できるようにし、構文確認と標準 unittest 7件を確認。実LM Studio + ブラウザ体感は未確認。 |
 | 2026-07-12 | 17:28 | #27 | LM StudioのJinjaテンプレート互換性対策として、tool実行結果を`role: tool`ではなくユーザーfollow-up形式で再投入するよう修正。構文確認と標準 unittest 8件は確認済み、実モデル完走はReadTimeoutで未確認。 |
+| 2026-07-12 | 18:19 | #28 | 純粋な挨拶のLLM非依存即答と、会話保存後のChroma/Markdown反映のバックグラウンド化を実装。構文確認・標準 unittest 9件・一時DBでの即答スモークを確認、ブラウザ体感は未確認。 |
+| 2026-07-12 | 18:32 | #29 | BRAIN/vault同期のEmbedding重複対策を実装。同期開始時のダミー検索Embeddingを廃止し、チャンク `content_hash` 比較・変更分バッチUpsert・削除差分処理・Embedding統計/単調時計計測を追加。構文確認、標準 unittest 12件、モック計測を確認。実LM Studio + ブラウザ体感は未確認。 |

@@ -55,6 +55,51 @@ SYSTEM_PROMPT = """あなたは「PETIT」という名前の、ユーザー専�
 """
 
 
+_NAME_PREFIXES = ("petit", "PETIT", "Petit", "プチ", "ぺち")
+_GREETING_REPLIES = {
+    "おはよう": "おはよう。今日も短くいこう。",
+    "おはよ": "おはよ。今日も短くいこう。",
+    "こんにちは": "こんにちは。どうする？",
+    "こんにちわ": "こんにちは。どうする？",
+    "こんばんは": "こんばんは。おつかれさま、どうする？",
+    "こんばんわ": "こんばんは。おつかれさま、どうする？",
+    "やっほー": "やっほー。どうした？",
+    "やほ": "やほ。どうした？",
+    "ただいま": "おかえり。何からやる？",
+    "おつかれ": "おつかれさま。少し整理する？",
+    "お疲れ": "おつかれさま。少し整理する？",
+    "おやすみ": "おやすみ。今日はここまでにしよう。",
+}
+
+
+def _compact_for_intent(text: str) -> str:
+    return "".join(ch for ch in text.strip() if ch.isalnum() or ch in ("ー", "疲"))
+
+
+def _instant_reply(user_message: str) -> dict[str, Any] | None:
+    """Return app-side replies for turns where waiting on an LLM hurts UX."""
+    compact = _compact_for_intent(user_message)
+    if not compact:
+        return None
+    for name in _NAME_PREFIXES:
+        if compact.startswith(name):
+            compact = compact[len(name):]
+        if compact.endswith(name):
+            compact = compact[: -len(name)]
+    reply = _GREETING_REPLIES.get(compact)
+    if reply is None:
+        return None
+    return {
+        "reply": reply,
+        "used_tools": [],
+        "model_route": {
+            "kind": "instant",
+            "model": None,
+            "reasons": ["instant_greeting"],
+        },
+    }
+
+
 def _build_messages(
     user_message: str,
     history: list[dict[str, str]] | None,
@@ -164,6 +209,10 @@ def run(
     May raise LMStudioError if the model backend is unreachable; the caller
     is expected to translate that into a friendly response.
     """
+    instant = _instant_reply(user_message)
+    if instant is not None:
+        return instant
+
     route = model_router.choose(user_message, history)
     if config.DEFER_AGENT_JOBS and allow_defer and model_router.can_defer(user_message, route):
         job_id = _queue_agent_followup(user_message, history)
