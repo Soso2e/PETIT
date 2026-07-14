@@ -43,9 +43,9 @@ storage/   SQLite などの実行時データ（git 管理外）
 
 | 変数 | 既定値 | 説明 |
 |------|--------|------|
-| `PETIT_LM_BASE_URL` | `http://localhost:1234/v1` | LM Studio のエンドポイント |
-| `PETIT_LM_MODEL` | `local-model` | 使用モデル名（LM Studio 上の id） |
-| `PETIT_CHAT_MODEL` | `PETIT_LM_MODEL` | 通常会話とツール結果の返答に使う常駐モデル |
+| `PETIT_LM_BASE_URL` / `PETIT_LM_MODEL` / `PETIT_LM_API_KEY` | local default | 旧互換の共通設定。個別設定未指定時のフォールバック |
+| `PETIT_CHAT_BASE_URL` / `PETIT_CHAT_MODEL` / `PETIT_CHAT_API_KEY` | 各 `PETIT_LM_*` | 雑談・短い確認用の接続先・モデル |
+| `PETIT_AGENT_BASE_URL` / `PETIT_AGENT_MODEL` / `PETIT_AGENT_API_KEY` | 各 `PETIT_LM_*` | ツール・計画・BRAIN/Notion/予定用の接続先・モデル |
 | `PETIT_LIGHT_MAX_TOKENS` | `512` | 軽量回答の最大生成量 |
 | `PETIT_HOST` / `PETIT_PORT` | `127.0.0.1` / `8000` | サーバーの待受 |
 | `PETIT_OBSIDIAN_VAULT_DIRS` | なし | RAG検索対象にする既存Obsidian vault。Windowsは`;`区切りで複数指定 |
@@ -87,6 +87,9 @@ storage/   SQLite などの実行時データ（git 管理外）
 「今日何からやる？」のような計画相談では、未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理します。
 会話のEmbeddingとMarkdown出力は応答後のバックグラウンド処理です。
 Embeddingは同一テキストをプロセス内キャッシュで重複送信せず、Vaultはチャンク内容が変わったファイルだけ再Embeddingします。
+
+ChatとAgentはURL・APIキー・モデルを個別設定できます。両方を同じ値にすれば1モデル構成のままです。Agentの軽量`/models`確認が失敗した場合、既にPython側で安全に取得済みの読み取り結果はChatモデルで整形して返します。ツール選択・書き込みはChatへ勝手に落とさず、利用不能として表示します。
+`/api/health` は生成を行わないキャッシュ付きモデル確認、同期状態、索引状態を返します。各応答の詳細欄では経路、モデル、ツール、同期鮮度、LLM/Embedding回数、時間、Agentフォールバックを確認できます。
 
 Google CalendarのCodex/MCP接続はPETITプロセスへ自動共有されません。PETIT側で読むには
 `PETIT_CALENDAR_ICS_URLS` にGoogle Calendarの非公開iCal URLを設定するか、`PETIT_CALENDAR_ICS_FILES`

@@ -16,7 +16,8 @@ class ModelRoutingTests(unittest.TestCase):
     def test_simple_and_agent_routes(self) -> None:
         self.assertEqual(model_router.choose("やっほー")["kind"], "chat")
         self.assertEqual(model_router.choose("今日何をすればいい？")["kind"], "agent")
-        self.assertEqual(model_router.choose("a" * (config.AGENT_MESSAGE_CHARS + 1))["kind"], "agent")
+        # Length alone must not escalate a harmless message to the agent model.
+        self.assertEqual(model_router.choose("a" * 1000)["kind"], "chat")
 
         self.assertEqual(model_router.choose("今何時？")["kind"], "agent")
 
@@ -40,14 +41,13 @@ class ModelRoutingTests(unittest.TestCase):
         calls = []
         recall = Mock(return_value="")
 
-        def fake_chat(messages, tools=None, temperature=None, model=None):
+        def fake_chat(messages, tools=None, temperature=None, model=None, route="chat"):
             calls.append({"tools": tools, "model": model})
             return {"role": "assistant", "content": "こんにちは"}
 
         with (
             patch.object(config, "CHAT_MODEL", "chat-test"),
             patch.object(config, "AGENT_MODEL", "agent-test"),
-            patch.object(config, "DEFER_AGENT_JOBS", False),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
             patch.object(agent.tools, "dispatch", return_value='{"count":0,"tasks":[]}'),
             patch.object(agent.recall, "build_recall_block", recall),
@@ -61,7 +61,7 @@ class ModelRoutingTests(unittest.TestCase):
     def test_empty_length_answer_retries_once(self) -> None:
         calls = []
 
-        def fake_chat(messages, tools=None, temperature=None, model=None):
+        def fake_chat(messages, tools=None, temperature=None, model=None, route="chat"):
             calls.append({"tools": tools, "model": model})
             if len(calls) == 1:
                 return {"role": "assistant", "content": "", "_finish_reason": "length"}
@@ -77,14 +77,13 @@ class ModelRoutingTests(unittest.TestCase):
     def test_explicit_request_receives_only_related_tools(self) -> None:
         calls = []
 
-        def fake_chat(messages, tools=None, temperature=None, model=None):
+        def fake_chat(messages, tools=None, temperature=None, model=None, route="chat"):
             calls.append({"tools": tools, "model": model})
             return {"role": "assistant", "content": "確認したよ"}
 
         with (
             patch.object(config, "CHAT_MODEL", "chat-test"),
             patch.object(config, "AGENT_MODEL", "agent-test"),
-            patch.object(config, "DEFER_AGENT_JOBS", False),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
             patch.object(agent.recall, "build_recall_block", return_value=""),
             patch.object(agent.situation, "build_context_block", return_value=""),
@@ -95,6 +94,27 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertIsNone(calls[0]["tools"])
         self.assertEqual(result["used_tools"][0]["name"], "get_tasks")
         self.assertEqual(len(calls), 1)
+
+    def test_agent_read_falls_back_to_chat_without_skipping_the_read(self) -> None:
+        calls = []
+
+        def fake_chat(messages, tools=None, temperature=None, model=None, route="chat"):
+            calls.append(route)
+            if route == "agent":
+                raise agent.LMStudioError("agent unavailable")
+            return {"role": "assistant", "content": "Chatで読み取り結果を整理したよ"}
+
+        with (
+            patch.object(agent, "chat_completion", side_effect=fake_chat),
+            patch.object(agent.tools, "dispatch", return_value='{"count": 2, "tasks": []}') as dispatch,
+        ):
+            result = agent.run("今日のタスクを確認して")
+
+        dispatch.assert_called_once_with("get_tasks", {"limit": 10})
+        self.assertEqual(calls, ["agent", "chat"])
+        self.assertEqual(result["model_route"]["requested_route"], "agent")
+        self.assertEqual(result["model_route"]["actual_route"], "chat_fallback")
+        self.assertEqual(result["model_route"]["fallback_reason"], "agent_unavailable")
 
     def test_incomplete_task_read_is_not_misrouted_as_completion(self) -> None:
         with (
@@ -221,7 +241,7 @@ class ModelRoutingTests(unittest.TestCase):
     def test_tool_results_are_returned_as_user_followup_for_lmstudio_templates(self) -> None:
         calls = []
 
-        def fake_chat(messages, tools=None, temperature=None, model=None):
+        def fake_chat(messages, tools=None, temperature=None, model=None, route="chat"):
             calls.append({"messages": messages, "tools": tools, "model": model})
             if len(calls) == 1:
                 return {
@@ -240,7 +260,6 @@ class ModelRoutingTests(unittest.TestCase):
         with (
             patch.object(config, "CHAT_MODEL", "agent-test"),
             patch.object(config, "AGENT_MODEL", "agent-test"),
-            patch.object(config, "DEFER_AGENT_JOBS", False),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
             patch.object(agent.tools, "dispatch", return_value='{"ok": true, "items": []}'),
             patch.object(agent.recall, "build_recall_block", return_value=""),
@@ -259,14 +278,13 @@ class ModelRoutingTests(unittest.TestCase):
     def test_deferable_agent_turn_is_not_queued(self) -> None:
         calls = []
 
-        def fake_chat(messages, tools=None, temperature=None, model=None):
+        def fake_chat(messages, tools=None, temperature=None, model=None, route="chat"):
             calls.append({"tools": tools, "model": model})
             return {"role": "assistant", "content": "先に短く返すね"}
 
         with (
             patch.object(config, "CHAT_MODEL", "chat-test"),
             patch.object(config, "AGENT_MODEL", "agent-test"),
-            patch.object(config, "DEFER_AGENT_JOBS", True),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
             patch.object(agent.tools, "dispatch", return_value='{"count":0,"tasks":[]}'),
         ):
@@ -278,6 +296,16 @@ class ModelRoutingTests(unittest.TestCase):
 
 
 class LLMRequestTests(unittest.TestCase):
+    def test_endpoint_uses_independent_chat_and_agent_settings(self) -> None:
+        with (
+            patch.object(config, "CHAT_BASE_URL", "http://chat.example/v1"),
+            patch.object(config, "CHAT_MODEL", "chat-model"),
+            patch.object(config, "AGENT_BASE_URL", "http://agent.example/v1"),
+            patch.object(config, "AGENT_MODEL", "agent-model"),
+        ):
+            self.assertEqual(lmstudio_client.endpoint("chat")["base_url"], "http://chat.example/v1")
+            self.assertEqual(lmstudio_client.endpoint("agent")["model"], "agent-model")
+
     def test_chat_completion_rejects_messages_without_user_query(self) -> None:
         with self.assertRaises(lmstudio_client.LMStudioError):
             lmstudio_client.chat_completion([{"role": "system", "content": "test"}])

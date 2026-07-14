@@ -76,10 +76,11 @@ LM_MODEL = os.getenv("PETIT_LM_MODEL", "local-model").strip() or "local-model"
 LM_TEMPERATURE = float(os.getenv("PETIT_LM_TEMPERATURE", "0.7"))
 LM_TIMEOUT = float(os.getenv("PETIT_LM_TIMEOUT", "120"))
 CHAT_MODEL = os.getenv("PETIT_CHAT_MODEL", LM_MODEL).strip() or LM_MODEL
-AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", CHAT_MODEL).strip() or CHAT_MODEL
-AGENT_MESSAGE_CHARS = int(os.getenv("PETIT_AGENT_MESSAGE_CHARS", "280"))
-AGENT_HISTORY_CHARS = int(os.getenv("PETIT_AGENT_HISTORY_CHARS", "1800"))
-DEFER_AGENT_JOBS = False  # compatibility only; deferred agent turns are disabled
+CHAT_BASE_URL = os.getenv("PETIT_CHAT_BASE_URL", LM_BASE_URL).strip() or LM_BASE_URL
+CHAT_API_KEY = os.getenv("PETIT_CHAT_API_KEY", LM_API_KEY)
+AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", LM_MODEL).strip() or LM_MODEL
+AGENT_BASE_URL = os.getenv("PETIT_AGENT_BASE_URL", LM_BASE_URL).strip() or LM_BASE_URL
+AGENT_API_KEY = os.getenv("PETIT_AGENT_API_KEY", LM_API_KEY)
 LIGHT_MAX_TOKENS = int(os.getenv("PETIT_LIGHT_MAX_TOKENS", "512"))
 ENABLE_THINKING = os.getenv("PETIT_ENABLE_THINKING", "0") not in ("0", "false", "False")
 

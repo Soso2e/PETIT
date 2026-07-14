@@ -64,8 +64,6 @@ CREATE TABLE IF NOT EXISTS conversation_episodes (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id);
-
 CREATE TABLE IF NOT EXISTS summaries (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at   TEXT NOT NULL,
@@ -163,6 +161,7 @@ def init_db() -> None:
             },
         )
         _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER"})
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id)")
         _ensure_columns(conn, "memory", {"source": "TEXT NOT NULL DEFAULT 'explicit'", "content_hash": "TEXT", "embedding_model": "TEXT", "embedding_version": "TEXT", "indexed_at": "TEXT"})
         _ensure_columns(conn, "calendar_events_cache", {"source_key": "TEXT", "external_id": "TEXT"})
         conn.execute(

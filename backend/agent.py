@@ -152,12 +152,40 @@ def _tool_result_message(user_message: str, results: list[dict[str, str]]) -> di
     return {"role": "user", "content": "\n".join(lines)}
 
 
-def _answer(message: dict[str, Any], messages: list[dict[str, Any]], model: str) -> str:
+def _answer(message: dict[str, Any], messages: list[dict[str, Any]], model: str, route: str | None = None) -> str:
     content = (message.get("content") or "").strip()
     if content or message.get("_finish_reason") != "length":
         return content
-    retry = chat_completion(messages, tools=None, model=model)
+    retry = chat_completion(messages, tools=None, model=model, route=route or ("agent" if model == config.AGENT_MODEL else "chat"))
     return (retry.get("content") or "").strip()
+
+
+def _complete(
+    messages: list[dict[str, Any]], *, tools_schema: list[dict[str, Any]] | None,
+    route: str, allow_chat_fallback: bool = False,
+) -> tuple[dict[str, Any], str, str | None]:
+    """Call the selected endpoint; only safe read results may be rephrased by chat."""
+    try:
+        return chat_completion(messages, tools=tools_schema, model=config.AGENT_MODEL if route == "agent" else config.CHAT_MODEL, route=route), route, None
+    except LMStudioError:
+        if route != "agent" or not allow_chat_fallback:
+            raise
+        message = chat_completion(messages, tools=None, model=config.CHAT_MODEL, route="chat")
+        return message, "chat_fallback", "agent_unavailable"
+
+
+def _route_meta(requested: str, actual: str, tools_used: list[str], fallback_reason: str | None = None) -> dict[str, Any]:
+    endpoint_id = "chat" if actual == "chat_fallback" else actual
+    model = config.CHAT_MODEL if endpoint_id == "chat" else config.AGENT_MODEL
+    return {
+        "kind": requested,
+        "requested_route": requested,
+        "actual_route": actual,
+        "fallback_reason": fallback_reason,
+        "model": model,
+        "base_url_id": endpoint_id,
+        "tools": tools_used,
+    }
 
 
 def _tool_failed(result: str) -> bool:
@@ -223,12 +251,12 @@ def _run_planning_consultation(user_message: str, history: list[dict[str, str]] 
     messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(_recent_history(history))
     messages.append(_tool_result_message(user_message, results))
-    answer = chat_completion(messages, tools=None, model=config.AGENT_MODEL)
+    answer, actual, fallback_reason = _complete(messages, tools_schema=None, route="agent", allow_chat_fallback=True)
     return {
-        "reply": _answer(answer, messages, config.AGENT_MODEL),
+        "reply": _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent"),
         "used_tools": used_tools,
         "persist": not failed,
-        "model_route": {"kind": "planning", "model": config.AGENT_MODEL, "tools": [name for name, _ in calls]},
+        "model_route": _route_meta("agent", actual, [name for name, _ in calls], fallback_reason) | {"kind": "planning"},
     }
 
 
@@ -250,12 +278,12 @@ def _run_forced_read(
     messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(_recent_history(history))
     messages.append(_tool_result_message(user_message, [{"name": name, "content": content}]))
-    answer = chat_completion(messages, tools=None, model=config.AGENT_MODEL)
+    answer, actual, fallback_reason = _complete(messages, tools_schema=None, route="agent", allow_chat_fallback=True)
     return {
-        "reply": _answer(answer, messages, config.AGENT_MODEL),
+        "reply": _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent"),
         "used_tools": [{"name": name, "arguments": json.dumps(args, ensure_ascii=False)}],
         "persist": not _tool_failed(content),
-        "model_route": {"kind": "forced_read", "model": config.AGENT_MODEL, "tools": [name]},
+        "model_route": _route_meta("agent", actual, [name], fallback_reason) | {"kind": "forced_read"},
     }
 
 
@@ -289,10 +317,11 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
     # One call for normal chat. Explicit tool requests may need one additional
     # call to phrase the tool result; they still never receive unrelated tools.
     for _ in range(min(config.MAX_TOOL_ITERATIONS, 2)):
-        message = chat_completion(
-            messages,
-            tools=selected_tools or None,
-            model=config.AGENT_MODEL if tool_names else config.CHAT_MODEL,
+        requested_route = "agent" if tool_names else "chat"
+        message, actual_route, fallback_reason = _complete(
+            messages, tools_schema=selected_tools or None, route=requested_route,
+            # Tool selection and writes are not safe to silently degrade.
+            allow_chat_fallback=False,
         )
         tool_calls = message.get("tool_calls") or []
         if not tool_calls:
@@ -302,13 +331,13 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
                     "reply": "対象は確認できましたが、安全な変更案を確定できませんでした。対象ファイルと変更内容をもう少し具体的にしてください。",
                     "used_tools": used_tools,
                     "persist": False,
-                    "model_route": {"kind": "agent", "model": model, "tools": tool_names},
+                    "model_route": _route_meta(requested_route, actual_route, tool_names, fallback_reason),
                 }
             return {
-                "reply": _answer(message, messages, model),
+                "reply": _answer(message, messages, model, "chat" if actual_route == "chat_fallback" else requested_route),
                 "used_tools": used_tools,
                 "persist": not had_tool_failure,
-                "model_route": {"kind": "agent" if tool_names else "chat", "model": model, "tools": tool_names},
+                "model_route": _route_meta(requested_route, actual_route, tool_names, fallback_reason),
             }
         results: list[dict[str, str]] = []
         for call in tool_calls:
@@ -323,14 +352,14 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
                         "reply": "書き込み内容を解釈できませんでした。内容を具体的にしてもう一度お願いします。",
                         "used_tools": [],
                         "persist": False,
-                        "model_route": {"kind": "agent", "model": config.AGENT_MODEL, "tools": tool_names},
+                        "model_route": _route_meta("agent", "agent", tool_names),
                     }
                 return {
                     "reply": _confirmation_text(name, parsed_args),
                     "used_tools": used_tools,
                     "pending_actions": [{"name": name, "arguments": parsed_args}],
                     "persist": True,
-                    "model_route": {"kind": "agent", "model": config.AGENT_MODEL, "tools": tool_names},
+                    "model_route": _route_meta("agent", "agent", tool_names),
                 }
             result = tools.dispatch(name, args)
             attempted_tool_names.add(name)
@@ -340,5 +369,5 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
         messages.append(_tool_result_message(user_message, results))
         selected_tools = _selected_schemas([name for name in tool_names if name not in attempted_tool_names])
 
-    model = config.AGENT_MODEL if tool_names else config.CHAT_MODEL
-    return {"reply": "確認した結果を短くまとめられませんでした。", "used_tools": used_tools, "persist": False, "model_route": {"kind": "agent" if tool_names else "chat", "model": model, "tools": tool_names}}
+    requested_route = "agent" if tool_names else "chat"
+    return {"reply": "確認した結果を短くまとめられませんでした。", "used_tools": used_tools, "persist": False, "model_route": _route_meta(requested_route, requested_route, tool_names)}
