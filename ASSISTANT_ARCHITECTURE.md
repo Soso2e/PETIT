@@ -24,8 +24,8 @@ tasks, schedule, and recent conversation, and propose a concrete next action.
 ## Turn flow
 
 1. Classify the request locally.
-2. Route a short simple turn to the chat model; route tools, long context,
-   multi-part requests, planning, and personal-history work to the agent model.
+2. Route a short simple turn to the chat model; route tools, planning,
+   personal-history work, analysis, and implementation requests to the agent model.
 3. Search BRAIN and memory only when the turn can benefit from personal context.
 4. For planning turns, refresh Notion read-only and load bounded task/calendar
    context.
@@ -36,16 +36,20 @@ tasks, schedule, and recent conversation, and propose a concrete next action.
 
 ## Model routing
 
-- `PETIT_CHAT_MODEL`: short conversation and natural-language presentation.
-- `PETIT_AGENT_MODEL`: tool calling, long requests, multi-step reasoning,
+- `PETIT_CHAT_BASE_URL` / `PETIT_CHAT_MODEL` / `PETIT_CHAT_API_KEY`: short
+  conversation and natural-language presentation endpoint.
+- `PETIT_AGENT_BASE_URL` / `PETIT_AGENT_MODEL` / `PETIT_AGENT_API_KEY`: tool
+  calling, multi-step reasoning,
   BRAIN/Notion/calendar work, analysis, and implementation requests.
-- When the models differ, the chat model presents the agent draft without changing
-  facts, warnings, unknowns, or next actions.
-- `PETIT_AGENT_MESSAGE_CHARS` and `PETIT_AGENT_HISTORY_CHARS`: deterministic
-  length thresholds.
+- Routing is intent/source based, not a raw message/history length threshold.
+- Agent `/models` health is cached. If it is unavailable, only a read result
+  that PETIT has already obtained safely may be presented by Chat. Tool choice
+  and all writes remain unavailable rather than being silently skipped.
+- `/api/health` and each response's `model_route.observability` expose route,
+  model endpoint ID, tool list, calls, freshness, fallback and elapsed time.
 
-Both model variables fall back to `PETIT_LM_MODEL`, so a one-model setup remains
-valid.
+All Chat/Agent settings fall back to their `PETIT_LM_*` counterpart, so a
+one-model setup remains valid and an Agent can instead run on another PC/GPU.
 
 ## Current limitations
 

@@ -33,23 +33,9 @@ from .registry import tool
     requires_confirmation=True,
 )
 def save_memory(content: str, type: str = "note") -> dict[str, Any]:
-    now = db.now_iso()
-    with db.get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO memory (created_at, type, content) VALUES (?, ?, ?)",
-            (now, type, content),
-        )
-        memory_id = int(cur.lastrowid)
-
-    # Also index into Chroma (best-effort; silently skipped if LLM is down)
-    chroma_client.add(
-        "petit_memory",
-        doc_id=f"mem_{memory_id}",
-        text=content,
-        metadata={"type": type, "created_at": now},
-    )
-
-    return {"saved": True, "id": memory_id, "type": type, "content": content}
+    memory_id, created = db.save_memory_item(content, type, "explicit")
+    chroma_client.sync_structured_data(db.all_memory(), db.all_episodes())
+    return {"saved": True, "created": created, "id": memory_id, "type": type, "content": content, "source": "explicit"}
 
 
 @tool(
@@ -75,8 +61,7 @@ def save_memory(content: str, type: str = "note") -> dict[str, Any]:
 def search_memory(query: str, limit: int = 8, include_vault: bool = True) -> dict[str, Any]:
     # --- Semantic search (RAG) ---
     mem_results = chroma_client.query("petit_memory", query, n_results=limit)
-    conv_results = chroma_client.query("petit_conversations", query, n_results=limit)
-    sum_results = chroma_client.query("petit_summaries", query, n_results=limit)
+    episode_results = chroma_client.query("petit_episodes", query, n_results=limit)
     vault_results = (
         chroma_client.query(vault_indexer.COLLECTION_NAME, query, n_results=limit)
         if include_vault
@@ -85,7 +70,7 @@ def search_memory(query: str, limit: int = 8, include_vault: bool = True) -> dic
 
     # Use semantic results only if at least one collection actually returned matches.
     # None = embedding failed (LM Studio down); [] = no matches or empty collection.
-    has_semantic = bool(mem_results) or bool(conv_results) or bool(sum_results) or bool(vault_results)
+    has_semantic = bool(mem_results) or bool(episode_results) or bool(vault_results)
 
     if has_semantic:
         memories = [
@@ -97,22 +82,13 @@ def search_memory(query: str, limit: int = 8, include_vault: bool = True) -> dic
             }
             for r in (mem_results or [])
         ]
-        conversations = [
+        episodes = [
             {
                 "text": r["document"],
-                "timestamp": r["metadata"].get("timestamp", ""),
+                "type": "episode", "title": r["metadata"].get("title", ""), "started_at": r["metadata"].get("started_at", ""),
                 "relevance": round(1 - r["distance"], 3),
             }
-            for r in (conv_results or [])
-        ]
-        summaries = [
-            {
-                "summary": r["document"],
-                "created_at": r["metadata"].get("created_at", ""),
-                "kind": r["metadata"].get("kind", "interval"),
-                "relevance": round(1 - r["distance"], 3),
-            }
-            for r in (sum_results or [])
+            for r in (episode_results or [])
         ]
         vault_notes = [
             {
@@ -129,10 +105,9 @@ def search_memory(query: str, limit: int = 8, include_vault: bool = True) -> dic
             "query": query,
             "search_type": "semantic",
             "memories": memories,
-            "conversations": conversations,
-            "summaries": summaries,
+            "episodes": episodes,
             "vault_notes": vault_notes,
-            "found": len(memories) + len(conversations) + len(summaries) + len(vault_notes),
+            "found": len(memories) + len(episodes) + len(vault_notes),
         }
 
     # --- Fallback: SQLite LIKE search + Markdown keyword search ---
@@ -143,42 +118,25 @@ def search_memory(query: str, limit: int = 8, include_vault: bool = True) -> dic
             "WHERE content LIKE ? ORDER BY id DESC LIMIT ?",
             (like, limit),
         ).fetchall()
-        conv_rows = conn.execute(
-            "SELECT id, timestamp, user_text, assistant_text FROM conversations "
-            "WHERE user_text LIKE ? OR assistant_text LIKE ? ORDER BY id DESC LIMIT ?",
-            (like, like, limit),
-        ).fetchall()
-        sum_rows = conn.execute(
-            "SELECT id, created_at, kind, summary FROM summaries "
-            "WHERE summary LIKE ? OR facts LIKE ? ORDER BY id DESC LIMIT ?",
-            (like, like, limit),
+        episode_rows = conn.execute(
+            "SELECT episode_id, started_at, title, summary FROM conversation_episodes WHERE title LIKE ? OR summary LIKE ? OR facts LIKE ? ORDER BY episode_id DESC LIMIT ?",
+            (like, like, like, limit),
         ).fetchall()
 
     memories = [
         {"content": r["content"], "created_at": r["created_at"], "type": r["type"]}
         for r in mem_rows
     ]
-    conversations = [
-        {
-            "text": f"ユーザー: {r['user_text']}\nPETIT: {r['assistant_text']}",
-            "timestamp": r["timestamp"],
-        }
-        for r in conv_rows
-    ]
-    summaries = [
-        {"summary": r["summary"], "created_at": r["created_at"], "kind": r["kind"]}
-        for r in sum_rows
-    ]
+    episodes = [{"type": "episode", "title": r["title"], "summary": r["summary"], "started_at": r["started_at"]} for r in episode_rows]
     vault_notes = vault_indexer.keyword_search(query, limit=limit) if include_vault else []
     return {
         "query": query,
         "search_type": "keyword",
         "note": "embedding モデルが利用不可のためキーワード検索にフォールバックしました。",
         "memories": memories,
-        "conversations": conversations,
-        "summaries": summaries,
+        "episodes": episodes,
         "vault_notes": vault_notes,
-        "found": len(memories) + len(conversations) + len(summaries) + len(vault_notes),
+        "found": len(memories) + len(episodes) + len(vault_notes),
     }
 
 
@@ -195,7 +153,7 @@ def summarize_now() -> dict[str, Any]:
     # Imported lazily to avoid a circular import (summarizer -> tools 経由)
     from .. import summarizer
 
-    return summarizer.summarize_pending(kind="interval")
+    return summarizer.summarize_pending(kind="interval", force=True)
 
 
 @tool(

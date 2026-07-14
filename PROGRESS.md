@@ -10,12 +10,16 @@
 - BRAIN / RAG: 実vaultの限定検索と、対象ファイル・追記内容の確認後に既存Markdownへ追記するE2Eを確認済み。`_private`・除外フォルダ・Vault外・Markdown以外は編集拒否し、変更後は該当ノートを再索引化する。
 - 能動支援: 「今日何からやる？」では未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理する。雑談ではツール・RAG・Embeddingを動かさない。
 - 書き込み確認: Notion、ローカル予定、長期記憶、引き継ぎ、BRAINの書き込みツールは10分有効のプレビューへ変換し、ブラウザの「実行する」確認後に同一引数を1回だけ実行する。
-- 二モデル構成: 会話モデルとエージェントモデルのルーター、長文・ツール・複雑処理の判定、エージェント回答を会話モデルで整える受け渡しを実装。現在の`.env`では両方とも `qwen/qwen3.5-9b` へフォールバックしており、別モデルでの実動作は未確認。
+- 二モデル構成: Chat/AgentのURL・モデル・APIキーを独立設定でき、未設定時は従来の`PETIT_LM_*`へフォールバックする。ルーティングは意図・関連ソースに基づき、長さだけではAgentへ送らない。安全に取得済みの読み取り結果だけはAgent停止時にChatで整形でき、ツール選択・書き込みは省略せず利用不能として返す。実別PC/別GPU動作は未確認。
 - 応答速度改善: 通常会話は9B用の`CHAT_MODEL`・短いsystem prompt・直近5会話・LM Studio 1回に固定し、ツール・RAG・Embeddingを実行しない。空回答、LM Studio/内部エラー、ツール失敗はSQLite・Markdown・Embeddingへ保存しない。実ブラウザで雑談・時刻・天気・各連携の応答を確認済み。
 - 軽量回答上限: `PETIT_LIGHT_MAX_TOKENS` を 512 に変更済み。`PETIT_ENABLE_THINKING=0` と `.env.example` に反映済み。実LM Studio応答のreasoning tokens 0は未確認。
 - Calendar: ICSは読み取り専用同期、`add_schedule`はPETITローカル予定への書き込みとして分離。ローカル予定の確認付き追加・再取得は実ブラウザE2E済み。実Google非公開iCal URLは未設定のため同期E2E未確認。将来のGoogle書き込みはprovider境界へ追加する。
-- LM Studio: `/v1/models` と `qwen/qwen3.5-9b` の実会話・tool callingを確認済み。空の`PETIT_AGENT_MODEL`は会話モデルへフォールバックする。別の27Bエージェントモデル構成は未確認。
-- 次にやること: Google Calendarの非公開iCal URLまたはエクスポートICSを設定して `/api/calendar/sync` E2E → 27Bエージェントモデルを設定して同じE2Eケースを再測定 → 週次レビュー／停滞プロジェクト検出を追加。
+- 観測性: `/api/health` はChat/Agent別のキャッシュ付き`/models`確認（接続先、モデル、loaded、遅延、Agentフォールバック可否）を返す。各ターンはrequest ID、実経路、モデル／endpoint ID、ツール、LLM回数、同期状態、参照件数、フォールバック、時間をログ・折りたたみ詳細へ出す。実ブラウザ表示は未確認。
+- LM Studio: 現在の実行環境ではChat/Agentの`/models`到達を確認できず、実モデル総合E2E・1/2モデル時間比較は未実施。単体テストで接続先分離とAgent→Chat読み取りフォールバックを確認済み。
+- 外部同期信頼性: Notion/ICS/TimeTreeの成功・失敗・stale状態をSQLite `sync_state` に保存する実装済み。自動テスト済み、実認証情報を使うNotion/Google/TimeTree E2Eは未確認。
+- 会話記憶: 短期（ブラウザセッション履歴）、エピソード（SQLite `conversation_episodes` / `petit_episodes`）、長期（SQLite `memory`）を分離。エピソードは20分のアイドル、8往復、明示まとめ、定期実行で確定する。単体テスト済み、実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。
+- 索引: SQLite記憶/エピソードは`content_hash`・Embeddingモデル/版・Chromaメタデータで差分だけを再索引化する。Vault差分索引は維持。起動時の実LM Studio件数は未測定。
+- 次にやること: LM Studioを起動して1モデル（Chat/Agent同一9B）と2モデル（別endpoint）で、READMEの意図別チャット・承認・同期・記憶・再起動ケースを実ブラウザ確認する。Agent停止／復旧、stale表示、起動前後Embedding件数、各経路の応答時間を記録する。
 
 ## 履歴
 
@@ -63,3 +67,7 @@
 | 2026-07-12 | 19:08 | #32 | `PETIT_LIGHT_MAX_TOKENS` の既定値を 512 に変更し、README の設定表も更新。設定反映のみで実動作は未確認。 |
 | 2026-07-12 | 19:23 | #33 | 通常会話を9B/Thinking OFF/LLM 1回へ統一し、関連ツール限定の27B経路、空回答再試行、messages user検証、空回答保存抑止、request ID、healthキャッシュ、Embedding重複ロックを実装。標準テスト15件・compileall・diffチェックを確認、実LM Studio + ブラウザE2Eは未確認。 |
 | 2026-07-12 | 20:11 | #34 | 動作確認済み: 意図別の限定取得、書き込み承認キュー、BRAIN安全編集、Calendar read/write分離、失敗保存抑止を実装。標準テスト30件と実ブラウザ+LM Studioで雑談/時刻/天気/Notion取得・作成・完了/BRAIN検索・追記/予定取得・追加をE2E確認。実Google ICSと別27Bモデルは未確認。 |
+
+| 2026-07-14 | 00:00 | #35 | Notion/ICS/TimeTreeの同期状態をSQLiteへ永続化し、失敗時キャッシュ維持・stale表示・TimeTree読取アダプター・回帰テストを追加。実サービスE2Eは未確認。 |
+| 2026-07-14 | 12:09 | #36 | 会話記憶を短期・エピソード・長期へ分離。エピソードSQLite/Markdown/Chroma差分索引、失敗時再試行、長期記憶の重複抑止と出典、ブラウザセッションID、回帰テストを追加。実ブラウザ＋実LM StudioのエピソードE2Eは未確認。 |
+| 2026-07-14 | 13:41 | #37 | 2モデル分散・観測性を実装。Chat/Agentの独立endpoint設定と旧設定fallback、Agent停止時の安全なChat整形fallback、`/api/health`別モデル状態、ターン詳細表示・ログ、無効な長さ/遅延Agent設定削除、旧DB索引作成順を修正。標準unittest 43件・compileall・health構造スモークは確認、実LM Studio/ブラウザE2Eと計測は未実施。 |

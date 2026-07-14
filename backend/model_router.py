@@ -13,31 +13,13 @@ _AGENT_SIGNALS = (
     "今何時", "今日何日", "現在時刻", "完了", "終わった", "中断", "復帰",
 )
 
-_DEFERABLE_SIGNALS = (
-    "今日何", "何すれば", "予定", "カレンダー", "タスク", "notion", "brain",
-    "記憶", "検索", "調べ", "ニュース", "天気", "分析", "比較", "優先",
-    "どこまで", "続き", "復帰", "まとめ", "プロジェクト", "方針",
-)
-
-_IMMEDIATE_ACTION_SIGNALS = (
-    "覚えて", "保存", "タスクにして", "追加して", "作って", "登録して",
-    "完了", "終わった", "消して", "削除", "更新して", "同期して",
-    "今何時", "今日何日", "現在時刻",
-)
-
-
 def choose(
     user_message: str,
     history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return the selected model plus transparent routing reasons."""
     text = user_message.strip()
-    history_chars = sum(len(str(item.get("content", ""))) for item in (history or []))
     reasons: list[str] = []
-    if len(text) >= config.AGENT_MESSAGE_CHARS:
-        reasons.append("long_request")
-    if history_chars >= config.AGENT_HISTORY_CHARS:
-        reasons.append("long_context")
     lowered = text.casefold()
     if any(signal.casefold() in lowered for signal in _AGENT_SIGNALS):
         reasons.append("tools_or_reasoning")
@@ -53,12 +35,6 @@ def choose(
 
 
 def can_defer(user_message: str, route: dict[str, Any]) -> bool:
-    """Whether this agent turn can safely run as a follow-up job."""
-    if route.get("kind") != "agent":
-        return False
-    text = user_message.strip().casefold()
-    if not text:
-        return False
-    if any(signal.casefold() in text for signal in _IMMEDIATE_ACTION_SIGNALS):
-        return False
-    return any(signal.casefold() in text for signal in _DEFERABLE_SIGNALS)
+    """Deferred chat turns were removed; keep this compatibility helper false."""
+    del user_message, route
+    return False

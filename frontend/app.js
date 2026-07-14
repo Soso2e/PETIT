@@ -8,8 +8,16 @@ const statusEl = document.getElementById("status");
 
 // In-memory conversation history sent back to the model for context.
 const history = [];
+const sessionId = localStorage.getItem("petit_session_id") || crypto.randomUUID();
+localStorage.setItem("petit_session_id", sessionId);
 
-function addMessage(role, text, { tools, error, actions } = {}) {
+function freshnessLabel(status, label) {
+  if (!status || !status.configured) return `${label}: 未使用`;
+  if (status.error) return `${label}: ${status.stale ? "古いキャッシュ" : "同期失敗"}`;
+  return `${label}: ${status.stale ? "古いキャッシュ" : "最新"}`;
+}
+
+function addMessage(role, text, { tools, error, actions, modelRoute } = {}) {
   const wrap = document.createElement("div");
   wrap.className = `msg msg--${role}`;
 
@@ -38,6 +46,29 @@ function addMessage(role, text, { tools, error, actions } = {}) {
     bubble.appendChild(controls);
     approve.addEventListener("click", () => decideAction(actions[0].approval_id, true, controls));
     cancel.addEventListener("click", () => decideAction(actions[0].approval_id, false, controls));
+  }
+
+  if (modelRoute && modelRoute.observability) {
+    const o = modelRoute.observability;
+    const details = document.createElement("details");
+    details.className = "turn-details";
+    const summary = document.createElement("summary");
+    const fallback = o.fallback ? " · Agentフォールバック" : "";
+    summary.textContent = `詳細 · ${o.actual_route || "instant"}${fallback}`;
+    const body = document.createElement("div");
+    body.textContent = [
+      `経路: ${o.actual_route || "instant"}`,
+      `モデル: ${o.model || "LLM未使用"}`,
+      `ツール: ${(o.tools || []).join(", ") || "なし"}`,
+      freshnessLabel(o.notion_sync, "Notion"),
+      freshnessLabel(o.calendar_sync, "Calendar"),
+      `BRAIN: ${o.brain_references || 0}件`,
+      `Memory: ${o.memory_references || 0}件`,
+      `LLM: ${o.llm_calls || 0}回 / Embedding: ${o.embedding_calls || 0}回`,
+      `処理時間: ${((o.elapsed_ms || 0) / 1000).toFixed(1)}秒`,
+    ].join("\n");
+    details.append(summary, body);
+    bubble.appendChild(details);
   }
 
   messagesEl.appendChild(wrap);
@@ -105,9 +136,9 @@ async function checkHealth() {
   try {
     const res = await fetch("/api/health");
     const data = await res.json();
-    if (data.lm_studio && data.lm_studio.ok) {
-      const models = data.lm_studio.models || [];
-      statusEl.textContent = "LM Studio 接続OK" + (models.length ? ` (${models[0]})` : "");
+    if (data.chat_model && data.chat_model.server_ok) {
+      const fallback = data.agent_model && !data.agent_model.server_ok ? " / Agentフォールバック可" : "";
+      statusEl.textContent = "Chat 接続OK" + fallback;
       statusEl.className = "status status--ok";
     } else {
       statusEl.textContent = "LM Studio 未接続";
@@ -130,7 +161,7 @@ async function sendMessage(text) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history, request_id: requestId }),
+      body: JSON.stringify({ message: text, history, request_id: requestId, session_id: sessionId }),
     });
     const data = await res.json();
     setTyping(false);
@@ -143,7 +174,7 @@ async function sendMessage(text) {
     } else {
       history.push({ role: "user", content: text });
       if (data.reply) {
-        addMessage("assistant", data.reply, { tools: data.used_tools, actions: data.pending_actions });
+        addMessage("assistant", data.reply, { tools: data.used_tools, actions: data.pending_actions, modelRoute: data.model_route });
         history.push({ role: "assistant", content: data.reply });
       }
     }

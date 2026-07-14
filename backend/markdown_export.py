@@ -103,6 +103,28 @@ def append_summary(summary: str, facts: list[str] | None, kind: str = "interval"
         return False
 
 
+def append_episode(episode: dict[str, Any]) -> bool:
+    """Write one readable episode note; raw turn logs remain in the daily note."""
+    try:
+        day = str(episode["started_at"])[:10]
+        stamp = str(episode["started_at"])[11:16].replace(":", "-")
+        path = config.AI_DAILY_DIR / f"{day}-episode-{episode['episode_id']}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        def block(name: str, raw: str) -> str:
+            import json
+            values = json.loads(raw) if raw else []
+            return "\n".join(f"- {value}" for value in values) or "- なし"
+        path.write_text(
+            f"---\ntype: petit_episode\nepisode_id: {episode['episode_id']}\nstarted_at: {episode['started_at']}\nended_at: {episode['ended_at']}\n---\n\n"
+            f"# {episode['title']} - {day} {stamp}\n\n## 概要\n\n{episode['summary']}\n\n## 決定事項\n\n{block('decisions', episode['decisions'])}\n\n## 作業中\n\n{block('work', episode['work_in_progress'])}\n\n## 次にやること\n\n{block('next', episode['next_action'])}\n\n## 関連会話\n\n{episode['source_ids']}\n",
+            encoding="utf-8",
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.debug("markdown append (episode) failed: %s", exc)
+        return False
+
+
 def append_memory(content: str, mem_type: str = "note") -> bool:
     """Append a durable memory item to AI_Memory/<type>.md (Obsidian-linkable).
 

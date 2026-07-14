@@ -82,6 +82,9 @@ body {
   color: var(--muted);
   margin-top: 6px;
 }
+.turn-details { margin-top: 8px; color: var(--muted); font-size: 11px; }
+.turn-details summary { cursor: pointer; }
+.turn-details div { margin-top: 5px; white-space: pre-wrap; line-height: 1.5; }
 
 .action-confirm { display: flex; gap: 8px; margin-top: 10px; }
 .action-confirm button {

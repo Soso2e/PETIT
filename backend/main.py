@@ -46,11 +46,10 @@ def _shutdown() -> None:
 
 
 def _chroma_sync() -> None:
-    """Index SQLite memory, conversations, and configured Obsidian vaults."""
+    """Incrementally index SQLite memory/episodes and configured vaults."""
     try:
         mem_rows = db.all_memory()
-        conv_rows = db.recent_conversations(limit=500)
-        counts = chroma_client.sync_from_sqlite(mem_rows, conv_rows)
+        counts = chroma_client.sync_structured_data(mem_rows, db.all_episodes())
         vault_counts = vault_indexer.index_configured_vaults()
         if any(counts.values()) or vault_counts.get("chunks"):
             log.info("Chroma sync: %s vault=%s", counts, vault_counts)
@@ -62,6 +61,7 @@ class ChatRequest(BaseModel):
     message: str
     history: list[dict[str, str]] | None = None
     request_id: str | None = None
+    session_id: str | None = None
 
 
 class PendingAction(BaseModel):
@@ -90,14 +90,17 @@ _PENDING_ACTION_TTL_SECONDS = 600
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
+    chat_health = lmstudio_client.health("chat")
+    agent_health = lmstudio_client.health("agent")
     try:
         mem_count = chroma_client._collection("petit_memory").count()
         conv_count = chroma_client._collection("petit_conversations").count()
+        episode_count = chroma_client._collection("petit_episodes").count()
         vault_count = chroma_client._collection("petit_vault").count()
         rag_info: dict[str, Any] = {
             "available": True,
             "embed_model": config.EMBED_MODEL,
-            "indexed": {"memory": mem_count, "conversations": conv_count, "vault": vault_count},
+            "indexed": {"memory": mem_count, "conversations_legacy": conv_count, "episodes": episode_count, "vault": vault_count},
             "embedding_stats": chroma_client.embedding_stats(),
         }
     except Exception:  # noqa: BLE001
@@ -109,16 +112,20 @@ def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "tools": tools.registered_names(),
-        "lm_studio": lmstudio_client.health(),
+        # `lm_studio` is retained for older clients; new clients use the two
+        # explicit model entries below.
+        "lm_studio": {"ok": chat_health["server_ok"], "models": chat_health.get("models", []), "base_url": chat_health["base_url"]},
+        "chat_model": chat_health,
+        "agent_model": agent_health | {"fallback_available": bool(chat_health["server_ok"])},
         "notion": {
             "configured": config.notion_configured(),
-            "db_id": config.NOTION_TASKS_DB_ID[:8] + "…" if config.NOTION_TASKS_DB_ID else None,
+            "sync": __import__("backend.tools.notion", fromlist=["status"]).status(),
         },
         "rag": rag_info,
         "auto_summary": {
             "enabled": config.AUTO_SUMMARY_ENABLED,
             "interval_hours": config.SUMMARY_INTERVAL_HOURS,
-            "summaries": len(db.recent_summaries(limit=1000)),
+            "summaries": len(db.recent_summaries(limit=1000)), "episodes": len(db.recent_episodes(limit=1000)),
         },
         "markdown": markdown_export.status(),
         "obsidian_vault": vault_indexer.status(),
@@ -129,10 +136,9 @@ def health() -> dict[str, Any]:
             "read_adapter": "ics",
             "write_providers": calendar_providers.available(),
         },
-        "model_routing": {
-            "chat_model": config.CHAT_MODEL,
-            "agent_model": config.AGENT_MODEL,
-        },
+        "brain": vault_indexer.status(),
+        "memory": {"episodes": len(db.recent_episodes(limit=1000)), "long_term": len(db.all_memory())},
+        "model_routing": {"chat_model": config.CHAT_MODEL, "agent_model": config.AGENT_MODEL},
     }
 
 
@@ -145,7 +151,8 @@ def chat(req: ChatRequest) -> ChatResponse:
 
     started = time.monotonic()
     try:
-        result = agent.run(message, history=req.history)
+        with lmstudio_client.observe_turn() as turn_metrics:
+            result = agent.run(message, history=req.history)
     except LMStudioError as exc:
         return ChatResponse(reply="", error=str(exc), request_id=request_id)
     except Exception as exc:  # noqa: BLE001
@@ -156,7 +163,6 @@ def chat(req: ChatRequest) -> ChatResponse:
     model_route["elapsed_ms"] = elapsed_ms
 
     used_tools = result.get("used_tools") or []
-    used_tools_str = ", ".join(t["name"] for t in used_tools) or None
     reply = (result.get("reply") or "").strip()
     pending_actions = _register_pending_actions(result.get("pending_actions") or [])
     if not reply:
@@ -166,15 +172,38 @@ def chat(req: ChatRequest) -> ChatResponse:
             model_route=model_route,
             request_id=request_id,
         )
+    tool_names = [str(item.get("name")) for item in used_tools]
+    model_route["observability"] = {
+        "request_id": request_id,
+        "requested_route": model_route.get("requested_route", model_route.get("kind", "instant")),
+        "actual_route": model_route.get("actual_route", model_route.get("kind", "instant")),
+        "model": model_route.get("model"),
+        "base_url_id": model_route.get("base_url_id"),
+        "tools": tool_names,
+        "llm_calls": turn_metrics["llm_calls"],
+        "embedding_calls": 0,
+        "notion_sync": __import__("backend.tools.notion", fromlist=["status"]).status(),
+        "calendar_sync": calendar_sync.status(),
+        "brain_references": int("search_brain_notes" in tool_names),
+        "memory_references": int("search_memory" in tool_names),
+        "fallback": model_route.get("actual_route") == "chat_fallback",
+        "elapsed_ms": elapsed_ms,
+        "error_type": None,
+    }
+    log.info("chat request_id=%s requested=%s actual=%s model=%s endpoint=%s tools=%s llm_calls=%s embedding_calls=0 fallback=%s elapsed_ms=%s error_type=%s",
+             request_id, model_route["observability"]["requested_route"], model_route["observability"]["actual_route"],
+             model_route["observability"]["model"], model_route["observability"]["base_url_id"], tool_names,
+             turn_metrics["llm_calls"], model_route["observability"]["fallback"], elapsed_ms, None)
+    used_tools_str = ", ".join(t["name"] for t in used_tools) or None
     if result.get("persist", True):
         conv_id = db.save_conversation(
             user_text=message,
             assistant_text=reply,
-            used_tools=used_tools_str,
+            used_tools=used_tools_str, session_id=(req.session_id or "").strip() or None,
         )
         threading.Thread(
             target=_persist_chat_artifacts,
-            args=(conv_id, message, reply, used_tools_str),
+        args=(conv_id, message, reply, used_tools_str),
             daemon=True,
         ).start()
     return ChatResponse(

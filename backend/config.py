@@ -76,10 +76,11 @@ LM_MODEL = os.getenv("PETIT_LM_MODEL", "local-model").strip() or "local-model"
 LM_TEMPERATURE = float(os.getenv("PETIT_LM_TEMPERATURE", "0.7"))
 LM_TIMEOUT = float(os.getenv("PETIT_LM_TIMEOUT", "120"))
 CHAT_MODEL = os.getenv("PETIT_CHAT_MODEL", LM_MODEL).strip() or LM_MODEL
-AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", CHAT_MODEL).strip() or CHAT_MODEL
-AGENT_MESSAGE_CHARS = int(os.getenv("PETIT_AGENT_MESSAGE_CHARS", "280"))
-AGENT_HISTORY_CHARS = int(os.getenv("PETIT_AGENT_HISTORY_CHARS", "1800"))
-DEFER_AGENT_JOBS = False  # compatibility only; deferred agent turns are disabled
+CHAT_BASE_URL = os.getenv("PETIT_CHAT_BASE_URL", LM_BASE_URL).strip() or LM_BASE_URL
+CHAT_API_KEY = os.getenv("PETIT_CHAT_API_KEY", LM_API_KEY)
+AGENT_MODEL = os.getenv("PETIT_AGENT_MODEL", LM_MODEL).strip() or LM_MODEL
+AGENT_BASE_URL = os.getenv("PETIT_AGENT_BASE_URL", LM_BASE_URL).strip() or LM_BASE_URL
+AGENT_API_KEY = os.getenv("PETIT_AGENT_API_KEY", LM_API_KEY)
 LIGHT_MAX_TOKENS = int(os.getenv("PETIT_LIGHT_MAX_TOKENS", "512"))
 ENABLE_THINKING = os.getenv("PETIT_ENABLE_THINKING", "0") not in ("0", "false", "False")
 
@@ -92,6 +93,11 @@ AUTO_SUMMARY_ENABLED = os.getenv("PETIT_AUTO_SUMMARY_ENABLED", "1") not in ("0",
 SUMMARY_INTERVAL_HOURS = float(os.getenv("PETIT_SUMMARY_INTERVAL_HOURS", "3"))
 # この件数未満の未処理会話しかなければ要約をスキップする（無駄なLLM呼び出し回避）
 SUMMARY_MIN_CONVERSATIONS = int(os.getenv("PETIT_SUMMARY_MIN_CONVERSATIONS", "1"))
+# Episodes are finalized only after a useful boundary.  This deliberately keeps
+# ordinary chat on its one-call path; these values are consumed asynchronously.
+EPISODE_IDLE_MINUTES = int(os.getenv("PETIT_EPISODE_IDLE_MINUTES", "20"))
+EPISODE_MAX_TURNS = int(os.getenv("PETIT_EPISODE_MAX_TURNS", "8"))
+EMBEDDING_VERSION = os.getenv("PETIT_EMBEDDING_VERSION", "1")
 
 # Embeddings (for RAG search via LM Studio)
 # Load a dedicated embedding model in LM Studio (e.g. nomic-embed-text, bge-m3)
@@ -126,10 +132,17 @@ NOTION_SYNC_TTL_SECONDS = float(os.getenv("NOTION_SYNC_TTL_SECONDS", "300"))
 CALENDAR_ICS_URLS = _list_from_env("PETIT_CALENDAR_ICS_URLS")
 CALENDAR_ICS_FILES = _path_list_from_env("PETIT_CALENDAR_ICS_FILES")
 CALENDAR_SYNC_TTL_SECONDS = float(os.getenv("PETIT_CALENDAR_SYNC_TTL_SECONDS", "300"))
+TIMETREE_EMAIL = os.getenv("TIMETREE_EMAIL", "")
+TIMETREE_PASSWORD = os.getenv("TIMETREE_PASSWORD", "")
+TIMETREE_CALENDAR_CODE = os.getenv("TIMETREE_CALENDAR_CODE", "")
 
 
 def notion_configured() -> bool:
     return bool(NOTION_API_KEY and NOTION_TASKS_DB_ID)
+
+
+def timetree_configured() -> bool:
+    return bool(TIMETREE_EMAIL and TIMETREE_PASSWORD and TIMETREE_CALENDAR_CODE)
 
 
 # Ensure storage exists

@@ -196,33 +196,51 @@ def query(
         return None
 
 
+def _existing_metadata(collection_name: str, ids: list[str]) -> dict[str, dict[str, Any]]:
+    if not ids:
+        return {}
+    try:
+        data = _collection(collection_name).get(ids=ids, include=["metadatas"])
+        return {str(key): value or {} for key, value in zip(data.get("ids") or [], data.get("metadatas") or [])}
+    except Exception:
+        return {}
+
+
+def sync_structured_data(memory_rows: list[dict[str, Any]], episode_rows: list[dict[str, Any]]) -> dict[str, int]:
+    """Incrementally index SQLite canonical data. Unchanged metadata emits no embedding request."""
+    from . import db
+    specs = [
+        ("petit_memory", memory_rows, "mem_", "id", lambda r: r["content"], lambda r: {"type": r.get("type", "note"), "source": r.get("source", "explicit"), "created_at": r.get("created_at", "")}, db.update_memory_indexed),
+        ("petit_episodes", episode_rows, "episode_", "episode_id", lambda r: "\n".join([r["title"], r["summary"], r.get("decisions", ""), r.get("facts", ""), r.get("work_in_progress", ""), r.get("next_action", "")]), lambda r: {"type": "episode", "title": r["title"], "started_at": r["started_at"], "ended_at": r["ended_at"]}, db.update_episode_indexed),
+    ]
+    counts: dict[str, int] = {"memory": 0, "episodes": 0}
+    for label, rows, prefix, key, text_of, meta_of, mark in specs:
+        ids = [f"{prefix}{row[key]}" for row in rows]
+        existing = _existing_metadata(label, ids)
+        docs: list[tuple[str, str, dict[str, Any]]] = []
+        changed: list[int] = []
+        for row, doc_id in zip(rows, ids):
+            text = text_of(row)
+            import hashlib
+            digest = row.get("content_hash") or hashlib.sha256(text.encode("utf-8")).hexdigest()
+            current = existing.get(doc_id, {})
+            if current.get("content_hash") == digest and current.get("embedding_model") == config.EMBED_MODEL and current.get("embedding_version") == config.EMBEDDING_VERSION:
+                continue
+            docs.append((doc_id, text, {**meta_of(row), "content_hash": digest, "embedding_model": config.EMBED_MODEL, "embedding_version": config.EMBEDDING_VERSION, "indexed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}))
+            changed.append(int(row[key]))
+        if not docs:
+            continue
+        indexed = add_many(label, docs)
+        if indexed == len(docs):
+            for row_id in changed:
+                mark(row_id, config.EMBED_MODEL, config.EMBEDDING_VERSION)
+        counts["memory" if label == "petit_memory" else "episodes"] = indexed
+    return counts
+
+
 def sync_from_sqlite(memory_rows: list[dict[str, Any]], conv_rows: list[dict[str, Any]]) -> dict[str, int]:
-    """Bulk-upsert SQLite rows into Chroma (called on startup).
-
-    Skips gracefully if embeddings are unavailable.
-    Returns counts of indexed items per collection.
-    """
-    mem_docs = [
-        (
-            f"mem_{row['id']}",
-            row["content"],
-            {"type": row.get("type", "note"), "created_at": row.get("created_at", "")},
-        )
-        for row in memory_rows
-    ]
-    conv_docs = [
-        (
-            f"conv_{row['id']}",
-            f"ユーザー: {row['user_text']}\nPETIT: {row['assistant_text']}",
-            {"timestamp": row.get("timestamp", "")},
-        )
-        for row in conv_rows
-    ]
-
-    return {
-        "memory": add_many("petit_memory", mem_docs),
-        "conversations": add_many("petit_conversations", conv_docs),
-    }
+    """Compatibility wrapper; raw conversations are no longer a primary index."""
+    return sync_structured_data(memory_rows, [])
 
 
 def embedding_stats() -> dict[str, int | None]:
