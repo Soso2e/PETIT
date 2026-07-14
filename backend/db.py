@@ -6,6 +6,7 @@ actually uses. New tables can be added as features land.
 from __future__ import annotations
 
 import sqlite3
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -28,15 +29,42 @@ CREATE TABLE IF NOT EXISTS conversations (
     timestamp     TEXT NOT NULL,
     user_text     TEXT NOT NULL,
     assistant_text TEXT NOT NULL,
-    used_tools    TEXT
+    used_tools    TEXT,
+    session_id    TEXT,
+    episode_id    INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS memory (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,
     type       TEXT NOT NULL DEFAULT 'note',
-    content    TEXT NOT NULL
+    content    TEXT NOT NULL,
+    source     TEXT NOT NULL DEFAULT 'explicit',
+    content_hash TEXT,
+    embedding_model TEXT,
+    embedding_version TEXT,
+    indexed_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS conversation_episodes (
+    episode_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    ended_at TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    decisions TEXT NOT NULL DEFAULT '[]',
+    facts TEXT NOT NULL DEFAULT '[]',
+    work_in_progress TEXT NOT NULL DEFAULT '[]',
+    next_action TEXT NOT NULL DEFAULT '[]',
+    source_conversation_ids TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    embedding_model TEXT,
+    embedding_version TEXT,
+    indexed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id);
 
 CREATE TABLE IF NOT EXISTS summaries (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,6 +162,8 @@ def init_db() -> None:
                 "done_date": "TEXT",
             },
         )
+        _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER"})
+        _ensure_columns(conn, "memory", {"source": "TEXT NOT NULL DEFAULT 'explicit'", "content_hash": "TEXT", "embedding_model": "TEXT", "embedding_version": "TEXT", "indexed_at": "TEXT"})
         _ensure_columns(conn, "calendar_events_cache", {"source_key": "TEXT", "external_id": "TEXT"})
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_source_external "
@@ -186,12 +216,12 @@ def record_sync_failure(source: str, error: str) -> str:
     return now
 
 
-def save_conversation(user_text: str, assistant_text: str, used_tools: str | None = None) -> int:
+def save_conversation(user_text: str, assistant_text: str, used_tools: str | None = None, session_id: str | None = None) -> int:
     with get_connection() as conn:
         cur = conn.execute(
-            "INSERT INTO conversations (timestamp, user_text, assistant_text, used_tools) "
-            "VALUES (?, ?, ?, ?)",
-            (now_iso(), user_text, assistant_text, used_tools),
+            "INSERT INTO conversations (timestamp, user_text, assistant_text, used_tools, session_id) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (now_iso(), user_text, assistant_text, used_tools, session_id),
         )
         return int(cur.lastrowid)
 
@@ -209,9 +239,75 @@ def recent_conversations(limit: int = 20) -> list[dict[str, Any]]:
 def all_memory() -> list[dict[str, Any]]:
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, created_at, type, content FROM memory ORDER BY id ASC"
+            "SELECT id, created_at, type, content, source, content_hash, embedding_model, embedding_version, indexed_at FROM memory ORDER BY id ASC"
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+def normalized_hash(content: str) -> str:
+    import hashlib
+    normalized = " ".join(content.casefold().split())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def save_memory_item(content: str, mem_type: str, source: str) -> tuple[int, bool]:
+    """Save a durable fact once. Exact normalized duplicates remain one record."""
+    digest = normalized_hash(content)
+    with get_connection() as conn:
+        row = conn.execute("SELECT id FROM memory WHERE content_hash = ?", (digest,)).fetchone()
+        if row:
+            return int(row["id"]), False
+        cur = conn.execute(
+            "INSERT INTO memory (created_at, type, content, source, content_hash) VALUES (?, ?, ?, ?, ?)",
+            (now_iso(), mem_type, content.strip(), source, digest),
+        )
+        return int(cur.lastrowid), True
+
+
+def update_memory_indexed(memory_id: int, model: str, version: str) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE memory SET embedding_model=?, embedding_version=?, indexed_at=? WHERE id=?", (model, version, now_iso(), memory_id))
+
+
+def pending_episode_groups() -> list[list[dict[str, Any]]]:
+    """Unfinalized turns grouped by browser session; never includes an episode twice."""
+    with get_connection() as conn:
+        rows = conn.execute("SELECT id, timestamp, user_text, assistant_text, used_tools, session_id FROM conversations WHERE episode_id IS NULL ORDER BY id ASC").fetchall()
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        item = dict(row)
+        groups.setdefault(item.get("session_id") or "legacy", []).append(item)
+    return list(groups.values())
+
+
+def save_episode(data: dict[str, Any]) -> int:
+    now = now_iso()
+    with get_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO conversation_episodes (started_at, ended_at, title, summary, decisions, facts, work_in_progress, next_action, source_conversation_ids, content_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (data["started_at"], data["ended_at"], data["title"], data["summary"], data["decisions"], data["facts"], data["work_in_progress"], data["next_action"], data["source_ids"], data["content_hash"], now, now),
+        )
+        episode_id = int(cur.lastrowid)
+        ids = json.loads(data["source_ids"])
+        conn.executemany("UPDATE conversations SET episode_id=? WHERE id=? AND episode_id IS NULL", [(episode_id, item) for item in ids])
+        return episode_id
+
+
+def recent_episodes(limit: int = 20) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM conversation_episodes ORDER BY episode_id DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(row) for row in reversed(rows)]
+
+
+def all_episodes() -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM conversation_episodes ORDER BY episode_id ASC").fetchall()
+    return [dict(row) for row in rows]
+
+
+def update_episode_indexed(episode_id: int, model: str, version: str) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE conversation_episodes SET embedding_model=?, embedding_version=?, indexed_at=?, updated_at=? WHERE episode_id=?", (model, version, now_iso(), now_iso(), episode_id))
 
 
 # --- Summaries ---------------------------------------------------------------

@@ -92,6 +92,11 @@ AUTO_SUMMARY_ENABLED = os.getenv("PETIT_AUTO_SUMMARY_ENABLED", "1") not in ("0",
 SUMMARY_INTERVAL_HOURS = float(os.getenv("PETIT_SUMMARY_INTERVAL_HOURS", "3"))
 # この件数未満の未処理会話しかなければ要約をスキップする（無駄なLLM呼び出し回避）
 SUMMARY_MIN_CONVERSATIONS = int(os.getenv("PETIT_SUMMARY_MIN_CONVERSATIONS", "1"))
+# Episodes are finalized only after a useful boundary.  This deliberately keeps
+# ordinary chat on its one-call path; these values are consumed asynchronously.
+EPISODE_IDLE_MINUTES = int(os.getenv("PETIT_EPISODE_IDLE_MINUTES", "20"))
+EPISODE_MAX_TURNS = int(os.getenv("PETIT_EPISODE_MAX_TURNS", "8"))
+EMBEDDING_VERSION = os.getenv("PETIT_EMBEDDING_VERSION", "1")
 
 # Embeddings (for RAG search via LM Studio)
 # Load a dedicated embedding model in LM Studio (e.g. nomic-embed-text, bge-m3)

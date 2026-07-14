@@ -8,6 +8,8 @@ const statusEl = document.getElementById("status");
 
 // In-memory conversation history sent back to the model for context.
 const history = [];
+const sessionId = localStorage.getItem("petit_session_id") || crypto.randomUUID();
+localStorage.setItem("petit_session_id", sessionId);
 
 function addMessage(role, text, { tools, error, actions } = {}) {
   const wrap = document.createElement("div");
@@ -130,7 +132,7 @@ async function sendMessage(text) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history, request_id: requestId }),
+      body: JSON.stringify({ message: text, history, request_id: requestId, session_id: sessionId }),
     });
     const data = await res.json();
     setTyping(false);

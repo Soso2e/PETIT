@@ -34,7 +34,7 @@ def build_recall_block(user_message: str, max_memories: int = 5, max_summaries: 
     """
     try:
         memories = _relevant_memories(user_message, max_memories)
-        summaries = _recent_summaries_text(max_summaries)
+        summaries = _recent_episode_text(max_summaries)
         vault_notes = _relevant_vault_notes(user_message, 3) if _should_search_vault(user_message) else []
     except Exception as exc:  # noqa: BLE001 - recall must never break a chat turn
         log.debug("recall failed: %s", exc)
@@ -71,9 +71,9 @@ def _relevant_memories(query: str, limit: int) -> list[str]:
     return []  # [] -> collection empty / no match
 
 
-def _recent_summaries_text(limit: int) -> list[str]:
-    rows = db.recent_summaries(limit=limit)
-    return [_clip(r["summary"]) for r in rows if r.get("summary")]
+def _recent_episode_text(limit: int) -> list[str]:
+    rows = db.recent_episodes(limit=limit)
+    return [_clip(f"{r['title']}: {r['summary']}") for r in rows if r.get("summary")]
 
 def _should_search_vault(message: str) -> bool:
     text = "".join(message.split()).casefold()

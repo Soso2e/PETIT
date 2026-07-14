@@ -16,7 +16,9 @@
 - Calendar: ICSは読み取り専用同期、`add_schedule`はPETITローカル予定への書き込みとして分離。ローカル予定の確認付き追加・再取得は実ブラウザE2E済み。実Google非公開iCal URLは未設定のため同期E2E未確認。将来のGoogle書き込みはprovider境界へ追加する。
 - LM Studio: `/v1/models` と `qwen/qwen3.5-9b` の実会話・tool callingを確認済み。空の`PETIT_AGENT_MODEL`は会話モデルへフォールバックする。別の27Bエージェントモデル構成は未確認。
 - 外部同期信頼性: Notion/ICS/TimeTreeの成功・失敗・stale状態をSQLite `sync_state` に保存する実装済み。自動テスト済み、実認証情報を使うNotion/Google/TimeTree E2Eは未確認。
-- 次にやること: 実Notion・Google ICS・TimeTree認証情報で同期成功/失敗時のブラウザ表示を確認 → 27Bエージェントモデルを設定して同じE2Eケースを再測定。
+- 会話記憶: 短期（ブラウザセッション履歴）、エピソード（SQLite `conversation_episodes` / `petit_episodes`）、長期（SQLite `memory`）を分離。エピソードは20分のアイドル、8往復、明示まとめ、定期実行で確定する。単体テスト済み、実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。
+- 索引: SQLite記憶/エピソードは`content_hash`・Embeddingモデル/版・Chromaメタデータで差分だけを再索引化する。Vault差分索引は維持。起動時の実LM Studio件数は未測定。
+- 次にやること: 実ブラウザでPETIT改善を数往復→「ここまでまとめて」→過去検索→再起動を確認し、起動前後のEmbedding件数を測定 → 実Notion・Google ICS・TimeTree認証情報で同期成功/失敗時のブラウザ表示を確認。
 
 ## 履歴
 
@@ -66,3 +68,4 @@
 | 2026-07-12 | 20:11 | #34 | 動作確認済み: 意図別の限定取得、書き込み承認キュー、BRAIN安全編集、Calendar read/write分離、失敗保存抑止を実装。標準テスト30件と実ブラウザ+LM Studioで雑談/時刻/天気/Notion取得・作成・完了/BRAIN検索・追記/予定取得・追加をE2E確認。実Google ICSと別27Bモデルは未確認。 |
 
 | 2026-07-14 | 00:00 | #35 | Notion/ICS/TimeTreeの同期状態をSQLiteへ永続化し、失敗時キャッシュ維持・stale表示・TimeTree読取アダプター・回帰テストを追加。実サービスE2Eは未確認。 |
+| 2026-07-14 | 12:09 | #36 | 会話記憶を短期・エピソード・長期へ分離。エピソードSQLite/Markdown/Chroma差分索引、失敗時再試行、長期記憶の重複抑止と出典、ブラウザセッションID、回帰テストを追加。実ブラウザ＋実LM StudioのエピソードE2Eは未確認。 |

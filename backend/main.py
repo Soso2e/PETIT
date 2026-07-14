@@ -46,11 +46,10 @@ def _shutdown() -> None:
 
 
 def _chroma_sync() -> None:
-    """Index SQLite memory, conversations, and configured Obsidian vaults."""
+    """Incrementally index SQLite memory/episodes and configured vaults."""
     try:
         mem_rows = db.all_memory()
-        conv_rows = db.recent_conversations(limit=500)
-        counts = chroma_client.sync_from_sqlite(mem_rows, conv_rows)
+        counts = chroma_client.sync_structured_data(mem_rows, db.all_episodes())
         vault_counts = vault_indexer.index_configured_vaults()
         if any(counts.values()) or vault_counts.get("chunks"):
             log.info("Chroma sync: %s vault=%s", counts, vault_counts)
@@ -62,6 +61,7 @@ class ChatRequest(BaseModel):
     message: str
     history: list[dict[str, str]] | None = None
     request_id: str | None = None
+    session_id: str | None = None
 
 
 class PendingAction(BaseModel):
@@ -93,11 +93,12 @@ def health() -> dict[str, Any]:
     try:
         mem_count = chroma_client._collection("petit_memory").count()
         conv_count = chroma_client._collection("petit_conversations").count()
+        episode_count = chroma_client._collection("petit_episodes").count()
         vault_count = chroma_client._collection("petit_vault").count()
         rag_info: dict[str, Any] = {
             "available": True,
             "embed_model": config.EMBED_MODEL,
-            "indexed": {"memory": mem_count, "conversations": conv_count, "vault": vault_count},
+            "indexed": {"memory": mem_count, "conversations_legacy": conv_count, "episodes": episode_count, "vault": vault_count},
             "embedding_stats": chroma_client.embedding_stats(),
         }
     except Exception:  # noqa: BLE001
@@ -118,7 +119,7 @@ def health() -> dict[str, Any]:
         "auto_summary": {
             "enabled": config.AUTO_SUMMARY_ENABLED,
             "interval_hours": config.SUMMARY_INTERVAL_HOURS,
-            "summaries": len(db.recent_summaries(limit=1000)),
+            "summaries": len(db.recent_summaries(limit=1000)), "episodes": len(db.recent_episodes(limit=1000)),
         },
         "markdown": markdown_export.status(),
         "obsidian_vault": vault_indexer.status(),
@@ -170,11 +171,11 @@ def chat(req: ChatRequest) -> ChatResponse:
         conv_id = db.save_conversation(
             user_text=message,
             assistant_text=reply,
-            used_tools=used_tools_str,
+            used_tools=used_tools_str, session_id=(req.session_id or "").strip() or None,
         )
         threading.Thread(
             target=_persist_chat_artifacts,
-            args=(conv_id, message, reply, used_tools_str),
+        args=(conv_id, message, reply, used_tools_str),
             daemon=True,
         ).start()
     return ChatResponse(

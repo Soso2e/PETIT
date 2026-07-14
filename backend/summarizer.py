@@ -1,15 +1,7 @@
-"""Periodic conversation summarizer — the heart of PETIT's memory accumulation.
-
-何をするか:
-1. まだ要約していない会話ターンを集める（前回の続きから）
-2. LLM に「要約 + 覚えておくべき事実/作業中の内容/タスク」を JSON で出させる
-3. 結果を SQLite(summaries) + Chroma(petit_summaries) + Markdown に蓄積
-4. 抽出した durable な事実を長期記憶(memory)へ自動保存（会話からデータが育つ）
-
-LM Studio が落ちていても例外で止めず、{"summarized": False, ...} を返す。
-"""
+"""Asynchronous episode finalization for PETIT's durable conversation memory."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -21,157 +13,85 @@ from .lmstudio_client import LMStudioError, chat_completion
 
 log = logging.getLogger(__name__)
 
-_SUMMARY_SYSTEM = """あなたはユーザー専用アシスタント「PETIT」の記憶整理エンジンです。
-渡された会話ログを読み、後でユーザーを助けるために必要な情報だけを抽出します。
-
-必ず次の JSON だけを出力してください（前後に説明文を付けない）:
-{
-  "summary": "この期間に何があったかの簡潔な要約（日本語・2〜4文）",
-  "facts": ["長期的に覚えておくべき事実・好み・決定事項（なければ空配列）"],
-  "work_in_progress": ["今やっている/中断中の作業・タスク（なければ空配列）"]
-}
-
-ルール:
-- 雑談だけで覚える価値がなければ facts と work_in_progress は空配列にする。
-- 推測で事実を作らない。会話に書かれたことだけを抽出する。
-- facts と work_in_progress の各要素は、それ単体で読んで分かる短い文にする。"""
+_SYSTEM = """あなたはPETITの会話エピソード整理機能です。会話に明記されたことだけを抽出し、推測を加えないでください。
+必ず次のJSONだけを返してください:
+{"title":"","summary":"","decisions":[],"facts":[],"work_in_progress":[],"next_action":[]}
+雑談だけなら summary は空文字にしてください。長期的に再利用できない一時的な発言は facts に入れません。"""
 
 
-def _build_transcript(convs: list[dict[str, Any]]) -> str:
-    lines: list[str] = []
-    for c in convs:
-        lines.append(f"[{c.get('timestamp', '')}]")
-        lines.append(f"ユーザー: {c.get('user_text', '')}")
-        lines.append(f"PETIT: {c.get('assistant_text', '')}")
-        lines.append("")
-    return "\n".join(lines)
+def _transcript(rows: list[dict[str, Any]]) -> str:
+    return "\n\n".join(f"[{r['timestamp']}]\nユーザー: {r['user_text']}\nPETIT: {r['assistant_text']}" for r in rows)
 
 
-def _extract_json(text: str) -> dict[str, Any]:
-    """Lenient JSON extraction — models often wrap JSON in prose or code fences."""
-    if not text:
-        return {}
-    # Strip code fences if present
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    candidate = fenced.group(1) if fenced else None
-    if candidate is None:
-        start = text.find("{")
-        end = text.rfind("}")
-        candidate = text[start : end + 1] if start != -1 and end > start else text
+def _json(text: str) -> dict[str, Any] | None:
+    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text or "", re.S)
+    candidate = match.group(1) if match else (text or "").strip()
+    if not candidate.startswith("{"):
+        start, end = candidate.find("{"), candidate.rfind("}")
+        candidate = candidate[start:end + 1] if start >= 0 and end > start else ""
     try:
-        data = json.loads(candidate)
-        return data if isinstance(data, dict) else {}
+        value = json.loads(candidate)
     except json.JSONDecodeError:
-        return {}
+        return None
+    return value if isinstance(value, dict) else None
 
 
-def _as_str_list(value: Any) -> list[str]:
-    if isinstance(value, list):
-        return [str(v).strip() for v in value if str(v).strip()]
-    if isinstance(value, str) and value.strip():
-        return [value.strip()]
-    return []
+def _items(value: Any) -> list[str]:
+    return [str(item).strip() for item in value] if isinstance(value, list) else []
 
 
-def summarize_pending(kind: str = "interval", min_conversations: int | None = None) -> dict[str, Any]:
-    """Summarize all not-yet-summarized conversation turns.
-
-    Returns a small status dict; never raises for an unreachable backend.
-    """
-    threshold = config.SUMMARY_MIN_CONVERSATIONS if min_conversations is None else min_conversations
-    last_id = db.last_summarized_conv_id()
-    convs = db.conversations_after(last_id)
-
-    if len(convs) < threshold:
-        return {"summarized": False, "reason": "no_new_conversations", "pending": len(convs)}
-
-    transcript = _build_transcript(convs)
-    messages = [
-        {"role": "system", "content": _SUMMARY_SYSTEM},
-        {"role": "user", "content": f"次の会話ログをまとめてください。\n\n{transcript}"},
-    ]
-
+def _eligible(rows: list[dict[str, Any]], force: bool) -> bool:
+    if force or len(rows) >= config.EPISODE_MAX_TURNS:
+        return True
     try:
-        # temperature low for stable JSON
-        message = chat_completion(messages, tools=None, temperature=0.2, model=config.AGENT_MODEL)
+        latest = datetime.fromisoformat(rows[-1]["timestamp"])
+        return (datetime.now(timezone.utc) - latest).total_seconds() >= config.EPISODE_IDLE_MINUTES * 60
+    except (ValueError, TypeError):
+        return False
+
+
+def _episode_text(parsed: dict[str, Any]) -> str:
+    values = [str(parsed.get("title", "")).strip(), str(parsed.get("summary", "")).strip()]
+    for key in ("decisions", "facts", "work_in_progress", "next_action"):
+        values.extend(_items(parsed.get(key)))
+    return "\n".join(value for value in values if value)
+
+
+def summarize_pending(kind: str = "interval", min_conversations: int | None = None, force: bool = False) -> dict[str, Any]:
+    """Finalize eligible unassigned turns. Failure leaves them untouched for retry."""
+    threshold = config.SUMMARY_MIN_CONVERSATIONS if min_conversations is None else min_conversations
+    groups = [rows for rows in db.pending_episode_groups() if len(rows) >= threshold and _eligible(rows, force)]
+    if not groups:
+        return {"summarized": False, "reason": "no_eligible_episode", "pending": sum(len(x) for x in db.pending_episode_groups())}
+    rows = groups[0]  # one bounded LLM job per scheduler tick
+    try:
+        result = chat_completion([{"role": "system", "content": _SYSTEM}, {"role": "user", "content": _transcript(rows)}], tools=None, temperature=0.2, model=config.AGENT_MODEL)
     except LMStudioError as exc:
-        log.info("Summarization skipped (LM Studio unavailable): %s", exc)
         return {"summarized": False, "reason": "lm_unavailable", "error": str(exc)}
-
-    raw = (message.get("content") or "").strip()
-    if not raw:
-        return {"summarized": False, "reason": "empty_model_response"}
-    parsed = _extract_json(raw)
-
-    summary_text = str(parsed.get("summary", "")).strip() or raw[:500]
-    if not summary_text:
-        return {"summarized": False, "reason": "empty_summary"}
-    facts = _as_str_list(parsed.get("facts"))
-    wip = _as_str_list(parsed.get("work_in_progress"))
-    all_facts = facts + [f"作業中: {w}" for w in wip]
-
-    period_start = convs[0].get("timestamp")
-    period_end = convs[-1].get("timestamp")
-    last_conv_id = int(convs[-1]["id"])
-
-    # 1) SQLite (正本)
-    summary_id = db.save_summary(
-        summary=summary_text,
-        facts=json.dumps(all_facts, ensure_ascii=False) if all_facts else None,
-        kind=kind,
-        period_start=period_start,
-        period_end=period_end,
-        last_conv_id=last_conv_id,
-        conv_count=len(convs),
-    )
-
-    # 2) Chroma (意味検索用)
-    chroma_client.add(
-        "petit_summaries",
-        doc_id=f"sum_{summary_id}",
-        text=summary_text + ("\n" + "\n".join(all_facts) if all_facts else ""),
-        metadata={"kind": kind, "created_at": db.now_iso(), "conv_count": len(convs)},
-    )
-
-    # 3) 抽出した事実を長期記憶へ自動蓄積（会話からデータが育つ）
-    saved_memories = 0
-    for fact in facts:
-        _save_durable_memory(fact, mem_type="fact")
-        saved_memories += 1
-    for w in wip:
-        _save_durable_memory(w, mem_type="project")
-        saved_memories += 1
-
-    # 4) Markdown (人が読む副本)
-    markdown_export.append_summary(summary_text, all_facts, kind=kind)
-
-    log.info(
-        "Summarized %d conversations -> summary #%d (%d facts/wip, %d memories)",
-        len(convs), summary_id, len(all_facts), saved_memories,
-    )
-    return {
-        "summarized": True,
-        "summary_id": summary_id,
-        "conv_count": len(convs),
-        "kind": kind,
-        "facts": all_facts,
-        "memories_saved": saved_memories,
+    parsed = _json((result.get("content") or "").strip())
+    if parsed is None:
+        return {"summarized": False, "reason": "invalid_json"}
+    summary = str(parsed.get("summary") or "").strip()
+    title = str(parsed.get("title") or "").strip()
+    if not summary or not title:
+        return {"summarized": False, "reason": "empty_episode"}
+    ids = [int(row["id"]) for row in rows]
+    text = _episode_text(parsed)
+    data = {
+        "started_at": rows[0]["timestamp"], "ended_at": rows[-1]["timestamp"], "title": title, "summary": summary,
+        "decisions": json.dumps(_items(parsed.get("decisions")), ensure_ascii=False), "facts": json.dumps(_items(parsed.get("facts")), ensure_ascii=False),
+        "work_in_progress": json.dumps(_items(parsed.get("work_in_progress")), ensure_ascii=False), "next_action": json.dumps(_items(parsed.get("next_action")), ensure_ascii=False),
+        "source_ids": json.dumps(ids), "content_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
     }
-
-
-def _save_durable_memory(content: str, mem_type: str) -> None:
-    """Persist one extracted memory to SQLite + Chroma + Markdown (best-effort)."""
-    now = db.now_iso()
-    with db.get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO memory (created_at, type, content) VALUES (?, ?, ?)",
-            (now, mem_type, content),
-        )
-        mem_id = int(cur.lastrowid)
-    chroma_client.add(
-        "petit_memory",
-        doc_id=f"mem_{mem_id}",
-        text=content,
-        metadata={"type": mem_type, "created_at": now, "source": "auto_summary"},
-    )
-    markdown_export.append_memory(content, mem_type)
+    episode_id = db.save_episode(data)
+    markdown_export.append_episode({**data, "episode_id": episode_id})
+    saved = 0
+    # Automatic promotion is intentionally narrow. Explicit save_memory remains separate.
+    for item, mem_type in [(x, "decision") for x in _items(parsed.get("decisions"))] + [(x, "fact") for x in _items(parsed.get("facts"))] + [(x, "project") for x in _items(parsed.get("work_in_progress"))]:
+        if len(item) < 8:
+            continue
+        memory_id, created = db.save_memory_item(item, mem_type, "auto_episode")
+        if created:
+            saved += 1
+    chroma_client.sync_structured_data(db.all_memory(), db.all_episodes())
+    return {"summarized": True, "episode_id": episode_id, "conv_count": len(rows), "kind": kind, "memories_saved": saved}
