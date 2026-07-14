@@ -1,167 +1,133 @@
-"""Read-only calendar sync adapters.
-
-The first supported source is iCalendar/ICS, which works with Google Calendar's
-private iCal export URL and with local exported .ics files. Events are normalized
-into calendar_events_cache so existing schedule and briefing paths can read them.
-"""
+"""Safe, read-only synchronization for Google/local ICS and TimeTree."""
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from . import config, db
+from .calendar_sources import timetree
 
 log = logging.getLogger(__name__)
-
+TOKYO = timezone(timedelta(hours=9), name="Asia/Tokyo")
 _last_sync_monotonic: float | None = None
 _last_result: dict[str, Any] | None = None
 
 
 def configured() -> bool:
-    return bool(config.CALENDAR_ICS_URLS or config.CALENDAR_ICS_FILES)
+    return bool(config.CALENDAR_ICS_URLS or config.CALENDAR_ICS_FILES or timetree.configured())
+
+
+def _result(source: str, ok: bool, count: int = 0, cached: bool = False, error: str | None = None) -> dict[str, Any]:
+    state = db.sync_state(source)
+    with db.get_connection() as conn:
+        has_cache = bool(conn.execute("SELECT 1 FROM calendar_events_cache WHERE source_key = ? LIMIT 1", (source,)).fetchone())
+    return {"ok": ok, "source": source, "synced_count": count, "cached": bool(cached or (not ok and has_cache)),
+            "stale": bool(not ok and state["last_success_at"]), "last_synced_at": state["last_success_at"],
+            "error": error}
 
 
 def status() -> dict[str, Any]:
-    return {
-        "provider": "ics" if configured() else "local_cache",
-        "configured": configured(),
-        "url_count": len(config.CALENDAR_ICS_URLS),
-        "file_count": len(config.CALENDAR_ICS_FILES),
-        "last_sync": _last_result,
-    }
+    states = []
+    for state in db.all_sync_states():
+        states.append({"source": state["source"], "last_synced_at": state["last_success_at"],
+                       "last_failed_at": state["last_failure_at"], "synced_count": state["synced_count"],
+                       "error": state["last_error"], "stale": bool(state["last_failure_at"] and state["last_success_at"])})
+    return {"configured": configured(), "url_count": len(config.CALENDAR_ICS_URLS),
+            "file_count": len(config.CALENDAR_ICS_FILES), "timetree_configured": timetree.configured(),
+            "sync_states": states}
 
 
 def sync_if_configured(force: bool = False) -> dict[str, Any]:
-    """Refresh calendar cache when sources are configured.
-
-    Uses a lightweight in-process TTL to avoid fetching private calendar URLs on
-    every planning turn.
-    """
     global _last_sync_monotonic, _last_result
-
     if not configured():
-        return {"synced": 0, "configured": False, "source": "local_cache"}
-
-    now = time.monotonic()
-    if (
-        not force
-        and _last_sync_monotonic is not None
-        and _last_result is not None
-        and now - _last_sync_monotonic < config.CALENDAR_SYNC_TTL_SECONDS
-    ):
+        return {**_result("calendar", False, error="外部カレンダーが設定されていません"), "configured": False, "sources": []}
+    if not force and _last_sync_monotonic is not None and _last_result is not None and time.monotonic() - _last_sync_monotonic < config.CALENDAR_SYNC_TTL_SECONDS:
         return {**_last_result, "cached": True}
-
     result = sync()
-    _last_sync_monotonic = now
-    _last_result = result
+    _last_sync_monotonic, _last_result = time.monotonic(), result
     return result
 
 
 def sync() -> dict[str, Any]:
-    sources: list[tuple[str, str, str]] = []
-    errors: list[dict[str, str]] = []
+    specs: list[tuple[str, str, Callable[[], str]]] = []
+    specs += [(f"google_ics:{i}", "google_ics", lambda url=url: _read_url(url)) for i, url in enumerate(config.CALENDAR_ICS_URLS, 1)]
+    specs += [(f"local_ics:{i}", "ics_file", lambda path=path: _read_file(path)) for i, path in enumerate(config.CALENDAR_ICS_FILES, 1)]
+    if timetree.configured():
+        specs.append(("timetree", "timetree", timetree.fetch_ics))
 
-    for idx, url in enumerate(config.CALENDAR_ICS_URLS, start=1):
+    results: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str | None]] = set()
+    for source_key, public_source, fetch in specs:
         try:
-            sources.append((f"url:{idx}", url, _read_url(url)))
-        except Exception as exc:  # noqa: BLE001
-            errors.append({"source": f"url:{idx}", "error": type(exc).__name__})
-            log.debug("calendar url sync failed (%s): %s", url, exc)
+            events = parse_ics(fetch())
+            unique = []
+            for event in events:
+                identity = (event["title"], event["start_time"], event.get("end_time"))
+                if identity not in seen:
+                    seen.add(identity)
+                    unique.append(event)
+            _replace_source(source_key, public_source, unique)
+            at = db.record_sync_success(source_key, len(unique))
+            results.append({"ok": True, "source": public_source, "synced_count": len(unique), "cached": False,
+                            "stale": False, "last_synced_at": at, "error": None})
+        except Exception as exc:  # no exception content: it can contain a private URL or credential
+            error = _safe_error(public_source, exc)
+            db.record_sync_failure(source_key, error)
+            results.append(_result(source_key, False, error=error) | {"source": public_source})
+            log.warning("calendar source sync failed: %s", public_source)
+    total = sum(item["synced_count"] for item in results if item["ok"])
+    ok = bool(results) and any(item["ok"] for item in results)
+    error = None if ok else (results[0]["error"] if results else "外部カレンダーが設定されていません")
+    return {"ok": ok, "source": "calendar", "synced_count": total, "cached": False,
+            "stale": any(item["stale"] for item in results), "last_synced_at": db.now_iso() if ok else None,
+            "error": error, "configured": bool(specs), "sources": results, "synced": total}
 
-    for path in config.CALENDAR_ICS_FILES:
-        try:
-            sources.append((f"file:{path}", str(path), _read_file(path)))
-        except Exception as exc:  # noqa: BLE001
-            errors.append({"source": f"file:{path}", "error": type(exc).__name__})
-            log.debug("calendar file sync failed (%s): %s", path, exc)
 
-    events: list[dict[str, Any]] = []
-    for source_id, source_label, text in sources:
-        for event in parse_ics(text):
-            event["source"] = "google_ics" if source_id.startswith("url:") else "ics_file"
-            event["description"] = _with_source(event.get("description"), source_label)
-            events.append(event)
-
-    conn = db.get_connection()
-    try:
-        conn.execute("DELETE FROM calendar_events_cache WHERE source IN ('google_ics', 'ics_file')")
+def _replace_source(source_key: str, source: str, events: list[dict[str, Any]]) -> None:
+    now = db.now_iso()
+    with db.get_connection() as conn:
+        conn.execute("DELETE FROM calendar_events_cache WHERE source_key = ?", (source_key,))
         for event in events:
-            conn.execute(
-                "INSERT INTO calendar_events_cache "
-                "(source, title, start_time, end_time, location, description, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    event["source"],
-                    event["title"],
-                    event.get("start_time"),
-                    event.get("end_time"),
-                    event.get("location"),
-                    event.get("description"),
-                    db.now_iso(),
-                ),
-            )
-        conn.commit()
-    finally:
-        conn.close()
-
-    return {
-        "synced": len(events),
-        "configured": True,
-        "sources": len(sources),
-        "errors": errors,
-    }
+            external_id = event.get("external_id") or hashlib.sha256(
+                f"{event['title']}|{event['start_time']}|{event.get('end_time') or ''}".encode()).hexdigest()
+            conn.execute("INSERT INTO calendar_events_cache (source, source_key, external_id, title, start_time, end_time, location, description, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                         (source, source_key, external_id, event["title"], event["start_time"], event.get("end_time"), event.get("location"), event.get("description"), now))
 
 
 def parse_ics(text: str) -> list[dict[str, Any]]:
-    events: list[dict[str, Any]] = []
-    current: dict[str, str] | None = None
-
+    events, current = [], None
     for raw_line in _unfold_lines(text):
         line = raw_line.strip()
-        if line == "BEGIN:VEVENT":
-            current = {}
-            continue
+        if line == "BEGIN:VEVENT": current = {}; continue
         if line == "END:VEVENT":
             if current:
                 event = _event_from_props(current)
-                if event:
-                    events.append(event)
-            current = None
-            continue
-        if current is None or ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        key_name = key.split(";", 1)[0].upper()
-        if key_name not in current:
-            current[key_name] = _unescape(value)
-
+                if event: events.append(event)
+            current = None; continue
+        if current is not None and ":" in line:
+            key, value = line.split(":", 1); name = key.split(";", 1)[0].upper()
+            if name not in current: current[name] = _unescape(value)
     return events
 
 
 def _event_from_props(props: dict[str, str]) -> dict[str, Any] | None:
-    title = props.get("SUMMARY", "").strip()
-    start = _normalize_ical_datetime(props.get("DTSTART"))
-    if not title or not start:
-        return None
-    return {
-        "title": title,
-        "start_time": start,
-        "end_time": _normalize_ical_datetime(props.get("DTEND")),
-        "location": props.get("LOCATION") or None,
-        "description": props.get("DESCRIPTION") or None,
-    }
+    title, start = props.get("SUMMARY", "").strip(), _normalize_ical_datetime(props.get("DTSTART"))
+    if not title or not start: return None
+    return {"external_id": props.get("UID") or None, "title": title, "start_time": start,
+            "end_time": _normalize_ical_datetime(props.get("DTEND")), "location": props.get("LOCATION") or None,
+            "description": props.get("DESCRIPTION") or None}
 
 
 def _read_url(url: str) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": "PETIT/1.0"})
     with urllib.request.urlopen(request, timeout=20) as response:  # noqa: S310
-        content_type = response.headers.get_content_charset() or "utf-8"
-        return response.read().decode(content_type, errors="replace")
+        return response.read().decode(response.headers.get_content_charset() or "utf-8", errors="replace")
 
 
 def _read_file(path: Path) -> str:
@@ -169,52 +135,32 @@ def _read_file(path: Path) -> str:
 
 
 def _unfold_lines(text: str) -> list[str]:
-    lines: list[str] = []
+    lines = []
     for raw in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        if raw.startswith((" ", "\t")) and lines:
-            lines[-1] += raw[1:]
-        else:
-            lines.append(raw)
+        if raw.startswith((" ", "\t")) and lines: lines[-1] += raw[1:]
+        else: lines.append(raw)
     return lines
 
 
 def _normalize_ical_datetime(value: str | None) -> str | None:
-    if not value:
-        return None
+    if not value: return None
     value = value.strip()
-    if len(value) == 8 and value.isdigit():
-        return f"{value[:4]}-{value[4:6]}-{value[6:8]}"
-    if value.endswith("Z"):
-        value = value[:-1] + "+0000"
-    try:
-        parsed = datetime.strptime(value, "%Y%m%dT%H%M%S%z")
-        return parsed.isoformat(timespec="seconds")
-    except ValueError:
-        pass
+    if len(value) == 8 and value.isdigit(): return f"{value[:4]}-{value[4:6]}-{value[6:8]}"
+    if value.endswith("Z"): value = value[:-1] + "+0000"
+    try: return datetime.strptime(value, "%Y%m%dT%H%M%S%z").isoformat(timespec="seconds")
+    except ValueError: pass
     for fmt in ("%Y%m%dT%H%M%S", "%Y%m%dT%H%M"):
-        try:
-            return datetime.strptime(value, fmt).isoformat(timespec="seconds")
-        except ValueError:
-            pass
-    try:
-        return parsedate_to_datetime(value).isoformat(timespec="seconds")
-    except (TypeError, ValueError):
-        return value
+        try: return datetime.strptime(value, fmt).replace(tzinfo=TOKYO).isoformat(timespec="seconds")
+        except ValueError: pass
+    try: return parsedate_to_datetime(value).isoformat(timespec="seconds")
+    except (TypeError, ValueError): return None
 
 
 def _unescape(value: str) -> str:
-    return (
-        value.replace("\\n", "\n")
-        .replace("\\N", "\n")
-        .replace("\\,", ",")
-        .replace("\\;", ";")
-        .replace("\\\\", "\\")
-        .strip()
-    )
+    return value.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\").strip()
 
 
-def _with_source(description: str | None, source_label: str) -> str:
-    source_line = f"calendar_source={source_label}"
-    if description:
-        return f"{description}\n{source_line}"
-    return source_line
+def _safe_error(source: str, exc: Exception) -> str:
+    if source == "timetree": return "TimeTree の同期に失敗しました"
+    if isinstance(exc, FileNotFoundError): return "ICS ファイルが見つかりません"
+    return "カレンダーの取得または解析に失敗しました"

@@ -126,10 +126,17 @@ NOTION_SYNC_TTL_SECONDS = float(os.getenv("NOTION_SYNC_TTL_SECONDS", "300"))
 CALENDAR_ICS_URLS = _list_from_env("PETIT_CALENDAR_ICS_URLS")
 CALENDAR_ICS_FILES = _path_list_from_env("PETIT_CALENDAR_ICS_FILES")
 CALENDAR_SYNC_TTL_SECONDS = float(os.getenv("PETIT_CALENDAR_SYNC_TTL_SECONDS", "300"))
+TIMETREE_EMAIL = os.getenv("TIMETREE_EMAIL", "")
+TIMETREE_PASSWORD = os.getenv("TIMETREE_PASSWORD", "")
+TIMETREE_CALENDAR_CODE = os.getenv("TIMETREE_CALENDAR_CODE", "")
 
 
 def notion_configured() -> bool:
     return bool(NOTION_API_KEY and NOTION_TASKS_DB_ID)
+
+
+def timetree_configured() -> bool:
+    return bool(TIMETREE_EMAIL and TIMETREE_PASSWORD and TIMETREE_CALENDAR_CODE)
 
 
 # Ensure storage exists

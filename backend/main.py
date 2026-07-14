@@ -112,7 +112,7 @@ def health() -> dict[str, Any]:
         "lm_studio": lmstudio_client.health(),
         "notion": {
             "configured": config.notion_configured(),
-            "db_id": config.NOTION_TASKS_DB_ID[:8] + "…" if config.NOTION_TASKS_DB_ID else None,
+            "sync": __import__("backend.tools.notion", fromlist=["status"]).status(),
         },
         "rag": rag_info,
         "auto_summary": {

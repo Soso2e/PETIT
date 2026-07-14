@@ -20,13 +20,13 @@ _CATEGORIES = ["JobHunt", "Sch", "Life", "Work", "Hobby", "Event", "Create", "Li
 _PRIORITIES = ["Low", "Mid", "High"]
 
 
-def _try_notion_sync() -> None:
+def _try_notion_sync() -> dict[str, Any]:
     """Silently sync from Notion if configured. Import lazily to avoid circular deps."""
     global _notion_sync
     if _notion_sync is None:
         from .notion import sync_if_configured  # noqa: PLC0415
         _notion_sync = sync_if_configured
-    _notion_sync()
+    return _notion_sync()
 
 
 @tool(
@@ -47,7 +47,7 @@ def _try_notion_sync() -> None:
     },
 )
 def get_tasks(status: str | None = None, limit: int = 20) -> dict[str, Any]:
-    _try_notion_sync()
+    sync = _try_notion_sync()
 
     sql = (
         "SELECT id, source, title, status, due_date, priority, category, reason, url, done_date "
@@ -65,7 +65,7 @@ def get_tasks(status: str | None = None, limit: int = 20) -> dict[str, Any]:
     with db.get_connection() as conn:
         rows = conn.execute(sql, params).fetchall()
     tasks = [dict(r) for r in rows]
-    return {"count": len(tasks), "tasks": tasks}
+    return {"count": len(tasks), "tasks": tasks, "sync": sync}
 
 
 @tool(

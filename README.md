@@ -92,6 +92,8 @@ Google CalendarのCodex/MCP接続はPETITプロセスへ自動共有されませ
 `PETIT_CALENDAR_ICS_URLS` にGoogle Calendarの非公開iCal URLを設定するか、`PETIT_CALENDAR_ICS_FILES`
 にエクスポート済み`.ics`ファイルを指定します。設定後は予定相談、朝ブリーフィング、`sync_calendar`、
 `POST /api/calendar/sync` から `calendar_events_cache` へ読み取り専用で同期します。
+同期結果はSQLiteの `sync_state` にソース別で保存され、`/api/health` と予定・タスク取得結果で最終成功・失敗・stale状態を確認できます。取得失敗時は直前の正常キャッシュを維持します。TimeTreeは `TIMETREE_EMAIL` / `TIMETREE_PASSWORD` / `TIMETREE_CALENDAR_CODE` を設定した場合だけ、読み取り専用ICSソースとして同期されます（`timetree-exporter` が必要です）。
+
 `add_schedule` はICSやGoogle Calendar本体へは書かず、現在は `destination=local` のPETITローカル予定だけへ追加します。
 書き込み先はprovider境界で分離しており、将来Google Calendar OAuthアダプターを追加できます。
 

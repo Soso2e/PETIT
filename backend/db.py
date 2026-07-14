@@ -76,6 +76,14 @@ CREATE TABLE IF NOT EXISTS calendar_events_cache (
     updated_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sync_state (
+    source              TEXT PRIMARY KEY,
+    last_success_at     TEXT,
+    last_failure_at     TEXT,
+    last_error          TEXT,
+    synced_count        INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS handoff_notes (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at      TEXT NOT NULL,
@@ -126,6 +134,12 @@ def init_db() -> None:
                 "done_date": "TEXT",
             },
         )
+        _ensure_columns(conn, "calendar_events_cache", {"source_key": "TEXT", "external_id": "TEXT"})
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_source_external "
+            "ON calendar_events_cache(source_key, external_id) "
+            "WHERE source_key IS NOT NULL AND external_id IS NOT NULL"
+        )
         conn.commit()
     finally:
         conn.close()
@@ -136,6 +150,40 @@ def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str
     for name, col_type in columns.items():
         if name not in existing:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {col_type}")
+
+
+def sync_state(source: str) -> dict[str, Any]:
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM sync_state WHERE source = ?", (source,)).fetchone()
+    return dict(row) if row else {"source": source, "last_success_at": None, "last_failure_at": None, "last_error": None, "synced_count": 0}
+
+
+def all_sync_states() -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute("SELECT * FROM sync_state ORDER BY source").fetchall()
+    return [dict(row) for row in rows]
+
+
+def record_sync_success(source: str, synced_count: int) -> str:
+    now = now_iso()
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO sync_state(source, last_success_at, last_failure_at, last_error, synced_count) VALUES (?, ?, NULL, NULL, ?) "
+            "ON CONFLICT(source) DO UPDATE SET last_success_at=excluded.last_success_at, last_failure_at=NULL, last_error=NULL, synced_count=excluded.synced_count",
+            (source, now, synced_count),
+        )
+    return now
+
+
+def record_sync_failure(source: str, error: str) -> str:
+    now = now_iso()
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO sync_state(source, last_failure_at, last_error, synced_count) VALUES (?, ?, ?, 0) "
+            "ON CONFLICT(source) DO UPDATE SET last_failure_at=excluded.last_failure_at, last_error=excluded.last_error",
+            (source, now, error),
+        )
+    return now
 
 
 def save_conversation(user_text: str, assistant_text: str, used_tools: str | None = None) -> int:
