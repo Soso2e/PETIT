@@ -214,6 +214,28 @@ def _confirmation_text(name: str, args: dict[str, Any]) -> str:
     return f"書き込み前に確認します。\n操作: {labels.get(name, name)}\n{details}\nこの内容で実行しますか？"
 
 
+def _fallback_read_reply(name: str, content: str) -> str:
+    """Keep safe schedule reads usable when the local model returns no text."""
+    if name != "get_schedule":
+        return ""
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    events = data.get("events") or []
+    sync = data.get("calendar_sync") or {}
+    lines = [f"予定は{len(events)}件あります。"]
+    for event in events:
+        title = str(event.get("title") or "タイトルなし")
+        start = str(event.get("start_time") or "時刻未設定")
+        lines.append(f"- {title}（{start}）")
+    if sync.get("stale"):
+        lines.append(f"※ 外部同期に失敗したため、{sync.get('last_synced_at') or '前回同期時'}の古いキャッシュです。")
+    return "\n".join(lines)
+
+
 def _direct_brain_append(user_message: str) -> dict[str, Any] | None:
     path_match = re.search(r"[「\"]([^」\"]+\.md)[」\"]", user_message, re.IGNORECASE)
     content_match = re.search(r"\.md[」\"].*?に[「\"](.+?)[」\"]と(?:追記|追加)", user_message, re.DOTALL | re.IGNORECASE)
@@ -279,8 +301,9 @@ def _run_forced_read(
     messages.extend(_recent_history(history))
     messages.append(_tool_result_message(user_message, [{"name": name, "content": content}]))
     answer, actual, fallback_reason = _complete(messages, tools_schema=None, route="agent", allow_chat_fallback=True)
+    reply = _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent")
     return {
-        "reply": _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent"),
+        "reply": reply or _fallback_read_reply(name, content),
         "used_tools": [{"name": name, "arguments": json.dumps(args, ensure_ascii=False)}],
         "persist": not _tool_failed(content),
         "model_route": _route_meta("agent", actual, [name], fallback_reason) | {"kind": "forced_read"},
