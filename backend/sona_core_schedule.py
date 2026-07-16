@@ -10,6 +10,7 @@ from sona_agent_core import (
     Actor,
     Client,
     CoreError,
+    DefaultPolicyEngine,
     ExecutionContext,
     Freshness,
     JsonLinesAuditSink,
@@ -119,6 +120,59 @@ class PetitGetScheduleAdapter:
         )
 
 
+class PetitSchedulePolicyEngine(DefaultPolicyEngine):
+    """Enforce the adapter's declared primary-scope boundary."""
+
+    async def evaluate_tool(self, context: ExecutionContext, definition: ToolDefinition, call: ToolCall):
+        if definition.supported_scopes and context.scopes.primary.type not in definition.supported_scopes:
+            from sona_agent_core.runtime.policy import PolicyDecision
+
+            return PolicyDecision(
+                effect="deny",
+                reason_code="SCOPE_NOT_SUPPORTED",
+                message="primary scope is not supported by this tool",
+                metadata={"supported_scopes": definition.supported_scopes},
+            )
+        return await super().evaluate_tool(context, definition, call)
+
+
+class PetitScheduleToolExecutor(ToolExecutor):
+    """Copy result provenance and freshness into the durable audit event."""
+
+    async def _emit_audit(self, context, status, invocation, **kwargs):
+        result = kwargs.get("result")
+        metadata = dict(kwargs.get("metadata") or {})
+        if result is not None:
+            freshness = result.freshness
+            sync = result.data.get("calendar_sync", {}) if isinstance(result.data, dict) else {}
+            metadata.update(
+                {
+                    "sources": [
+                        {
+                            "provider": source.provider,
+                            "resource_type": source.resource_type,
+                            "external_id": source.external_id,
+                        }
+                        for source in result.sources
+                    ],
+                    "freshness": (
+                        {
+                            "status": freshness.status,
+                            "source_updated_at": freshness.source_updated_at,
+                            "observed_at": freshness.observed_at,
+                        }
+                        if freshness is not None
+                        else None
+                    ),
+                    "stale": bool(freshness and freshness.status == "stale"),
+                    "last_synced_at": sync.get("last_synced_at"),
+                    "sync_error": sync.get("error"),
+                }
+            )
+        kwargs["metadata"] = metadata
+        await super()._emit_audit(context, status, invocation, **kwargs)
+
+
 def _freshness(sync: dict[str, Any]) -> Freshness:
     if sync.get("stale"):
         status = "stale"
@@ -166,8 +220,9 @@ async def execute_get_schedule(
 ) -> ToolResult:
     registry = InMemoryToolRegistry()
     registry.register(adapter or PetitGetScheduleAdapter())
-    executor = ToolExecutor(
+    executor = PetitScheduleToolExecutor(
         registry,
+        policy_engine=PetitSchedulePolicyEngine(),
         audit_sink=audit_sink or JsonLinesAuditSink(config.SONA_CORE_AUDIT_PATH),
     )
     now = _now()

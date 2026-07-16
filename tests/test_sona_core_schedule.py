@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from unittest.mock import Mock
 
 from sona_agent_core import MemoryAuditSink
 
@@ -54,6 +55,13 @@ class SonaCoreScheduleTests(unittest.TestCase):
         self.assertEqual(len(audit.events), 1)
         self.assertEqual(audit.events[0].tool_name, "get_schedule")
         self.assertEqual(audit.events[0].context.metadata["execution_path"], "sona_core")
+        self.assertEqual(
+            audit.events[0].metadata["sources"],
+            [{"provider": "local", "resource_type": "calendar_events_cache", "external_id": "local"}],
+        )
+        self.assertEqual(audit.events[0].metadata["freshness"]["status"], "unknown")
+        self.assertIsNotNone(audit.events[0].metadata["freshness"]["observed_at"])
+        self.assertFalse(audit.events[0].metadata["stale"])
 
     def test_scope_and_capability_are_enforced(self) -> None:
         adapter = sona_core_schedule.PetitGetScheduleAdapter(lambda **_: {"count": 0, "events": [], "calendar_sync": {"ok": True}})
@@ -61,6 +69,52 @@ class SonaCoreScheduleTests(unittest.TestCase):
         denied = asyncio.run(sona_core_schedule.execute_get_schedule({}, context=missing_capability, adapter=adapter))
         self.assertEqual(denied.status, "denied")
         self.assertEqual(denied.error.code, "CAPABILITY_INSUFFICIENT")
+
+    def test_personal_scope_succeeds(self) -> None:
+        handler = Mock(return_value={"count": 0, "events": [], "calendar_sync": {"ok": True}})
+        result = asyncio.run(
+            sona_core_schedule.execute_get_schedule(
+                {}, context=sona_core_schedule.build_context(scope_id="soso"), adapter=sona_core_schedule.PetitGetScheduleAdapter(handler)
+            )
+        )
+        self.assertEqual(result.status, "success")
+        handler.assert_called_once_with(date=None)
+
+    def test_fresh_source_and_freshness_are_recorded_in_audit(self) -> None:
+        schedule_data = {
+            "count": 1,
+            "events": [{"source": "google_ics", "title": "Current"}],
+            "calendar_sync": {"ok": True, "stale": False, "last_synced_at": "2026-07-17T01:00:00+00:00", "error": None},
+        }
+        audit = MemoryAuditSink()
+        result = asyncio.run(
+            sona_core_schedule.execute_get_schedule(
+                {}, adapter=sona_core_schedule.PetitGetScheduleAdapter(lambda **_: schedule_data), audit_sink=audit
+            )
+        )
+        event = audit.events[0]
+        self.assertEqual(result.status, "success")
+        self.assertEqual(event.status, "success")
+        self.assertEqual(event.metadata["sources"][0]["provider"], "google_ics")
+        self.assertEqual(event.metadata["freshness"]["status"], "fresh")
+        self.assertEqual(event.metadata["freshness"]["source_updated_at"], "2026-07-17T01:00:00+00:00")
+        self.assertIsNotNone(event.metadata["freshness"]["observed_at"])
+        self.assertFalse(event.metadata["stale"])
+        self.assertEqual(event.metadata["last_synced_at"], "2026-07-17T01:00:00+00:00")
+        self.assertIsNone(event.metadata["sync_error"])
+
+    def test_non_personal_primary_scope_is_denied_without_calling_handler(self) -> None:
+        handler = Mock(return_value={"count": 0, "events": [], "calendar_sync": {"ok": True}})
+        context = sona_core_schedule.build_context()
+        context = context.model_copy(
+            update={"scopes": context.scopes.model_copy(update={"primary": context.scopes.primary.model_copy(update={"type": "project", "id": "petit"})})}
+        )
+        result = asyncio.run(
+            sona_core_schedule.execute_get_schedule({}, context=context, adapter=sona_core_schedule.PetitGetScheduleAdapter(handler))
+        )
+        self.assertEqual(result.status, "denied")
+        self.assertEqual(result.error.code, "SCOPE_NOT_SUPPORTED")
+        handler.assert_not_called()
 
     def test_stale_cache_is_explicit_in_result_and_audit_context(self) -> None:
         stale_schedule = {
@@ -81,6 +135,15 @@ class SonaCoreScheduleTests(unittest.TestCase):
         self.assertEqual(result.freshness.status, "stale")
         self.assertTrue(result.sources[0].metadata["stale"])
         self.assertEqual(audit.events[0].status, "success")
+        self.assertEqual(
+            audit.events[0].metadata["sources"],
+            [{"provider": "google_ics", "resource_type": "calendar_events_cache", "external_id": "google_ics"}],
+        )
+        self.assertEqual(audit.events[0].metadata["freshness"]["status"], "stale")
+        self.assertEqual(audit.events[0].metadata["freshness"]["source_updated_at"], "2026-07-16T10:00:00+00:00")
+        self.assertTrue(audit.events[0].metadata["stale"])
+        self.assertEqual(audit.events[0].metadata["last_synced_at"], "2026-07-16T10:00:00+00:00")
+        self.assertEqual(audit.events[0].metadata["sync_error"], "sync failed")
 
     def test_core_unavailable_does_not_fall_back_to_legacy_handler(self) -> None:
         with (
