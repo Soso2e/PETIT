@@ -46,6 +46,7 @@ class CalendarSyncTests(unittest.TestCase):
                 patch.object(config, "DB_PATH", db_path),
                 patch.object(config, "CALENDAR_ICS_FILES", [ics_path]),
                 patch.object(config, "CALENDAR_ICS_URLS", []),
+                patch.object(calendar_sync.timetree, "configured", return_value=False),
             ):
                 db.init_db()
                 result = calendar_sync.sync()

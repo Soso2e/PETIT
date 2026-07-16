@@ -47,6 +47,9 @@ storage/   SQLite などの実行時データ（git 管理外）
 | `PETIT_CHAT_BASE_URL` / `PETIT_CHAT_MODEL` / `PETIT_CHAT_API_KEY` | 各 `PETIT_LM_*` | 雑談・短い確認用の接続先・モデル |
 | `PETIT_AGENT_BASE_URL` / `PETIT_AGENT_MODEL` / `PETIT_AGENT_API_KEY` | 各 `PETIT_LM_*` | ツール・計画・BRAIN/Notion/予定用の接続先・モデル |
 | `PETIT_LIGHT_MAX_TOKENS` | `512` | 軽量回答の最大生成量 |
+| `PETIT_USE_SONA_CORE` | `0` | `1`の場合のみ、予定取得をSona Agent Core経由で実行する検証用Flag |
+| `PETIT_OWNER_ID` / `PETIT_PERSONAL_SCOPE_ID` | `soso` / `soso` | Core経由のActorと`personal` Scopeの識別子 |
+| `PETIT_SONA_CORE_AUDIT_PATH` | `storage/audit/sona_agent_core.jsonl` | Core Tool実行のJSON Lines監査ログ出力先 |
 | `PETIT_HOST` / `PETIT_PORT` | `127.0.0.1` / `8000` | サーバーの待受 |
 | `PETIT_OBSIDIAN_VAULT_DIRS` | なし | RAG検索対象にする既存Obsidian vault。Windowsは`;`区切りで複数指定 |
 | `PETIT_VAULT_SUBDIR` | `PETIT` | PETITがMarkdownを書き込むvault内サブディレクトリ |

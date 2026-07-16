@@ -19,7 +19,8 @@
 - 外部同期信頼性: Notion/ICS/TimeTreeの成功・失敗・stale状態をSQLite `sync_state` に保存する実装済み。自動テスト済み、実認証情報を使うNotion/Google/TimeTree E2Eは未確認。
 - 会話記憶: 短期（ブラウザセッション履歴）、エピソード（SQLite `conversation_episodes` / `petit_episodes`）、長期（SQLite `memory`）を分離。エピソードは20分のアイドル、8往復、明示まとめ、定期実行で確定する。単体テスト済み、実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。
 - 索引: SQLite記憶/エピソードは`content_hash`・Embeddingモデル/版・Chromaメタデータで差分だけを再索引化する。Vault差分索引は維持。起動時の実LM Studio件数は未測定。
-- 次にやること: LM Studioを起動して1モデル（Chat/Agent同一9B）と2モデル（別endpoint）で、READMEの意図別チャット・承認・同期・記憶・再起動ケースを実ブラウザ確認する。Agent停止／復旧、stale表示、起動前後Embedding件数、各経路の応答時間を記録する。
+- Sona Agent Core: `PETIT_USE_SONA_CORE=1`のときだけ`get_schedule`をCore経由で実行するAdapterを追加。既存の予定取得処理は維持し、`personal` Scope、`schedule.read` Capability、Source/Freshnessを付加する。Audit metadataへSource/Freshness・stale・同期状態を保存し、`personal`以外のPrimary Scopeはハンドラー実行前に拒否する。Feature Flag無効時は旧経路を使用し、Coreが利用不能なら明示エラーにする。標準unittest 52件とcompileallは確認済み。実ブラウザ・実CalendarでのCore経路は未確認。
+- 次にやること: `PETIT_USE_SONA_CORE=1`でLM Studioを起動し、実ブラウザから予定取得、同期失敗時のstale表示、`storage/audit/sona_agent_core.jsonl`の監査記録を確認する。続けて1モデル（Chat/Agent同一9B）と2モデル（別endpoint）で、READMEの意図別チャット・承認・同期・記憶・再起動ケースを実ブラウザ確認する。
 
 ## 履歴
 
@@ -71,3 +72,5 @@
 | 2026-07-14 | 00:00 | #35 | Notion/ICS/TimeTreeの同期状態をSQLiteへ永続化し、失敗時キャッシュ維持・stale表示・TimeTree読取アダプター・回帰テストを追加。実サービスE2Eは未確認。 |
 | 2026-07-14 | 12:09 | #36 | 会話記憶を短期・エピソード・長期へ分離。エピソードSQLite/Markdown/Chroma差分索引、失敗時再試行、長期記憶の重複抑止と出典、ブラウザセッションID、回帰テストを追加。実ブラウザ＋実LM StudioのエピソードE2Eは未確認。 |
 | 2026-07-14 | 13:41 | #37 | 2モデル分散・観測性を実装。Chat/Agentの独立endpoint設定と旧設定fallback、Agent停止時の安全なChat整形fallback、`/api/health`別モデル状態、ターン詳細表示・ログ、無効な長さ/遅延Agent設定削除、旧DB索引作成順を修正。標準unittest 43件・compileall・health構造スモークは確認、実LM Studio/ブラウザE2Eと計測は未実施。 |
+| 2026-07-17 | 00:09 | #38 | Milestone 2の`get_schedule`縦切りを追加。固定commitのSona Agent Core依存、Feature Flag、PETIT Adapter、`personal` Scope・`schedule.read`検証、Source/Freshness、JSON Lines監査、旧経路互換テストを追加。標準unittest 49件・compileall確認済み。実ブラウザ/実CalendarのCore経路は未確認。 |
+| 2026-07-17 | 03:09 | #39 | 動作確認済み: Milestone 2の予定取得Audit metadataへSource/Freshness・stale・最終同期日時・同期エラーを記録し、正常/stale両ケースと誤Primary Scope拒否（既存ハンドラー未呼出し）のテストを追加。依存導入、標準unittest 52件、compileall成功。 |

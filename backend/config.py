@@ -87,6 +87,12 @@ ENABLE_THINKING = os.getenv("PETIT_ENABLE_THINKING", "0") not in ("0", "false", 
 # Agent
 MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "2"))
 
+# Sona Agent Core is opt-in while PETIT validates the first vertical slice.
+USE_SONA_CORE = os.getenv("PETIT_USE_SONA_CORE", "0") not in ("0", "false", "False")
+SONA_CORE_AUDIT_PATH = _path_from_env("PETIT_SONA_CORE_AUDIT_PATH", STORAGE_DIR / "audit" / "sona_agent_core.jsonl")
+PETIT_OWNER_ID = os.getenv("PETIT_OWNER_ID", "soso").strip() or "soso"
+PETIT_PERSONAL_SCOPE_ID = os.getenv("PETIT_PERSONAL_SCOPE_ID", "soso").strip() or "soso"
+
 # Autonomous summarization (background scheduler)
 # 何時間おきに会話を自動でまとめて蓄積するか。2〜3時間 / 1日 などを想定。
 AUTO_SUMMARY_ENABLED = os.getenv("PETIT_AUTO_SUMMARY_ENABLED", "1") not in ("0", "false", "False")
