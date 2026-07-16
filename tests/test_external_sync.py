@@ -22,7 +22,12 @@ class ExternalSyncTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = Path(self.tmp.name) / "test.db"
-        self.patches = [patch.object(config, "DB_PATH", self.db), patch.object(config, "CALENDAR_ICS_URLS", []), patch.object(config, "CALENDAR_ICS_FILES", [])]
+        self.patches = [
+            patch.object(config, "DB_PATH", self.db),
+            patch.object(config, "CALENDAR_ICS_URLS", []),
+            patch.object(config, "CALENDAR_ICS_FILES", []),
+            patch.object(calendar_sync.timetree, "configured", return_value=False),
+        ]
         for item in self.patches: item.start()
         db.init_db()
 

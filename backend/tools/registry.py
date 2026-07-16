@@ -10,6 +10,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .. import config
+
 Handler = Callable[..., Any]
 
 
@@ -98,6 +100,16 @@ def dispatch(name: str, arguments: dict[str, Any] | str | None) -> str:
         arguments = parse_arguments(name, arguments)
     except ValueError as exc:
         return f"[error] {exc}"
+
+    if name == "get_schedule" and config.USE_SONA_CORE:
+        # The legacy handler remains the source of schedule data.  Core only
+        # supplies the execution contract, policy, freshness, and audit path.
+        try:
+            from .. import sona_core_schedule
+        except ImportError:
+            return "[error] Sona Agent Core is unavailable; PETIT_USE_SONA_CORE cannot use the legacy path"
+
+        return sona_core_schedule.dispatch_get_schedule(arguments)
 
     try:
         result = tool_obj.handler(**arguments)
