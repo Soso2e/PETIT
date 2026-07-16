@@ -84,8 +84,12 @@ def sync() -> dict[str, Any]:
     total = sum(item["synced_count"] for item in results if item["ok"])
     ok = bool(results) and any(item["ok"] for item in results)
     error = None if ok else (results[0]["error"] if results else "外部カレンダーが設定されていません")
+    last_synced_at = max(
+        (item["last_synced_at"] for item in results if item.get("last_synced_at")),
+        default=None,
+    )
     return {"ok": ok, "source": "calendar", "synced_count": total, "cached": False,
-            "stale": any(item["stale"] for item in results), "last_synced_at": db.now_iso() if ok else None,
+            "stale": any(item["stale"] for item in results), "last_synced_at": last_synced_at,
             "error": error, "configured": bool(specs), "sources": results, "synced": total}
 
 
