@@ -57,7 +57,12 @@ def build_context(*, request_id: str | None = None, capabilities: tuple[str, ...
         client=Client(client_id="petit", name="PETIT", version="m2"),
         scopes=ScopeSet(primary=ScopeRef(type="personal", id=scope_id or config.PETIT_PERSONAL_SCOPE_ID, provider="petit")),
         channel="petit_web",
-        metadata={"feature_flag": "PETIT_USE_SONA_CORE", "execution_path": "sona_core"},
+        metadata={
+            "feature_flag": "PETIT_USE_SONA_CORE",
+            "feature_flag_enabled": bool(config.USE_SONA_CORE),
+            "execution_path": "sona_core",
+            "core_path": True,
+        },
     )
 
 
@@ -124,6 +129,15 @@ class PetitSchedulePolicyEngine(DefaultPolicyEngine):
     """Enforce the adapter's declared primary-scope boundary."""
 
     async def evaluate_tool(self, context: ExecutionContext, definition: ToolDefinition, call: ToolCall):
+        if definition.name == "add_schedule" and call.arguments.get("destination", "local") != "local":
+            from sona_agent_core.runtime.policy import PolicyDecision
+
+            return PolicyDecision(
+                effect="deny",
+                reason_code="DESTINATION_NOT_SUPPORTED",
+                message="destination must be local",
+                metadata={"supported_destinations": ("local",)},
+            )
         if definition.supported_scopes and context.scopes.primary.type not in definition.supported_scopes:
             from sona_agent_core.runtime.policy import PolicyDecision
 

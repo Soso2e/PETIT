@@ -131,3 +131,13 @@ body {
 .send:disabled { opacity: 0.5; cursor: default; }
 
 .typing { color: var(--muted); font-style: italic; }
+.action-preview {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+}
+
+.action-preview dt { font-weight: 700; }
+.action-preview dd { margin: 0; overflow-wrap: anywhere; }

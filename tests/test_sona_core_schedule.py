@@ -52,16 +52,17 @@ class SonaCoreScheduleTests(unittest.TestCase):
         self.assertEqual({key: result.data[key] for key in ("date", "count", "events")}, {key: legacy[key] for key in ("date", "count", "events")})
         self.assertEqual(result.freshness.status, "unknown")
         self.assertEqual(result.sources[0].provider, "local")
-        self.assertEqual(len(audit.events), 1)
-        self.assertEqual(audit.events[0].tool_name, "get_schedule")
-        self.assertEqual(audit.events[0].context.metadata["execution_path"], "sona_core")
+        self.assertEqual(len(audit.events), 2)
+        event = audit.events[-1]
+        self.assertEqual(event.tool_name, "get_schedule")
+        self.assertEqual(event.context.metadata["execution_path"], "sona_core")
         self.assertEqual(
-            audit.events[0].metadata["sources"],
+            event.metadata["sources"],
             [{"provider": "local", "resource_type": "calendar_events_cache", "external_id": "local"}],
         )
-        self.assertEqual(audit.events[0].metadata["freshness"]["status"], "unknown")
-        self.assertIsNotNone(audit.events[0].metadata["freshness"]["observed_at"])
-        self.assertFalse(audit.events[0].metadata["stale"])
+        self.assertEqual(event.metadata["freshness"]["status"], "unknown")
+        self.assertIsNotNone(event.metadata["freshness"]["observed_at"])
+        self.assertFalse(event.metadata["stale"])
 
     def test_scope_and_capability_are_enforced(self) -> None:
         adapter = sona_core_schedule.PetitGetScheduleAdapter(lambda **_: {"count": 0, "events": [], "calendar_sync": {"ok": True}})
@@ -92,7 +93,7 @@ class SonaCoreScheduleTests(unittest.TestCase):
                 {}, adapter=sona_core_schedule.PetitGetScheduleAdapter(lambda **_: schedule_data), audit_sink=audit
             )
         )
-        event = audit.events[0]
+        event = audit.events[-1]
         self.assertEqual(result.status, "success")
         self.assertEqual(event.status, "success")
         self.assertEqual(event.metadata["sources"][0]["provider"], "google_ics")
@@ -134,16 +135,16 @@ class SonaCoreScheduleTests(unittest.TestCase):
         self.assertEqual(result.status, "success")
         self.assertEqual(result.freshness.status, "stale")
         self.assertTrue(result.sources[0].metadata["stale"])
-        self.assertEqual(audit.events[0].status, "success")
+        self.assertEqual(audit.events[-1].status, "success")
         self.assertEqual(
-            audit.events[0].metadata["sources"],
+            audit.events[-1].metadata["sources"],
             [{"provider": "google_ics", "resource_type": "calendar_events_cache", "external_id": "google_ics"}],
         )
-        self.assertEqual(audit.events[0].metadata["freshness"]["status"], "stale")
-        self.assertEqual(audit.events[0].metadata["freshness"]["source_updated_at"], "2026-07-16T10:00:00+00:00")
-        self.assertTrue(audit.events[0].metadata["stale"])
-        self.assertEqual(audit.events[0].metadata["last_synced_at"], "2026-07-16T10:00:00+00:00")
-        self.assertEqual(audit.events[0].metadata["sync_error"], "sync failed")
+        self.assertEqual(audit.events[-1].metadata["freshness"]["status"], "stale")
+        self.assertEqual(audit.events[-1].metadata["freshness"]["source_updated_at"], "2026-07-16T10:00:00+00:00")
+        self.assertTrue(audit.events[-1].metadata["stale"])
+        self.assertEqual(audit.events[-1].metadata["last_synced_at"], "2026-07-16T10:00:00+00:00")
+        self.assertEqual(audit.events[-1].metadata["sync_error"], "sync failed")
 
     def test_core_unavailable_does_not_fall_back_to_legacy_handler(self) -> None:
         with (

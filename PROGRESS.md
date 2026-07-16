@@ -19,8 +19,9 @@
 - 外部同期信頼性: Notion/ICS/TimeTreeの成功・失敗・stale状態をSQLite `sync_state` に保存する実装済み。自動テスト済み、実認証情報を使うNotion/Google/TimeTree E2Eは未確認。
 - 会話記憶: 短期（ブラウザセッション履歴）、エピソード（SQLite `conversation_episodes` / `petit_episodes`）、長期（SQLite `memory`）を分離。エピソードは20分のアイドル、8往復、明示まとめ、定期実行で確定する。単体テスト済み、実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。
 - 索引: SQLite記憶/エピソードは`content_hash`・Embeddingモデル/版・Chromaメタデータで差分だけを再索引化する。Vault差分索引は維持。起動時の実LM Studio件数は未測定。
-- Sona Agent Core: `PETIT_USE_SONA_CORE=1`のときだけ`get_schedule`をCore経由で実行するAdapterを追加。既存の予定取得処理は維持し、`personal` Scope、`schedule.read` Capability、Source/Freshnessを付加する。Audit metadataへSource/Freshness・stale・同期状態を保存し、`personal`以外のPrimary Scopeはハンドラー実行前に拒否する。Feature Flag無効時は旧経路を使用し、Coreが利用不能なら明示エラーにする。標準unittest 52件とcompileallは確認済み。実ブラウザ・実CalendarでのCore経路は未確認。
-- 次にやること: `PETIT_USE_SONA_CORE=1`でLM Studioを起動し、実ブラウザから予定取得、同期失敗時のstale表示、`storage/audit/sona_agent_core.jsonl`の監査記録を確認する。続けて1モデル（Chat/Agent同一9B）と2モデル（別endpoint）で、READMEの意図別チャット・承認・同期・記憶・再起動ケースを実ブラウザ確認する。
+- Sona Agent Core: Milestone 3として`PETIT_USE_SONA_CORE=1`時の`add_schedule`を`PetitAddScheduleAdapter`へ移行。SQLiteにApprovalとIdempotency実行結果を永続化し、10分期限、原子的な一回消費、同一Key再実行抑止・異引数競合、Capability/Scope/local保存先検証、requested/approved/rejected/expired/started/completed/failed/idempotency-hit Auditを実装。既存`add_schedule`を再実装せず呼び出し、Flag OFF時と他Toolは旧経路を維持。標準unittest 59件・compileall・依存導入が成功し、公開済みMilestone 2依存へ戻した状態でもFlag OFFの旧Approval登録スモークが成功。実ブラウザはUI起動と自然文送信まで確認したが、LM Studio接続タイムアウトのため確認UI・承認・キャンセル・二重送信・Core OFFの実ブラウザE2Eは未確認。
+- 既知Issue: `requirements.txt`のSona Agent Core固定commitは公開済みMilestone 2版のまま。Milestone 3 CoreをPush後にcommit固定を更新する必要があり、現状の開発確認は隣接Core repoのeditable installを使用する。
+- 次にやること: LM Studioを到達可能にしてMilestone 3の承認・キャンセル・二重送信・`get_schedule`再取得・Audit・Core OFFを実ブラウザ確認し、Core公開後にPETITの固定commitを更新する。
 
 ## 履歴
 
@@ -74,3 +75,4 @@
 | 2026-07-14 | 13:41 | #37 | 2モデル分散・観測性を実装。Chat/Agentの独立endpoint設定と旧設定fallback、Agent停止時の安全なChat整形fallback、`/api/health`別モデル状態、ターン詳細表示・ログ、無効な長さ/遅延Agent設定削除、旧DB索引作成順を修正。標準unittest 43件・compileall・health構造スモークは確認、実LM Studio/ブラウザE2Eと計測は未実施。 |
 | 2026-07-17 | 00:09 | #38 | Milestone 2の`get_schedule`縦切りを追加。固定commitのSona Agent Core依存、Feature Flag、PETIT Adapter、`personal` Scope・`schedule.read`検証、Source/Freshness、JSON Lines監査、旧経路互換テストを追加。標準unittest 49件・compileall確認済み。実ブラウザ/実CalendarのCore経路は未確認。 |
 | 2026-07-17 | 03:09 | #39 | 動作確認済み: Milestone 2の予定取得Audit metadataへSource/Freshness・stale・最終同期日時・同期エラーを記録し、正常/stale両ケースと誤Primary Scope拒否（既存ハンドラー未呼出し）のテストを追加。依存導入、標準unittest 52件、compileall成功。 |
+| 2026-07-17 | 04:29 | #40 | Milestone 3 PETIT Safe Writeを実装。`add_schedule`だけをFeature FlagでCoreのSQLite Approval/Idempotency/Auditへ接続し、既存書き込みをAdapterで一回実行。標準unittest 59件、compileall、依存導入、Flag OFF旧Approvalスモーク成功。実ブラウザはLM Studioタイムアウトで確認UI以降未確認、Core固定commit更新も公開後対応。 |
