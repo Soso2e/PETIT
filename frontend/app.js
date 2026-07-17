@@ -36,6 +36,27 @@ function addMessage(role, text, { tools, error, actions, modelRoute } = {}) {
   if (actions && actions.length) {
     const controls = document.createElement("div");
     controls.className = "action-confirm";
+    if (actions[0].name === "add_schedule") {
+      const args = actions[0].arguments || {};
+      const preview = document.createElement("dl");
+      preview.className = "action-preview";
+      const fields = [
+        ["予定タイトル", args.title],
+        ["開始日時", args.start_time],
+        ["終了日時", args.end_time || "未指定"],
+        ["場所", args.location || "未指定"],
+        ["説明", args.description || "未指定"],
+        ["保存先", "PETITローカル予定"],
+      ];
+      for (const [label, value] of fields) {
+        const term = document.createElement("dt");
+        const detail = document.createElement("dd");
+        term.textContent = label;
+        detail.textContent = value;
+        preview.append(term, detail);
+      }
+      controls.appendChild(preview);
+    }
     const approve = document.createElement("button");
     approve.type = "button";
     approve.textContent = "実行する";

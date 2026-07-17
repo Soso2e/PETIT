@@ -223,10 +223,18 @@ def _register_pending_actions(actions: list[dict[str, Any]]) -> list[PendingActi
         for key in expired:
             _pending_actions.pop(key, None)
         for action in actions:
+            action_name = str(action["name"])
+            action_arguments = dict(action.get("arguments") or {})
+            if config.USE_SONA_CORE and action_name == "add_schedule":
+                from . import sona_core_add_schedule
+
+                approval_id = sona_core_add_schedule.register_pending(action_arguments)
+                registered.append(PendingAction(approval_id=approval_id, name=action_name, arguments=action_arguments))
+                continue
             approval_id = uuid4().hex
             value = {
-                "name": str(action["name"]),
-                "arguments": dict(action.get("arguments") or {}),
+                "name": action_name,
+                "arguments": action_arguments,
                 "created_at": now,
             }
             _pending_actions[approval_id] = value
@@ -236,6 +244,28 @@ def _register_pending_actions(actions: list[dict[str, Any]]) -> list[PendingActi
 
 @app.post("/api/actions/{approval_id}", response_model=ChatResponse)
 def decide_action(approval_id: str, decision: ActionDecision) -> ChatResponse:
+    if config.USE_SONA_CORE:
+        try:
+            from . import sona_core_add_schedule
+
+            core_request = sona_core_add_schedule.get_pending(approval_id)
+        except Exception:  # noqa: BLE001
+            core_request = None
+        if core_request is not None and core_request.invocation.call.name == "add_schedule":
+            try:
+                result = sona_core_add_schedule.decide_pending(approval_id, decision.approved)
+            except (KeyError, ValueError) as exc:
+                return ChatResponse(reply="", error=f"確認操作を実行できません。{exc}")
+            if not decision.approved:
+                return ChatResponse(reply="書き込みをキャンセルしました。")
+            if result is None or result.status != "success":
+                message = result.error.message if result and result.error else "schedule write failed"
+                return ChatResponse(reply="", error=f"書き込みに失敗しました。{message}")
+            rendered = json.dumps(result.data, ensure_ascii=False, default=str)
+            return ChatResponse(
+                reply=f"確認された内容を実行しました。\n{_short_tool_result(rendered)}",
+                used_tools=[{"name": "add_schedule", "arguments": core_request.invocation.call.arguments}],
+            )
     with _pending_actions_lock:
         action = _pending_actions.pop(approval_id, None)
     if action is None or time.monotonic() - action["created_at"] > _PENDING_ACTION_TTL_SECONDS:
