@@ -22,6 +22,8 @@
 - Sona Agent Core: Milestone 3として`PETIT_USE_SONA_CORE=1`時の`add_schedule`を`PetitAddScheduleAdapter`へ移行。SQLiteにApprovalとIdempotency実行結果を永続化し、10分期限、原子的な一回消費、同一Key再実行抑止・異引数競合、Capability/Scope/local保存先検証、requested/approved/rejected/expired/started/completed/failed/idempotency-hit Auditを実装。既存`add_schedule`を再実装せず呼び出し、Flag OFF時と他Toolは旧経路を維持。標準unittest 59件・compileall・依存導入が成功し、公開済みMilestone 2依存へ戻した状態でもFlag OFFの旧Approval登録スモークが成功。実ブラウザはUI起動と自然文送信まで確認したが、LM Studio接続タイムアウトのため確認UI・承認・キャンセル・二重送信・Core OFFの実ブラウザE2Eは未確認。
 - 既知Issue: `requirements.txt`のSona Agent Core固定commitは公開済みMilestone 2版のまま。Milestone 3 CoreをPush後にcommit固定を更新する必要があり、現状の開発確認は隣接Core repoのeditable installを使用する。
 - 次にやること: LM Studioを到達可能にしてMilestone 3の承認・キャンセル・二重送信・`get_schedule`再取得・Audit・Core OFFを実ブラウザ確認し、Core公開後にPETITの固定commitを更新する。
+- Sona Agent Core: Milestone 2動作確認済み。Core ONの実ブラウザ予定取得、`personal:soso` / `schedule.read`、JSONL `tool.completed`、外部ICSの`SourceReference(provider=ics_file)`とfresh Freshnessを確認した。Core OFFでは同じ3件を旧`get_schedule`経路で返し、Audit行が増えないことを確認した。ICS欠損時は直前キャッシュ3件を保持し、stale・同期エラー・最終成功時刻をToolResult/Auditへ残し、ブラウザ回答でも古いキャッシュと明示する。
+- 次にやること: Issue #6の日付解析は別件として未解決のまま扱う。続けて1モデル（Chat/Agent同一9B）と2モデル（別endpoint）で、READMEの意図別チャット・承認・同期・記憶・再起動ケースを実ブラウザ確認する。
 
 ## 履歴
 
@@ -76,3 +78,4 @@
 | 2026-07-17 | 00:09 | #38 | Milestone 2の`get_schedule`縦切りを追加。固定commitのSona Agent Core依存、Feature Flag、PETIT Adapter、`personal` Scope・`schedule.read`検証、Source/Freshness、JSON Lines監査、旧経路互換テストを追加。標準unittest 49件・compileall確認済み。実ブラウザ/実CalendarのCore経路は未確認。 |
 | 2026-07-17 | 03:09 | #39 | 動作確認済み: Milestone 2の予定取得Audit metadataへSource/Freshness・stale・最終同期日時・同期エラーを記録し、正常/stale両ケースと誤Primary Scope拒否（既存ハンドラー未呼出し）のテストを追加。依存導入、標準unittest 52件、compileall成功。 |
 | 2026-07-17 | 04:29 | #40 | Milestone 3 PETIT Safe Writeを実装。`add_schedule`だけをFeature FlagでCoreのSQLite Approval/Idempotency/Auditへ接続し、既存書き込みをAdapterで一回実行。標準unittest 59件、compileall、依存導入、Flag OFF旧Approvalスモーク成功。実ブラウザはLM Studioタイムアウトで確認UI以降未確認、Core固定commit更新も公開後対応。 |
+| 2026-07-16 | 18:38 | #40 | 動作確認済み: Milestone 2残りE2Eを完了。Core ON/OFFで同じ3件、`personal:soso` / `schedule.read` / JSONL Audit、外部ICS SourceReference、fresh/stale、失敗時キャッシュ保持と古さ表示を実ブラウザ+LM Studioで確認。失敗時の最終同期時刻保持と空モデル回答時の予定フォールバックを修正し、標準unittest 53件・compileall成功。Issue #6は対象外のまま維持。 |

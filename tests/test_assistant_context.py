@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 import tempfile
 import sqlite3
@@ -115,6 +116,21 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertEqual(result["model_route"]["requested_route"], "agent")
         self.assertEqual(result["model_route"]["actual_route"], "chat_fallback")
         self.assertEqual(result["model_route"]["fallback_reason"], "agent_unavailable")
+
+    def test_schedule_read_uses_stale_cache_reply_when_model_returns_empty(self) -> None:
+        stale = json.dumps({
+            "count": 1,
+            "events": [{"title": "外部予定", "start_time": "2026-07-17T12:00:00+09:00"}],
+            "calendar_sync": {"ok": False, "stale": True, "last_synced_at": "2026-07-17T03:34:00+09:00", "error": "sync failed"},
+        }, ensure_ascii=False)
+        with (
+            patch.object(agent, "chat_completion", return_value={"role": "assistant", "content": ""}),
+            patch.object(agent.tools, "dispatch", return_value=stale),
+        ):
+            result = agent.run("今日の予定を確認して")
+
+        self.assertIn("外部予定", result["reply"])
+        self.assertIn("古いキャッシュ", result["reply"])
 
     def test_incomplete_task_read_is_not_misrouted_as_completion(self) -> None:
         with (

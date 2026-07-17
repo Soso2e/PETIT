@@ -54,6 +54,7 @@ class ExternalSyncTests(unittest.TestCase):
             result = calendar_sync.sync()
         self.assertFalse(result["ok"])
         self.assertTrue(result["sources"][0]["stale"])
+        self.assertEqual(result["last_synced_at"], result["sources"][0]["last_synced_at"])
         self.assertNotIn("token", result["sources"][0]["error"])
         self.assertEqual(self.event_count("google_ics:1"), 1)
 
