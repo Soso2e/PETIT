@@ -3,9 +3,21 @@ import Foundation
 enum PetitAPIError: LocalizedError, Sendable {
     case invalidBaseURL
     case insecureURL
+    case networkUnavailable
+    case timedOut
     case invalidResponse
     case httpStatus(Int, String)
     case requestMismatch
+    case apiFailure(code: String?, message: String)
+
+    var affectsConnectivity: Bool {
+        switch self {
+        case .invalidBaseURL, .insecureURL, .networkUnavailable:
+            return true
+        case .timedOut, .invalidResponse, .httpStatus, .requestMismatch, .apiFailure:
+            return false
+        }
+    }
 
     var errorDescription: String? {
         switch self {
@@ -13,19 +25,33 @@ enum PetitAPIError: LocalizedError, Sendable {
             return "Tailscale ServeのURLを入力してください。"
         case .insecureURL:
             return "HTTPSのTailscale Serve URLを使用してください。"
+        case .networkUnavailable:
+            return "PETITへ接続できません。TailscaleとPC側の起動状態を確認してください。"
+        case .timedOut:
+            return "PETITの処理が時間内に終わりませんでした。接続は維持されています。"
         case .invalidResponse:
             return "PETITから正しい応答を受け取れませんでした。"
         case .httpStatus(let status, let message):
             return "PETIT APIエラー（\(status)）: \(message)"
         case .requestMismatch:
             return "応答のrequest IDが一致しません。"
+        case .apiFailure(let code, let message):
+            if let code, !code.isEmpty {
+                return "PETIT処理エラー［\(code)］: \(message)"
+            }
+            return "PETIT処理エラー: \(message)"
         }
     }
 }
 
 struct PetitAPIClient: Sendable {
     let baseURL: URL
-    let session: URLSession = .shared
+    let session: URLSession
+
+    init(baseURL: URL, session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
+    }
 
     static func normalizedBaseURL(from rawValue: String) -> URL? {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -42,6 +68,19 @@ struct PetitAPIClient: Sendable {
         components.query = nil
         components.fragment = nil
         return components.url
+    }
+
+    static func timeout(for path: String) -> TimeInterval {
+        switch path {
+        case "/api/ping": return 5
+        case "/api/chat": return 60
+        case let value where value.hasPrefix("/api/actions/"): return 30
+        default: return 20
+        }
+    }
+
+    func ping() async throws -> PingResponse {
+        try await request(path: "/api/ping", method: "GET", body: Optional<Data>.none)
     }
 
     func health() async throws -> HealthResponse {
@@ -61,7 +100,11 @@ struct PetitAPIClient: Sendable {
             sessionId: sessionID
         )
         let body = try encoder.encode(payload)
-        let response: ChatResponse = try await request(path: "/api/chat", method: "POST", body: body)
+        let response: ChatResponse = try await request(
+            path: "/api/chat",
+            method: "POST",
+            body: body
+        )
         if let returnedID = response.requestId, returnedID != requestID {
             throw PetitAPIError.requestMismatch
         }
@@ -100,7 +143,7 @@ struct PetitAPIClient: Sendable {
 
         let relativePath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let url = baseURL.appending(path: relativePath)
-        var request = URLRequest(url: url, timeoutInterval: 130)
+        var request = URLRequest(url: url, timeoutInterval: Self.timeout(for: path))
         request.httpMethod = method
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -108,15 +151,29 @@ struct PetitAPIClient: Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw PetitAPIError.invalidResponse
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                let message = String(data: data, encoding: .utf8) ?? "Unknown error"
+                throw PetitAPIError.httpStatus(http.statusCode, message)
+            }
+            do {
+                return try decoder.decode(Response.self, from: data)
+            } catch {
+                throw PetitAPIError.invalidResponse
+            }
+        } catch let error as PetitAPIError {
+            throw error
+        } catch let error as URLError {
+            if error.code == .timedOut {
+                throw PetitAPIError.timedOut
+            }
+            throw PetitAPIError.networkUnavailable
+        } catch {
             throw PetitAPIError.invalidResponse
         }
-        guard (200..<300).contains(http.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw PetitAPIError.httpStatus(http.statusCode, message)
-        }
-
-        return try decoder.decode(Response.self, from: data)
     }
 }
