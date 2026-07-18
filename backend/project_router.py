@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from . import db, project_continuity, project_resume
+from . import db, project_continuity, project_registration, project_resume
 
 log = logging.getLogger(__name__)
 
@@ -245,12 +245,7 @@ def handle_project_turn(
         }
     if resolution.kind == "new_candidate":
         name = resolution.target_text or "その名前"
-        return {
-            "reply": f"「{name}」はまだプロジェクト台帳にないよ。新規プロジェクトとして登録するか、既存プロジェクトの別名か確認したい。",
-            "used_tools": [],
-            "persist": True,
-            "model_route": route,
-        }
+        return project_registration.preview_new_project(name, user_id=user_id)
 
     previous = project_continuity.get_active_project(user_id)
     active = project_continuity.set_active_project(user_id, resolution.project_id)
@@ -282,8 +277,14 @@ def try_handle_project_turn(
     user_id: str,
     recent_history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any] | None:
-    """Best-effort continuity entrypoint for completion and project switching."""
+    """Best-effort entrypoint for registration, completion, and switching."""
     try:
+        registration = project_registration.try_handle_registration_turn(
+            user_message,
+            user_id=user_id,
+        )
+        if registration:
+            return registration
         from . import project_completion
 
         completion = project_completion.try_handle_completion_turn(
