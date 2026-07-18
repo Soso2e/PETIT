@@ -46,22 +46,31 @@ class ProjectCompletionTests(unittest.TestCase):
     def test_scope_answer_creates_preview_but_does_not_save(self) -> None:
         project_completion.try_handle_completion_turn("終わった", user_id=config.PETIT_OWNER_ID)
 
-        result = project_completion.try_handle_completion_turn("実装だけ終わった。ブラウザ確認はまだ", user_id=config.PETIT_OWNER_ID)
+        result = project_completion.try_handle_completion_turn(
+            "実装だけ終わった。ブラウザ確認はまだ",
+            user_id=config.PETIT_OWNER_ID,
+        )
         args = self._pending_args(result)
 
         self.assertEqual(args["stage"], "implemented")
         self.assertIn("実画面確認", args["unverified_items"])
         self.assertIn("自動テスト", args["unverified_items"])
         self.assertIsNone(project_continuity.get_project_checkpoint(config.PETIT_OWNER_ID, "petit"))
+        self.assertIsNone(project_completion.get_completion_draft(config.PETIT_OWNER_ID))
 
     def test_approved_tool_saves_checkpoint_and_event_once(self) -> None:
+        project_continuity.save_project_checkpoint(
+            config.PETIT_OWNER_ID,
+            "petit",
+            source_conversation_ids=[99],
+        )
         project_completion.try_handle_completion_turn("終わった", user_id=config.PETIT_OWNER_ID)
         preview = project_completion.try_handle_completion_turn(
             "テストも通った。次はブラウザで確認する",
             user_id=config.PETIT_OWNER_ID,
         )
         args = self._pending_args(preview)
-        db.save_conversation(args["source_user_text"], preview["reply"], session_id="test")
+        conversation_id = db.save_conversation(args["source_user_text"], preview["reply"], session_id="test")
 
         first = json.loads(tools.dispatch("save_project_completion", args))
         second = json.loads(tools.dispatch("save_project_completion", args))
@@ -73,14 +82,15 @@ class ProjectCompletionTests(unittest.TestCase):
         self.assertEqual(checkpoint["stage"], "automated_tests_verified")
         self.assertEqual(checkpoint["next_action"], "ブラウザで確認する")
         self.assertIn("実画面確認", checkpoint["unverified_items"])
+        self.assertEqual(checkpoint["source_conversation_ids"], [99, conversation_id])
         with db.get_connection() as conn:
             events = conn.execute("SELECT event_type, provider, source_conversation_id FROM project_events").fetchall()
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["event_type"], "tests_verified")
         self.assertEqual(events[0]["provider"], "petit")
-        self.assertIsNotNone(events[0]["source_conversation_id"])
+        self.assertEqual(events[0]["source_conversation_id"], conversation_id)
 
-    def test_deployed_does_not_mean_production_verified(self) -> None:
+    def test_deployed_does_not_invent_tests_ui_or_production_evidence(self) -> None:
         result = project_completion.try_handle_completion_turn(
             "デプロイしたけど本番確認はまだ",
             user_id=config.PETIT_OWNER_ID,
@@ -89,7 +99,31 @@ class ProjectCompletionTests(unittest.TestCase):
 
         self.assertEqual(args["stage"], "deployed")
         self.assertIn("本番確認", args["unverified_items"])
+        self.assertIn("自動テスト", args["unverified_items"])
+        self.assertIn("実画面確認", args["unverified_items"])
+        self.assertIn("デプロイ済み（ユーザー確認）", args["completed_evidence"])
+        self.assertNotIn("自動テスト確認済み（ユーザー確認）", args["completed_evidence"])
+        self.assertNotIn("実画面確認済み（ユーザー確認）", args["completed_evidence"])
         self.assertNotIn("本番確認済み（ユーザー確認）", args["completed_evidence"])
+
+    def test_explicit_complete_can_clear_remaining_items(self) -> None:
+        project_continuity.save_project_checkpoint(
+            config.PETIT_OWNER_ID,
+            "petit",
+            blockers=["旧ブロッカー"],
+            unverified_items=["自動テスト", "本番確認"],
+        )
+
+        result = project_completion.try_handle_completion_turn(
+            "全部終わって完全に完了した",
+            user_id=config.PETIT_OWNER_ID,
+        )
+        args = self._pending_args(result)
+
+        self.assertEqual(args["stage"], "completed")
+        self.assertEqual(args["unverified_items"], [])
+        self.assertEqual(args["blockers"], [])
+        self.assertIn("完全完了（ユーザー確認）", args["completed_evidence"])
 
     def test_today_is_done_is_paused_not_completed(self) -> None:
         result = project_completion.try_handle_completion_turn("今日はここまで", user_id=config.PETIT_OWNER_ID)
