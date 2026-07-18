@@ -5,17 +5,20 @@ on:
     branches:
       - feat/project-continuity-routing
       - feat/project-completion-checkpoint
+      - feat/project-resume-context
   pull_request:
     paths:
       - "backend/project_continuity.py"
       - "backend/project_router.py"
       - "backend/project_completion.py"
+      - "backend/project_resume.py"
       - "backend/tools/project_completion.py"
       - "backend/tools/__init__.py"
       - "backend/agent.py"
       - "tests/test_project_continuity.py"
       - "tests/test_project_router.py"
       - "tests/test_project_completion.py"
+      - "tests/test_project_resume.py"
       - ".github/workflows/project-continuity-tests.yml"
 
 jobs:
@@ -35,4 +38,4 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall backend tests
       - name: Run project continuity tests
-        run: python -m unittest tests.test_project_continuity tests.test_project_router tests.test_project_completion
+        run: python -m unittest tests.test_project_continuity tests.test_project_router tests.test_project_completion tests.test_project_resume
