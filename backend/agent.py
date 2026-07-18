@@ -1,7 +1,7 @@
 """Minimal conversation flow for PETIT.
 
 The default path is deliberately boring: one chat-model call, a short prompt,
-and only the last five conversation turns.  Retrieval and situation gathering
+and only the last five conversation turns. Retrieval and situation gathering
 are opt-in through explicit tool routing.
 """
 from __future__ import annotations
@@ -11,7 +11,7 @@ import re
 from datetime import date, timedelta
 from typing import Any
 
-from . import config, db, project_router, recall, situation, tools  # recall/situation kept import-compatible; never used for chat
+from . import config, db, model_router, project_router, recall, situation, tools  # recall/situation kept import-compatible; never used for chat
 from .lmstudio_client import LMStudioError, chat_completion
 
 SYSTEM_PROMPT = (
@@ -338,6 +338,8 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
     )
     if project_turn:
         return project_turn
+
+    route_decision = model_router.choose(user_message, history)
     tool_names = _related_tool_names(user_message)
     write_requested = any(tools.requires_confirmation(name) for name in tool_names)
     if "edit_brain_note" in tool_names:
@@ -362,31 +364,33 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
     used_tools: list[dict[str, Any]] = []
     attempted_tool_names: set[str] = set()
     had_tool_failure = False
+    requested_route = "agent" if tool_names or route_decision["kind"] == "agent" else "chat"
 
     # One call for normal chat. Explicit tool requests may need one additional
     # call to phrase the tool result; they still never receive unrelated tools.
     for _ in range(min(config.MAX_TOOL_ITERATIONS, 2)):
-        requested_route = "agent" if tool_names else "chat"
         message, actual_route, fallback_reason = _complete(
-            messages, tools_schema=selected_tools or None, route=requested_route,
-            # Tool selection and writes are not safe to silently degrade.
-            allow_chat_fallback=False,
+            messages,
+            tools_schema=selected_tools or None,
+            route=requested_route,
+            # Pure reasoning can safely degrade to Chat. Tool selection and writes cannot.
+            allow_chat_fallback=requested_route == "agent" and not tool_names,
         )
         tool_calls = message.get("tool_calls") or []
         if not tool_calls:
-            model = config.AGENT_MODEL if tool_names else config.CHAT_MODEL
+            model = config.AGENT_MODEL if requested_route == "agent" else config.CHAT_MODEL
             if write_requested:
                 return {
                     "reply": "対象は確認できましたが、安全な変更案を確定できませんでした。対象ファイルと変更内容をもう少し具体的にしてください。",
                     "used_tools": used_tools,
                     "persist": False,
-                    "model_route": _route_meta(requested_route, actual_route, tool_names, fallback_reason),
+                    "model_route": _route_meta(requested_route, actual_route, tool_names, fallback_reason) | {"reasons": route_decision["reasons"]},
                 }
             return {
                 "reply": _answer(message, messages, model, "chat" if actual_route == "chat_fallback" else requested_route),
                 "used_tools": used_tools,
                 "persist": not had_tool_failure,
-                "model_route": _route_meta(requested_route, actual_route, tool_names, fallback_reason),
+                "model_route": _route_meta(requested_route, actual_route, tool_names, fallback_reason) | {"reasons": route_decision["reasons"]},
             }
         results: list[dict[str, str]] = []
         for call in tool_calls:
@@ -418,5 +422,9 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
         messages.append(_tool_result_message(user_message, results))
         selected_tools = _selected_schemas([name for name in tool_names if name not in attempted_tool_names])
 
-    requested_route = "agent" if tool_names else "chat"
-    return {"reply": "確認した結果を短くまとめられませんでした。", "used_tools": used_tools, "persist": False, "model_route": _route_meta(requested_route, requested_route, tool_names)}
+    return {
+        "reply": "確認した結果を短くまとめられませんでした。",
+        "used_tools": used_tools,
+        "persist": False,
+        "model_route": _route_meta(requested_route, requested_route, tool_names) | {"reasons": route_decision["reasons"]},
+    }
