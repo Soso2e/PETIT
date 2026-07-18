@@ -2,28 +2,29 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書きしてよい。
+履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。最終形はスマホとPCの両方から使える音声中心の常駐アシスタントで、現状はテキストチャットMVPを土台にしている。
 - TimeTree バックアップ: `tools/timetree_backup.py` 実装済みだが本番 E2E 未検証（実認証情報待ち）。カレンダーコード確認は初回だけ対話実行が必要（`timetree-exporter -e your@email.com`）。
 - Notion: 実タスクDBの未完了取得、確認画面を経由した作成・完了更新を実ブラウザ + LM StudioでE2E確認済み。Notion失敗時はローカルへ代替保存しない。
 - BRAIN / RAG: 実vaultの限定検索と、対象ファイル・追記内容の確認後に既存Markdownへ追記するE2Eを確認済み。`_private`・除外フォルダ・Vault外・Markdown以外は編集拒否し、変更後は該当ノートを再索引化する。
 - 能動支援: 「今日何からやる？」では未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理する。雑談ではツール・RAG・Embeddingを動かさない。
-- 書き込み確認: Notion、ローカル予定、長期記憶、引き継ぎ、BRAINの書き込みツールは10分有効のプレビューへ変換し、ブラウザの「実行する」確認後に同一引数を1回だけ実行する。
+- 書き込み確認: Notion、ローカル予定、長期記憶、引き継ぎ、BRAIN、プロジェクト登録・別名・終了checkpointの書き込みはプレビューへ変換し、ブラウザの「実行する」確認後に同一引数を1回だけ実行する。
 - 二モデル構成: Chat/AgentのURL・モデル・APIキーを独立設定でき、未設定時は従来の`PETIT_LM_*`へフォールバックする。ルーティングは意図・関連ソースに基づき、長さだけではAgentへ送らない。安全に取得済みの読み取り結果だけはAgent停止時にChatで整形でき、ツール選択・書き込みは省略せず利用不能として返す。実別PC/別GPU動作は未確認。
 - 応答速度改善: 通常会話は9B用の`CHAT_MODEL`・短いsystem prompt・直近5会話・LM Studio 1回に固定し、ツール・RAG・Embeddingを実行しない。空回答、LM Studio/内部エラー、ツール失敗はSQLite・Markdown・Embeddingへ保存しない。実ブラウザで雑談・時刻・天気・各連携の応答を確認済み。
 - 軽量回答上限: `PETIT_LIGHT_MAX_TOKENS` を 512 に変更済み。`PETIT_ENABLE_THINKING=0` と `.env.example` に反映済み。実LM Studio応答のreasoning tokens 0は未確認。
 - Calendar: ICSは読み取り専用同期、`add_schedule`はPETITローカル予定への書き込みとして分離。ローカル予定の確認付き追加・再取得は実ブラウザE2E済み。実Google非公開iCal URLは未設定のため同期E2E未確認。将来のGoogle書き込みはprovider境界へ追加する。
-- 観測性: `/api/health` はChat/Agent別のキャッシュ付き`/models`確認（接続先、モデル、loaded、遅延、Agentフォールバック可否）を返す。各ターンはrequest ID、実経路、モデル／endpoint ID、ツール、LLM回数、同期状態、参照件数、フォールバック、時間をログ・折りたたみ詳細へ出す。実ブラウザ表示は未確認。
+- 観測性: `/api/health` はChat/Agent別のキャッシュ付き`/models`確認（接続先、モデル、loaded、遅延、Agentフォールバック可否）を返す。各ターンはrequest ID、実経路、モデル／endpoint ID、ツール、同期状態、参照件数、フォールバック、時間をログ・折りたたみ詳細へ出す。Project Continuityではcheckpoint・event・episode・handoff・source freshnessの参照件数も返す。実ブラウザ表示は未確認。
 - LM Studio: 現在の実行環境ではChat/Agentの`/models`到達を確認できず、実モデル総合E2E・1/2モデル時間比較は未実施。単体テストで接続先分離とAgent→Chat読み取りフォールバックを確認済み。
 - 外部同期信頼性: Notion/ICS/TimeTreeの成功・失敗・stale状態をSQLite `sync_state` に保存する実装済み。自動テスト済み、実認証情報を使うNotion/Google/TimeTree E2Eは未確認。
 - 会話記憶: 短期（ブラウザセッション履歴）、エピソード（SQLite `conversation_episodes` / `petit_episodes`）、長期（SQLite `memory`）を分離。エピソードは20分のアイドル、8往復、明示まとめ、定期実行で確定する。単体テスト済み、実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。
 - 索引: SQLite記憶/エピソードは`content_hash`・Embeddingモデル/版・Chromaメタデータで差分だけを再索引化する。Vault差分索引は維持。起動時の実LM Studio件数は未測定。
+- Project Continuity Phase 1: 内部プロジェクト台帳、別名、確認可能な外部source link、会話episodeの多対多Relation、active project、checkpoint、確認済みproject event、開始・終了確認・切替・再開・新規登録・別名追加を実装。LM Studio非依存の決定論的経路と限定コンテキスト取得を追加し、各stacked PRのcompileall／専用unittest／GitHub Actionsは成功。実ブラウザでの登録承認・キャンセル・終了確認・再起動後復元は未確認。
+- Project Continuity Phase 2: 個人プロジェクトはNotion、Life is Tech／教え子向けはLinkraft、コード変更はGitHub、長期設計はBRAINを正本として内部project idへ確認付きで接続する。Linkraftはそそ本人所有プロジェクトだけを読み取る。
 - Sona Agent Core: Milestone 3として`PETIT_USE_SONA_CORE=1`時の`add_schedule`を`PetitAddScheduleAdapter`へ移行。SQLiteにApprovalとIdempotency実行結果を永続化し、10分期限、原子的な一回消費、同一Key再実行抑止・異引数競合、Capability/Scope/local保存先検証、requested/approved/rejected/expired/started/completed/failed/idempotency-hit Auditを実装。既存`add_schedule`を再実装せず呼び出し、Flag OFF時と他Toolは旧経路を維持。標準unittest 59件・compileall・依存導入が成功し、公開済みMilestone 2依存へ戻した状態でもFlag OFFの旧Approval登録スモークが成功。実ブラウザはUI起動と自然文送信まで確認したが、LM Studio接続タイムアウトのため確認UI・承認・キャンセル・二重送信・Core OFFの実ブラウザE2Eは未確認。
 - 既知Issue: `requirements.txt`のSona Agent Core固定commitは公開済みMilestone 2版のまま。Milestone 3 CoreをPush後にcommit固定を更新する必要があり、現状の開発確認は隣接Core repoのeditable installを使用する。
-- 次にやること: LM Studioを到達可能にしてMilestone 3の承認・キャンセル・二重送信・`get_schedule`再取得・Audit・Core OFFを実ブラウザ確認し、Core公開後にPETITの固定commitを更新する。
 - Sona Agent Core: Milestone 2動作確認済み。Core ONの実ブラウザ予定取得、`personal:soso` / `schedule.read`、JSONL `tool.completed`、外部ICSの`SourceReference(provider=ics_file)`とfresh Freshnessを確認した。Core OFFでは同じ3件を旧`get_schedule`経路で返し、Audit行が増えないことを確認した。ICS欠損時は直前キャッシュ3件を保持し、stale・同期エラー・最終成功時刻をToolResult/Auditへ残し、ブラウザ回答でも古いキャッシュと明示する。
-- 次にやること: Issue #6の日付解析は別件として未解決のまま扱う。続けて1モデル（Chat/Agent同一9B）と2モデル（別endpoint）で、READMEの意図別チャット・承認・同期・記憶・再起動ケースを実ブラウザ確認する。
+- 次にやること: Project Continuityのstacked PRを下から順に統合し、実ブラウザで新規登録／別名／切替／終了確認／承認・キャンセル／再起動後復元をE2E確認する。その後Phase 2のNotion Adapter v2とLinkraft owner-only読み取りへ進む。Issue #6の日付解析とSona Agent Core固定commit更新は別件として維持する。
 
 ## 履歴
 
@@ -36,8 +37,8 @@
 | 2026-06-25 | 13:20 | #3 | RAG検索実装: chroma_client.py（ChromaDB永続化 + LM Studio embeddings カスタム関数 + graceful fallback）、search_memory がセマンティック検索→キーワード自動フォールバック、save_memory と会話ターンを Chroma に自動索引化、起動時に既存SQLiteデータをバックグラウンド同期、/api/health に RAG ステータス追加。`feat/rag` ブランチ。 |
 | 2026-06-25 | 17:50 | #4 | Progress Log を1ファイルに整理: 詳細ログ `progress.md` を削除し、進捗記録を `PROGRESS.md`（表形式）に一本化。CLAUDE.md の Progress Log ルールとディレクトリ構成を更新。 |
 | 2026-06-25 | 18:10 | #5 | PROGRESS.md に「現在の状態 / 未確認・TODO」セクション（上書き可）を追加し、履歴表（追記専用）と2部構成に。CLAUDE.md の作業開始/終了ルールを同期。 |
-| 2026-06-25 | 18:30 | #6 | 自律的な会話蓄積を実装: N時間おきの自動要約 scheduler.py、summarizer.py、Obsidian形式の markdown_export.py、summaries テーブル、summarize_now ツール、/api/summarize・/api/summaries、search_memory の要約検索対応を追加。`claude/autonomous-conversation-md-db-tlyat4` ブランチ。 |
-| 2026-06-25 | 18:28 | #7 | 「人間っぽく喋る」実装: recall.py で毎ターン関連記憶+直近要約を注入、proactive.py + /api/proactive で開いた瞬間の話しかけ、agent.py の相棒口調プロンプト、フロントの opener 表示を追加。`claude/autonomous-conversation-md-db-tlyat4` ブランチ。 |
+| 2026-06-25 | 18:30 | #6 | 自律的な会話蓄積を実装: N時間おきの自動要約 scheduler.py、summarizer.py、Obsidian形式の markdown_export.py、summaries テーブル、summarize_now ツール、/api/summarize・`/api/summaries`、search_memory の要約検索対応を追加。`claude/autonomous-conversation-md-db-tlyat4` ブランチ。 |
+| 2026-06-25 | 18:28 | #7 | 「人間っぽく喋る」実装: recall.py で毎ターン関連記憶+直近要約を注入、proactive.py + `/api/proactive` で開いた瞬間の話しかけ、agent.py の相棒口調プロンプト、フロントの opener 表示を追加。`claude/autonomous-conversation-md-db-tlyat4` ブランチ。 |
 | 2026-06-30 | 10:08 | #8 | Notion タスク作成/完了更新、引き継ぎメモ、中断復帰ツールを実装。一時DBでローカル fallback と復帰ツールの最小動作を確認。実 Notion E2E は未確認。 |
 | 2026-07-05 | 07:43 | #8 | ローカル予定追加ツール `add_schedule` を実装。`calendar_events_cache` に予定を保存し、`get_schedule` で取得できることをテスト用DBで確認。README のツール一覧を更新。 |
 | 2026-07-05 | 07:49 | #9 | 朝ブリーフィング実装: `briefing.py`、`/api/briefing`、`create_daily_briefing` ツールを追加。予定・未完了タスク・直近要約から「今やる1個」を含むブリーフィングを生成し、LM Studio 不通時は定型文へフォールバック。 |
@@ -73,9 +74,10 @@
 | 2026-07-12 | 20:11 | #34 | 動作確認済み: 意図別の限定取得、書き込み承認キュー、BRAIN安全編集、Calendar read/write分離、失敗保存抑止を実装。標準テスト30件と実ブラウザ+LM Studioで雑談/時刻/天気/Notion取得・作成・完了/BRAIN検索・追記/予定取得・追加をE2E確認。実Google ICSと別27Bモデルは未確認。 |
 
 | 2026-07-14 | 00:00 | #35 | Notion/ICS/TimeTreeの同期状態をSQLiteへ永続化し、失敗時キャッシュ維持・stale表示・TimeTree読取アダプター・回帰テストを追加。実サービスE2Eは未確認。 |
-| 2026-07-14 | 12:09 | #36 | 会話記憶を短期・エピソード・長期へ分離。エピソードSQLite/Markdown/Chroma差分索引、失敗時再試行、長期記憶の重複抑止と出典、ブラウザセッションID、回帰テストを追加。実ブラウザ＋実LM StudioのエピソードE2Eは未確認。 |
+| 2026-07-14 | 12:09 | #36 | 会話記憶を短期・エピソード・長期へ分離。エピソードSQLite/Markdown/Chroma差分索引、失敗時再試行、長期記憶の重複抑止と出典、ブラウザセッションID、回帰テストを追加。実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。 |
 | 2026-07-14 | 13:41 | #37 | 2モデル分散・観測性を実装。Chat/Agentの独立endpoint設定と旧設定fallback、Agent停止時の安全なChat整形fallback、`/api/health`別モデル状態、ターン詳細表示・ログ、無効な長さ/遅延Agent設定削除、旧DB索引作成順を修正。標準unittest 43件・compileall・health構造スモークは確認、実LM Studio/ブラウザE2Eと計測は未実施。 |
 | 2026-07-17 | 00:09 | #38 | Milestone 2の`get_schedule`縦切りを追加。固定commitのSona Agent Core依存、Feature Flag、PETIT Adapter、`personal` Scope・`schedule.read`検証、Source/Freshness、JSON Lines監査、旧経路互換テストを追加。標準unittest 49件・compileall確認済み。実ブラウザ/実CalendarのCore経路は未確認。 |
 | 2026-07-17 | 03:09 | #39 | 動作確認済み: Milestone 2の予定取得Audit metadataへSource/Freshness・stale・最終同期日時・同期エラーを記録し、正常/stale両ケースと誤Primary Scope拒否（既存ハンドラー未呼出し）のテストを追加。依存導入、標準unittest 52件、compileall成功。 |
 | 2026-07-17 | 04:29 | #40 | Milestone 3 PETIT Safe Writeを実装。`add_schedule`だけをFeature FlagでCoreのSQLite Approval/Idempotency/Auditへ接続し、既存書き込みをAdapterで一回実行。標準unittest 59件、compileall、依存導入、Flag OFF旧Approvalスモーク成功。実ブラウザはLM Studioタイムアウトで確認UI以降未確認、Core固定commit更新も公開後対応。 |
 | 2026-07-16 | 18:38 | #40 | 動作確認済み: Milestone 2残りE2Eを完了。Core ON/OFFで同じ3件、`personal:soso` / `schedule.read` / JSONL Audit、外部ICS SourceReference、fresh/stale、失敗時キャッシュ保持と古さ表示を実ブラウザ+LM Studioで確認。失敗時の最終同期時刻保持と空モデル回答時の予定フォールバックを修正し、標準unittest 53件・compileall成功。Issue #6は対象外のまま維持。 |
+| 2026-07-18 | 03:20 | #41 | Project Continuity Engine Phase 1をstacked PRで実装。SQLite project identity／alias／source link／episode Relation／active state／checkpoint、決定論的な開始・切替、終了確認と承認保存、限定resume context、確認付き新規登録・別名追加を追加。外部source linkの明示解除後再割当も実装。各専用GitHub Actions・compileall・unittest成功。実ブラウザE2Eとstack統合は未実施。 |
