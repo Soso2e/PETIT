@@ -19,7 +19,17 @@ jobs:
         run: python -m pip install fastapi httpx pydantic chromadb timetree-exporter
       - name: Compile
         run: python -m compileall backend tests
-      - name: Candidate discovery
+      - name: Vault keyword search
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_keyword_search_finds_note
+      - name: Vault path resolution
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_source_path_resolves_to_vault_relative_note
+      - name: Note parsing
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_note_data_is_safe_and_bounded
+      - name: Candidate upsert
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_candidate_upsert_round_trips
+      - name: Full candidate discovery
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_full_discovery_returns_one_candidate
+      - name: Candidate exclusion boundary
         run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_discovery_creates_candidate_but_not_source_link
       - name: Path safety
         run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_explicit_inspection_rejects_private_outside_and_non_markdown
