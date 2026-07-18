@@ -378,7 +378,11 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
         )
         tool_calls = message.get("tool_calls") or []
         if not tool_calls:
-            model = config.AGENT_MODEL if requested_route == "agent" else config.CHAT_MODEL
+            model = (
+                config.CHAT_MODEL
+                if actual_route == "chat_fallback"
+                else (config.AGENT_MODEL if requested_route == "agent" else config.CHAT_MODEL)
+            )
             if write_requested:
                 return {
                     "reply": "対象は確認できましたが、安全な変更案を確定できませんでした。対象ファイルと変更内容をもう少し具体的にしてください。",
