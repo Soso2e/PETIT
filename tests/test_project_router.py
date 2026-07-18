@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import config, db, project_continuity, project_router
+from backend import agent, config, db, project_continuity, project_router
 
 
 class ProjectRouterTests(unittest.TestCase):
@@ -129,6 +129,14 @@ class ProjectRouterTests(unittest.TestCase):
         self.assertIsNone(project_router.handle_project_turn("こんにちは", user_id="soso"))
         self.assertIsNone(project_router.handle_project_turn("ゲームやる", user_id="soso"))
         self.assertIsNone(project_continuity.get_active_project("soso"))
+
+    def test_agent_uses_project_fast_path_without_calling_lm_studio(self) -> None:
+        with patch("backend.agent.chat_completion", side_effect=AssertionError("LLM must not run")):
+            result = agent.run("プチ進める")
+
+        self.assertEqual(result["model_route"]["kind"], "project_continuity")
+        self.assertEqual(project_continuity.get_active_project(config.PETIT_OWNER_ID)["project_id"], "petit")
+        self.assertIn("PETIT", result["reply"])
 
 
 if __name__ == "__main__":
