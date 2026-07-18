@@ -72,10 +72,17 @@ storage/   SQLite などの実行時データ（git 管理外）
 | `LINKRAFT_BASE_URL` | なし | owner-only PETIT read APIを公開したLinkraftのURL |
 | `LINKRAFT_PETIT_READ_TOKEN` | なし | Linkraftと共有する読み取り専用Bearer Token |
 | `LINKRAFT_SYNC_TTL_SECONDS` | `300` | Linkraftプロジェクト差分同期のTTL |
+| `PETIT_GITHUB_TOKEN` | なし | private repositoryにも使える最小権限のGitHub read token |
+| `PETIT_GITHUB_API_URL` | `https://api.github.com` | GitHub REST APIの接続先 |
+| `PETIT_GITHUB_SYNC_TTL_SECONDS` | `300` | GitHub evidence同期のTTL |
+| `PETIT_GITHUB_INITIAL_LOOKBACK_DAYS` | `30` | 初回同期で遡る日数 |
+| `PETIT_GITHUB_MAX_CHECK_COMMITS` | `50` | 1回でcheckを確認するcommit数の上限 |
+| `PETIT_GITHUB_MAX_DEPLOYMENTS` | `20` | 1回でstatusを確認する最近のdeployment数 |
 
-Notion Adapter v2の日本語プロパティ名、Relation設定、Linkraft側のトークンハッシュ設定は、
-[`docs/notion_adapter_v2.md`](docs/notion_adapter_v2.md) と
-[`docs/linkraft_owner_sync.md`](docs/linkraft_owner_sync.md) を参照してください。
+Notion Adapter v2、Linkraft、GitHub evidenceの詳細設定は、
+[`docs/notion_adapter_v2.md`](docs/notion_adapter_v2.md)、
+[`docs/linkraft_owner_sync.md`](docs/linkraft_owner_sync.md)、
+[`docs/github_evidence.md`](docs/github_evidence.md) を参照してください。
 
 ## 現在使える主なツール
 
@@ -94,6 +101,8 @@ Notion Adapter v2の日本語プロパティ名、Relation設定、Linkraft側�
 - `save_project_completion` — 確認済み到達状態をcheckpointとイベントへ保存
 - `sync_notion_tasks` / `get_notion_project_candidates` / `link_notion_project_candidate` — Notion Relation同期と確認付き紐付け
 - `sync_linkraft_projects` / `get_linkraft_project_candidates` / `link_linkraft_project_candidate` — Linkraft owner-only同期と確認付き紐付け
+- `inspect_github_repository` / `sync_github_evidence` — GitHub repository候補の読取と確認済みrepositoryの証拠同期
+- `get_github_repository_candidates` / `link_github_repository_candidate` — GitHub候補一覧と確認付き紐付け
 
 ## Project Continuity Engine
 
@@ -118,6 +127,7 @@ confirmed_at IS NOT NULL
 
 - Notionは再開ターン内で最大1回だけ、既存TTLを尊重して同期します。
 - Linkraftは選択プロジェクトの確認済み外部IDだけを、保存済みcursorから差分同期します。
+- GitHubは選択プロジェクトの確認済み`owner/name`だけを読み、commit・PR・check・deploymentを別種のevidenceとして同期します。
 - 未確認候補、removed link、別プロジェクト、未対応providerは呼びません。
 - 1ソースが失敗しても、保存済みcheckpointからの再開は止めません。
 - 前回成功キャッシュがある場合は保持し、staleと明示します。
@@ -146,6 +156,17 @@ confirmed_at IS NOT NULL
 
 保存状態は最低限、`implemented`、`automated_tests_verified`、`ui_verified`、`deployed`、`production_verified`、`paused`、`blocked`、`completed`を区別します。
 
+### GitHub evidenceと完了状態の境界
+
+GitHub上の事実は、PETIT checkpointを自動で上書きしません。
+
+- commit存在は、特定のrevisionが存在する証拠であり、実装全体の完了証明ではありません。
+- check successは、そのcheckが対象SHAで成功した証拠です。実画面・本番確認は証明しません。
+- PR mergeはbase branchへ統合された証拠です。deployは証明しません。
+- deployment successはGitHubがenvironment/refへの配布成功を報告した証拠です。本番機能確認は証明しません。
+
+同じcheckが`in_progress`から`success`へ変わる場合はdefault branch headを再確認し、deployment本体の作成後にstatusだけ変わった場合も最近のdeployment statusを再確認します。
+
 ### 新規登録・別名
 
 ```text
@@ -164,10 +185,10 @@ SQLiteは外部正本を置き換えず、内部ID、別名、確認状態、che
 
 - 個人プロジェクト・個人タスク: Notion Adapter v2
 - Life is Tech／教え子向けプロジェクト: Linkraft（そそ本人所有のみ）
+- コード・PR・CI・deploymentの事実: GitHub evidence Adapter
 
 次の対象:
 
-- コード変更の事実: GitHub
 - 長期知識・設計: BRAIN / Obsidian
 
 ## 会話処理の最小フロー
@@ -175,6 +196,8 @@ SQLiteは外部正本を置き換えず、内部ID、別名、確認状態、che
 通常の雑談は、短いsystem prompt・直近5会話・ユーザー発話だけを渡し、会話モデルを1回だけ呼びます。ツール、RAG、Embedding、外部同期、要約は実行しません。
 
 明確なプロジェクト開始・終了・登録は、通常モデルより前に決定論的なProject Continuity経路で処理します。外部source refreshは、確認済みプロジェクトを開始・再開するときだけ行います。
+
+GitHubの一般的な雑談ではツールを公開しません。`owner/name`やGitHub URLの登録・紐付け、候補確認、明示的な同期依頼だけをGitHub evidenceツールへルーティングします。
 
 明確なタスク・予定・検索などだけ、発話に関係するツール定義を絞って渡します。「今日何からやる？」のような計画相談では、未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理します。
 
@@ -224,7 +247,10 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
     tests.test_project_registration \
     tests.test_project_source_refresh \
     tests.test_notion_adapter_v2 \
-    tests.test_linkraft_owner_sync
+    tests.test_linkraft_owner_sync \
+    tests.test_github_evidence \
+    tests.test_github_client_evidence \
+    tests.test_github_evidence_routing
   ```
 
 - 全Python構文確認: `python -m compileall backend tests`
