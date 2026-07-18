@@ -311,7 +311,10 @@ def render_resume_message(
         if state.get("stale")
     ]
     if stale:
-        facts.append(f"※ {'、'.join(stale)}は前回成功時のキャッシュ。")
+        stale_text = "、".join(stale)
+        facts.append(
+            f"※ {stale_text}は最新同期に失敗。{stale_text}は前回成功時のキャッシュ。"
+        )
 
     if context.next_action:
         facts.append(f"次は「{context.next_action}」の予定だった。")
