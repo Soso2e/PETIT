@@ -18,30 +18,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Show toolchain
-        run: |
-          xcodebuild -version
-          swift --version
+        with:
+          show-progress: false
 
       - name: Install XcodeGen
-        run: brew install xcodegen
+        run: brew install xcodegen >/dev/null
 
       - name: Generate Xcode project
         working-directory: ios/PETITMobile
-        run: xcodegen generate
+        run: xcodegen generate >/dev/null
 
       - name: Build for iOS Simulator
         working-directory: ios/PETITMobile
         run: |
-          set -o pipefail
+          set +e
           xcodebuild \
             -project PETITMobile.xcodeproj \
             -scheme PETITMobile \
             -sdk iphonesimulator \
             -destination "generic/platform=iOS Simulator" \
             CODE_SIGNING_ALLOWED=NO \
-            build | xcpretty
+            build > "$RUNNER_TEMP/ios-build.log" 2>&1
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            echo "--- Relevant build diagnostics ---"
+            grep -E "error:|warning:|BUILD FAILED|The following build commands failed" "$RUNNER_TEMP/ios-build.log" | tail -n 80 || true
+            exit "$STATUS"
+          fi
+          echo "iOS Simulator build succeeded"
 
       - name: Select available iPhone Simulator
         id: simulator
@@ -67,10 +72,18 @@ jobs:
       - name: Run unit tests
         working-directory: ios/PETITMobile
         run: |
-          set -o pipefail
+          set +e
           xcodebuild \
             -project PETITMobile.xcodeproj \
             -scheme PETITMobile \
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.device_id }}" \
             CODE_SIGNING_ALLOWED=NO \
-            test | xcpretty
+            test > "$RUNNER_TEMP/ios-test.log" 2>&1
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            echo "--- Relevant test diagnostics ---"
+            grep -E "error:|warning:|failed|FAILURE|TEST FAILED" "$RUNNER_TEMP/ios-test.log" | tail -n 80 || true
+            exit "$STATUS"
+          fi
+          echo "iOS unit tests succeeded"
