@@ -5,6 +5,7 @@ or:        python -m backend.main
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from fastapi import FastAPI
@@ -12,19 +13,20 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-import logging
 import json
+import logging
 import threading
 import time
 from uuid import uuid4
 
-from . import agent, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, vault_indexer, worker
+from . import agent, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, request_context, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
+_artifact_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="petit-artifacts")
 
 
 @app.on_event("startup")
@@ -81,6 +83,11 @@ class ChatResponse(BaseModel):
 
 class ActionDecision(BaseModel):
     approved: bool
+
+
+class JobAck(BaseModel):
+    job_ids: list[int] = Field(default_factory=list)
+    session_id: str
 
 
 _pending_actions: dict[str, dict[str, Any]] = {}
@@ -145,14 +152,16 @@ def health() -> dict[str, Any]:
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest) -> ChatResponse:
     request_id = (req.request_id or "").strip() or uuid4().hex
+    session_id = (req.session_id or "").strip() or None
     message = (req.message or "").strip()
     if not message:
         return ChatResponse(reply="", error="メッセージが空です。", request_id=request_id)
 
     started = time.monotonic()
     try:
-        with lmstudio_client.observe_turn() as turn_metrics:
-            result = agent.run(message, history=req.history)
+        with request_context.bind(request_id=request_id, session_id=session_id):
+            with lmstudio_client.observe_turn() as turn_metrics:
+                result = agent.run(message, history=req.history)
     except LMStudioError as exc:
         return ChatResponse(reply="", error=str(exc), request_id=request_id)
     except Exception as exc:  # noqa: BLE001
@@ -199,13 +208,10 @@ def chat(req: ChatRequest) -> ChatResponse:
         conv_id = db.save_conversation(
             user_text=message,
             assistant_text=reply,
-            used_tools=used_tools_str, session_id=(req.session_id or "").strip() or None,
+            used_tools=used_tools_str,
+            session_id=session_id,
         )
-        threading.Thread(
-            target=_persist_chat_artifacts,
-        args=(conv_id, message, reply, used_tools_str),
-            daemon=True,
-        ).start()
+        _artifact_executor.submit(_persist_chat_artifacts, conv_id, message, reply, used_tools_str)
     return ChatResponse(
         reply=reply,
         used_tools=used_tools,
@@ -326,7 +332,11 @@ def summarize() -> dict[str, Any]:
 
 @app.get("/api/summaries")
 def summaries(limit: int = 20) -> dict[str, Any]:
-    return {"summaries": db.recent_summaries(limit=limit)}
+    return {
+        "episodes": db.recent_episodes(limit=limit),
+        "summaries": db.recent_summaries(limit=limit),
+    }
+
 
 @app.post("/api/vault/sync")
 def sync_obsidian_vault(max_files: int | None = None) -> dict[str, Any]:
@@ -352,14 +362,24 @@ def sync_calendar(force: bool = True) -> dict[str, Any]:
 
 
 @app.get("/api/conversations")
-def conversations(limit: int = 20) -> dict[str, Any]:
-    return {"conversations": db.recent_conversations(limit=limit)}
+def conversations(limit: int = 20, session_id: str | None = None) -> dict[str, Any]:
+    return {"conversations": db.recent_conversations(limit=limit, session_id=(session_id or "").strip() or None)}
+
+
 @app.get("/api/jobs")
-def jobs(limit: int = 10, mark_delivered: bool = True) -> dict[str, Any]:
-    rows = db.undelivered_jobs(limit=limit)
-    if mark_delivered:
-        db.mark_jobs_delivered([int(row["id"]) for row in rows])
-    return {"jobs": rows}
+def jobs(limit: int = 10, session_id: str | None = None) -> dict[str, Any]:
+    """Read completed jobs without mutating delivery state."""
+    return {"jobs": db.undelivered_jobs(limit=limit, session_id=(session_id or "").strip() or None)}
+
+
+@app.post("/api/jobs/ack")
+def acknowledge_jobs(payload: JobAck) -> dict[str, Any]:
+    session_id = payload.session_id.strip()
+    if not session_id:
+        return {"acknowledged": 0, "error": "session_id is required"}
+    ids = [int(item) for item in payload.job_ids if int(item) > 0]
+    db.mark_jobs_delivered(ids, session_id=session_id)
+    return {"acknowledged": len(ids)}
 
 
 # --- Static frontend ---------------------------------------------------------
