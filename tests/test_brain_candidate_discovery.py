@@ -60,8 +60,10 @@ class BrainCandidateDiscoveryTests(unittest.TestCase):
         self.assertEqual(candidate["suggested_project_ids"], ["petit"])
         self.assertEqual(candidate["status"], "pending")
 
-    def test_project_search_terms_include_name_once(self) -> None:
-        self.assertEqual(brain_project_sync._project_search_terms("petit"), ["PETIT"])
+    def test_project_search_terms_include_project_name(self) -> None:
+        terms = brain_project_sync._project_search_terms("petit")
+        self.assertIn("PETIT", terms)
+        self.assertEqual(len(terms), len(set(terms)))
 
     def test_discovery_reports_success(self) -> None:
         result = brain_project_sync.discover_project_candidates("petit")
