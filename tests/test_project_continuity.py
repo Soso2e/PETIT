@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import config, db, project_continuity
+from backend import config, db, project_continuity, project_source_links
 
 
 class ProjectContinuityStorageTests(unittest.TestCase):
@@ -133,6 +133,35 @@ class ProjectContinuityStorageTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "another project"):
             project_continuity.link_project_source("other", "github", "Soso2e/PETIT")
+
+    def test_removed_source_can_be_reassigned_only_through_explicit_path(self) -> None:
+        project_continuity.create_project("PETIT", project_id="petit")
+        project_continuity.create_project("Other", project_id="other")
+        link = project_continuity.link_project_source(
+            "petit",
+            "github",
+            "Soso2e/PETIT",
+            metadata={"branch": "main"},
+            confirmed=True,
+        )
+        with self.assertRaisesRegex(ValueError, "must be removed"):
+            project_source_links.reassign_removed_source_link(link["id"], "other")
+
+        project_continuity.remove_project_source_link(link["id"])
+        moved = project_source_links.reassign_removed_source_link(
+            link["id"],
+            "other",
+            metadata={"branch": "develop"},
+            confirmed=True,
+        )
+
+        self.assertEqual(moved["project_id"], "other")
+        self.assertEqual(moved["status"], "active")
+        self.assertIsNotNone(moved["confirmed_at"])
+        self.assertEqual(moved["metadata"], {"branch": "develop"})
+        history = project_source_links.source_link_history("github", "Soso2e/PETIT")
+        self.assertEqual(history["project_id"], "other")
+        self.assertEqual(history["project_name"], "Other")
 
     def test_existing_database_can_add_continuity_tables_non_destructively(self) -> None:
         with db.get_connection() as conn:
