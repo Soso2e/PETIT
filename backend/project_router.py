@@ -211,7 +211,7 @@ def _checkpoint_lines(checkpoint: dict[str, Any] | None) -> list[str]:
         lines.append(f"次は「{checkpoint['next_action']}」の予定。")
     blockers = [str(item) for item in checkpoint.get("blockers") or [] if str(item).strip()]
     if blockers:
-        lines.append(f"残っているブロッカーは{ '、'.join(blockers[:2]) }。")
+        lines.append(f"残っているブロッカーは{'、'.join(blockers[:2])}。")
     if not lines:
         lines.append("保存済みの前回状態はあるけど、再開メモはまだ空だよ。")
     lines.append("今日はどこから進める？")
@@ -274,8 +274,17 @@ def try_handle_project_turn(
     user_id: str,
     recent_history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any] | None:
-    """Best-effort wrapper so continuity storage never breaks ordinary chat."""
+    """Best-effort continuity entrypoint for completion and project switching."""
     try:
+        from . import project_completion
+
+        completion = project_completion.try_handle_completion_turn(
+            user_message,
+            user_id=user_id,
+            recent_history=recent_history,
+        )
+        if completion:
+            return completion
         return handle_project_turn(user_message, user_id=user_id, recent_history=recent_history)
     except Exception as exc:  # noqa: BLE001
         log.debug("project routing skipped: %s", exc)
