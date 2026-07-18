@@ -22,7 +22,7 @@ jobs:
           show-progress: false
 
       - name: Install XcodeGen
-        run: brew install xcodegen >/dev/null
+        run: brew install xcodegen >/dev/null 2>&1
 
       - name: Generate Xcode project
         working-directory: ios/PETITMobile
@@ -87,3 +87,12 @@ jobs:
             exit "$STATUS"
           fi
           echo "iOS unit tests succeeded"
+
+      - name: Upload iOS diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ci-diagnostics
+          path: ${{ runner.temp }}/ios-*.log
+          if-no-files-found: ignore
+          retention-days: 7
