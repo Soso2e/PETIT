@@ -20,4 +20,4 @@ jobs:
       - name: Compile
         run: python -m compileall backend tests
       - name: Test GitHub evidence
-        run: python -m unittest tests.test_github_evidence tests.test_project_source_refresh tests.test_project_resume tests.test_linkraft_owner_sync tests.test_notion_adapter_v2
+        run: python -m unittest tests.test_github_evidence tests.test_github_client_evidence tests.test_project_source_refresh tests.test_project_resume tests.test_linkraft_owner_sync tests.test_notion_adapter_v2
