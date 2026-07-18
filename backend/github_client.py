@@ -1,7 +1,7 @@
 """Minimal read-only GitHub REST client for project evidence.
 
 The client retrieves repository metadata, default-branch commits, pull requests,
-check runs for newly seen commits, and deployment statuses. It performs no writes.
+check runs, and deployment statuses. It performs no writes.
 """
 from __future__ import annotations
 
@@ -142,61 +142,77 @@ def list_pull_requests(repository: str, *, since: str | None) -> list[dict[str, 
     return items
 
 
-def list_check_runs(repository: str, commits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def list_check_runs(repository: str, refs: list[str]) -> list[dict[str, Any]]:
+    """Read check runs for new commits plus the current default-branch head.
+
+    Re-reading the branch ref lets PETIT observe an in-progress check becoming final
+    even when no additional commit was pushed after the previous cursor.
+    """
     full_name = normalize_repository(repository)
     result: list[dict[str, Any]] = []
-    for commit in commits[: github_config.MAX_CHECK_COMMITS]:
-        sha = str(commit.get("sha") or "").strip()
-        if not sha:
+    seen_refs: set[str] = set()
+    seen_checks: set[str] = set()
+    for ref in refs[: github_config.MAX_CHECK_COMMITS + 1]:
+        target = str(ref or "").strip()
+        if not target or target in seen_refs:
             continue
+        seen_refs.add(target)
         data = _get(
-            f"/repos/{quote(full_name, safe='/')}/commits/{quote(sha, safe='')}/check-runs",
+            f"/repos/{quote(full_name, safe='/')}/commits/{quote(target, safe='')}/check-runs",
             params={"per_page": 100},
         )
         if not isinstance(data, dict):
             raise GitHubEvidenceError("GitHub returned invalid check run data")
-        for item in data.get("check_runs") or []:
-            if isinstance(item, dict):
-                item = dict(item)
-                item["commit_sha"] = sha
-                result.append(item)
+        for raw in data.get("check_runs") or []:
+            if not isinstance(raw, dict):
+                continue
+            item = dict(raw)
+            check_key = str(item.get("id") or f"{item.get('name')}:{item.get('head_sha')}:{item.get('started_at')}")
+            if check_key in seen_checks:
+                continue
+            seen_checks.add(check_key)
+            item["commit_sha"] = str(item.get("head_sha") or (target if len(target) >= 7 else ""))
+            result.append(item)
     return result
 
 
 def list_deployments(repository: str, *, since: str | None) -> list[dict[str, Any]]:
+    """Read a bounded recent deployment set and evaluate latest status timestamps.
+
+    Deployment status may change without a new commit. PETIT therefore reads the
+    latest status for the most recent deployments, then applies the cursor to both
+    deployment and status timestamps.
+    """
     full_name = normalize_repository(repository)
+    data = _get(
+        f"/repos/{quote(full_name, safe='/')}/deployments",
+        params={"per_page": github_config.MAX_DEPLOYMENTS, "page": 1},
+    )
+    if not isinstance(data, list):
+        raise GitHubEvidenceError("GitHub returned invalid deployment data")
     result: list[dict[str, Any]] = []
-    for page in range(1, github_config.MAX_PAGES + 1):
-        data = _get(
-            f"/repos/{quote(full_name, safe='/')}/deployments",
-            params={"per_page": 100, "page": page},
+    for deployment in [item for item in data if isinstance(item, dict)]:
+        deployment_id = deployment.get("id")
+        if deployment_id is None:
+            continue
+        statuses = _get(
+            f"/repos/{quote(full_name, safe='/')}/deployments/{deployment_id}/statuses",
+            params={"per_page": 100},
         )
-        if not isinstance(data, list):
-            raise GitHubEvidenceError("GitHub returned invalid deployment data")
-        page_items = [item for item in data if isinstance(item, dict)]
-        selected = [
-            item
-            for item in page_items
-            if _is_after(item.get("updated_at") or item.get("created_at"), since)
-        ]
-        for deployment in selected:
-            deployment_id = deployment.get("id")
-            if deployment_id is None:
-                continue
-            statuses = _get(
-                f"/repos/{quote(full_name, safe='/')}/deployments/{deployment_id}/statuses",
-                params={"per_page": 100},
-            )
-            if not isinstance(statuses, list):
-                raise GitHubEvidenceError("GitHub returned invalid deployment status data")
-            item = dict(deployment)
-            item["statuses"] = [status for status in statuses if isinstance(status, dict)]
-            item["latest_status"] = item["statuses"][0] if item["statuses"] else None
+        if not isinstance(statuses, list):
+            raise GitHubEvidenceError("GitHub returned invalid deployment status data")
+        item = dict(deployment)
+        item["statuses"] = [status for status in statuses if isinstance(status, dict)]
+        item["latest_status"] = item["statuses"][0] if item["statuses"] else None
+        latest = item["latest_status"] if isinstance(item["latest_status"], dict) else {}
+        changed_at = (
+            latest.get("updated_at")
+            or latest.get("created_at")
+            or item.get("updated_at")
+            or item.get("created_at")
+        )
+        if _is_after(changed_at, since):
             result.append(item)
-        if len(data) < 100 or (since and page_items and not _is_after(
-            page_items[-1].get("updated_at") or page_items[-1].get("created_at"), since
-        )):
-            break
     return result
 
 
@@ -208,7 +224,8 @@ def get_repository_evidence(repository: str, since: str | None = None) -> dict[s
     default_branch = str(metadata.get("default_branch") or "main")
     commits = list_commits(full_name, branch=default_branch, since=since)
     pulls = list_pull_requests(full_name, since=since)
-    checks = list_check_runs(full_name, commits)
+    commit_refs = [str(item.get("sha") or "") for item in commits if isinstance(item, dict)]
+    checks = list_check_runs(full_name, [*commit_refs, default_branch])
     deployments = list_deployments(full_name, since=since)
     return {
         "source": "github",
