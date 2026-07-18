@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from . import db, project_continuity
+from . import db, project_continuity, project_resume
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +39,18 @@ _ACTIVE_CONTEXT_TARGETS = {
     "続き",
 }
 _AMBIGUOUS_CONTEXT_TARGETS = {"次", "次のやつ", "別のやつ", "どれか", "何か"}
-_PROJECT_ORIENTED_ACTIONS = {"進める", "再開", "再開する", "戻る", "開発", "開発する", "作業", "作業する", "続ける", "取りかかる"}
+_PROJECT_ORIENTED_ACTIONS = {
+    "進める",
+    "再開",
+    "再開する",
+    "戻る",
+    "開発",
+    "開発する",
+    "作業",
+    "作業する",
+    "続ける",
+    "取りかかる",
+}
 
 
 @dataclass(frozen=True)
@@ -181,7 +192,12 @@ def resolve_project(
     ambiguous_context = {project_continuity.normalize_alias(item) for item in _AMBIGUOUS_CONTEXT_TARGETS}
     if normalized_target in active_context:
         if active:
-            candidate = {"id": active["project_id"], "name": active["name"], "matched_alias": None, "description": active.get("description")}
+            candidate = {
+                "id": active["project_id"],
+                "name": active["name"],
+                "matched_alias": None,
+                "description": active.get("description"),
+            }
             return ProjectResolution(
                 kind="resolved",
                 project_id=str(active["project_id"]),
@@ -199,23 +215,6 @@ def resolve_project(
     if contains_ascii_name or project_oriented:
         return ProjectResolution(kind="new_candidate", reason="unregistered_explicit_name", target_text=target)
     return ProjectResolution(kind="none", reason="ordinary_activity_not_project", target_text=target)
-
-
-def _checkpoint_lines(checkpoint: dict[str, Any] | None) -> list[str]:
-    if not checkpoint:
-        return ["前回メモはまだないよ。今日はどこから始める？"]
-    lines: list[str] = []
-    if checkpoint.get("last_summary"):
-        lines.append(f"前回は「{checkpoint['last_summary']}」で止まってる。")
-    if checkpoint.get("next_action"):
-        lines.append(f"次は「{checkpoint['next_action']}」の予定。")
-    blockers = [str(item) for item in checkpoint.get("blockers") or [] if str(item).strip()]
-    if blockers:
-        lines.append(f"残っているブロッカーは{'、'.join(blockers[:2])}。")
-    if not lines:
-        lines.append("保存済みの前回状態はあるけど、再開メモはまだ空だよ。")
-    lines.append("今日はどこから進める？")
-    return lines
 
 
 def _ambiguous_reply(resolution: ProjectResolution) -> str:
@@ -238,7 +237,12 @@ def handle_project_turn(
     if resolution.kind == "none":
         return None
     if resolution.kind == "ambiguous":
-        return {"reply": _ambiguous_reply(resolution), "used_tools": [], "persist": True, "model_route": route}
+        return {
+            "reply": _ambiguous_reply(resolution),
+            "used_tools": [],
+            "persist": True,
+            "model_route": route,
+        }
     if resolution.kind == "new_candidate":
         name = resolution.target_text or "その名前"
         return {
@@ -252,19 +256,23 @@ def handle_project_turn(
     active = project_continuity.set_active_project(user_id, resolution.project_id)
     if not active:
         return None
-    checkpoint = project_continuity.get_project_checkpoint(user_id, str(active["project_id"]))
     same_project = bool(previous and previous["project_id"] == active["project_id"])
-    if same_project:
-        opening = f"「{active['name']}」を続けるんだね。"
-    elif previous:
-        opening = f"「{previous['name']}」から「{active['name']}」に切り替えたよ。"
-    else:
-        opening = f"「{active['name']}」を始めるんだね。"
+    context = project_resume.build_resume_context(user_id, str(active["project_id"]))
+    reply = project_resume.render_resume_message(
+        context,
+        previous_project_name=str(previous["name"]) if previous and not same_project else None,
+        same_project=same_project,
+    )
     return {
-        "reply": "\n".join([opening, *_checkpoint_lines(checkpoint)]),
+        "reply": reply,
         "used_tools": [],
         "persist": True,
-        "model_route": route | {"previous_project_id": previous["project_id"] if previous else None, "active_project_id": active["project_id"]},
+        "model_route": route
+        | {
+            "previous_project_id": previous["project_id"] if previous else None,
+            "active_project_id": active["project_id"],
+            "resume_references": context.reference_counts(),
+        },
     }
 
 

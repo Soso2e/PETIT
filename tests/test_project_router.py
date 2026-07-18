@@ -68,7 +68,7 @@ class ProjectRouterTests(unittest.TestCase):
 
         self.assertIsNotNone(result)
         self.assertEqual(project_continuity.get_active_project("soso")["project_id"], "linkraft")
-        self.assertIn("PETIT」から「Linkraft", result["reply"])
+        self.assertIn("PETITからLinkraft", result["reply"])
         self.assertIn("管理画面の実装まで完了", result["reply"])
         self.assertIn("公開D1へmigrationを適用", result["reply"])
 
