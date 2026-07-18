@@ -28,7 +28,7 @@ jobs:
       - name: Candidate upsert
         run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_candidate_upsert_round_trips
       - name: Project search terms
-        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_project_search_terms_include_name_once
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_project_search_terms_include_project_name
       - name: Discovery success
         run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_reports_success
       - name: Discovery count
