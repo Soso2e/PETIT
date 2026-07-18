@@ -1,8 +1,8 @@
 """Bounded project resume context and deterministic fallback rendering.
 
 PETIT reads project-scoped checkpoints, approved events, confirmed episode links,
-legacy handoffs, and freshness for confirmed external sources. Phase 2 adapters can
-add source-specific state without changing the resume contract.
+legacy handoffs, bounded BRAIN note cache, and freshness for confirmed external
+sources. External adapters cannot replace the user-confirmed checkpoint.
 """
 from __future__ import annotations
 
@@ -10,7 +10,13 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from . import db, project_completion, project_continuity, project_source_refresh
+from . import (
+    brain_project_sync,
+    db,
+    project_completion,
+    project_continuity,
+    project_source_refresh,
+)
 
 
 @dataclass
@@ -21,6 +27,7 @@ class ProjectResumeContext:
     updates_after_checkpoint: list[dict[str, Any]] = field(default_factory=list)
     recent_episodes: list[dict[str, Any]] = field(default_factory=list)
     legacy_handoff: dict[str, Any] | None = None
+    brain_notes: list[dict[str, Any]] = field(default_factory=list)
     verified_items: list[str] = field(default_factory=list)
     unverified_items: list[str] = field(default_factory=list)
     next_action: str | None = None
@@ -38,6 +45,7 @@ class ProjectResumeContext:
             "updates_after_checkpoint": len(self.updates_after_checkpoint),
             "episodes": len(self.recent_episodes),
             "legacy_handoff": int(self.legacy_handoff is not None),
+            "brain_notes": len(self.brain_notes),
             "sources": len(self.source_freshness),
             "stale_sources": sorted(
                 provider for provider, state in self.source_freshness.items() if state.get("stale")
@@ -168,6 +176,7 @@ def build_resume_context(
     *,
     event_limit: int = 5,
     episode_limit: int = 3,
+    brain_note_limit: int = 3,
 ) -> ProjectResumeContext:
     project = project_continuity.get_project(project_id)
     if not project:
@@ -177,6 +186,7 @@ def build_resume_context(
     events = _recent_project_events(project_id, max(1, min(event_limit, 10)))
     episodes = _recent_project_episodes(project_id, max(1, min(episode_limit, 5)))
     handoff = _legacy_handoff(project_id)
+    brain_notes = brain_project_sync.project_notes(project_id, limit=brain_note_limit)
     checkpoint_updated_at = str((checkpoint or {}).get("updated_at") or "")
     updates = [
         event for event in events
@@ -203,6 +213,7 @@ def build_resume_context(
         updates_after_checkpoint=updates,
         recent_episodes=episodes,
         legacy_handoff=handoff,
+        brain_notes=brain_notes,
         verified_items=verified,
         unverified_items=unverified,
         next_action=next_action,
@@ -241,6 +252,15 @@ def _compact_items(items: list[str], limit: int = 3) -> str:
     return "、".join(cleaned[:limit])
 
 
+def _brain_note_summary(notes: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for note in notes[:3]:
+        title = str(note.get("title") or Path(str(note.get("relative_path") or "note")).stem)
+        excerpt = " ".join(str(note.get("excerpt") or "").split())[:160]
+        parts.append(f"{title}: {excerpt}" if excerpt else title)
+    return "／".join(parts)
+
+
 def render_resume_message(
     context: ProjectResumeContext,
     *,
@@ -276,6 +296,10 @@ def render_resume_message(
     update_text = _compact_items(update_summaries, limit=2)
     if update_text:
         facts.append(f"その後のPETIT内更新は{update_text}。")
+
+    brain_summary = _brain_note_summary(context.brain_notes)
+    if brain_summary:
+        facts.append(f"関連BRAINは{brain_summary}。")
 
     blockers = _compact_items(context.blockers, limit=2)
     if blockers:
