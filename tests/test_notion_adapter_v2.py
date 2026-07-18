@@ -194,11 +194,13 @@ class NotionAdapterV2Tests(unittest.TestCase):
         self.assertIsNone(task["project_id"])
         self.assertEqual(task["project_external_id"], "notion-project-petit")
 
-    def test_partial_failure_keeps_project_cache_and_updates_tasks(self) -> None:
+    def test_partial_failure_keeps_project_cache_and_replaces_successful_task_source(self) -> None:
         first = notion_project_sync.sync_all_if_configured(force=True, project_loader=lambda: [notion_client.parse_project_page(self.project_page())], task_loader=lambda: [notion_client.parse_task_page(self.task_page("task-a"))])
         self.assertTrue(first["ok"])
+
         def project_failure() -> list[dict]:
             raise NotionError("projects unavailable")
+
         second = notion_project_sync.sync_all_if_configured(force=True, project_loader=project_failure, task_loader=lambda: [notion_client.parse_task_page(self.task_page("task-b"))])
         self.assertFalse(second["ok"])
         self.assertTrue(second["partial"])
@@ -209,7 +211,7 @@ class NotionAdapterV2Tests(unittest.TestCase):
             project_count = conn.execute("SELECT COUNT(*) FROM notion_projects_cache").fetchone()[0]
             task_ids = {row["external_id"] for row in conn.execute("SELECT external_id FROM tasks_cache WHERE source='notion'").fetchall()}
         self.assertEqual(project_count, 1)
-        self.assertEqual(task_ids, {"task-a", "task-b"})
+        self.assertEqual(task_ids, {"task-b"})
 
     def test_resume_aggregates_notion_project_and_task_freshness(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
