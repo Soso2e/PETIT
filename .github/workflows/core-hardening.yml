@@ -1,0 +1,37 @@
+name: Core hardening tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "tests/test_core_hardening.py"
+      - ".github/workflows/core-hardening.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install fastapi uvicorn httpx pydantic chromadb timetree-exporter
+
+      - name: Compile Python sources
+        run: python -m compileall backend tests/test_core_hardening.py
+
+      - name: Check frontend syntax
+        run: node --check frontend/app.js
+
+      - name: Run core hardening regression tests
+        run: python -m unittest tests.test_core_hardening -v

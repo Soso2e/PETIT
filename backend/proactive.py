@@ -1,7 +1,7 @@
 """Proactive openers — PETIT が向こうから話しかける層。
 
 「生きてる感」を出すために、ユーザーがアプリを開いたとき等に PETIT 側から
-一言を生成する。時間帯・直近の要約・作業中の内容を踏まえた自然な切り出し。
+一言を生成する。時間帯・直近のエピソード・作業中の内容を踏まえた自然な切り出し。
 
 完全なサーバープッシュ（アプリを閉じていても届く）には OS 通知や常駐が要るので、
 ここでは「開いた瞬間に向こうから話しかける」までを担う。フロントが取得して表示する。
@@ -41,9 +41,13 @@ def _time_of_day(now: datetime | None = None) -> str:
 
 
 def _context_block() -> tuple[str, list[str]]:
-    """Returns (recent-summary-text, work_in_progress list) from memory."""
-    summaries = db.recent_summaries(limit=2)
-    latest = summaries[-1]["summary"] if summaries else ""
+    """Returns (recent episode text, work_in_progress list) from memory."""
+    episodes = db.recent_episodes(limit=2)
+    if episodes:
+        latest = str(episodes[-1].get("summary") or "")
+    else:
+        summaries = db.recent_summaries(limit=2)
+        latest = str(summaries[-1].get("summary") or "") if summaries else ""
     wip = [m["content"] for m in db.all_memory() if m.get("type") == "project"][-3:]
     return latest, wip
 

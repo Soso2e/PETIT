@@ -6,7 +6,7 @@ const inputEl = document.getElementById("input");
 const sendEl = document.getElementById("send");
 const statusEl = document.getElementById("status");
 
-// In-memory conversation history sent back to the model for context.
+// Conversation history restored from SQLite and sent back to the model.
 const history = [];
 const sessionId = localStorage.getItem("petit_session_id") || crypto.randomUUID();
 localStorage.setItem("petit_session_id", sessionId);
@@ -133,26 +133,39 @@ function setTyping(on) {
   }
 }
 
+async function acknowledgeJobs(ids) {
+  if (!ids.length) return;
+  await fetch("/api/jobs/ack", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ job_ids: ids, session_id: sessionId }),
+  });
+}
 
 async function pollJobs() {
   try {
-    const res = await fetch("/api/jobs?limit=10&mark_delivered=true");
+    const res = await fetch(`/api/jobs?limit=10&session_id=${encodeURIComponent(sessionId)}`);
     const data = await res.json();
+    const delivered = [];
     for (const job of data.jobs || []) {
       if (job.status === "done") {
         const text = job.result_text || "調べ終わったけど、結果が空でした。";
         addMessage("assistant", "調べ終わったよ。\n" + text);
         history.push({ role: "assistant", content: text });
+        delivered.push(job.id);
       } else if (job.status === "failed") {
         const text = "調べものが失敗しました: " + (job.error || "unknown error");
         addMessage("assistant", text, { error: true });
         history.push({ role: "assistant", content: text });
+        delivered.push(job.id);
       }
     }
+    await acknowledgeJobs(delivered);
   } catch (e) {
     // Background job polling should not interrupt chat.
   }
 }
+
 async function checkHealth() {
   try {
     const res = await fetch("/api/health");
@@ -231,7 +244,35 @@ inputEl.addEventListener("input", () => {
   inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
 });
 
-// On load, let PETIT speak first — fetch a proactive opener from the backend.
+function removeStaticGreeting() {
+  const greeting = document.getElementById("greeting");
+  if (greeting) greeting.remove();
+}
+
+async function restoreHistory() {
+  try {
+    const res = await fetch(`/api/conversations?limit=10&session_id=${encodeURIComponent(sessionId)}`);
+    const data = await res.json();
+    const rows = data.conversations || [];
+    if (!rows.length) return false;
+    removeStaticGreeting();
+    for (const row of rows) {
+      if (row.user_text) {
+        addMessage("user", row.user_text);
+        history.push({ role: "user", content: row.user_text });
+      }
+      if (row.assistant_text) {
+        addMessage("assistant", row.assistant_text);
+        history.push({ role: "assistant", content: row.assistant_text });
+      }
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// On a new session, let PETIT speak first. Existing sessions restore SQLite history.
 async function loadOpener() {
   try {
     const res = await fetch("/api/proactive");
@@ -240,7 +281,6 @@ async function loadOpener() {
       const greeting = document.getElementById("greeting");
       const bubble = greeting && greeting.querySelector(".bubble");
       if (bubble) bubble.textContent = data.message;
-      // Seed history so the model has continuity with its own opener.
       history.push({ role: "assistant", content: data.message });
     }
   } catch (e) {
@@ -248,9 +288,14 @@ async function loadOpener() {
   }
 }
 
-checkHealth();
+async function initialize() {
+  await checkHealth();
+  const restored = await restoreHistory();
+  if (!restored) await loadOpener();
+  await pollJobs();
+  inputEl.focus();
+}
+
 setInterval(checkHealth, 60000);
 setInterval(pollJobs, 3000);
-loadOpener();
-inputEl.focus();
-
+initialize();

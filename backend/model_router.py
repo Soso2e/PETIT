@@ -9,15 +9,22 @@ _AGENT_SIGNALS = (
     "タスク", "予定", "カレンダー", "notion", "brain", "記憶", "覚えて",
     "調べ", "検索", "ニュース", "天気", "ツール", "同期", "実装", "修正",
     "分析", "比較", "設計", "計画", "優先", "今週", "明日", "今日何", "何すれば",
-    "どこまで", "続き", "まとめ", "プロジェクト", "決定", "方針",
+    "どこまで", "続き", "まとめ", "プロジェクト", "決定", "方針", "レビュー",
+    "検証", "原因", "問題", "改善", "コード", "仕様", "要件", "デバッグ",
     "今何時", "今日何日", "現在時刻", "完了", "終わった", "中断", "復帰",
 )
+
 
 def choose(
     user_message: str,
     history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Return the selected model plus transparent routing reasons."""
+    """Return the selected model plus transparent routing reasons.
+
+    Tool selection remains separate. This router also catches pure reasoning turns
+    that do not expose any tool schema, such as code review or architecture analysis.
+    """
+    del history  # Reserved for future conversation-aware routing.
     text = user_message.strip()
     reasons: list[str] = []
     lowered = text.casefold()

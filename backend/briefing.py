@@ -1,6 +1,6 @@
 """Daily briefing generation for PETIT.
 
-予定・タスク・直近要約を集めて、「今日まず何をするか」まで絞る。
+予定・タスク・直近エピソードを集めて、「今日まず何をするか」まで絞る。
 LM Studio が使える場合は自然文に整え、落ちている場合は定型文で返す。
 """
 from __future__ import annotations
@@ -25,6 +25,12 @@ _SYSTEM = """あなたはユーザー専用アシスタント「PETIT」。
 - 医療・生活改善スコアのような評価はしない。"""
 
 
+def _recent_context(limit: int = 2) -> list[dict[str, Any]]:
+    """Prefer the current episode store; retain legacy summaries as migration fallback."""
+    episodes = db.recent_episodes(limit=limit)
+    return episodes if episodes else db.recent_summaries(limit=limit)
+
+
 def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
     """Create a compact daily briefing for target_date (YYYY-MM-DD)."""
     day = target_date or date_type.today().isoformat()
@@ -32,13 +38,15 @@ def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
     calendar_sync_status = calendar_sync.sync_if_configured()
     events = _events_for(day)
     tasks = _open_tasks(day)
-    summaries = db.recent_summaries(limit=2)
-    next_action = _pick_next_action(events, tasks, summaries)
+    recent_context = _recent_context(limit=2)
+    next_action = _pick_next_action(events, tasks, recent_context)
     context = {
         "date": day,
         "events": events,
         "tasks": tasks,
-        "recent_summaries": summaries,
+        "recent_context": recent_context,
+        # Compatibility for older callers; values now come from episodes first.
+        "recent_summaries": recent_context,
         "next_action": next_action,
         "notion_sync": notion_sync,
         "calendar_sync": calendar_sync_status,
@@ -108,14 +116,14 @@ def _calendar_source_status(events: list[dict[str, Any]], sync_status: dict[str,
 def _pick_next_action(
     events: list[dict[str, Any]],
     tasks: list[dict[str, Any]],
-    summaries: list[dict[str, Any]],
+    recent_context: list[dict[str, Any]],
 ) -> str:
     if tasks:
         return f"まず「{tasks[0]['title']}」から始める"
     if events:
         return f"次の予定「{events[0]['title']}」の準備をする"
-    if summaries:
-        summary = str(summaries[-1].get("summary", "")).strip()
+    if recent_context:
+        summary = str(recent_context[-1].get("summary", "")).strip()
         if summary:
             return f"昨日までの流れを見て、{summary[:40]}の続きから再開する"
     return "今日やることを1つだけ決める"
@@ -140,9 +148,9 @@ def _format_context(context: dict[str, Any]) -> str:
         lines.append("- なし")
 
     lines.append("最近の流れ:")
-    for summary in context["recent_summaries"][-2:]:
-        lines.append(f"- {summary.get('summary', '')}")
-    if not context["recent_summaries"]:
+    for item in context["recent_context"][-2:]:
+        lines.append(f"- {item.get('summary', '')}")
+    if not context["recent_context"]:
         lines.append("- なし")
 
     lines.append(f"今やる1個: {context['next_action']}")
