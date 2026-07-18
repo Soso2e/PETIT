@@ -5,8 +5,8 @@ actually uses. New tables can be added as features land.
 """
 from __future__ import annotations
 
-import sqlite3
 import json
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -22,6 +22,7 @@ class _ClosingConnection(sqlite3.Connection):
             return bool(super().__exit__(exc_type, exc, traceback))
         finally:
             self.close()
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
@@ -67,13 +68,13 @@ CREATE TABLE IF NOT EXISTS conversation_episodes (
 CREATE TABLE IF NOT EXISTS summaries (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at   TEXT NOT NULL,
-    kind         TEXT NOT NULL DEFAULT 'interval',  -- interval | daily
+    kind         TEXT NOT NULL DEFAULT 'interval',
     period_start TEXT,
     period_end   TEXT,
     last_conv_id INTEGER NOT NULL DEFAULT 0,
     conv_count   INTEGER NOT NULL DEFAULT 0,
     summary      TEXT NOT NULL,
-    facts        TEXT  -- JSON-encoded list of extracted durable facts/tasks
+    facts        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tasks_cache (
@@ -129,6 +130,10 @@ CREATE TABLE IF NOT EXISTS jobs (
     result_text TEXT,
     error       TEXT,
     delivered   INTEGER NOT NULL DEFAULT 0,
+    session_id  TEXT,
+    request_id  TEXT,
+    claimed_at  TEXT,
+    delivered_at TEXT,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );"""
@@ -139,9 +144,10 @@ def now_iso() -> str:
 
 
 def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(config.DB_PATH, factory=_ClosingConnection)
+    conn = sqlite3.connect(config.DB_PATH, timeout=5.0, factory=_ClosingConnection)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
     return conn
 
 
@@ -149,6 +155,8 @@ def init_db() -> None:
     Path(config.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = get_connection()
     try:
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         conn.executescript(SCHEMA)
         _ensure_columns(
             conn,
@@ -162,13 +170,25 @@ def init_db() -> None:
         )
         _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER"})
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id, id)")
         _ensure_columns(conn, "memory", {"source": "TEXT NOT NULL DEFAULT 'explicit'", "content_hash": "TEXT", "embedding_model": "TEXT", "embedding_version": "TEXT", "indexed_at": "TEXT"})
         _ensure_columns(conn, "calendar_events_cache", {"source_key": "TEXT", "external_id": "TEXT"})
+        _ensure_columns(
+            conn,
+            "jobs",
+            {
+                "session_id": "TEXT",
+                "request_id": "TEXT",
+                "claimed_at": "TEXT",
+                "delivered_at": "TEXT",
+            },
+        )
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_source_external "
             "ON calendar_events_cache(source_key, external_id) "
             "WHERE source_key IS NOT NULL AND external_id IS NOT NULL"
         )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_delivery ON jobs(session_id, delivered, status, id)")
         conn.commit()
     finally:
         conn.close()
@@ -225,13 +245,21 @@ def save_conversation(user_text: str, assistant_text: str, used_tools: str | Non
         return int(cur.lastrowid)
 
 
-def recent_conversations(limit: int = 20) -> list[dict[str, Any]]:
+def recent_conversations(limit: int = 20, session_id: str | None = None) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit), 200))
     with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, timestamp, user_text, assistant_text, used_tools "
-            "FROM conversations ORDER BY id DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        if session_id:
+            rows = conn.execute(
+                "SELECT id, timestamp, user_text, assistant_text, used_tools, session_id "
+                "FROM conversations WHERE session_id = ? ORDER BY id DESC LIMIT ?",
+                (session_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, timestamp, user_text, assistant_text, used_tools, session_id "
+                "FROM conversations ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
     return [dict(r) for r in reversed(rows)]
 
 
@@ -390,13 +418,28 @@ def recent_handoff_notes(limit: int = 5) -> list[dict[str, Any]]:
 
 # --- Background jobs ---------------------------------------------------------
 
-def create_job(job_type: str, input_json: str) -> int:
+def create_job(
+    job_type: str,
+    input_json: str,
+    *,
+    session_id: str | None = None,
+    request_id: str | None = None,
+) -> int:
+    if session_id is None or request_id is None:
+        try:
+            from . import request_context
+
+            current_request, current_session = request_context.current_ids()
+        except Exception:  # noqa: BLE001
+            current_request, current_session = None, None
+        request_id = request_id or current_request
+        session_id = session_id or current_session
     ts = now_iso()
     with get_connection() as conn:
         cur = conn.execute(
-            "INSERT INTO jobs (type, status, input_json, created_at, updated_at) "
-            "VALUES (?, 'queued', ?, ?, ?)",
-            (job_type, input_json, ts, ts),
+            "INSERT INTO jobs (type, status, input_json, session_id, request_id, created_at, updated_at) "
+            "VALUES (?, 'queued', ?, ?, ?, ?, ?)",
+            (job_type, input_json, session_id, request_id, ts, ts),
         )
         return int(cur.lastrowid)
 
@@ -404,15 +447,16 @@ def create_job(job_type: str, input_json: str) -> int:
 def claim_next_job() -> dict[str, Any] | None:
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, type, input_json FROM jobs "
+            "SELECT id, type, input_json, session_id, request_id FROM jobs "
             "WHERE status = 'queued' ORDER BY id ASC LIMIT 1"
         ).fetchone()
         if row is None:
             return None
+        claimed_at = now_iso()
         updated = conn.execute(
-            "UPDATE jobs SET status = 'running', updated_at = ? "
+            "UPDATE jobs SET status = 'running', claimed_at = ?, updated_at = ? "
             "WHERE id = ? AND status = 'queued'",
-            (now_iso(), row["id"]),
+            (claimed_at, claimed_at, row["id"]),
         ).rowcount
         if not updated:
             return None
@@ -436,24 +480,40 @@ def fail_job(job_id: int, error: str) -> None:
         )
 
 
-def undelivered_jobs(limit: int = 10) -> list[dict[str, Any]]:
+def undelivered_jobs(limit: int = 10, session_id: str | None = None) -> list[dict[str, Any]]:
+    limit = max(1, min(int(limit), 100))
     with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, type, status, result_text, error, created_at, updated_at "
-            "FROM jobs WHERE delivered = 0 AND status IN ('done', 'failed') "
-            "ORDER BY id ASC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        if session_id:
+            rows = conn.execute(
+                "SELECT id, type, status, result_text, error, session_id, request_id, created_at, updated_at "
+                "FROM jobs WHERE delivered = 0 AND session_id = ? AND status IN ('done', 'failed') "
+                "ORDER BY id ASC LIMIT ?",
+                (session_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, type, status, result_text, error, session_id, request_id, created_at, updated_at "
+                "FROM jobs WHERE delivered = 0 AND status IN ('done', 'failed') "
+                "ORDER BY id ASC LIMIT ?",
+                (limit,),
+            ).fetchall()
     return [dict(r) for r in rows]
 
 
-def mark_jobs_delivered(job_ids: list[int]) -> None:
+def mark_jobs_delivered(job_ids: list[int], session_id: str | None = None) -> None:
     if not job_ids:
         return
     placeholders = ",".join("?" for _ in job_ids)
+    delivered_at = now_iso()
     with get_connection() as conn:
-        conn.execute(
-            f"UPDATE jobs SET delivered = 1, updated_at = ? WHERE id IN ({placeholders})",
-            [now_iso(), *job_ids],
-        )
-
+        if session_id:
+            conn.execute(
+                f"UPDATE jobs SET delivered = 1, delivered_at = ?, updated_at = ? "
+                f"WHERE session_id = ? AND id IN ({placeholders})",
+                [delivered_at, delivered_at, session_id, *job_ids],
+            )
+        else:
+            conn.execute(
+                f"UPDATE jobs SET delivered = 1, delivered_at = ?, updated_at = ? WHERE id IN ({placeholders})",
+                [delivered_at, delivered_at, *job_ids],
+            )
