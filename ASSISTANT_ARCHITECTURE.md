@@ -13,11 +13,13 @@ and propose a concrete next action.
   notes, and reusable context. PETIT retrieves a small ranked set; it never puts
   the whole vault into one prompt. `_private`, attachments, and Obsidian internals
   are excluded from indexing.
-- Notion: canonical editable personal project and task data. The current adapter
-  syncs a task database; Phase 2 adds project/task Relations and scattered-page
-  discovery after user confirmation.
-- Linkraft: canonical Life is Tech / student project state. Phase 2 reads only
-  projects owned by the PETIT user through a dedicated read-only identity.
+- Notion: canonical editable personal project and task data. The Phase 2 adapter
+  preserves project/task Relations, assignees, hierarchy, blockers, source IDs,
+  and separate project/task freshness. Name similarity creates a candidate only;
+  an internal project mapping requires confirmation.
+- Linkraft: canonical Life is Tech / student project state. PETIT reads only
+  projects owned by the configured Linkraft user through a dedicated read-only
+  bearer identity. Confirmed projects use per-project delta cursors.
 - GitHub: evidence that code, tests, pull requests, or deployments changed. A
   commit alone never proves full completion.
 - Google Calendar: authoritative calendar outside PETIT. PETIT can import a
@@ -50,8 +52,8 @@ reassigned to another project.
   evidence, unverified work, session bounds, and source conversation ids.
 - `episode_project_links`: many-to-many relation between conversation episodes and
   projects, including relation type, confidence, and confirmation state.
-- `project_events`: approved PETIT-side project changes. Phase 2 adapters normalize
-  external changes into the same project-scoped event model.
+- `project_events`: approved PETIT-side project changes plus normalized external
+  source changes.
 - `project_completion_drafts`: short-lived clarification state for vague completion.
 - `project_write_receipts`: idempotency receipts for confirmed project creation and
   alias writes.
@@ -71,17 +73,34 @@ stopped and never loads every memory, Vault note, or external source.
 ### Start and resume
 
 For `Linkraftやる`, `PETITに戻る`, or a confirmed alias, PETIT resolves one project,
-updates `active_project_state`, and builds a bounded `ProjectResumeContext` in this
-priority order:
+updates `active_project_state`, refreshes only that project's confirmed sources,
+and builds a bounded `ProjectResumeContext` in this priority order:
 
 1. project checkpoint
-2. recent approved project events
+2. recent approved or normalized project events
 3. recent confirmed linked episodes
 4. compatible legacy handoff note
 5. freshness of confirmed external source links
 
 The renderer keeps verified items, unverified items, blockers, and next action
 separate. Its reference counts are exposed in `model_route.resume_references`.
+
+### Confirmed source refresh
+
+Immediately before resume context is read, PETIT selects only `project_source_links`
+rows where the internal project matches, `status=active`, and `confirmed_at` is set.
+
+- Notion runs at most once for the resume turn and keeps its normal TTL-aware,
+  independent project/task synchronization.
+- Linkraft refreshes only the selected project's confirmed external IDs. It does
+  not use the broad all-linked-project sync and retains a cursor per external ID.
+- Unconfirmed candidates, removed links, other projects, and unsupported providers
+  are never sent to an adapter.
+- One provider failure does not stop another provider or checkpoint-based resume.
+- Previous successful caches remain available and are disclosed as stale.
+- The refresh result records attempted, failed, and skipped providers without an LLM.
+
+Detailed behavior is documented in [`docs/project_source_refresh.md`](docs/project_source_refresh.md).
 
 ### Completion
 
@@ -106,15 +125,16 @@ confirmed; collisions are disclosed and remain ambiguous during future routing.
 ## Turn flow
 
 1. Check the deterministic Project Continuity path.
-2. Classify the remaining request locally.
-3. Route a short simple turn to the chat model; route tools, planning,
+2. For an explicit project resume, refresh only its confirmed external sources.
+3. Classify the remaining request locally.
+4. Route a short simple turn to the chat model; route tools, planning,
    personal-history work, analysis, and implementation requests to the agent model.
-4. Search BRAIN and memory only when the turn can benefit from personal context.
-5. For planning turns, refresh Notion read-only and load bounded task/calendar
+5. Search BRAIN and memory only when the turn can benefit from personal context.
+6. For planning turns, refresh Notion read-only and load bounded task/calendar
    context.
-6. Let the selected model use only related tools if it is an agent turn.
-7. Return a short answer with a next action when useful.
-8. Convert write tool calls into an expiring preview. Execute the exact stored
+7. Let the selected model use only related tools if it is an agent turn.
+8. Return a short answer with a next action when useful.
+9. Convert write tool calls into an expiring preview. Execute the exact stored
    arguments once only after the user presses the confirmation button.
 
 ## Model routing
@@ -124,8 +144,8 @@ confirmed; collisions are disclosed and remain ambiguous during future routing.
 - `PETIT_AGENT_BASE_URL` / `PETIT_AGENT_MODEL` / `PETIT_AGENT_API_KEY`: tool
   calling, multi-step reasoning, BRAIN/Notion/calendar work, analysis, and
   implementation requests.
-- Project Continuity's Phase 1 start/end/register/resume path does not require a
-  model.
+- Project Continuity's start/end/register/resume and confirmed-source refresh path
+  does not require a model.
 - Routing is intent/source based, not a raw message/history length threshold.
 - Agent `/models` health is cached. If it is unavailable, only a read result
   that PETIT has already obtained safely may be presented by Chat. Tool choice
@@ -147,21 +167,25 @@ one-model setup remains valid and an Agent can instead run on another PC/GPU.
 - confirmed completion events
 - start, finish, switch, resume, registration, and alias conversation flows
 
-### Phase 2
+### Phase 2 implemented
 
-- Notion project/task Relation adapter
-- scattered Notion/BRAIN candidate discovery with confirmation
-- Linkraft owner-only read adapter
-- GitHub commit/PR/test/deploy evidence
+- Notion project/task Relation adapter and confirmation-first mappings
+- Linkraft owner-only read API and PETIT adapter
 - external project events and per-source freshness
+- confirmed-source refresh immediately before project resume
+
+### Phase 2 remaining
+
+- scattered BRAIN candidate discovery with confirmation
+- GitHub commit/PR/test/deploy evidence
 - project-aware morning briefing and cross-project prioritization
 
 ## Current limitations
 
-- Phase 1 automated tests and compile checks pass, but the stacked changes still
-  need a real browser approval/cancel/restart E2E before release.
-- Notion, Linkraft, GitHub, and BRAIN are not yet connected to the new internal
-  project ids; this is Phase 2.
+- Automated tests and compile checks cover the continuity and source adapters, but
+  real service credentials and browser approval/cancel/restart E2E remain required.
+- GitHub evidence and BRAIN project mappings are not yet connected to the internal
+  project IDs.
 - Google Calendar's Codex/MCP login is isolated from PETIT. ICS read import is
   available, but a Google Calendar API/OAuth write provider is still required.
 - Live model quality depends on both configured LM Studio models being loaded and
