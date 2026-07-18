@@ -22,9 +22,17 @@ _COMPLETION_START = re.compile(
     r"(?:終わった|できた|ここまで(?:にする|で終わり)?|一旦終わり|今日は終わり|作業終わり|完了した)",
     re.IGNORECASE,
 )
+_DETAILED_PROGRESS = re.compile(
+    r"(?:実装(?:した|できた|終わった|済み)|"
+    r"テスト(?:も)?(?:通った|済み|成功)|unittest|build成功|ビルド成功|"
+    r"ブラウザ確認(?:した|済み)|実画面(?:で)?確認(?:した|済み)|実機確認(?:した|済み)|"
+    r"デプロイ(?:した|済み)|公開した|反映した|"
+    r"本番(?:で)?確認(?:した|済み)|公開確認(?:した|済み)|"
+    r"ブロッカー|詰まった|詰まって|エラーで止ま)",
+    re.IGNORECASE,
+)
 _TASK_WRITE_PATTERN = re.compile(r"(?:タスク.*(?:完了|終わ)|完了にして|ステータス.*完了)", re.IGNORECASE)
 _NEGATIONS = ("まだ", "未確認", "未実施", "してない", "していない", "できてない", "できていない", "残って")
-_PIPELINE_ITEMS = ("実装", "自動テスト", "実画面確認", "デプロイ", "本番確認")
 _STAGE_LABELS = {
     "implemented": "実装済み",
     "automated_tests_verified": "自動テスト確認済み",
@@ -127,12 +135,12 @@ def _is_completion_start(message: str) -> bool:
         return False
     if text.endswith(("?", "？")):
         return False
-    return bool(_COMPLETION_START.search(text))
+    return bool(_COMPLETION_START.search(text) or _DETAILED_PROGRESS.search(text))
 
 
 def _summary_hint(message: str, project_name: str, history: list[dict[str, str]] | None) -> str:
-    stripped = _COMPLETION_START.sub("", message)
-    stripped = re.sub(r"(?:一旦|とりあえず|やっと|これで|は|が|を|も)+", " ", stripped).strip(" 、。！!")
+    stripped = _COMPLETION_START.sub("", message).strip(" 、。！!")
+    stripped = re.sub(r"^(?:一旦|とりあえず|やっと|これで)\s*", "", stripped).strip()
     if len(stripped) >= 3:
         return stripped[:160]
     for item in reversed(history or []):
@@ -177,16 +185,12 @@ def _remove_verified(items: list[str], verified: set[str]) -> list[str]:
     return [item for item in items if item not in verified]
 
 
-def _parse_scope(
-    text: str,
-    *,
-    checkpoint: dict[str, Any] | None,
-) -> dict[str, Any] | None:
+def _parse_scope(text: str, *, checkpoint: dict[str, Any] | None) -> dict[str, Any] | None:
     compact = " ".join(text.strip().split())
     if not compact:
         return None
 
-    explicit_completed = bool(re.search(r"(?:完全に|全部|すべて|もう残り(?:は)?ない).{0,6}(?:完了|終わ)", compact))
+    explicit_completed = bool(re.search(r"(?:完全に|全部|すべて|もう残り(?:は)?ない).{0,8}(?:完了|終わ)", compact))
     paused = bool(re.search(r"(?:今日はここまで|一旦(?:ここまで|終わり)|保留|中断|今日は終わり)", compact))
     blocked = bool(re.search(r"(?:ブロッカー|詰まった|詰まって|進めない|進まない|エラーで止ま)", compact))
 
@@ -226,21 +230,23 @@ def _parse_scope(
 
     evidence: list[str] = []
     verified_items: set[str] = set()
-    if implemented or stage in {"automated_tests_verified", "ui_verified", "deployed", "production_verified", "completed"}:
+    if implemented:
         evidence.append("実装済み（ユーザー確認）")
         verified_items.add("実装")
-    if tested or stage in {"ui_verified", "deployed", "production_verified", "completed"}:
+    if tested:
         evidence.append("自動テスト確認済み（ユーザー確認）")
         verified_items.add("自動テスト")
-    if ui_verified or stage in {"deployed", "production_verified", "completed"}:
+    if ui_verified:
         evidence.append("実画面確認済み（ユーザー確認）")
         verified_items.add("実画面確認")
-    if deployed or stage in {"production_verified", "completed"}:
+    if deployed:
         evidence.append("デプロイ済み（ユーザー確認）")
         verified_items.add("デプロイ")
-    if production or stage == "completed":
+    if production:
         evidence.append("本番確認済み（ユーザー確認）")
         verified_items.add("本番確認")
+    if explicit_completed:
+        evidence.append("完全完了（ユーザー確認）")
 
     unverified = _remove_verified(old_unverified, verified_items)
     explicit_unverified: list[str] = []
@@ -259,11 +265,11 @@ def _parse_scope(
     elif stage == "automated_tests_verified":
         defaults = ["実画面確認", "デプロイ", "本番確認"]
     elif stage == "ui_verified":
-        defaults = ["デプロイ", "本番確認"]
+        defaults = ["自動テスト", "デプロイ", "本番確認"]
     elif stage == "deployed":
-        defaults = ["本番確認"]
-    elif stage in {"production_verified", "completed"}:
-        defaults = []
+        defaults = ["自動テスト", "実画面確認", "本番確認"]
+    elif stage == "production_verified":
+        defaults = ["自動テスト"]
     unverified = _merge_unique(unverified, [*defaults, *explicit_unverified])
     if stage == "completed":
         unverified = []
@@ -314,7 +320,11 @@ def _completion_arguments(
 
 
 def _preview_reply(project_name: str, args: dict[str, Any]) -> str:
-    lines = [f"お疲れさま。「{project_name}」はこう記録するよ。", f"- 到達: {_STAGE_LABELS[args['stage']]}", f"- まとめ: {args['last_summary']}"]
+    lines = [
+        f"お疲れさま。「{project_name}」はこう記録するよ。",
+        f"- 到達: {_STAGE_LABELS[args['stage']]}",
+        f"- まとめ: {args['last_summary']}",
+    ]
     if args.get("completed_evidence"):
         lines.append(f"- 確認済み: {'、'.join(args['completed_evidence'])}")
     if args.get("unverified_items"):
@@ -352,7 +362,12 @@ def _pending_preview(
         "used_tools": [],
         "pending_actions": [{"name": "save_project_completion", "arguments": args}],
         "persist": True,
-        "model_route": {"kind": "project_completion_preview", "model": None, "project_id": project["project_id"], "stage": parsed["stage"]},
+        "model_route": {
+            "kind": "project_completion_preview",
+            "model": None,
+            "project_id": project["project_id"],
+            "stage": parsed["stage"],
+        },
     }
 
 
@@ -383,12 +398,17 @@ def try_handle_completion_turn(
                 checkpoint=checkpoint,
             )
             if preview:
+                _clear_draft(user_id)
                 return preview
             return {
                 "reply": "どこまで終わったか、もう少しだけ教えて。実装まで、テストまで、実画面確認まで、デプロイまでのどれに近い？",
                 "used_tools": [],
                 "persist": True,
-                "model_route": {"kind": "project_completion_clarification", "model": None, "project_id": draft["project_id"]},
+                "model_route": {
+                    "kind": "project_completion_clarification",
+                    "model": None,
+                    "project_id": draft["project_id"],
+                },
             }
 
         if not _is_completion_start(user_message):
@@ -418,7 +438,12 @@ def try_handle_completion_turn(
             "reply": f"お疲れさま。「{active['name']}」は一旦できたんだね。今回は実装まで？ テストや実画面確認、デプロイも終わった感じ？",
             "used_tools": [],
             "persist": True,
-            "model_route": {"kind": "project_completion_clarification", "model": None, "project_id": active["project_id"], "draft_expires_at": draft.get("expires_at")},
+            "model_route": {
+                "kind": "project_completion_clarification",
+                "model": None,
+                "project_id": active["project_id"],
+                "draft_expires_at": draft.get("expires_at"),
+            },
         }
     except Exception as exc:  # noqa: BLE001
         log.debug("project completion routing skipped: %s", exc)
@@ -451,13 +476,27 @@ def commit_completion(
 ) -> dict[str, Any]:
     """Commit one approved completion preview idempotently."""
     ensure_completion_schema()
+    if stage not in _EVENT_TYPES or event_type != _EVENT_TYPES[stage]:
+        raise ValueError("invalid completion stage or event type")
+    if not project_continuity.get_project(project_id):
+        raise ValueError("project not found")
+
     with db.get_connection() as conn:
         existing = conn.execute("SELECT id FROM project_events WHERE idempotency_key=?", (idempotency_key,)).fetchone()
     if existing:
         checkpoint = project_continuity.get_project_checkpoint(user_id, project_id)
-        return {"saved": True, "idempotency_hit": True, "event_id": int(existing["id"]), "checkpoint": checkpoint}
+        return {
+            "saved": True,
+            "idempotency_hit": True,
+            "event_id": int(existing["id"]),
+            "checkpoint": checkpoint,
+        }
 
     source_conversation_id = _latest_source_conversation_id(source_user_text)
+    previous = project_continuity.get_project_checkpoint(user_id, project_id) or {}
+    conversation_ids = [int(value) for value in previous.get("source_conversation_ids") or [] if value is not None]
+    if source_conversation_id is not None and source_conversation_id not in conversation_ids:
+        conversation_ids.append(source_conversation_id)
     checkpoint = project_continuity.save_project_checkpoint(
         user_id,
         project_id,
@@ -468,7 +507,7 @@ def commit_completion(
         completed_evidence=completed_evidence,
         unverified_items=unverified_items,
         last_session_ended_at=db.now_iso(),
-        source_conversation_ids=[source_conversation_id] if source_conversation_id else None,
+        source_conversation_ids=conversation_ids if conversation_ids else None,
     )
     now = db.now_iso()
     payload = {
@@ -483,8 +522,22 @@ def commit_completion(
         cursor = conn.execute(
             "INSERT INTO project_events (project_id, provider, event_type, summary, source_conversation_id, payload_json, idempotency_key, occurred_at, created_at) "
             "VALUES (?, 'petit', ?, ?, ?, ?, ?, ?, ?)",
-            (project_id, event_type, event_summary, source_conversation_id, json.dumps(payload, ensure_ascii=False), idempotency_key, now, now),
+            (
+                project_id,
+                event_type,
+                event_summary,
+                source_conversation_id,
+                json.dumps(payload, ensure_ascii=False),
+                idempotency_key,
+                now,
+                now,
+            ),
         )
         event_id = int(cursor.lastrowid)
     _clear_draft(user_id)
-    return {"saved": True, "idempotency_hit": False, "event_id": event_id, "checkpoint": checkpoint}
+    return {
+        "saved": True,
+        "idempotency_hit": False,
+        "event_id": event_id,
+        "checkpoint": checkpoint,
+    }
