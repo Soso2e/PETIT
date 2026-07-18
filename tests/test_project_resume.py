@@ -6,13 +6,25 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import config, db, project_completion, project_continuity, project_resume, project_router
+from backend import (
+    config,
+    db,
+    project_completion,
+    project_continuity,
+    project_resume,
+    project_router,
+    project_source_refresh,
+)
 
 
 class ProjectResumeTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
-        self.db_patch = patch.object(config, "DB_PATH", Path(self.temp_dir.name) / "app.db")
+        self.db_patch = patch.object(
+            config,
+            "DB_PATH",
+            Path(self.temp_dir.name) / "app.db",
+        )
         self.db_patch.start()
         db.init_db()
         project_continuity.ensure_project_schema()
@@ -63,6 +75,23 @@ class ProjectResumeTests(unittest.TestCase):
         self.assertIn("ブロッカーはLM Studio停止", rendered)
         self.assertIn("ブラウザで再開会話を確認する", rendered)
 
+    def test_resume_never_refreshes_external_sources_inline(self) -> None:
+        project_continuity.link_project_source(
+            "petit",
+            "github",
+            "Soso2e/PETIT",
+            confirmed=True,
+        )
+        with patch.object(
+            project_source_refresh,
+            "refresh_project_sources",
+        ) as refresh:
+            context = project_resume.build_resume_context("soso", "petit")
+
+        refresh.assert_not_called()
+        self.assertEqual(context.source_refresh["mode"], "cached_only")
+        self.assertEqual(context.source_refresh["attempted"], [])
+
     def test_no_saved_context_does_not_invent_previous_work(self) -> None:
         context = project_resume.build_resume_context("soso", "linkraft")
         rendered = project_resume.render_resume_message(context)
@@ -99,7 +128,10 @@ class ProjectResumeTests(unittest.TestCase):
         context = project_resume.build_resume_context("soso", "petit")
         rendered = project_resume.render_resume_message(context)
 
-        self.assertEqual([item["episode_id"] for item in context.recent_episodes], [petit_episode])
+        self.assertEqual(
+            [item["episode_id"] for item in context.recent_episodes],
+            [petit_episode],
+        )
         self.assertIn("PETITの設計を決めた", rendered)
         self.assertNotIn("Linkraftの管理画面", rendered)
         self.assertNotIn("未確認の関連候補", rendered)
@@ -112,15 +144,20 @@ class ProjectResumeTests(unittest.TestCase):
         )
         with db.get_connection() as conn:
             conn.execute(
-                "UPDATE project_checkpoints SET updated_at='2026-01-01T00:00:00+00:00' WHERE user_id='soso' AND project_id='petit'"
+                "UPDATE project_checkpoints SET updated_at='2026-01-01T00:00:00+00:00' "
+                "WHERE user_id='soso' AND project_id='petit'"
             )
             conn.execute(
-                "INSERT INTO project_events (project_id, provider, event_type, summary, payload_json, idempotency_key, occurred_at, created_at) "
-                "VALUES ('petit', 'petit', 'decision', '再開時は確認済み事実だけ使う', '{}', 'event-petit', '2026-07-18T00:00:00+00:00', '2026-07-18T00:00:00+00:00')"
+                "INSERT INTO project_events "
+                "(project_id, provider, event_type, summary, payload_json, idempotency_key, occurred_at, created_at) "
+                "VALUES ('petit', 'petit', 'decision', '再開時は確認済み事実だけ使う', '{}', "
+                "'event-petit', '2026-07-18T00:00:00+00:00', '2026-07-18T00:00:00+00:00')"
             )
             conn.execute(
-                "INSERT INTO project_events (project_id, provider, event_type, summary, payload_json, idempotency_key, occurred_at, created_at) "
-                "VALUES ('linkraft', 'petit', 'decision', '他プロジェクトの更新', '{}', 'event-linkraft', '2026-07-18T00:00:00+00:00', '2026-07-18T00:00:00+00:00')"
+                "INSERT INTO project_events "
+                "(project_id, provider, event_type, summary, payload_json, idempotency_key, occurred_at, created_at) "
+                "VALUES ('linkraft', 'petit', 'decision', '他プロジェクトの更新', '{}', "
+                "'event-linkraft', '2026-07-18T00:00:00+00:00', '2026-07-18T00:00:00+00:00')"
             )
 
         context = project_resume.build_resume_context("soso", "petit")
@@ -133,7 +170,8 @@ class ProjectResumeTests(unittest.TestCase):
     def test_legacy_handoff_is_used_as_compatibility_fallback(self) -> None:
         with db.get_connection() as conn:
             conn.execute(
-                "INSERT INTO handoff_notes (created_at, current_project, stopped_at, next_action, blockers, note, source) "
+                "INSERT INTO handoff_notes "
+                "(created_at, current_project, stopped_at, next_action, blockers, note, source) "
                 "VALUES (?, 'プチ', '設計途中', 'Repository層から再開', '[]', '旧引き継ぎメモ', 'manual')",
                 (db.now_iso(),),
             )
@@ -160,7 +198,7 @@ class ProjectResumeTests(unittest.TestCase):
         rendered = project_resume.render_resume_message(context)
 
         self.assertTrue(context.source_freshness["notion"]["stale"])
-        self.assertIn("notionは最新同期に失敗", rendered)
+        self.assertIn("notionは前回成功時のキャッシュ", rendered)
 
     def test_router_exposes_reference_counts_without_llm(self) -> None:
         project_continuity.save_project_checkpoint(
@@ -175,6 +213,7 @@ class ProjectResumeTests(unittest.TestCase):
         refs = result["model_route"]["resume_references"]
         self.assertEqual(refs["checkpoint"], 1)
         self.assertEqual(refs["events"], 0)
+        self.assertEqual(refs["source_refresh_mode"], "cached_only")
         self.assertIn("保存基盤まで完了", result["reply"])
 
 
