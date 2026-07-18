@@ -58,6 +58,10 @@ _TOOL_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("complete_task", ("完了にして", "終わった", "タスクを完了")),
     ("add_schedule", ("予定を入", "予定に追加")),
     ("sync_notion_tasks", ("notionを同期", "Notionを同期")),
+    ("sync_github_evidence", ("githubを同期", "githubの進捗を同期", "github更新を取得", "github evidence")),
+    ("get_github_repository_candidates", ("github候補", "githubリポジトリ候補")),
+    ("link_github_repository_candidate", ("github候補を紐付け", "githubリポジトリ候補を紐付け")),
+    ("ignore_github_repository_candidate", ("github候補を無視", "githubリポジトリ候補を無視")),
     ("sync_calendar", ("カレンダーを同期", "予定を同期")),
     ("sync_obsidian_vault", ("vaultを同期", "再インデックス")),
     ("edit_brain_note", ("BRAINを修正", "BRAINに追記", "brainを修正", "vaultを修正", "ノートを修正", "ノートに追記")),
@@ -65,6 +69,9 @@ _TOOL_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 _PLANNING_PATTERN = re.compile(r"(今日|明日|今週).{0,16}(何から|何を|どうする|どうしよう|すれば|優先|始め)")
 _RECALL_PATTERN = re.compile(r"(昨日|前回|この前).{0,16}(何|やった|してた|続き|決め)")
+_GITHUB_REPOSITORY_PATTERN = re.compile(
+    r"(?:[A-Za-z][A-Za-z0-9_.-]*/[A-Za-z0-9_.-]+|[A-Za-z0-9_.-]+/[A-Za-z][A-Za-z0-9_.-]*)"
+)
 
 
 def _compact(text: str) -> str:
@@ -107,6 +114,16 @@ def _related_tool_names(message: str) -> list[str]:
     for name, signals in _TOOL_SIGNALS:
         if any(signal.casefold() in text for signal in signals):
             names.append(name)
+    repository_reference = "github.com/" in text or (
+        any(marker in text for marker in ("github", "リポジトリ", "repository"))
+        and bool(_GITHUB_REPOSITORY_PATTERN.search(message))
+    )
+    if repository_reference and any(
+        verb in text for verb in ("登録", "紐付け", "ひも付け", "確認", "候補")
+    ):
+        names.append("inspect_github_repository")
+    if "link_github_repository_candidate" in names or "ignore_github_repository_candidate" in names:
+        names = [name for name in names if name != "get_github_repository_candidates"]
     # Natural consultations are intents rather than explicit source commands.
     # Expose only the three relevant read tools and let the agent choose among
     # them; no retrieval happens merely because a schema was exposed.
@@ -209,6 +226,8 @@ def _confirmation_text(name: str, args: dict[str, Any]) -> str:
         "save_memory": "長期記憶へ保存",
         "create_handoff_note": "引き継ぎメモを保存",
         "edit_brain_note": "BRAINノートを変更",
+        "link_github_repository_candidate": "GitHub repository候補を内部プロジェクトへ紐付け",
+        "ignore_github_repository_candidate": "GitHub repository候補を無視対象に変更",
     }
     details = "\n".join(f"- {key}: {value}" for key, value in args.items() if value not in (None, ""))
     return f"書き込み前に確認します。\n操作: {labels.get(name, name)}\n{details}\nこの内容で実行しますか？"

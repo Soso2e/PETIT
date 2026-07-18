@@ -9,7 +9,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from . import db, linkraft_config, linkraft_sync, notion_project_sync, project_continuity
+from . import (
+    db,
+    github_sync,
+    linkraft_config,
+    linkraft_sync,
+    notion_project_sync,
+    project_continuity,
+)
 from .linkraft_client import LinkraftError, get_project_snapshot
 
 
@@ -138,17 +145,31 @@ def _refresh_notion(*, force: bool) -> dict[str, Any]:
     return result | {"provider": "notion", "skipped": False}
 
 
+def _provider_result(provider: str, items: list[dict[str, Any]]) -> dict[str, Any]:
+    active = [item for item in items if not item.get("skipped")]
+    return {
+        "provider": provider,
+        "ok": bool(active) and all(item.get("ok") for item in active),
+        "configured": any(item.get("configured") for item in items),
+        "skipped": not active,
+        "stale": any(item.get("stale") for item in items),
+        "error": "; ".join(str(item["error"]) for item in items if item.get("error")) or None,
+        "links": items,
+    }
+
+
 def refresh_project_sources(
     project_id: str,
     *,
     force: bool = False,
     notion_refresher: Callable[..., dict[str, Any]] | None = None,
     linkraft_refresher: Callable[..., dict[str, Any]] | None = None,
+    github_refresher: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Refresh each confirmed provider at most once for the selected project.
 
-    Linkraft may have multiple confirmed external IDs for a project, but no other
-    project's Linkraft link is read. Unsupported providers are reported as skipped.
+    Linkraft and GitHub may have multiple confirmed external IDs for a project, but
+    no other project's source link is read. Unsupported providers are skipped.
     """
     if not project_continuity.get_project(project_id):
         return {
@@ -178,20 +199,22 @@ def refresh_project_sources(
                 result = refresh(force=force)
             elif provider == "linkraft":
                 refresh = linkraft_refresher or refresh_linkraft_link
-                items = [
-                    refresh(project_id, str(link["external_id"]), force=force)
-                    for link in grouped[provider]
-                ]
-                active = [item for item in items if not item.get("skipped")]
-                result = {
-                    "provider": "linkraft",
-                    "ok": bool(active) and all(item.get("ok") for item in active),
-                    "configured": any(item.get("configured") for item in items),
-                    "skipped": not active,
-                    "stale": any(item.get("stale") for item in items),
-                    "error": "; ".join(str(item["error"]) for item in items if item.get("error")) or None,
-                    "links": items,
-                }
+                result = _provider_result(
+                    "linkraft",
+                    [
+                        refresh(project_id, str(link["external_id"]), force=force)
+                        for link in grouped[provider]
+                    ],
+                )
+            elif provider == "github":
+                refresh = github_refresher or github_sync.refresh_repository_link
+                result = _provider_result(
+                    "github",
+                    [
+                        refresh(project_id, str(link["external_id"]), force=force)
+                        for link in grouped[provider]
+                    ],
+                )
             else:
                 result = {
                     "provider": provider,
