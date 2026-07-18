@@ -31,6 +31,12 @@ class GitHubEvidenceRoutingTests(unittest.TestCase):
     def test_general_github_chat_stays_tool_free(self) -> None:
         self.assertEqual(agent._related_tool_names("GitHubって便利だよね"), [])
 
+    def test_date_like_slash_text_is_not_a_repository(self) -> None:
+        self.assertNotIn(
+            "inspect_github_repository",
+            agent._related_tool_names("2026/07/18の予定を確認して"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
