@@ -27,8 +27,14 @@ jobs:
         run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_note_data_is_safe_and_bounded
       - name: Candidate upsert
         run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_candidate_upsert_round_trips
-      - name: Full candidate discovery
-        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_full_discovery_returns_one_candidate
+      - name: Project search terms
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_project_search_terms_include_name_once
+      - name: Discovery success
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_reports_success
+      - name: Discovery count
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_returns_one_candidate
+      - name: Discovery path
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_candidate_has_expected_path
       - name: Candidate exclusion boundary
         run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_discovery_creates_candidate_but_not_source_link
       - name: Path safety
