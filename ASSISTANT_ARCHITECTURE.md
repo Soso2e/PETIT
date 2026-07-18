@@ -20,8 +20,13 @@ and propose a concrete next action.
 - Linkraft: canonical Life is Tech / student project state. PETIT reads only
   projects owned by the configured Linkraft user through a dedicated read-only
   bearer identity. Confirmed projects use per-project delta cursors.
-- GitHub: evidence that code, tests, pull requests, or deployments changed. A
-  commit alone never proves full completion.
+- GitHub: read-only engineering evidence. PETIT preserves repository metadata,
+  commits, pull requests, check runs, and deployment statuses as distinct facts.
+  A commit alone never proves implementation completion; a successful check proves
+  only that named automated check for its SHA; a merge does not prove deployment;
+  a successful deployment status does not prove production behavior was verified.
+  Repository names create candidates only, and confirmed mappings use per-repository
+  cursors and freshness.
 - Google Calendar: authoritative calendar outside PETIT. PETIT can import a
   configured private iCal/ICS URL read-only into `calendar_events_cache`.
   Writes currently target only PETIT's local calendar provider; Google Calendar
@@ -94,13 +99,35 @@ rows where the internal project matches, `status=active`, and `confirmed_at` is 
   independent project/task synchronization.
 - Linkraft refreshes only the selected project's confirmed external IDs. It does
   not use the broad all-linked-project sync and retains a cursor per external ID.
+- GitHub refreshes only the selected project's confirmed `owner/name` repositories.
+  It reads bounded commit and PR changes, rechecks current default-branch checks so
+  asynchronous status changes are observed, and evaluates recent deployment-status
+  timestamps. It never changes a PETIT checkpoint.
 - Unconfirmed candidates, removed links, other projects, and unsupported providers
   are never sent to an adapter.
 - One provider failure does not stop another provider or checkpoint-based resume.
 - Previous successful caches remain available and are disclosed as stale.
 - The refresh result records attempted, failed, and skipped providers without an LLM.
 
-Detailed behavior is documented in [`docs/project_source_refresh.md`](docs/project_source_refresh.md).
+Detailed behavior is documented in
+[`docs/project_source_refresh.md`](docs/project_source_refresh.md) and
+[`docs/github_evidence.md`](docs/github_evidence.md).
+
+### GitHub evidence boundary
+
+`github_evidence_cache` preserves evidence type, external identity, source state,
+SHA/ref, URL, timestamps, and source payload. Final source facts are normalized into
+idempotent `project_events`, including `commit_pushed`, pull-request state changes,
+check success/failure, and deployment success/failure.
+
+These events are updates after a checkpoint, not replacements for it. In particular:
+
+- a commit does not set `implemented`
+- a successful check does not set `ui_verified` or `production_verified`
+- a merged pull request does not set `deployed`
+- a successful deployment does not set `production_verified`
+
+Only the user's completion-confirmation conversation can update the checkpoint.
 
 ### Completion
 
@@ -122,6 +149,10 @@ Unknown explicit names are never auto-created. PETIT proposes a confirmed
 once. Existing names offer activation instead of duplication. Alias writes are also
 confirmed; collisions are disclosed and remain ambiguous during future routing.
 
+GitHub repository inspection similarly creates an untrusted candidate. Only approval
+creates a confirmed `provider=github` source link. Repository mapping and ignoring
+use the existing pending-action confirmation path.
+
 ## Turn flow
 
 1. Check the deterministic Project Continuity path.
@@ -132,10 +163,12 @@ confirmed; collisions are disclosed and remain ambiguous during future routing.
 5. Search BRAIN and memory only when the turn can benefit from personal context.
 6. For planning turns, refresh Notion read-only and load bounded task/calendar
    context.
-7. Let the selected model use only related tools if it is an agent turn.
-8. Return a short answer with a next action when useful.
-9. Convert write tool calls into an expiring preview. Execute the exact stored
-   arguments once only after the user presses the confirmation button.
+7. Expose GitHub tools only for an explicit repository registration, candidate
+   action, or evidence-sync request; ordinary GitHub chat remains tool-free.
+8. Let the selected model use only related tools if it is an agent turn.
+9. Return a short answer with a next action when useful.
+10. Convert write tool calls into an expiring preview. Execute the exact stored
+    arguments once only after the user presses the confirmation button.
 
 ## Model routing
 
@@ -171,21 +204,23 @@ one-model setup remains valid and an Agent can instead run on another PC/GPU.
 
 - Notion project/task Relation adapter and confirmation-first mappings
 - Linkraft owner-only read API and PETIT adapter
+- GitHub commit/PR/check/deployment evidence adapter and confirmation-first mappings
 - external project events and per-source freshness
 - confirmed-source refresh immediately before project resume
 
 ### Phase 2 remaining
 
 - scattered BRAIN candidate discovery with confirmation
-- GitHub commit/PR/test/deploy evidence
 - project-aware morning briefing and cross-project prioritization
 
 ## Current limitations
 
 - Automated tests and compile checks cover the continuity and source adapters, but
-  real service credentials and browser approval/cancel/restart E2E remain required.
-- GitHub evidence and BRAIN project mappings are not yet connected to the internal
-  project IDs.
+  real Notion, Linkraft, and GitHub credentials plus browser approval/cancel/restart
+  E2E remain required.
+- BRAIN project mappings are not yet connected to internal project IDs.
+- GitHub evidence is bounded polling rather than webhook delivery. Check and
+  deployment status changes become visible on the next permitted refresh.
 - Google Calendar's Codex/MCP login is isolated from PETIT. ICS read import is
   available, but a Google Calendar API/OAuth write provider is still required.
 - Live model quality depends on both configured LM Studio models being loaded and
