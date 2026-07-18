@@ -1,0 +1,51 @@
+name: BRAIN project mapping tests
+
+on:
+  push:
+    branches: [feat/brain-project-mapping]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install fastapi httpx pydantic chromadb timetree-exporter
+      - name: Compile
+        run: python -m compileall backend tests
+      - name: Vault keyword search
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_keyword_search_finds_note
+      - name: Vault path resolution
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_source_path_resolves_to_vault_relative_note
+      - name: Note parsing
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_note_data_is_safe_and_bounded
+      - name: Candidate upsert
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_candidate_upsert_round_trips
+      - name: Discovery success
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_reports_success
+      - name: Discovery count
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_returns_one_candidate
+      - name: Discovery path
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_candidate_has_expected_path
+      - name: Candidate exclusion boundary
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_discovery_creates_candidate_but_not_source_link
+      - name: Path safety
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_explicit_inspection_rejects_private_outside_and_non_markdown
+      - name: Confirmed mapping
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_link_requires_confirmation_and_builds_bounded_cache
+      - name: Hash event idempotency
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_content_change_creates_one_idempotent_event
+      - name: Project source boundary
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_source_refresh_reads_only_confirmed_target_note
+      - name: Missing note fallback
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_missing_note_keeps_cache_and_checkpoint_for_resume
+      - name: Bounded resume excerpt
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_resume_excerpt_is_bounded
+      - name: Source adapter regressions
+        run: python -m unittest tests.test_project_source_refresh tests.test_project_resume tests.test_github_evidence tests.test_linkraft_owner_sync tests.test_notion_adapter_v2
