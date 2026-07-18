@@ -146,12 +146,13 @@ def list_check_runs(repository: str, refs: list[str]) -> list[dict[str, Any]]:
     """Read check runs for new commits plus the current default-branch head.
 
     Re-reading the branch ref lets PETIT observe an in-progress check becoming final
-    even when no additional commit was pushed after the previous cursor.
+    even when no additional commit was pushed after the previous cursor. When the
+    same check is returned through multiple refs, the later read is authoritative.
     """
     full_name = normalize_repository(repository)
-    result: list[dict[str, Any]] = []
+    order: list[str] = []
+    by_check: dict[str, dict[str, Any]] = {}
     seen_refs: set[str] = set()
-    seen_checks: set[str] = set()
     for ref in refs[: github_config.MAX_CHECK_COMMITS + 1]:
         target = str(ref or "").strip()
         if not target or target in seen_refs:
@@ -168,12 +169,11 @@ def list_check_runs(repository: str, refs: list[str]) -> list[dict[str, Any]]:
                 continue
             item = dict(raw)
             check_key = str(item.get("id") or f"{item.get('name')}:{item.get('head_sha')}:{item.get('started_at')}")
-            if check_key in seen_checks:
-                continue
-            seen_checks.add(check_key)
+            if check_key not in by_check:
+                order.append(check_key)
             item["commit_sha"] = str(item.get("head_sha") or (target if len(target) >= 7 else ""))
-            result.append(item)
-    return result
+            by_check[check_key] = item
+    return [by_check[key] for key in order]
 
 
 def list_deployments(repository: str, *, since: str | None) -> list[dict[str, Any]]:
