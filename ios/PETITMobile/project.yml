@@ -32,7 +32,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.soso.PETITMobile
-        PRODUCT_NAME: PETIT
         GENERATE_INFOPLIST_FILE: true
         INFOPLIST_KEY_CFBundleDisplayName: PETIT
         INFOPLIST_KEY_UILaunchScreen_Generation: true

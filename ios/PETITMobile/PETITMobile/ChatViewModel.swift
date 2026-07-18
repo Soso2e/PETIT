@@ -1,6 +1,6 @@
 import Foundation
 
-struct DisplayMessage: Identifiable, Equatable {
+struct DisplayMessage: Identifiable {
     let id = UUID()
     let role: ChatRole
     let text: String
@@ -98,7 +98,7 @@ final class ChatViewModel: ObservableObject {
         isSending = true
         do {
             let response = try await PetitAPIClient(baseURL: baseURL).decideAction(
-                approvalID: action.approvalID,
+                approvalID: action.approvalId,
                 approved: approved
             )
             if let error = response.error, !error.isEmpty {

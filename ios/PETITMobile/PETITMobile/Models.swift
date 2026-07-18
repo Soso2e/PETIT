@@ -13,15 +13,15 @@ struct ChatHistoryItem: Codable, Equatable {
 struct ChatRequest: Encodable {
     let message: String
     let history: [ChatHistoryItem]
-    let requestID: String
-    let sessionID: String
+    let requestId: String
+    let sessionId: String
 }
 
 struct ChatResponse: Decodable {
     let reply: String
     let usedTools: [UsedTool]
     let error: String?
-    let requestID: String?
+    let requestId: String?
     let pendingActions: [PendingAction]
 }
 
@@ -32,11 +32,11 @@ struct UsedTool: Decodable, Identifiable {
 }
 
 struct PendingAction: Decodable, Identifiable {
-    let approvalID: String
+    let approvalId: String
     let name: String
     let arguments: [String: JSONValue]
 
-    var id: String { approvalID }
+    var id: String { approvalId }
 }
 
 struct ActionDecision: Encodable {
@@ -50,9 +50,9 @@ struct HealthResponse: Decodable {
 }
 
 struct ModelHealth: Decodable {
-    let serverOK: Bool?
+    let serverOk: Bool?
     let model: String?
-    let baseURL: String?
+    let baseUrl: String?
 }
 
 enum JSONValue: Codable, Equatable, CustomStringConvertible {

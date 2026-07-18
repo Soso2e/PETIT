@@ -38,7 +38,7 @@ struct PetitAPIClient {
             return nil
         }
 
-        components.path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.path = ""
         components.query = nil
         components.fragment = nil
         return components.url
@@ -57,12 +57,12 @@ struct PetitAPIClient {
         let payload = ChatRequest(
             message: message,
             history: history,
-            requestID: requestID,
-            sessionID: sessionID
+            requestId: requestID,
+            sessionId: sessionID
         )
         let body = try encoder.encode(payload)
         let response: ChatResponse = try await request(path: "/api/chat", method: "POST", body: body)
-        if let returnedID = response.requestID, returnedID != requestID {
+        if let returnedID = response.requestId, returnedID != requestID {
             throw PetitAPIError.requestMismatch
         }
         return response
@@ -98,7 +98,8 @@ struct PetitAPIClient {
             throw PetitAPIError.insecureURL
         }
 
-        let url = baseURL.appending(path: path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+        let relativePath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let url = baseURL.appending(path: relativePath)
         var request = URLRequest(url: url, timeoutInterval: 130)
         request.httpMethod = method
         request.httpBody = body
