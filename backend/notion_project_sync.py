@@ -150,16 +150,32 @@ def _upsert_candidate(
     )
 
 
+def _delete_missing(conn: Any, table: str, id_column: str, seen_ids: list[str], *, where: str = "") -> None:
+    """Replace one successfully loaded source without touching cache on loader failure."""
+    prefix = f"DELETE FROM {table}"
+    conditions = [where] if where else []
+    if seen_ids:
+        placeholders = ",".join("?" for _ in seen_ids)
+        conditions.append(f"({id_column} IS NULL OR {id_column} NOT IN ({placeholders}))")
+        sql = prefix + (" WHERE " + " AND ".join(conditions) if conditions else "")
+        conn.execute(sql, seen_ids)
+    else:
+        sql = prefix + (" WHERE " + " AND ".join(conditions) if conditions else "")
+        conn.execute(sql)
+
+
 def upsert_projects(projects: list[dict[str, Any]]) -> int:
-    """Cache Notion projects and create unconfirmed mapping candidates."""
+    """Cache Notion projects, replace stale source rows, and create mapping candidates."""
     ensure_notion_project_schema()
     now = db.now_iso()
+    seen_ids: list[str] = []
     with db.get_connection() as conn:
         for project in projects:
             external_id = str(project.get("external_id") or "").strip()
             title = str(project.get("title") or "").strip()
             if not external_id or not title:
                 continue
+            seen_ids.append(external_id)
             internal_project_id = _confirmed_internal_project(conn, external_id)
             conn.execute(
                 "INSERT INTO notion_projects_cache "
@@ -191,7 +207,8 @@ def upsert_projects(projects: list[dict[str, Any]]) -> int:
                 ),
             )
             _upsert_candidate(conn, project, internal_project_id=internal_project_id, now=now)
-    return sum(1 for item in projects if item.get("external_id") and item.get("title"))
+        _delete_missing(conn, "notion_projects_cache", "external_id", seen_ids)
+    return len(seen_ids)
 
 
 def _resolve_task_project(conn: Any, external_ids: list[str]) -> str | None:
@@ -204,16 +221,17 @@ def _resolve_task_project(conn: Any, external_ids: list[str]) -> str | None:
 
 
 def upsert_tasks(tasks: list[dict[str, Any]]) -> int:
-    """Extend the legacy task cache without losing Notion Relation identities."""
+    """Replace the Notion task cache while preserving Relation identities."""
     ensure_notion_project_schema()
     now = db.now_iso()
-    count = 0
+    seen_ids: list[str] = []
     with db.get_connection() as conn:
         for task in tasks:
             external_id = str(task.get("external_id") or "").strip()
             title = str(task.get("title") or "").strip()
             if not external_id or not title:
                 continue
+            seen_ids.append(external_id)
             project_external_ids = [str(item) for item in task.get("project_external_ids") or [] if str(item).strip()]
             parent_external_ids = [str(item) for item in task.get("parent_external_ids") or [] if str(item).strip()]
             project_id = _resolve_task_project(conn, project_external_ids)
@@ -259,8 +277,8 @@ def upsert_tasks(tasks: list[dict[str, Any]]) -> int:
                     "VALUES ('notion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     values,
                 )
-            count += 1
-    return count
+        _delete_missing(conn, "tasks_cache", "external_id", seen_ids, where="source='notion'")
+    return len(seen_ids)
 
 
 def _safe_error(exc: Exception) -> str:
@@ -310,7 +328,8 @@ def _sync_source(
     if not force and last is not None and time.monotonic() - last < config.NOTION_SYNC_TTL_SECONDS:
         return _source_status(source, True) | {"ok": True, "cached": True, "skipped": False}
     try:
-        count = writer(loader())
+        loaded = loader()
+        count = writer(loaded)
         at = db.record_sync_success(source, count)
         _last_sync_monotonic[source] = time.monotonic()
         return {
