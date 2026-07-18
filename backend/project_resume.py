@@ -1,9 +1,8 @@
 """Bounded project resume context and deterministic fallback rendering.
 
-Phase 1 only reads PETIT-owned facts: checkpoints, approved project events,
-confirmed episode links, legacy handoff notes, and freshness for confirmed source
-links. External adapters can add richer events in Phase 2 without changing the
-resume contract.
+PETIT reads project-scoped checkpoints, approved events, confirmed episode links,
+legacy handoffs, and freshness for confirmed external sources. Phase 2 adapters can
+add source-specific state without changing the resume contract.
 """
 from __future__ import annotations
 
@@ -118,6 +117,36 @@ def _legacy_handoff(project_id: str) -> dict[str, Any] | None:
     return None
 
 
+def _aggregate_source_states(provider: str) -> dict[str, Any]:
+    all_states = db.all_sync_states()
+    child_states = [state for state in all_states if str(state.get("source") or "").startswith(f"{provider}:")]
+    states = child_states or [state for state in all_states if state.get("source") == provider]
+    if not states:
+        states = [db.sync_state(provider)]
+    successful = [str(state["last_success_at"]) for state in states if state.get("last_success_at")]
+    failed = [str(state["last_failure_at"]) for state in states if state.get("last_failure_at")]
+    errors = [
+        f"{state.get('source')}: {state.get('last_error')}"
+        for state in states
+        if state.get("last_error")
+    ]
+    return {
+        "stale": any(state.get("last_failure_at") and state.get("last_success_at") for state in states),
+        "last_success_at": max(successful, default=None),
+        "last_failure_at": max(failed, default=None),
+        "error": "; ".join(errors) if errors else None,
+        "sources": {
+            str(state.get("source")): {
+                "last_success_at": state.get("last_success_at"),
+                "last_failure_at": state.get("last_failure_at"),
+                "error": state.get("last_error"),
+                "synced_count": state.get("synced_count"),
+            }
+            for state in states
+        },
+    }
+
+
 def _source_freshness(project_id: str) -> dict[str, dict[str, Any]]:
     project_continuity.ensure_project_schema()
     with db.get_connection() as conn:
@@ -126,26 +155,7 @@ def _source_freshness(project_id: str) -> dict[str, dict[str, Any]]:
             "WHERE project_id=? AND status='active' AND confirmed_at IS NOT NULL ORDER BY provider",
             (project_id,),
         ).fetchall()
-    result: dict[str, dict[str, Any]] = {}
-    for row in rows:
-        provider = str(row["provider"])
-        state = db.sync_state(provider)
-        stale = bool(state.get("last_failure_at") and state.get("last_success_at"))
-        result[provider] = {
-            "stale": stale,
-            "last_success_at": state.get("last_success_at"),
-            "last_failure_at": state.get("last_failure_at"),
-            "error": state.get("last_error"),
-        }
-    return result
-
-
-def _first_text(values: list[Any]) -> str | None:
-    for value in values:
-        text = str(value).strip()
-        if text:
-            return text
-    return None
+    return {str(row["provider"]): _aggregate_source_states(str(row["provider"])) for row in rows}
 
 
 def build_resume_context(
