@@ -1,0 +1,39 @@
+name: Project source refresh tests
+
+on:
+  push:
+    branches:
+      - feat/project-source-refresh
+  pull_request:
+    paths:
+      - "backend/project_source_refresh.py"
+      - "backend/project_resume.py"
+      - "backend/notion_project_sync.py"
+      - "backend/linkraft_*.py"
+      - "tests/test_project_source_refresh.py"
+      - "tests/test_project_resume.py"
+      - ".github/workflows/project-source-refresh-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install fastapi httpx pydantic chromadb timetree-exporter
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Run source refresh and resume tests
+        run: |
+          python -m unittest \
+            tests.test_project_source_refresh \
+            tests.test_project_resume \
+            tests.test_linkraft_owner_sync \
+            tests.test_notion_adapter_v2
