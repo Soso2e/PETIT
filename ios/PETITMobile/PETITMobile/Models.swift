@@ -1,23 +1,23 @@
 import Foundation
 
-enum ChatRole: String, Codable {
+enum ChatRole: String, Codable, Sendable {
     case user
     case assistant
 }
 
-struct ChatHistoryItem: Codable, Equatable {
+struct ChatHistoryItem: Codable, Equatable, Sendable {
     let role: ChatRole
     let content: String
 }
 
-struct ChatRequest: Encodable {
+struct ChatRequest: Encodable, Sendable {
     let message: String
     let history: [ChatHistoryItem]
     let requestId: String
     let sessionId: String
 }
 
-struct ChatResponse: Decodable {
+struct ChatResponse: Decodable, Sendable {
     let reply: String
     let usedTools: [UsedTool]
     let error: String?
@@ -25,13 +25,13 @@ struct ChatResponse: Decodable {
     let pendingActions: [PendingAction]
 }
 
-struct UsedTool: Decodable, Identifiable {
+struct UsedTool: Decodable, Identifiable, Sendable {
     let name: String
 
     var id: String { name }
 }
 
-struct PendingAction: Decodable, Identifiable {
+struct PendingAction: Decodable, Identifiable, Sendable {
     let approvalId: String
     let name: String
     let arguments: [String: JSONValue]
@@ -39,23 +39,23 @@ struct PendingAction: Decodable, Identifiable {
     var id: String { approvalId }
 }
 
-struct ActionDecision: Encodable {
+struct ActionDecision: Encodable, Sendable {
     let approved: Bool
 }
 
-struct HealthResponse: Decodable {
+struct HealthResponse: Decodable, Sendable {
     let status: String
     let chatModel: ModelHealth?
     let agentModel: ModelHealth?
 }
 
-struct ModelHealth: Decodable {
+struct ModelHealth: Decodable, Sendable {
     let serverOk: Bool?
     let model: String?
     let baseUrl: String?
 }
 
-enum JSONValue: Codable, Equatable, CustomStringConvertible {
+enum JSONValue: Codable, Equatable, CustomStringConvertible, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)

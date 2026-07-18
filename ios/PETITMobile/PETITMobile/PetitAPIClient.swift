@@ -1,6 +1,6 @@
 import Foundation
 
-enum PetitAPIError: LocalizedError {
+enum PetitAPIError: LocalizedError, Sendable {
     case invalidBaseURL
     case insecureURL
     case invalidResponse
@@ -23,9 +23,9 @@ enum PetitAPIError: LocalizedError {
     }
 }
 
-struct PetitAPIClient {
+struct PetitAPIClient: Sendable {
     let baseURL: URL
-    var session: URLSession = .shared
+    let session: URLSession = .shared
 
     static func normalizedBaseURL(from rawValue: String) -> URL? {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -89,7 +89,7 @@ struct PetitAPIClient {
         return value
     }
 
-    private func request<Response: Decodable>(
+    private func request<Response: Decodable & Sendable>(
         path: String,
         method: String,
         body: Data?
