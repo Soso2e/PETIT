@@ -10,7 +10,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from . import db, project_completion, project_continuity
+from . import db, project_completion, project_continuity, project_source_refresh
 
 
 @dataclass
@@ -26,6 +26,7 @@ class ProjectResumeContext:
     next_action: str | None = None
     blockers: list[str] = field(default_factory=list)
     source_freshness: dict[str, dict[str, Any]] = field(default_factory=dict)
+    source_refresh: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -41,6 +42,9 @@ class ProjectResumeContext:
             "stale_sources": sorted(
                 provider for provider, state in self.source_freshness.items() if state.get("stale")
             ),
+            "source_refresh_attempted": len(self.source_refresh.get("attempted") or []),
+            "source_refresh_failed": list(self.source_refresh.get("failed") or []),
+            "source_refresh_skipped": list(self.source_refresh.get("skipped") or []),
         }
 
 
@@ -168,6 +172,7 @@ def build_resume_context(
     project = project_continuity.get_project(project_id)
     if not project:
         raise ValueError("project not found")
+    source_refresh = project_source_refresh.refresh_project_sources(project_id)
     checkpoint = project_continuity.get_project_checkpoint(user_id, project_id)
     events = _recent_project_events(project_id, max(1, min(event_limit, 10)))
     episodes = _recent_project_episodes(project_id, max(1, min(episode_limit, 5)))
@@ -203,6 +208,7 @@ def build_resume_context(
         next_action=next_action,
         blockers=blockers,
         source_freshness=_source_freshness(project_id),
+        source_refresh=source_refresh,
     )
 
 
@@ -277,6 +283,11 @@ def render_resume_message(
     stale = [provider for provider, state in context.source_freshness.items() if state.get("stale")]
     if stale:
         facts.append(f"※ {'、'.join(stale)}は最新同期に失敗していて、前回成功時の情報。")
+    refresh_failed = [
+        provider for provider in context.source_refresh.get("failed") or [] if provider not in stale
+    ]
+    if refresh_failed:
+        facts.append(f"※ {'、'.join(refresh_failed)}の更新に失敗したため、保存済み情報で再開している。")
 
     if context.next_action:
         facts.append(f"次は「{context.next_action}」の予定だった。")
