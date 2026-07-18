@@ -65,7 +65,13 @@ def summarize_pending(kind: str = "interval", min_conversations: int | None = No
         return {"summarized": False, "reason": "no_eligible_episode", "pending": sum(len(x) for x in db.pending_episode_groups())}
     rows = groups[0]  # one bounded LLM job per scheduler tick
     try:
-        result = chat_completion([{"role": "system", "content": _SYSTEM}, {"role": "user", "content": _transcript(rows)}], tools=None, temperature=0.2, model=config.AGENT_MODEL)
+        result = chat_completion(
+            [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": _transcript(rows)}],
+            tools=None,
+            temperature=0.2,
+            model=config.AGENT_MODEL,
+            route="agent",
+        )
     except LMStudioError as exc:
         return {"summarized": False, "reason": "lm_unavailable", "error": str(exc)}
     parsed = _json((result.get("content") or "").strip())
