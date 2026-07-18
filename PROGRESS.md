@@ -4,28 +4,21 @@
 
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
-- プロダクトの軸は `PETIT_AS_JARVIS`。最終形はスマホとPCの両方から使える音声中心の常駐アシスタントで、現状はテキストチャットMVPを土台にしている。
-- TimeTree バックアップ: `tools/timetree_backup.py` 実装済みだが本番 E2E 未検証（実認証情報待ち）。カレンダーコード確認は初回だけ対話実行が必要（`timetree-exporter -e your@email.com`）。
-- Notion: 既存の実タスクDB取得・確認付き作成・完了更新は実ブラウザ + LM StudioでE2E確認済み。Adapter v2ではプロジェクトDB、Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻を保持し、プロジェクトDB／タスクDBを独立同期する。名前一致は候補だけ作り、確認済みsource linkだけ内部project idへ解決する。実プロジェクトDBでのv2 E2Eは未確認。
-- Linkraft: Linkraft側にCookie非依存のowner-only読み取りAPIを追加し、本人作成プロジェクト、タスク、activities、相談・進捗投稿、knowledgeを差分cursor付きで返す。PETIT側は未確認候補を自動リンクせず、確認済み外部IDだけを同期してtasks_cache／project_eventsへ正規化する。Linkraft側lint・test・production buildとPETIT側専用／回帰テストは成功。実公開URL・token・owner user idを使うE2Eは未確認。
-- GitHub evidence: confirmation-firstの読み取りAdapterを実装。repository候補は自動リンクせず、確認済み`owner/name`だけをresume直前に同期する。commit、PR、check run、deployment statusを別々のcache／eventとして保持し、同じ事実を重複登録しない。commit／check success／merge／deployment successからcheckpointを自動変更しない。default branch headのcheck再確認と最近のdeployment status再確認に対応。private repository用tokenの実E2Eは未確認。
-- BRAIN / RAG: 実vaultの限定検索と、対象ファイル・追記内容の確認後に既存Markdownへ追記するE2Eを確認済み。`_private`・除外フォルダ・Vault外・Markdown以外は編集拒否し、変更後は該当ノートを再索引化する。内部project idとの確認付きノート紐付けは未実装。
-- 能動支援: 「今日何からやる？」では未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理する。雑談ではツール・RAG・Embedding・外部project同期を動かさない。
-- 書き込み確認: Notion、ローカル予定、長期記憶、引き継ぎ、BRAIN、プロジェクト登録・別名・終了checkpoint、Notion／Linkraft／GitHub候補紐付けの書き込みはプレビューへ変換し、ブラウザの「実行する」確認後に同一引数を1回だけ実行する。
-- 二モデル構成: Chat/AgentのURL・モデル・APIキーを独立設定でき、未設定時は従来の`PETIT_LM_*`へフォールバックする。ルーティングは意図・関連ソースに基づき、長さだけではAgentへ送らない。安全に取得済みの読み取り結果だけはAgent停止時にChatで整形でき、ツール選択・書き込みは省略せず利用不能として返す。実別PC/別GPU動作は未確認。
-- 応答速度改善: 通常会話は9B用の`CHAT_MODEL`・短いsystem prompt・直近5会話・LM Studio 1回に固定し、ツール・RAG・Embeddingを実行しない。空回答、LM Studio/内部エラー、ツール失敗はSQLite・Markdown・Embeddingへ保存しない。実ブラウザで雑談・時刻・天気・既存各連携の応答を確認済み。
-- 軽量回答上限: `PETIT_LIGHT_MAX_TOKENS` を 512 に変更済み。`PETIT_ENABLE_THINKING=0` と `.env.example` に反映済み。実LM Studio応答のreasoning tokens 0は未確認。
-- Calendar: ICSは読み取り専用同期、`add_schedule`はPETITローカル予定への書き込みとして分離。ローカル予定の確認付き追加・再取得は実ブラウザE2E済み。実Google非公開iCal URLは未設定のため同期E2E未確認。将来のGoogle書き込みはprovider境界へ追加する。
-- 観測性: `/api/health` はChat/Agent別のキャッシュ付き`/models`確認を返す。各ターンはrequest ID、実経路、モデル／endpoint ID、ツール、同期状態、参照件数、フォールバック、時間を表示する。Project Continuityではcheckpoint・event・episode・handoff・source freshnessに加え、resume直前refreshのattempted／failed／skipped providerを返す。実ブラウザ表示は未確認。
-- LM Studio: LM StudioはPETITと同じPCの`http://127.0.0.1:1234/v1/models`で稼働し、Chat／Agent／Embedding用モデル一覧を取得済み。`.env`の`PETIT_LM_BASE_URL`だけが到達不能なリンクローカルIP `169.254.83.107`を参照しており、PETITプロセスも停止中。CoreのFeature FlagはLM接続設定に関与しない。localhostへの設定変更、PETIT再起動、実ブラウザ確認は未実施。
-- 外部同期信頼性: Notion／Linkraft／GitHub／ICS／TimeTreeの成功・失敗・stale状態をSQLite `sync_state` に保存する。再開直前は選択projectの`status=active`かつ確認済みsource linkだけを更新し、Notionは1回、Linkraftは該当外部ID、GitHubは該当repositoryだけをcursor／TTL付きで同期する。1ソース失敗時も以前のcacheとcheckpointで再開する。自動テスト成功、実認証情報を使うNotion／Linkraft／GitHub／Google／TimeTree総合E2Eは未確認。
-- 会話記憶: 短期（ブラウザセッション履歴）、エピソード（SQLite `conversation_episodes` / `petit_episodes`）、長期（SQLite `memory`）を分離。エピソードは20分のアイドル、8往復、明示まとめ、定期実行で確定する。単体テスト済み、実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。
-- 索引: SQLite記憶/エピソードは`content_hash`・Embeddingモデル/版・Chromaメタデータで差分だけを再索引化する。Vault差分索引は維持。起動時の実LM Studio件数は未測定。
-- Project Continuity Phase 1: 内部プロジェクト台帳、別名、確認可能な外部source link、会話episodeの多対多Relation、active project、checkpoint、確認済みproject event、開始・終了確認・切替・再開・新規登録・別名追加をmainへ統合済み。LM Studio非依存の決定論的経路と限定コンテキスト取得を追加し、compileall／専用unittest／GitHub Actionsは成功。実ブラウザでの登録承認・キャンセル・終了確認・再起動後復元は未確認。
-- Project Continuity Phase 2: Notion Adapter v2、Linkraft owner-only API／Adapter、確認済みsourceのresume直前refreshはmainへ統合済み。GitHub evidence AdapterをPR #29で実装し、専用・Project Continuity・Notion・Linkraft・source refreshのCIを検証中。残りはBRAINノートのproject紐付け、project-aware briefing。
-- Sona Agent Core: Milestone 3として`PETIT_USE_SONA_CORE=1`時の`add_schedule`を`PetitAddScheduleAdapter`へ移行。SQLiteにApprovalとIdempotency実行結果を永続化し、10分期限、原子的な一回消費、同一Key再実行抑止・異引数競合、Capability/Scope/local保存先検証、Auditを実装。実ブラウザはLM Studio接続タイムアウトのため確認UI以降未確認。
-- 既知Issue: `requirements.txt`のSona Agent Core固定commitは公開済みMilestone 2版のまま。Milestone 3 CoreをPush後にcommit固定を更新する必要がある。Issue #6の日付解析は別件として維持する。
-- 次にやること: PR #29をmainへ統合し、実ブラウザでproject登録／別名／切替／終了確認／承認・キャンセル／再起動復元と、実Notion／Linkraft／GitHub credentialsによる候補確認・差分同期・stale fallbackをE2E確認する。その後BRAIN project mapping、project-aware morning briefingへ進む。
+- プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
+- モデル経路: Chat/AgentのURL・モデル・APIキーを独立設定できる。`model_router`を実会話経路へ接続し、ツールなしの設計・分析・コードレビューもAgentへ送る。安全に取得済みの読み取り結果だけAgent停止時にChat整形でき、ツール選択・書き込みは黙って省略しない。実1モデル／2モデルE2Eは未確認。
+- 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
+- セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
+- SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
+- Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
+- Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
+- GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
+- BRAIN / RAG: 実vault限定検索と確認付き安全編集を実装済み。`_private`・Vault外・Markdown以外は拒否。内部project idとの確認付きノート紐付けは未実装。
+- Calendar: ICSは読み取り専用、`add_schedule`はPETITローカル予定のみ。Google private iCal実E2Eと将来のOAuth書き込みproviderは未対応。
+- Project Continuity: 内部project台帳、alias、確認済みsource link、episode Relation、active state、checkpoint、handoff、resume直前source refreshを統合済み。実ブラウザでの登録・切替・終了・再起動復元は未確認。
+- Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
+- LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
+- 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
+- 次にやること: このcore hardening PRのCIを通し、`.env`をlocalhostへ直して1モデル構成のブラウザE2Eを完了する。その後だけAgent別endpointを検証し、BRAIN project mapping／project-aware briefingへ進む。
 
 ## 履歴
 
@@ -45,23 +38,18 @@
 | 2026-07-05 | 07:49 | #9 | 朝ブリーフィング実装: `briefing.py`、`/api/briefing`、`create_daily_briefing` ツールを追加。予定・未完了タスク・直近要約から「今やる1個」を含むブリーフィングを生成し、LM Studio 不通時は定型文へフォールバック。 |
 | 2026-07-06 | 03:13 | #10 | ニュース/天気ツールと SQLite バックグラウンドキューを実装。ツール登録・構文・ワーカーモック・外部 API 疎通を確認、LM Studio 経由の意図選択は未確認。 |
 | 2026-07-08 | 08:09 | #11 | PETIT 用ローカルLLM要件を調査・整理。コード変更なし、実モデル検証は未実施。 |
-
 | 2026-07-08 | 07:47 | #12 | 朝の初回会話向け実装状況を確認。`create_daily_briefing` / `/api/briefing` は実装済み、天気統合・起床時刻記録・初回おはよう判定は未実装。 |
 | 2026-07-08 | 08:29 | #13 | マージ後のコンフリクト解消結果を確認し、`backend/db.py` の構文破損、ツール import 重複、README / PROGRESS の重複記載を修正。構文・一時DBで最小動作を確認。 |
-
 | 2026-07-09 | 18:18 | #14 | 会話ログからパーソナルデータを作る設計方針を確認。コード変更なし、SQLite/Chroma をAI用正本、Markdown を人間用副本、Notion は公開・手動編集用に分ける案を整理。 |
 | 2026-07-09 | 18:22 | #15 | 既存 Obsidian vault を参照するRAG化方針を確認。コード変更なし、外部Markdownは読み込み用インデックス、会話由来の新情報はSQLite正本とMarkdown副本に追記する案を整理。 |
 | 2026-07-09 | 18:23 | #16 | Markdown の脳みそは既存 Obsidian vault に統一する方針を確認。SQLite は構造化正本、Chroma は検索インデックス、Markdown は vault 内のPETIT領域へ集約する案に更新。 |
-
 | 2026-07-09 | 18:34 | #17 | 既存 Obsidian vault をPETITのMarkdown脳として扱うRAG連携を実装。`vault_indexer`、`petit_vault`、`sync_obsidian_vault`、`/api/vault/sync`、vault配下Markdown出力設定を追加。一時vaultでキーワード検索を確認、実vault + embedding索引化は未確認。 |
 | 2026-07-10 | 09:12 | #18 | 現在時刻取得の実装状況を確認。現状は `agent.py` で日付のみ注入、正確な現在時刻取得ツールは未実装。コード変更なし。 |
 | 2026-07-10 | 09:14 | #19 | `get_current_time` ツールを追加し、現在時刻・日付を聞かれたら使うよう agent ルールと README を更新。構文・ツール登録・実行を確認。 |
-
 | 2026-07-12 | 18:44 | #20 | NotionタスクDBの`.env`設定を更新し、完了日プロパティ`DoneDate`をコード・サンプル設定・READMEへ反映。実Notion E2Eは未確認。 |
 | 2026-07-12 | 18:49 | #21 | プロジェクトルートの`.env`をPETIT起動時に自動読込する処理を追加。明示的なOS環境変数を優先。構文と設定読込のスモーク確認済み。 |
 | 2026-07-11 | 19:31 | #22 | LM Studioの実エンドポイントを確認し、`.env` の `PETIT_LM_BASE_URL` に `/v1` を追加。モデル一覧取得と単純なチャット応答を確認済み。PETITブラウザ画面での再確認は未実施。 |
 | 2026-07-12 | 05:50 | #23 | 専用アシスタント環境を再監査・再構築。BRAIN関連検索と自動注入、Notion状況同期/TTL、朝ブリーフィング、二モデルルーティング/受け渡し、Embedding障害時保護、連携状態可視化を実装。単体4件・実Notion読取・実vault検索を確認、Google Calendar本体同期と実LM会話は未確認。 |
-
 | 2026-07-12 | 13:38 | #24 | PETIT_AS_JARVIS を最終像として明示し、スマホ利用とPC常駐を含む音声中心アシスタントへコンセプト表現を調整。 |
 | 2026-07-12 | 13:56 | #25 | Google Calendar向けICS読み取り同期を実装。`sync_calendar`ツール、`/api/calendar/sync`、朝ブリーフィング/状況注入への同期、README/.env例、単体テストを追加。実Google iCal URLでのE2Eは未確認。 |
 | 2026-07-12 | 17:09 | #26 | 軽量モデル即答 + `agent_followup` Job追記を実装。読み取り系の重い相談を遅延実行できるようにし、構文確認と標準 unittest 7件を確認。実LM Studio + ブラウザ体感は未確認。 |
@@ -88,3 +76,4 @@
 | 2026-07-18 | 06:05 | #46 | GitHub evidence Adapterを実装。repository候補の確認付き紐付け、commit／PR／check／deploymentの分離cache、idempotent project events、per-repository cursor／TTL／stale fallback、token秘匿、resume直前refresh、明示的会話ルーティングを追加。check非同期完了とdeployment status後更新を再確認し、GitHub専用・Project Continuity・Notion・Linkraft・source refreshのテストを追加。 |
 | 2026-07-18 | 17:03 | #47 | 調査完了: LM Studio未接続はSona Agent Core化ではなく、`169.254.83.107:1234`へのネットワーク経路不在が直接原因。稼働中PETITの正しいURL参照と`ConnectError`、正しい`/v1/models`への疎通失敗、該当Wi-Fi切断を確認。さらにディスク上`.env`のURLで`/`欠落を確認。設定・コード修正および復旧後E2Eは未実施。 |
 | 2026-07-18 | 17:19 | #48 | 調査完了: 同一PCのLM Studio `127.0.0.1:1234/v1/models`は正常応答し、6モデルを確認。`.env`が到達不能な`169.254.83.107`を参照し、PETITプロセスは停止中。直接原因を設定先の不一致に確定。localhostへの変更・再起動・ブラウザE2Eは未実施。 |
+| 2026-07-18 | 18:09 | #49 | Core hardeningを実装。model_routerを実経路へ接続、エピソード要約のAgent endpoint修正、briefing/proactiveのepisode優先、Notion成功同期のsource置換、SQLite WAL/busy timeout、session履歴復元、jobのsession/request紐付けと明示ack、回帰テスト・検証手順を追加。変更ファイルのpy_compileとfrontendのnode構文確認成功、全CIと実ブラウザE2Eは未確認。 |
