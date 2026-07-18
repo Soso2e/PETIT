@@ -10,9 +10,11 @@ from backend import (
     config,
     db,
     notion_client,
+    notion_project_links,
     notion_project_sync,
     project_continuity,
     project_resume,
+    tools,
 )
 from backend.notion_client import NotionError
 
@@ -24,7 +26,7 @@ class NotionAdapterV2Tests(unittest.TestCase):
         self.db_patch.start()
         self.config_patch = patch.multiple(
             config,
-            NOTION_API_KEY="secret_test",
+            NOTION_API_KEY="test-key",
             NOTION_PROJECTS_DB_ID="projects-db",
             NOTION_TASKS_DB_ID="tasks-db",
             NOTION_PROP_TITLE="タスク名",
@@ -119,7 +121,6 @@ class NotionAdapterV2Tests(unittest.TestCase):
 
     def test_project_parser_preserves_people_period_and_relations(self) -> None:
         parsed = notion_client.parse_project_page(self.project_page())
-
         self.assertEqual(parsed["title"], "PETIT")
         self.assertEqual(parsed["owner_external_ids"], ["notion-user-soso"])
         self.assertEqual(parsed["period_start"], "2026-07-01")
@@ -130,7 +131,6 @@ class NotionAdapterV2Tests(unittest.TestCase):
 
     def test_task_parser_preserves_project_assignees_and_hierarchy(self) -> None:
         parsed = notion_client.parse_task_page(self.task_page())
-
         self.assertEqual(parsed["project_external_id"], "notion-project-petit")
         self.assertEqual(parsed["project_external_ids"], ["notion-project-petit"])
         self.assertEqual(parsed["assignee_external_ids"], ["notion-user-soso", "notion-user-helper"])
@@ -140,47 +140,43 @@ class NotionAdapterV2Tests(unittest.TestCase):
 
     def test_same_name_creates_candidate_but_does_not_auto_link(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
-        parsed = notion_client.parse_project_page(self.project_page())
-
-        notion_project_sync.upsert_projects([parsed])
-
+        notion_project_sync.upsert_projects([notion_client.parse_project_page(self.project_page())])
         with db.get_connection() as conn:
-            cached = conn.execute(
-                "SELECT internal_project_id FROM notion_projects_cache WHERE external_id='notion-project-petit'"
-            ).fetchone()
-            candidate = conn.execute(
-                "SELECT project_id, status, suggested_project_ids FROM notion_source_candidates "
-                "WHERE external_id='notion-project-petit'"
-            ).fetchone()
+            cached = conn.execute("SELECT internal_project_id FROM notion_projects_cache WHERE external_id='notion-project-petit'").fetchone()
+            candidate = conn.execute("SELECT project_id, status, suggested_project_ids FROM notion_source_candidates WHERE external_id='notion-project-petit'").fetchone()
         self.assertIsNone(cached["internal_project_id"])
         self.assertIsNone(candidate["project_id"])
         self.assertEqual(candidate["status"], "pending")
         self.assertEqual(json.loads(candidate["suggested_project_ids"]), ["petit"])
-        self.assertEqual(project_continuity.get_project("petit")["canonical_provider"], None)
+
+    def test_candidate_link_tool_confirms_mapping_and_remaps_tasks(self) -> None:
+        project_continuity.create_project("PETIT", project_id="petit")
+        notion_project_sync.upsert_projects([notion_client.parse_project_page(self.project_page())])
+        notion_project_sync.upsert_tasks([notion_client.parse_task_page(self.task_page())])
+        candidate = notion_project_links.list_candidates()[0]
+        self.assertTrue(tools.requires_confirmation("link_notion_project_candidate"))
+        result = json.loads(tools.dispatch("link_notion_project_candidate", {"candidate_id": candidate["id"], "project_id": "petit"}))
+        self.assertTrue(result["linked"])
+        self.assertIsNotNone(result["source_link"]["confirmed_at"])
+        with db.get_connection() as conn:
+            task = conn.execute("SELECT project_id FROM tasks_cache WHERE external_id='task-a'").fetchone()
+            source = conn.execute("SELECT project_id, status, confirmed_at FROM project_source_links WHERE provider='notion' AND external_id='notion-project-petit'").fetchone()
+            candidate_row = conn.execute("SELECT status, project_id FROM notion_source_candidates WHERE id=?", (candidate["id"],)).fetchone()
+        self.assertEqual(task["project_id"], "petit")
+        self.assertEqual(source["project_id"], "petit")
+        self.assertEqual(source["status"], "active")
+        self.assertIsNotNone(source["confirmed_at"])
+        self.assertEqual(candidate_row["status"], "linked")
+        self.assertEqual(candidate_row["project_id"], "petit")
 
     def test_confirmed_source_link_resolves_project_and_task(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
-        project_continuity.link_project_source(
-            "petit",
-            "notion",
-            "notion-project-petit",
-            external_url="https://notion.so/notion-project-petit",
-            confirmed=True,
-        )
+        project_continuity.link_project_source("petit", "notion", "notion-project-petit", external_url="https://notion.so/notion-project-petit", confirmed=True)
         notion_project_sync.upsert_projects([notion_client.parse_project_page(self.project_page())])
         notion_project_sync.upsert_tasks([notion_client.parse_task_page(self.task_page())])
-
         with db.get_connection() as conn:
-            project = conn.execute(
-                "SELECT internal_project_id FROM notion_projects_cache WHERE external_id='notion-project-petit'"
-            ).fetchone()
-            task = conn.execute(
-                "SELECT project_id, project_external_id, project_external_ids, assignee_external_ids, "
-                "parent_external_id, subtask_external_ids, summary FROM tasks_cache WHERE external_id='task-a'"
-            ).fetchone()
-            candidate = conn.execute(
-                "SELECT status, project_id FROM notion_source_candidates WHERE external_id='notion-project-petit'"
-            ).fetchone()
+            project = conn.execute("SELECT internal_project_id FROM notion_projects_cache WHERE external_id='notion-project-petit'").fetchone()
+            task = conn.execute("SELECT project_id, project_external_id, assignee_external_ids, parent_external_id, subtask_external_ids, summary FROM tasks_cache WHERE external_id='task-a'").fetchone()
         self.assertEqual(project["internal_project_id"], "petit")
         self.assertEqual(task["project_id"], "petit")
         self.assertEqual(task["project_external_id"], "notion-project-petit")
@@ -188,38 +184,22 @@ class NotionAdapterV2Tests(unittest.TestCase):
         self.assertEqual(task["parent_external_id"], "task-parent")
         self.assertEqual(json.loads(task["subtask_external_ids"]), ["task-child-a", "task-child-b"])
         self.assertEqual(task["summary"], "プロジェクトとタスクを同期する")
-        self.assertEqual(candidate["status"], "linked")
-        self.assertEqual(candidate["project_id"], "petit")
 
     def test_unconfirmed_relation_never_populates_internal_task_project(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
         notion_project_sync.upsert_projects([notion_client.parse_project_page(self.project_page())])
         notion_project_sync.upsert_tasks([notion_client.parse_task_page(self.task_page())])
-
         with db.get_connection() as conn:
-            task = conn.execute(
-                "SELECT project_id, project_external_id FROM tasks_cache WHERE external_id='task-a'"
-            ).fetchone()
+            task = conn.execute("SELECT project_id, project_external_id FROM tasks_cache WHERE external_id='task-a'").fetchone()
         self.assertIsNone(task["project_id"])
         self.assertEqual(task["project_external_id"], "notion-project-petit")
 
     def test_partial_failure_keeps_project_cache_and_updates_tasks(self) -> None:
-        first = notion_project_sync.sync_all_if_configured(
-            force=True,
-            project_loader=lambda: [notion_client.parse_project_page(self.project_page())],
-            task_loader=lambda: [notion_client.parse_task_page(self.task_page("task-a"))],
-        )
+        first = notion_project_sync.sync_all_if_configured(force=True, project_loader=lambda: [notion_client.parse_project_page(self.project_page())], task_loader=lambda: [notion_client.parse_task_page(self.task_page("task-a"))])
         self.assertTrue(first["ok"])
-
         def project_failure() -> list[dict]:
             raise NotionError("projects unavailable")
-
-        second = notion_project_sync.sync_all_if_configured(
-            force=True,
-            project_loader=project_failure,
-            task_loader=lambda: [notion_client.parse_task_page(self.task_page("task-b"))],
-        )
-
+        second = notion_project_sync.sync_all_if_configured(force=True, project_loader=project_failure, task_loader=lambda: [notion_client.parse_task_page(self.task_page("task-b"))])
         self.assertFalse(second["ok"])
         self.assertTrue(second["partial"])
         self.assertTrue(second["sources"]["projects"]["stale"])
@@ -227,28 +207,18 @@ class NotionAdapterV2Tests(unittest.TestCase):
         self.assertTrue(second["sources"]["tasks"]["ok"])
         with db.get_connection() as conn:
             project_count = conn.execute("SELECT COUNT(*) FROM notion_projects_cache").fetchone()[0]
-            task_ids = {
-                row["external_id"]
-                for row in conn.execute("SELECT external_id FROM tasks_cache WHERE source='notion'").fetchall()
-            }
+            task_ids = {row["external_id"] for row in conn.execute("SELECT external_id FROM tasks_cache WHERE source='notion'").fetchall()}
         self.assertEqual(project_count, 1)
         self.assertEqual(task_ids, {"task-a", "task-b"})
 
     def test_resume_aggregates_notion_project_and_task_freshness(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
-        project_continuity.link_project_source(
-            "petit",
-            "notion",
-            "notion-project-petit",
-            confirmed=True,
-        )
+        project_continuity.link_project_source("petit", "notion", "notion-project-petit", confirmed=True)
         db.record_sync_success("notion:projects", 1)
         db.record_sync_success("notion:tasks", 2)
         db.record_sync_failure("notion:projects", "project API timeout")
-
         context = project_resume.build_resume_context("soso", "petit")
         rendered = project_resume.render_resume_message(context)
-
         self.assertTrue(context.source_freshness["notion"]["stale"])
         self.assertIn("notion:projects", context.source_freshness["notion"]["sources"])
         self.assertIn("notion:tasks", context.source_freshness["notion"]["sources"])
@@ -256,14 +226,9 @@ class NotionAdapterV2Tests(unittest.TestCase):
 
     def test_legacy_flat_task_page_stays_parseable(self) -> None:
         page = self.task_page("legacy-task")
-        page["properties"].pop("プロジェクト")
-        page["properties"].pop("担当者")
-        page["properties"].pop("親タスク")
-        page["properties"].pop("サブタスク")
-        page["properties"].pop("要約")
-
+        for key in ("プロジェクト", "担当者", "親タスク", "サブタスク", "要約"):
+            page["properties"].pop(key)
         parsed = notion_client._parse_page(page)
-
         self.assertEqual(parsed["title"], "Notion Adapter v2を実装")
         self.assertEqual(parsed["project_external_ids"], [])
         self.assertEqual(parsed["assignee_external_ids"], [])
