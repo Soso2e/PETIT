@@ -118,8 +118,10 @@ CHROMA_PATH = Path(os.getenv("PETIT_CHROMA_PATH", STORAGE_DIR / "chroma"))
 
 # Notion
 NOTION_API_KEY = os.getenv("NOTION_API_KEY", "")
+NOTION_PROJECTS_DB_ID = os.getenv("NOTION_PROJECTS_DB_ID", "")
 NOTION_TASKS_DB_ID = os.getenv("NOTION_TASKS_DB_ID", "")
-# Property names in your Notion task DB (customize if your DB uses different names)
+
+# Legacy task property names remain valid for create/update and flat task-only DBs.
 NOTION_PROP_TITLE = os.getenv("NOTION_PROP_TITLE", "name")
 NOTION_PROP_STATUS = os.getenv("NOTION_PROP_STATUS", "Status")
 NOTION_PROP_DUE = os.getenv("NOTION_PROP_DUE", "Date")
@@ -127,8 +129,24 @@ NOTION_PROP_PRIORITY = os.getenv("NOTION_PROP_PRIORITY", "Priority")
 NOTION_PROP_CATEGORY = os.getenv("NOTION_PROP_CATEGORY", "Category")
 NOTION_PROP_REASON = os.getenv("NOTION_PROP_REASON", "reason")
 NOTION_PROP_DONE_DATE = os.getenv("NOTION_PROP_DONE_DATE", os.getenv("NOTION_PROP_DONE", "Done"))
-# Backward-compatible alias for code or local .env files using the old name.
 NOTION_PROP_DONE = NOTION_PROP_DONE_DATE
+
+# Project database properties.
+NOTION_PROJECT_PROP_TITLE = os.getenv("NOTION_PROJECT_PROP_TITLE", "プロジェクト名")
+NOTION_PROJECT_PROP_STATUS = os.getenv("NOTION_PROJECT_PROP_STATUS", "ステータス")
+NOTION_PROJECT_PROP_OWNER = os.getenv("NOTION_PROJECT_PROP_OWNER", "オーナー")
+NOTION_PROJECT_PROP_PRIORITY = os.getenv("NOTION_PROJECT_PROP_PRIORITY", "優先度")
+NOTION_PROJECT_PROP_PERIOD = os.getenv("NOTION_PROJECT_PROP_PERIOD", "期間")
+NOTION_PROJECT_PROP_SUMMARY = os.getenv("NOTION_PROJECT_PROP_SUMMARY", "要約")
+NOTION_PROJECT_PROP_TASKS = os.getenv("NOTION_PROJECT_PROP_TASKS", "タスク")
+NOTION_PROJECT_PROP_BLOCKED_BY = os.getenv("NOTION_PROJECT_PROP_BLOCKED_BY", "次のプロジェクトを保留中：")
+
+# Task Relation properties. Core task fields continue to use the legacy names above.
+NOTION_TASK_PROP_PROJECT = os.getenv("NOTION_TASK_PROP_PROJECT", "プロジェクト")
+NOTION_TASK_PROP_ASSIGNEE = os.getenv("NOTION_TASK_PROP_ASSIGNEE", "担当者")
+NOTION_TASK_PROP_PARENT = os.getenv("NOTION_TASK_PROP_PARENT", "親タスク")
+NOTION_TASK_PROP_SUBTASKS = os.getenv("NOTION_TASK_PROP_SUBTASKS", "サブタスク")
+NOTION_TASK_PROP_SUMMARY = os.getenv("NOTION_TASK_PROP_SUMMARY", "要約")
 
 NOTION_DEFAULT_STATUS = os.getenv("NOTION_DEFAULT_STATUS", "Yet")
 NOTION_DONE_STATUS = os.getenv("NOTION_DONE_STATUS", "Done")
@@ -146,6 +164,10 @@ TIMETREE_CALENDAR_CODE = os.getenv("TIMETREE_CALENDAR_CODE", "")
 
 def notion_configured() -> bool:
     return bool(NOTION_API_KEY and NOTION_TASKS_DB_ID)
+
+
+def notion_projects_configured() -> bool:
+    return bool(NOTION_API_KEY and NOTION_PROJECTS_DB_ID)
 
 
 def timetree_configured() -> bool:
