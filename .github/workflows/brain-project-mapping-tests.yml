@@ -19,5 +19,19 @@ jobs:
         run: python -m pip install fastapi httpx pydantic chromadb timetree-exporter
       - name: Compile
         run: python -m compileall backend tests
-      - name: Test BRAIN project mapping
-        run: python -m unittest tests.test_brain_project_mapping tests.test_project_source_refresh tests.test_project_resume tests.test_github_evidence tests.test_linkraft_owner_sync tests.test_notion_adapter_v2
+      - name: Candidate discovery
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_discovery_creates_candidate_but_not_source_link
+      - name: Path safety
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_explicit_inspection_rejects_private_outside_and_non_markdown
+      - name: Confirmed mapping
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_link_requires_confirmation_and_builds_bounded_cache
+      - name: Hash event idempotency
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_content_change_creates_one_idempotent_event
+      - name: Project source boundary
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_source_refresh_reads_only_confirmed_target_note
+      - name: Missing note fallback
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_missing_note_keeps_cache_and_checkpoint_for_resume
+      - name: Bounded resume excerpt
+        run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_resume_excerpt_is_bounded
+      - name: Source adapter regressions
+        run: python -m unittest tests.test_project_source_refresh tests.test_project_resume tests.test_github_evidence tests.test_linkraft_owner_sync tests.test_notion_adapter_v2
