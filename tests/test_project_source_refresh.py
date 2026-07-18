@@ -101,8 +101,14 @@ class ProjectSourceRefreshTests(unittest.TestCase):
         self.assertEqual(result["failed"], [])
         self.assertEqual(result["skipped"], ["notion"])
 
-    def test_resume_keeps_checkpoint_when_refresh_fails(self) -> None:
+    def test_explicit_refresh_failure_does_not_block_cached_resume(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
+        project_continuity.link_project_source(
+            "petit",
+            "linkraft",
+            "linkraft-petit",
+            confirmed=True,
+        )
         project_continuity.save_project_checkpoint(
             "soso",
             "petit",
@@ -110,24 +116,30 @@ class ProjectSourceRefreshTests(unittest.TestCase):
             last_summary="自動テストまで完了",
             next_action="実ブラウザで確認する",
         )
-        failed = {
-            "ok": False,
-            "project_id": "petit",
-            "providers": {"linkraft": {"ok": False, "error": "timeout"}},
-            "attempted": ["linkraft"],
-            "failed": ["linkraft"],
-            "skipped": [],
-        }
 
-        with patch.object(project_source_refresh, "refresh_project_sources", return_value=failed):
-            context = project_resume.build_resume_context("soso", "petit")
+        refresh = project_source_refresh.refresh_project_sources(
+            "petit",
+            force=True,
+            linkraft_refresher=lambda project_id, external_id, *, force: {
+                "ok": False,
+                "configured": True,
+                "skipped": False,
+                "stale": False,
+                "error": "timeout",
+                "external_id": external_id,
+            },
+        )
+        self.assertFalse(refresh["ok"])
+        self.assertEqual(refresh["failed"], ["linkraft"])
+
+        context = project_resume.build_resume_context("soso", "petit")
         rendered = project_resume.render_resume_message(context)
 
         self.assertEqual(context.checkpoint["last_summary"], "自動テストまで完了")
         self.assertIn("自動テストまで完了", rendered)
         self.assertIn("実ブラウザで確認する", rendered)
-        self.assertIn("linkraftの更新に失敗", rendered)
-        self.assertEqual(context.reference_counts()["source_refresh_failed"], ["linkraft"])
+        self.assertEqual(context.source_refresh["mode"], "cached_only")
+        self.assertEqual(context.reference_counts()["source_refresh_failed"], [])
 
     def test_linkraft_refresh_uses_saved_cursor_and_ttl(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")

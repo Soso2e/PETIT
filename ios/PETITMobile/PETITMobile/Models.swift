@@ -21,6 +21,7 @@ struct ChatResponse: Decodable, Sendable {
     let reply: String
     let usedTools: [UsedTool]
     let error: String?
+    let errorCode: String?
     let requestId: String?
     let pendingActions: [PendingAction]
 }
@@ -41,6 +42,10 @@ struct PendingAction: Decodable, Identifiable, Sendable {
 
 struct ActionDecision: Encodable, Sendable {
     let approved: Bool
+}
+
+struct PingResponse: Decodable, Sendable {
+    let status: String
 }
 
 struct HealthResponse: Decodable, Sendable {
@@ -78,7 +83,10 @@ enum JSONValue: Codable, Equatable, CustomStringConvertible, Sendable {
         } else if let value = try? container.decode([JSONValue].self) {
             self = .array(value)
         } else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported JSON value")
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported JSON value"
+            )
         }
     }
 
@@ -100,7 +108,9 @@ enum JSONValue: Codable, Equatable, CustomStringConvertible, Sendable {
         case .number(let value): return String(value)
         case .bool(let value): return value ? "true" : "false"
         case .object(let value):
-            return value.keys.sorted().map { "\($0): \(value[$0]!)" }.joined(separator: ", ")
+            return value.keys.sorted()
+                .map { "\($0): \(value[$0]!)" }
+                .joined(separator: ", ")
         case .array(let value): return value.map(\.description).joined(separator: ", ")
         case .null: return "null"
         }

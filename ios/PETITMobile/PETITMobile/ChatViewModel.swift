@@ -27,14 +27,12 @@ final class ChatViewModel: ObservableObject {
         }
 
         do {
-            let health = try await PetitAPIClient(baseURL: baseURL).health()
-            isConnected = health.status == "ok"
+            let ping = try await PetitAPIClient(baseURL: baseURL).ping()
+            isConnected = ping.status == "ok"
             connectionLabel = isConnected ? "PETIT接続OK" : "PETIT異常"
             errorMessage = nil
         } catch {
-            isConnected = false
-            connectionLabel = "接続失敗"
-            errorMessage = error.localizedDescription
+            apply(error, connectionCheck: true)
         }
     }
 
@@ -46,10 +44,15 @@ final class ChatViewModel: ObservableObject {
             return
         }
 
-        let requestID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        messages.append(DisplayMessage(role: .user, text: text, tools: [], pendingActions: []))
+        let requestID = UUID().uuidString
+            .replacingOccurrences(of: "-", with: "")
+            .lowercased()
+        messages.append(
+            DisplayMessage(role: .user, text: text, tools: [], pendingActions: [])
+        )
         isSending = true
         errorMessage = nil
+        defer { isSending = false }
 
         do {
             let response = try await PetitAPIClient(baseURL: baseURL).chat(
@@ -60,7 +63,10 @@ final class ChatViewModel: ObservableObject {
             )
 
             if let error = response.error, !error.isEmpty {
-                throw PetitAPIError.httpStatus(200, error)
+                throw PetitAPIError.apiFailure(
+                    code: response.errorCode,
+                    message: error
+                )
             }
 
             history.append(ChatHistoryItem(role: .user, content: text))
@@ -78,12 +84,8 @@ final class ChatViewModel: ObservableObject {
             isConnected = true
             connectionLabel = "PETIT接続OK"
         } catch {
-            errorMessage = error.localizedDescription
-            isConnected = false
-            connectionLabel = "接続失敗"
+            apply(error)
         }
-
-        isSending = false
     }
 
     func decide(
@@ -97,13 +99,18 @@ final class ChatViewModel: ObservableObject {
         }
 
         isSending = true
+        defer { isSending = false }
+
         do {
             let response = try await PetitAPIClient(baseURL: baseURL).decideAction(
                 approvalID: action.approvalId,
                 approved: approved
             )
             if let error = response.error, !error.isEmpty {
-                throw PetitAPIError.httpStatus(200, error)
+                throw PetitAPIError.apiFailure(
+                    code: response.errorCode,
+                    message: error
+                )
             }
             if !response.reply.isEmpty {
                 history.append(ChatHistoryItem(role: .assistant, content: response.reply))
@@ -116,9 +123,23 @@ final class ChatViewModel: ObservableObject {
                     )
                 )
             }
+            isConnected = true
+            connectionLabel = "PETIT接続OK"
         } catch {
-            errorMessage = error.localizedDescription
+            apply(error)
         }
-        isSending = false
+    }
+
+    private func apply(_ error: Error, connectionCheck: Bool = false) {
+        errorMessage = error.localizedDescription
+        let apiError = error as? PetitAPIError
+        if connectionCheck || apiError?.affectsConnectivity == true {
+            isConnected = false
+            connectionLabel = "接続失敗"
+            return
+        }
+
+        // PETITまで到達した後のLM・ツール・JSON処理エラーは、接続断と混同しない。
+        connectionLabel = isConnected ? "PETIT接続OK・処理失敗" : "PETIT処理失敗"
     }
 }

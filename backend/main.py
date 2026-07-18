@@ -5,34 +5,44 @@ or:        python -m backend.main
 """
 from __future__ import annotations
 
+import json
+import logging
+import threading
+import time
 from typing import Any
+from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-import logging
-import json
-import threading
-import time
-from uuid import uuid4
-
-from . import agent, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, scheduler, tools, vault_indexer, worker
+from . import (
+    agent,
+    briefing,
+    calendar_providers,
+    calendar_sync,
+    chroma_client,
+    config,
+    db,
+    lmstudio_client,
+    markdown_export,
+    proactive,
+    scheduler,
+    tools,
+    vault_indexer,
+    worker,
+)
 from .lmstudio_client import LMStudioError
-from .notion_client import NotionError
 
 log = logging.getLogger(__name__)
-
 app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
 
 
 @app.on_event("startup")
 def _startup() -> None:
     db.init_db()
-    # Sync existing SQLite data into Chroma in background (best-effort)
     threading.Thread(target=_chroma_sync, daemon=True).start()
-    # Autonomous summarizer: fold conversations into memory every N hours
     if config.AUTO_SUMMARY_ENABLED:
         scheduler.get_scheduler().start()
     worker.get_worker().start()
@@ -74,6 +84,7 @@ class ChatResponse(BaseModel):
     reply: str
     used_tools: list[dict[str, Any]] = Field(default_factory=list)
     error: str | None = None
+    error_code: str | None = None
     model_route: dict[str, Any] | None = None
     request_id: str | None = None
     pending_actions: list[PendingAction] = Field(default_factory=list)
@@ -88,8 +99,15 @@ _pending_actions_lock = threading.Lock()
 _PENDING_ACTION_TTL_SECONDS = 600
 
 
+@app.get("/api/ping")
+def ping() -> dict[str, str]:
+    """Dependency-free liveness probe for mobile and remote clients."""
+    return {"status": "ok"}
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
+    """Detailed diagnostics. This endpoint may touch local dependencies."""
     chat_health = lmstudio_client.health("chat")
     agent_health = lmstudio_client.health("agent")
     try:
@@ -100,23 +118,34 @@ def health() -> dict[str, Any]:
         rag_info: dict[str, Any] = {
             "available": True,
             "embed_model": config.EMBED_MODEL,
-            "indexed": {"memory": mem_count, "conversations_legacy": conv_count, "episodes": episode_count, "vault": vault_count},
+            "indexed": {
+                "memory": mem_count,
+                "conversations_legacy": conv_count,
+                "episodes": episode_count,
+                "vault": vault_count,
+            },
             "embedding_stats": chroma_client.embedding_stats(),
         }
     except Exception:  # noqa: BLE001
         rag_info = {"available": False, "embed_model": config.EMBED_MODEL}
 
     with db.get_connection() as conn:
-        calendar_cached = int(conn.execute("SELECT COUNT(*) FROM calendar_events_cache").fetchone()[0])
+        calendar_cached = int(
+            conn.execute("SELECT COUNT(*) FROM calendar_events_cache").fetchone()[0]
+        )
 
     return {
         "status": "ok",
         "tools": tools.registered_names(),
-        # `lm_studio` is retained for older clients; new clients use the two
-        # explicit model entries below.
-        "lm_studio": {"ok": chat_health["server_ok"], "models": chat_health.get("models", []), "base_url": chat_health["base_url"]},
+        "lm_studio": {
+            "ok": chat_health["server_ok"],
+            "models": chat_health.get("models", []),
+            "base_url": chat_health["base_url"],
+        },
         "chat_model": chat_health,
-        "agent_model": agent_health | {"fallback_available": bool(chat_health["server_ok"])},
+        "agent_model": agent_health | {
+            "fallback_available": bool(chat_health["server_ok"])
+        },
         "notion": {
             "configured": config.notion_configured(),
             "sync": __import__("backend.tools.notion", fromlist=["status"]).status(),
@@ -125,7 +154,8 @@ def health() -> dict[str, Any]:
         "auto_summary": {
             "enabled": config.AUTO_SUMMARY_ENABLED,
             "interval_hours": config.SUMMARY_INTERVAL_HOURS,
-            "summaries": len(db.recent_summaries(limit=1000)), "episodes": len(db.recent_episodes(limit=1000)),
+            "summaries": len(db.recent_summaries(limit=1000)),
+            "episodes": len(db.recent_episodes(limit=1000)),
         },
         "markdown": markdown_export.status(),
         "obsidian_vault": vault_indexer.status(),
@@ -137,8 +167,14 @@ def health() -> dict[str, Any]:
             "write_providers": calendar_providers.available(),
         },
         "brain": vault_indexer.status(),
-        "memory": {"episodes": len(db.recent_episodes(limit=1000)), "long_term": len(db.all_memory())},
-        "model_routing": {"chat_model": config.CHAT_MODEL, "agent_model": config.AGENT_MODEL},
+        "memory": {
+            "episodes": len(db.recent_episodes(limit=1000)),
+            "long_term": len(db.all_memory()),
+        },
+        "model_routing": {
+            "chat_model": config.CHAT_MODEL,
+            "agent_model": config.AGENT_MODEL,
+        },
     }
 
 
@@ -147,17 +183,33 @@ def chat(req: ChatRequest) -> ChatResponse:
     request_id = (req.request_id or "").strip() or uuid4().hex
     message = (req.message or "").strip()
     if not message:
-        return ChatResponse(reply="", error="メッセージが空です。", request_id=request_id)
+        return ChatResponse(
+            reply="",
+            error="メッセージが空です。",
+            error_code="validation",
+            request_id=request_id,
+        )
 
     started = time.monotonic()
     try:
         with lmstudio_client.observe_turn() as turn_metrics:
             result = agent.run(message, history=req.history)
     except LMStudioError as exc:
-        return ChatResponse(reply="", error=str(exc), request_id=request_id)
+        return ChatResponse(
+            reply="",
+            error=str(exc),
+            error_code="lm_studio",
+            request_id=request_id,
+        )
     except Exception as exc:  # noqa: BLE001
         log.exception("chat failed request_id=%s", request_id)
-        return ChatResponse(reply="", error=f"内部処理に失敗しました（{type(exc).__name__}）。", request_id=request_id)
+        return ChatResponse(
+            reply="",
+            error=f"内部処理に失敗しました（{type(exc).__name__}）。",
+            error_code="internal",
+            request_id=request_id,
+        )
+
     elapsed_ms = max(0, round((time.monotonic() - started) * 1000))
     model_route = dict(result.get("model_route") or {})
     model_route["elapsed_ms"] = elapsed_ms
@@ -169,20 +221,28 @@ def chat(req: ChatRequest) -> ChatResponse:
         return ChatResponse(
             reply="",
             error="返答を生成できませんでした。もう一度短く言い換えてください。",
+            error_code="empty_response",
             model_route=model_route,
             request_id=request_id,
         )
+
     tool_names = [str(item.get("name")) for item in used_tools]
     model_route["observability"] = {
         "request_id": request_id,
-        "requested_route": model_route.get("requested_route", model_route.get("kind", "instant")),
-        "actual_route": model_route.get("actual_route", model_route.get("kind", "instant")),
+        "requested_route": model_route.get(
+            "requested_route", model_route.get("kind", "instant")
+        ),
+        "actual_route": model_route.get(
+            "actual_route", model_route.get("kind", "instant")
+        ),
         "model": model_route.get("model"),
         "base_url_id": model_route.get("base_url_id"),
         "tools": tool_names,
         "llm_calls": turn_metrics["llm_calls"],
         "embedding_calls": 0,
-        "notion_sync": __import__("backend.tools.notion", fromlist=["status"]).status(),
+        "notion_sync": __import__(
+            "backend.tools.notion", fromlist=["status"]
+        ).status(),
         "calendar_sync": calendar_sync.status(),
         "brain_references": int("search_brain_notes" in tool_names),
         "memory_references": int("search_memory" in tool_names),
@@ -190,22 +250,35 @@ def chat(req: ChatRequest) -> ChatResponse:
         "elapsed_ms": elapsed_ms,
         "error_type": None,
     }
-    log.info("chat request_id=%s requested=%s actual=%s model=%s endpoint=%s tools=%s llm_calls=%s embedding_calls=0 fallback=%s elapsed_ms=%s error_type=%s",
-             request_id, model_route["observability"]["requested_route"], model_route["observability"]["actual_route"],
-             model_route["observability"]["model"], model_route["observability"]["base_url_id"], tool_names,
-             turn_metrics["llm_calls"], model_route["observability"]["fallback"], elapsed_ms, None)
+    log.info(
+        "chat request_id=%s requested=%s actual=%s model=%s endpoint=%s "
+        "tools=%s llm_calls=%s embedding_calls=0 fallback=%s elapsed_ms=%s error_type=%s",
+        request_id,
+        model_route["observability"]["requested_route"],
+        model_route["observability"]["actual_route"],
+        model_route["observability"]["model"],
+        model_route["observability"]["base_url_id"],
+        tool_names,
+        turn_metrics["llm_calls"],
+        model_route["observability"]["fallback"],
+        elapsed_ms,
+        None,
+    )
+
     used_tools_str = ", ".join(t["name"] for t in used_tools) or None
     if result.get("persist", True):
         conv_id = db.save_conversation(
             user_text=message,
             assistant_text=reply,
-            used_tools=used_tools_str, session_id=(req.session_id or "").strip() or None,
+            used_tools=used_tools_str,
+            session_id=(req.session_id or "").strip() or None,
         )
         threading.Thread(
             target=_persist_chat_artifacts,
-        args=(conv_id, message, reply, used_tools_str),
+            args=(conv_id, message, reply, used_tools_str),
             daemon=True,
         ).start()
+
     return ChatResponse(
         reply=reply,
         used_tools=used_tools,
@@ -219,7 +292,11 @@ def _register_pending_actions(actions: list[dict[str, Any]]) -> list[PendingActi
     now = time.monotonic()
     registered: list[PendingAction] = []
     with _pending_actions_lock:
-        expired = [key for key, value in _pending_actions.items() if now - value["created_at"] > _PENDING_ACTION_TTL_SECONDS]
+        expired = [
+            key
+            for key, value in _pending_actions.items()
+            if now - value["created_at"] > _PENDING_ACTION_TTL_SECONDS
+        ]
         for key in expired:
             _pending_actions.pop(key, None)
         for action in actions:
@@ -229,7 +306,13 @@ def _register_pending_actions(actions: list[dict[str, Any]]) -> list[PendingActi
                 from . import sona_core_add_schedule
 
                 approval_id = sona_core_add_schedule.register_pending(action_arguments)
-                registered.append(PendingAction(approval_id=approval_id, name=action_name, arguments=action_arguments))
+                registered.append(
+                    PendingAction(
+                        approval_id=approval_id,
+                        name=action_name,
+                        arguments=action_arguments,
+                    )
+                )
                 continue
             approval_id = uuid4().hex
             value = {
@@ -238,7 +321,13 @@ def _register_pending_actions(actions: list[dict[str, Any]]) -> list[PendingActi
                 "created_at": now,
             }
             _pending_actions[approval_id] = value
-            registered.append(PendingAction(approval_id=approval_id, name=value["name"], arguments=value["arguments"]))
+            registered.append(
+                PendingAction(
+                    approval_id=approval_id,
+                    name=value["name"],
+                    arguments=value["arguments"],
+                )
+            )
     return registered
 
 
@@ -253,32 +342,62 @@ def decide_action(approval_id: str, decision: ActionDecision) -> ChatResponse:
             core_request = None
         if core_request is not None and core_request.invocation.call.name == "add_schedule":
             try:
-                result = sona_core_add_schedule.decide_pending(approval_id, decision.approved)
+                result = sona_core_add_schedule.decide_pending(
+                    approval_id, decision.approved
+                )
             except (KeyError, ValueError) as exc:
-                return ChatResponse(reply="", error=f"確認操作を実行できません。{exc}")
+                return ChatResponse(
+                    reply="",
+                    error=f"確認操作を実行できません。{exc}",
+                    error_code="approval",
+                )
             if not decision.approved:
                 return ChatResponse(reply="書き込みをキャンセルしました。")
             if result is None or result.status != "success":
-                message = result.error.message if result and result.error else "schedule write failed"
-                return ChatResponse(reply="", error=f"書き込みに失敗しました。{message}")
+                message = (
+                    result.error.message
+                    if result and result.error
+                    else "schedule write failed"
+                )
+                return ChatResponse(
+                    reply="",
+                    error=f"書き込みに失敗しました。{message}",
+                    error_code="tool",
+                )
             rendered = json.dumps(result.data, ensure_ascii=False, default=str)
             return ChatResponse(
                 reply=f"確認された内容を実行しました。\n{_short_tool_result(rendered)}",
-                used_tools=[{"name": "add_schedule", "arguments": core_request.invocation.call.arguments}],
+                used_tools=[
+                    {
+                        "name": "add_schedule",
+                        "arguments": core_request.invocation.call.arguments,
+                    }
+                ],
             )
+
     with _pending_actions_lock:
         action = _pending_actions.pop(approval_id, None)
     if action is None or time.monotonic() - action["created_at"] > _PENDING_ACTION_TTL_SECONDS:
-        return ChatResponse(reply="", error="確認待ち操作が見つからないか、期限切れです。")
+        return ChatResponse(
+            reply="",
+            error="確認待ち操作が見つからないか、期限切れです。",
+            error_code="approval",
+        )
     if not decision.approved:
         return ChatResponse(reply="書き込みをキャンセルしました。")
 
     result = tools.dispatch(action["name"], action["arguments"])
     if _tool_result_failed(result):
-        return ChatResponse(reply="", error=f"書き込みに失敗しました。{_short_tool_result(result)}")
+        return ChatResponse(
+            reply="",
+            error=f"書き込みに失敗しました。{_short_tool_result(result)}",
+            error_code="tool",
+        )
     return ChatResponse(
         reply=f"確認された内容を実行しました。\n{_short_tool_result(result)}",
-        used_tools=[{"name": action["name"], "arguments": action["arguments"]}],
+        used_tools=[
+            {"name": action["name"], "arguments": action["arguments"]}
+        ],
     )
 
 
@@ -291,7 +410,10 @@ def _tool_result_failed(result: str) -> bool:
         return False
     return isinstance(data, dict) and (
         bool(data.get("error"))
-        or any(data.get(key) is False for key in ("ok", "created", "completed", "added", "saved", "updated"))
+        or any(
+            data.get(key) is False
+            for key in ("ok", "created", "completed", "added", "saved", "updated")
+        )
     )
 
 
@@ -299,10 +421,14 @@ def _short_tool_result(result: str) -> str:
     return result if len(result) <= 600 else result[:600] + "…"
 
 
-def _persist_chat_artifacts(conv_id: int, message: str, reply: str, used_tools: str | None) -> None:
+def _persist_chat_artifacts(
+    conv_id: int,
+    message: str,
+    reply: str,
+    used_tools: str | None,
+) -> None:
     """Best-effort side effects that must not block chat responses."""
     timestamp = db.now_iso()
-    # Casual chat is stored as history but does not trigger RAG embedding.
     if used_tools:
         chroma_client.add(
             "petit_conversations",
@@ -320,13 +446,13 @@ def _persist_chat_artifacts(conv_id: int, message: str, reply: str, used_tools: 
 
 @app.post("/api/summarize")
 def summarize() -> dict[str, Any]:
-    """Manually trigger a summarization pass (otherwise runs on the scheduler)."""
     return scheduler.get_scheduler().run_once()
 
 
 @app.get("/api/summaries")
 def summaries(limit: int = 20) -> dict[str, Any]:
     return {"summaries": db.recent_summaries(limit=limit)}
+
 
 @app.post("/api/vault/sync")
 def sync_obsidian_vault(max_files: int | None = None) -> dict[str, Any]:
@@ -335,25 +461,24 @@ def sync_obsidian_vault(max_files: int | None = None) -> dict[str, Any]:
 
 @app.get("/api/proactive")
 def proactive_opener() -> dict[str, Any]:
-    """A line PETIT says first when the user opens the app (talks proactively)."""
     return proactive.generate_opener()
 
 
 @app.get("/api/briefing")
 def daily_briefing(date: str | None = None) -> dict[str, Any]:
-    """Daily briefing: schedule + tasks + recent memory -> one next action."""
     return briefing.create_daily_briefing(date)
 
 
 @app.post("/api/calendar/sync")
 def sync_calendar(force: bool = True) -> dict[str, Any]:
-    """Read configured calendar sources into the local schedule cache."""
     return calendar_sync.sync_if_configured(force=force)
 
 
 @app.get("/api/conversations")
 def conversations(limit: int = 20) -> dict[str, Any]:
     return {"conversations": db.recent_conversations(limit=limit)}
+
+
 @app.get("/api/jobs")
 def jobs(limit: int = 10, mark_delivered: bool = True) -> dict[str, Any]:
     rows = db.undelivered_jobs(limit=limit)
@@ -362,8 +487,6 @@ def jobs(limit: int = 10, mark_delivered: bool = True) -> dict[str, Any]:
     return {"jobs": rows}
 
 
-# --- Static frontend ---------------------------------------------------------
-# Mount assets under /static and serve index.html at the root.
 if config.FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=config.FRONTEND_DIR), name="static")
 

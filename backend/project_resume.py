@@ -1,8 +1,8 @@
-"""Bounded project resume context and deterministic fallback rendering.
+"""Build project resume messages from cached PETIT-owned state only.
 
-PETIT reads project-scoped checkpoints, approved events, confirmed episode links,
-legacy handoffs, and freshness for confirmed external sources. Phase 2 adapters can
-add source-specific state without changing the resume contract.
+Project resume is part of the interactive conversation path. It must never wait for
+Notion, Linkraft, GitHub, or any other network source. Explicit sync commands update
+those caches separately; this module only reads the latest saved state.
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from . import db, project_completion, project_continuity, project_source_refresh
+from . import db, project_completion, project_continuity
 
 
 @dataclass
@@ -42,18 +42,28 @@ class ProjectResumeContext:
             "stale_sources": sorted(
                 provider for provider, state in self.source_freshness.items() if state.get("stale")
             ),
+            "source_refresh_mode": self.source_refresh.get("mode", "cached_only"),
             "source_refresh_attempted": len(self.source_refresh.get("attempted") or []),
             "source_refresh_failed": list(self.source_refresh.get("failed") or []),
             "source_refresh_skipped": list(self.source_refresh.get("skipped") or []),
         }
 
 
+def _cached_only_refresh_state() -> dict[str, Any]:
+    return {
+        "mode": "cached_only",
+        "attempted": [],
+        "failed": [],
+        "skipped": [],
+        "error": None,
+    }
+
+
 def _decode_json(value: str | None, fallback: Any) -> Any:
     try:
-        decoded = json.loads(value or "")
+        return json.loads(value or "")
     except (json.JSONDecodeError, TypeError):
         return fallback
-    return decoded
 
 
 def _recent_project_events(project_id: str, limit: int) -> list[dict[str, Any]]:
@@ -123,10 +133,14 @@ def _legacy_handoff(project_id: str) -> dict[str, Any] | None:
 
 def _aggregate_source_states(provider: str) -> dict[str, Any]:
     all_states = db.all_sync_states()
-    child_states = [state for state in all_states if str(state.get("source") or "").startswith(f"{provider}:")]
+    child_states = [
+        state for state in all_states
+        if str(state.get("source") or "").startswith(f"{provider}:")
+    ]
     states = child_states or [state for state in all_states if state.get("source") == provider]
     if not states:
         states = [db.sync_state(provider)]
+
     successful = [str(state["last_success_at"]) for state in states if state.get("last_success_at")]
     failed = [str(state["last_failure_at"]) for state in states if state.get("last_failure_at")]
     errors = [
@@ -159,7 +173,10 @@ def _source_freshness(project_id: str) -> dict[str, dict[str, Any]]:
             "WHERE project_id=? AND status='active' AND confirmed_at IS NOT NULL ORDER BY provider",
             (project_id,),
         ).fetchall()
-    return {str(row["provider"]): _aggregate_source_states(str(row["provider"])) for row in rows}
+    return {
+        str(row["provider"]): _aggregate_source_states(str(row["provider"]))
+        for row in rows
+    }
 
 
 def build_resume_context(
@@ -169,10 +186,11 @@ def build_resume_context(
     event_limit: int = 5,
     episode_limit: int = 3,
 ) -> ProjectResumeContext:
+    """Return immediately from saved state; never perform external I/O here."""
     project = project_continuity.get_project(project_id)
     if not project:
         raise ValueError("project not found")
-    source_refresh = project_source_refresh.refresh_project_sources(project_id)
+
     checkpoint = project_continuity.get_project_checkpoint(user_id, project_id)
     events = _recent_project_events(project_id, max(1, min(event_limit, 10)))
     episodes = _recent_project_episodes(project_id, max(1, min(episode_limit, 5)))
@@ -191,10 +209,11 @@ def build_resume_context(
         next_action = str(handoff.get("next_action") or "").strip() or None
     if not blockers and handoff and handoff.get("blockers"):
         raw = _decode_json(str(handoff.get("blockers")), None)
-        if isinstance(raw, list):
-            blockers = [str(item) for item in raw if str(item).strip()]
-        else:
-            blockers = [str(handoff["blockers"]).strip()]
+        blockers = (
+            [str(item) for item in raw if str(item).strip()]
+            if isinstance(raw, list)
+            else [str(handoff["blockers"]).strip()]
+        )
 
     return ProjectResumeContext(
         project=project,
@@ -208,7 +227,7 @@ def build_resume_context(
         next_action=next_action,
         blockers=blockers,
         source_freshness=_source_freshness(project_id),
-        source_refresh=source_refresh,
+        source_refresh=_cached_only_refresh_state(),
     )
 
 
@@ -226,7 +245,11 @@ def _main_summary(context: ProjectResumeContext) -> str | None:
         if summary:
             return summary
     if context.legacy_handoff:
-        note = str(context.legacy_handoff.get("note") or context.legacy_handoff.get("stopped_at") or "").strip()
+        note = str(
+            context.legacy_handoff.get("note")
+            or context.legacy_handoff.get("stopped_at")
+            or ""
+        ).strip()
         if note:
             return note
     return None
@@ -259,6 +282,7 @@ def render_resume_message(
     summary = _main_summary(context)
     if summary:
         facts.append(f"前回は「{summary}」で止まってる。")
+
     verified = _compact_items(context.verified_items)
     unverified = _compact_items(context.unverified_items)
     if verified and unverified:
@@ -271,7 +295,8 @@ def render_resume_message(
     update_summaries = [
         str(item.get("summary") or "").strip()
         for item in context.updates_after_checkpoint
-        if str(item.get("summary") or "").strip() and str(item.get("summary") or "").strip() != summary
+        if str(item.get("summary") or "").strip()
+        and str(item.get("summary") or "").strip() != summary
     ]
     update_text = _compact_items(update_summaries, limit=2)
     if update_text:
@@ -280,14 +305,16 @@ def render_resume_message(
     blockers = _compact_items(context.blockers, limit=2)
     if blockers:
         facts.append(f"ブロッカーは{blockers}。")
-    stale = [provider for provider, state in context.source_freshness.items() if state.get("stale")]
-    if stale:
-        facts.append(f"※ {'、'.join(stale)}は最新同期に失敗していて、前回成功時の情報。")
-    refresh_failed = [
-        provider for provider in context.source_refresh.get("failed") or [] if provider not in stale
+
+    stale = [
+        provider for provider, state in context.source_freshness.items()
+        if state.get("stale")
     ]
-    if refresh_failed:
-        facts.append(f"※ {'、'.join(refresh_failed)}の更新に失敗したため、保存済み情報で再開している。")
+    if stale:
+        stale_text = "、".join(stale)
+        facts.append(
+            f"※ {stale_text}は最新同期に失敗。{stale_text}は前回成功時のキャッシュ。"
+        )
 
     if context.next_action:
         facts.append(f"次は「{context.next_action}」の予定だった。")
