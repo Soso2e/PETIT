@@ -1,0 +1,36 @@
+name: Linkraft owner sync tests
+
+on:
+  push:
+    branches:
+      - feat/linkraft-owner-sync
+  pull_request:
+    paths:
+      - "backend/linkraft_config.py"
+      - "backend/linkraft_client.py"
+      - "backend/linkraft_sync.py"
+      - "backend/linkraft_project_links.py"
+      - "backend/tools/linkraft.py"
+      - "backend/tools/__init__.py"
+      - "backend/project_resume.py"
+      - "tests/test_linkraft_owner_sync.py"
+      - ".github/workflows/linkraft-owner-sync-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install fastapi httpx pydantic chromadb timetree-exporter
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Run Linkraft and resume tests
+        run: python -m unittest tests.test_linkraft_owner_sync tests.test_project_resume
