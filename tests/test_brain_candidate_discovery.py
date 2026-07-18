@@ -60,10 +60,19 @@ class BrainCandidateDiscoveryTests(unittest.TestCase):
         self.assertEqual(candidate["suggested_project_ids"], ["petit"])
         self.assertEqual(candidate["status"], "pending")
 
-    def test_full_discovery_returns_one_candidate(self) -> None:
+    def test_project_search_terms_include_name_once(self) -> None:
+        self.assertEqual(brain_project_sync._project_search_terms("petit"), ["PETIT"])
+
+    def test_discovery_reports_success(self) -> None:
         result = brain_project_sync.discover_project_candidates("petit")
-        self.assertTrue(result["ok"])
-        self.assertEqual(result["count"], 1)
+        self.assertTrue(result.get("ok"), result)
+
+    def test_discovery_returns_one_candidate(self) -> None:
+        result = brain_project_sync.discover_project_candidates("petit")
+        self.assertEqual(result.get("count"), 1, result)
+
+    def test_discovery_candidate_has_expected_path(self) -> None:
+        result = brain_project_sync.discover_project_candidates("petit")
         self.assertEqual(result["candidates"][0]["relative_path"], "Projects/PETIT.md")
 
 
