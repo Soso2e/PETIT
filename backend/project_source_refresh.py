@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from . import (
+    brain_project_sync,
     db,
     github_sync,
     linkraft_config,
@@ -165,12 +166,9 @@ def refresh_project_sources(
     notion_refresher: Callable[..., dict[str, Any]] | None = None,
     linkraft_refresher: Callable[..., dict[str, Any]] | None = None,
     github_refresher: Callable[..., dict[str, Any]] | None = None,
+    brain_refresher: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Refresh each confirmed provider at most once for the selected project.
-
-    Linkraft and GitHub may have multiple confirmed external IDs for a project, but
-    no other project's source link is read. Unsupported providers are skipped.
-    """
+    """Refresh confirmed sources for only the selected internal project."""
     if not project_continuity.get_project(project_id):
         return {
             "ok": False,
@@ -210,6 +208,15 @@ def refresh_project_sources(
                 refresh = github_refresher or github_sync.refresh_repository_link
                 result = _provider_result(
                     "github",
+                    [
+                        refresh(project_id, str(link["external_id"]), force=force)
+                        for link in grouped[provider]
+                    ],
+                )
+            elif provider == "brain":
+                refresh = brain_refresher or brain_project_sync.refresh_note_link
+                result = _provider_result(
+                    "brain",
                     [
                         refresh(project_id, str(link["external_id"]), force=force)
                         for link in grouped[provider]
