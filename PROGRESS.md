@@ -17,7 +17,7 @@
 - 軽量回答上限: `PETIT_LIGHT_MAX_TOKENS` を 512 に変更済み。`PETIT_ENABLE_THINKING=0` と `.env.example` に反映済み。実LM Studio応答のreasoning tokens 0は未確認。
 - Calendar: ICSは読み取り専用同期、`add_schedule`はPETITローカル予定への書き込みとして分離。ローカル予定の確認付き追加・再取得は実ブラウザE2E済み。実Google非公開iCal URLは未設定のため同期E2E未確認。将来のGoogle書き込みはprovider境界へ追加する。
 - 観測性: `/api/health` はChat/Agent別のキャッシュ付き`/models`確認を返す。各ターンはrequest ID、実経路、モデル／endpoint ID、ツール、同期状態、参照件数、フォールバック、時間を表示する。Project Continuityではcheckpoint・event・episode・handoff・source freshnessに加え、resume直前refreshのattempted／failed／skipped providerを返す。実ブラウザ表示は未確認。
-- LM Studio: 現在の実行環境ではChat/Agentの`/models`到達を確認できず、実モデル総合E2E・1/2モデル時間比較は未実施。単体テストで接続先分離とAgent→Chat読み取りフォールバックを確認済み。
+- LM Studio: LM StudioはPETITと同じPCの`http://127.0.0.1:1234/v1/models`で稼働し、Chat／Agent／Embedding用モデル一覧を取得済み。`.env`の`PETIT_LM_BASE_URL`だけが到達不能なリンクローカルIP `169.254.83.107`を参照しており、PETITプロセスも停止中。CoreのFeature FlagはLM接続設定に関与しない。localhostへの設定変更、PETIT再起動、実ブラウザ確認は未実施。
 - 外部同期信頼性: Notion／Linkraft／GitHub／ICS／TimeTreeの成功・失敗・stale状態をSQLite `sync_state` に保存する。再開直前は選択projectの`status=active`かつ確認済みsource linkだけを更新し、Notionは1回、Linkraftは該当外部ID、GitHubは該当repositoryだけをcursor／TTL付きで同期する。1ソース失敗時も以前のcacheとcheckpointで再開する。自動テスト成功、実認証情報を使うNotion／Linkraft／GitHub／Google／TimeTree総合E2Eは未確認。
 - 会話記憶: 短期（ブラウザセッション履歴）、エピソード（SQLite `conversation_episodes` / `petit_episodes`）、長期（SQLite `memory`）を分離。エピソードは20分のアイドル、8往復、明示まとめ、定期実行で確定する。単体テスト済み、実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。
 - 索引: SQLite記憶/エピソードは`content_hash`・Embeddingモデル/版・Chromaメタデータで差分だけを再索引化する。Vault差分索引は維持。起動時の実LM Studio件数は未測定。
@@ -86,3 +86,5 @@
 | 2026-07-18 | 05:24 | #44 | Linkraft側owner-only PETIT read APIとPETIT側Adapterを統合。Bearer token hash＋owner user id境界、project snapshot／delta cursor、task・activity・support・knowledge cache、idempotent project event、候補確認、stale fallbackを追加。PETIT側のtool import漏れを修正し、Notion／Linkraft／Project Continuity CI成功後にPR #25をmainへ統合。 |
 | 2026-07-18 | 05:40 | #45 | 選択projectの確認済みactive sourceだけを再開直前に更新する`project_source_refresh`を実装。Notionはprovider単位で1回、Linkraftは対象external idだけをTTL／cursor付きで同期し、未確認・removed・別project・未対応providerを除外。失敗時もcheckpointと既存cacheで再開し、attempted／failed／skippedを観測可能にした。4系統CI成功。 |
 | 2026-07-18 | 06:05 | #46 | GitHub evidence Adapterを実装。repository候補の確認付き紐付け、commit／PR／check／deploymentの分離cache、idempotent project events、per-repository cursor／TTL／stale fallback、token秘匿、resume直前refresh、明示的会話ルーティングを追加。check非同期完了とdeployment status後更新を再確認し、GitHub専用・Project Continuity・Notion・Linkraft・source refreshのテストを追加。 |
+| 2026-07-18 | 17:03 | #47 | 調査完了: LM Studio未接続はSona Agent Core化ではなく、`169.254.83.107:1234`へのネットワーク経路不在が直接原因。稼働中PETITの正しいURL参照と`ConnectError`、正しい`/v1/models`への疎通失敗、該当Wi-Fi切断を確認。さらにディスク上`.env`のURLで`/`欠落を確認。設定・コード修正および復旧後E2Eは未実施。 |
+| 2026-07-18 | 17:19 | #48 | 調査完了: 同一PCのLM Studio `127.0.0.1:1234/v1/models`は正常応答し、6モデルを確認。`.env`が到達不能な`169.254.83.107`を参照し、PETITプロセスは停止中。直接原因を設定先の不一致に確定。localhostへの変更・再起動・ブラウザE2Eは未実施。 |
