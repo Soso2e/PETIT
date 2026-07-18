@@ -69,6 +69,9 @@ _TOOL_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 _PLANNING_PATTERN = re.compile(r"(今日|明日|今週).{0,16}(何から|何を|どうする|どうしよう|すれば|優先|始め)")
 _RECALL_PATTERN = re.compile(r"(昨日|前回|この前).{0,16}(何|やった|してた|続き|決め)")
+_GITHUB_REPOSITORY_PATTERN = re.compile(
+    r"(?:[A-Za-z][A-Za-z0-9_.-]*/[A-Za-z0-9_.-]+|[A-Za-z0-9_.-]+/[A-Za-z][A-Za-z0-9_.-]*)"
+)
 
 
 def _compact(text: str) -> str:
@@ -111,10 +114,16 @@ def _related_tool_names(message: str) -> list[str]:
     for name, signals in _TOOL_SIGNALS:
         if any(signal.casefold() in text for signal in signals):
             names.append(name)
-    if ("github.com/" in text or re.search(r"[\w.-]+/[\w.-]+", message)) and any(
+    repository_reference = "github.com/" in text or (
+        any(marker in text for marker in ("github", "リポジトリ", "repository"))
+        and bool(_GITHUB_REPOSITORY_PATTERN.search(message))
+    )
+    if repository_reference and any(
         verb in text for verb in ("登録", "紐付け", "ひも付け", "確認", "候補")
     ):
         names.append("inspect_github_repository")
+    if "link_github_repository_candidate" in names or "ignore_github_repository_candidate" in names:
+        names = [name for name in names if name != "get_github_repository_candidates"]
     # Natural consultations are intents rather than explicit source commands.
     # Expose only the three relevant read tools and let the agent choose among
     # them; no retrieval happens merely because a schema was exposed.
