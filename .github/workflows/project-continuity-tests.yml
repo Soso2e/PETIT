@@ -1,0 +1,33 @@
+name: Project continuity tests
+
+on:
+  push:
+    branches:
+      - feat/project-continuity-routing
+  pull_request:
+    paths:
+      - "backend/project_continuity.py"
+      - "backend/project_router.py"
+      - "backend/agent.py"
+      - "tests/test_project_continuity.py"
+      - "tests/test_project_router.py"
+      - ".github/workflows/project-continuity-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install fastapi httpx pydantic chromadb timetree-exporter
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Run project continuity tests
+        run: python -m unittest tests.test_project_continuity tests.test_project_router

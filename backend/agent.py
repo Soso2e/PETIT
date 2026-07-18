@@ -11,7 +11,7 @@ import re
 from datetime import date, timedelta
 from typing import Any
 
-from . import config, db, recall, situation, tools  # recall/situation kept import-compatible; never used for chat
+from . import config, db, project_router, recall, situation, tools  # recall/situation kept import-compatible; never used for chat
 from .lmstudio_client import LMStudioError, chat_completion
 
 SYSTEM_PROMPT = (
@@ -312,6 +312,13 @@ def _run_forced_read(
 
 def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow_defer: bool = True) -> dict[str, Any]:
     del allow_defer  # Kept for worker/API compatibility; deferred chat is removed.
+    project_turn = project_router.try_handle_project_turn(
+        user_message,
+        user_id=config.PETIT_OWNER_ID,
+        recent_history=history,
+    )
+    if project_turn:
+        return project_turn
     tool_names = _related_tool_names(user_message)
     write_requested = any(tools.requires_confirmation(name) for name in tool_names)
     if "edit_brain_note" in tool_names:
