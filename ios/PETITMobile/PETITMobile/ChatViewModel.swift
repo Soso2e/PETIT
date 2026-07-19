@@ -50,6 +50,13 @@ final class ChatViewModel: ObservableObject {
         messages.append(
             DisplayMessage(role: .user, text: text, tools: [], pendingActions: [])
         )
+
+        // The current message is sent separately from history. Keep a snapshot for
+        // this request, then record the user turn immediately so a failed response
+        // does not erase conversational context for the next message.
+        let requestHistory = history
+        history.append(ChatHistoryItem(role: .user, content: text))
+
         isSending = true
         errorMessage = nil
         defer { isSending = false }
@@ -57,7 +64,7 @@ final class ChatViewModel: ObservableObject {
         do {
             let response = try await PetitAPIClient(baseURL: baseURL).chat(
                 message: text,
-                history: history,
+                history: requestHistory,
                 sessionID: settings.sessionID,
                 requestID: requestID
             )
@@ -69,7 +76,6 @@ final class ChatViewModel: ObservableObject {
                 )
             }
 
-            history.append(ChatHistoryItem(role: .user, content: text))
             if !response.reply.isEmpty {
                 history.append(ChatHistoryItem(role: .assistant, content: response.reply))
                 messages.append(
