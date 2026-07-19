@@ -11,6 +11,7 @@ from typing import Any
 
 from .. import config, db
 from ..notion_client import NotionError, create_task_page, update_task_page
+from ..task_taxonomy import AREAS, AREA_LABELS, resolve_area
 from .registry import tool
 
 # Imported lazily to avoid circular import at module load time.
@@ -33,7 +34,8 @@ def _try_notion_sync() -> dict[str, Any]:
     name="get_tasks",
     description=(
         "タスク一覧を取得する。Notion が設定されていれば自動で最新データを取得する。"
-        "「今日のタスク教えて」「やること何があったっけ」のような発話で使う。"
+        "エリアは personal（個人）/ group（グループ）/ university（大学）/ work（仕事）。"
+        "「今日のタスク教えて」「大学のやること何があったっけ」のような発話で使う。"
     ),
     parameters={
         "type": "object",
@@ -42,30 +44,42 @@ def _try_notion_sync() -> dict[str, Any]:
                 "type": "string",
                 "description": "絞り込むステータス。省略で未完了のみ、allで全件。",
             },
+            "area": {
+                "type": "string",
+                "enum": list(AREAS),
+                "description": "責任の発生源で絞り込む。個人/グループ/大学/仕事。",
+            },
             "limit": {"type": "integer", "description": "最大件数", "default": 20},
         },
     },
 )
-def get_tasks(status: str | None = None, limit: int = 20) -> dict[str, Any]:
+def get_tasks(status: str | None = None, area: str | None = None, limit: int = 20) -> dict[str, Any]:
     sync = _try_notion_sync()
+    normalized_area, _ = resolve_area(area)
 
     sql = (
-        "SELECT id, source, title, status, due_date, priority, category, reason, url, done_date "
-        "FROM tasks_cache"
+        "SELECT id, source, title, status, due_date, priority, category, area, reason, url, done_date, "
+        "project_id, project_external_id FROM tasks_cache"
     )
+    conditions: list[str] = []
     params: list[Any] = []
     if status and status.casefold() != "all":
-        sql += " WHERE status = ?"
+        conditions.append("status = ?")
         params.append(status)
     elif not status:
-        sql += " WHERE status != ?"
+        conditions.append("status != ?")
         params.append(config.NOTION_DONE_STATUS)
+    if normalized_area:
+        conditions.append("area = ?")
+        params.append(normalized_area)
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
     sql += " ORDER BY (due_date IS NULL), due_date ASC LIMIT ?"
-    params.append(limit)
+    params.append(max(1, min(int(limit), 100)))
     with db.get_connection() as conn:
         rows = conn.execute(sql, params).fetchall()
     tasks = [dict(r) for r in rows]
-    return {"count": len(tasks), "tasks": tasks, "sync": sync}
+    return {"count": len(tasks), "tasks": tasks, "filters": {"status": status, "area": normalized_area}, "sync": sync}
 
 
 @tool(
@@ -100,8 +114,9 @@ def add_task(title: str, due_date: str | None = None, priority: str | None = Non
     name="create_task",
     description=(
         "新しいタスクを作成する。Notion が設定されていれば Notion のタスクDBに作成し、"
-        "未設定ならローカルDBに保存する。分類が明らかなときだけ category を指定し、"
-        "迷う場合はツールを呼ぶ前にユーザーへ確認する。"
+        "未設定ならローカルDBに保存する。area は責任の発生源で、personal（個人）/ "
+        "group（グループ）/ university（大学）/ work（仕事）から指定する。"
+        "areaが明確なら指定し、判断できない場合だけユーザーへ確認する。"
     ),
     parameters={
         "type": "object",
@@ -109,17 +124,22 @@ def add_task(title: str, due_date: str | None = None, priority: str | None = Non
             "title": {"type": "string", "description": "タスク名"},
             "due_date": {
                 "type": "string",
-                "description": "期限または日時。YYYY-MM-DD または ISO datetime。任意。",
+                "description": "目標完了日時。YYYY-MM-DD または ISO datetime。作業予定とは別。",
             },
             "priority": {
                 "type": "string",
                 "enum": _PRIORITIES,
                 "description": "優先度。迷う場合は Mid。",
             },
+            "area": {
+                "type": "string",
+                "enum": list(AREAS),
+                "description": "責任の発生源。personal/group/university/work。",
+            },
             "category": {
                 "type": "string",
                 "enum": _CATEGORIES,
-                "description": "分類。迷う場合は省略してよい。",
+                "description": "旧Category。既存DB互換用。迷う場合は省略してよい。",
             },
             "reason": {"type": "string", "description": "補足・理由・メモ。任意。"},
         },
@@ -131,11 +151,13 @@ def create_task(
     title: str,
     due_date: str | None = None,
     priority: str | None = None,
+    area: str | None = None,
     category: str | None = None,
     reason: str | None = None,
 ) -> dict[str, Any]:
     priority = _normalize_option(priority, _PRIORITIES)
     category, category_source = _resolve_category(title, category, reason)
+    area, area_source = resolve_area(area, category)
 
     if config.notion_configured():
         try:
@@ -144,6 +166,7 @@ def create_task(
                 due_date=due_date,
                 priority=priority or "Mid",
                 categories=[category] if category else None,
+                area=AREA_LABELS[area] if area else None,
                 reason=reason,
             )
             _cache_task(task, source="notion")
@@ -151,6 +174,7 @@ def create_task(
                 "created": True,
                 "source": "notion",
                 "task": task,
+                "area_source": area_source,
                 "category_source": category_source,
             }
         except NotionError as exc:
@@ -161,8 +185,14 @@ def create_task(
                 "message": "Notionへの作成に失敗したため、ローカルへ代替保存していません。",
             }
 
-    local = _create_local_task(title, due_date, priority, category, reason)
-    return {"created": True, "source": "local", "task": local, "category_source": category_source}
+    local = _create_local_task(title, due_date, priority, area, category, reason)
+    return {
+        "created": True,
+        "source": "local",
+        "task": local,
+        "area_source": area_source,
+        "category_source": category_source,
+    }
 
 
 @tool(
@@ -259,6 +289,7 @@ def _create_local_task(
     title: str,
     due_date: str | None,
     priority: str | None,
+    area: str | None,
     category: str | None,
     reason: str | None,
 ) -> dict[str, Any]:
@@ -266,9 +297,9 @@ def _create_local_task(
     with db.get_connection() as conn:
         cur = conn.execute(
             "INSERT INTO tasks_cache "
-            "(source, title, status, due_date, priority, category, reason, updated_at) "
-            "VALUES ('local', ?, ?, ?, ?, ?, ?, ?)",
-            (title, config.NOTION_DEFAULT_STATUS, due_date, priority or "Mid", category, reason, now),
+            "(source, title, status, due_date, priority, area, category, reason, updated_at) "
+            "VALUES ('local', ?, ?, ?, ?, ?, ?, ?, ?)",
+            (title, config.NOTION_DEFAULT_STATUS, due_date, priority or "Mid", area, category, reason, now),
         )
         task_id = int(cur.lastrowid)
     return {
@@ -278,6 +309,7 @@ def _create_local_task(
         "status": config.NOTION_DEFAULT_STATUS,
         "due_date": due_date,
         "priority": priority or "Mid",
+        "area": area,
         "category": category,
         "reason": reason,
     }
@@ -286,6 +318,7 @@ def _create_local_task(
 def _cache_task(task: dict[str, Any], source: str) -> int:
     now = db.now_iso()
     external_id = task.get("external_id")
+    area, _ = resolve_area(task.get("area"), task.get("category"))
     with db.get_connection() as conn:
         existing = None
         if external_id:
@@ -296,13 +329,14 @@ def _cache_task(task: dict[str, Any], source: str) -> int:
         if existing:
             conn.execute(
                 "UPDATE tasks_cache SET source=?, title=?, status=?, due_date=?, priority=?, "
-                "category=?, reason=?, url=?, done_date=?, updated_at=? WHERE id=?",
+                "area=?, category=?, reason=?, url=?, done_date=?, updated_at=? WHERE id=?",
                 (
                     source,
                     task["title"],
                     task["status"],
                     task.get("due_date"),
                     task.get("priority"),
+                    area,
                     task.get("category"),
                     task.get("reason"),
                     task.get("url"),
@@ -314,14 +348,15 @@ def _cache_task(task: dict[str, Any], source: str) -> int:
             return int(existing["id"])
         cur = conn.execute(
             "INSERT INTO tasks_cache "
-            "(source, title, status, due_date, priority, category, reason, external_id, url, done_date, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(source, title, status, due_date, priority, area, category, reason, external_id, url, done_date, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 source,
                 task["title"],
                 task["status"],
                 task.get("due_date"),
                 task.get("priority"),
+                area,
                 task.get("category"),
                 task.get("reason"),
                 external_id,
@@ -360,6 +395,7 @@ def _find_task_candidates(title_query: str | None) -> list[dict[str, Any]]:
             "title": row["title"],
             "status": row["status"],
             "due_date": row["due_date"],
+            "area": row["area"],
             "source": row["source"],
         }
         for row in rows
