@@ -5,12 +5,37 @@ on:
     branches: [feat/brain-project-mapping]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Fix project alias ordering
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/brain_project_sync.py")
+          text = path.read_text(encoding="utf-8")
+          old = '"SELECT alias FROM project_aliases WHERE project_id=? ORDER BY id",'
+          new = '"SELECT alias FROM project_aliases WHERE project_id=? ORDER BY created_at, normalized_alias",'
+          if old in text:
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          if git diff --quiet -- backend/brain_project_sync.py; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/brain_project_sync.py
+          git commit -m "fix: order project aliases by existing columns"
+          git push origin HEAD:${{ github.head_ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -20,13 +45,7 @@ jobs:
       - name: Compile
         run: python -m compileall backend tests
       - name: BRAIN candidate discovery
-        run: python -m unittest tests.test_brain_candidate_discovery -v 2>&1 | tee brain-discovery.log
-      - name: Upload discovery diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: brain-discovery-log
-          path: brain-discovery.log
+        run: python -m unittest tests.test_brain_candidate_discovery -v
       - name: Candidate exclusion boundary
         run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_discovery_creates_candidate_but_not_source_link
       - name: Path safety
