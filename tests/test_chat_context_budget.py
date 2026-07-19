@@ -31,10 +31,14 @@ class CompactChatContextTests(unittest.TestCase):
             calls.append({"messages": messages, "tools": tools, "model": model, "route": route})
             return {"role": "assistant", "content": "楽しんできてね。"}
 
-        history = [
-            {"role": "user", "content": f"過去の話題{index}"},
-            {"role": "assistant", "content": f"過去の返答{index}"},
-        ] * 5
+        history = []
+        for index in range(5):
+            history.extend(
+                [
+                    {"role": "user", "content": f"過去の話題{index}"},
+                    {"role": "assistant", "content": f"過去の返答{index}"},
+                ]
+            )
 
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
