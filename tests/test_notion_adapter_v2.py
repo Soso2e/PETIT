@@ -17,6 +17,7 @@ from backend import (
     tools,
 )
 from backend.notion_client import NotionError
+from backend.tools import tasks as task_tools
 
 
 class NotionAdapterV2Tests(unittest.TestCase):
@@ -34,12 +35,14 @@ class NotionAdapterV2Tests(unittest.TestCase):
             NOTION_PROP_DUE="期限",
             NOTION_PROP_PRIORITY="優先度",
             NOTION_PROP_CATEGORY="タグ",
+            NOTION_PROP_AREA="エリア",
             NOTION_PROP_REASON="理由",
             NOTION_PROP_DONE_DATE="完了日",
             NOTION_PROJECT_PROP_TITLE="プロジェクト名",
             NOTION_PROJECT_PROP_STATUS="ステータス",
             NOTION_PROJECT_PROP_OWNER="オーナー",
             NOTION_PROJECT_PROP_PRIORITY="優先度",
+            NOTION_PROJECT_PROP_AREA="エリア",
             NOTION_PROJECT_PROP_PERIOD="期間",
             NOTION_PROJECT_PROP_SUMMARY="要約",
             NOTION_PROJECT_PROP_TASKS="タスク",
@@ -55,8 +58,10 @@ class NotionAdapterV2Tests(unittest.TestCase):
         project_continuity.ensure_project_schema()
         notion_project_sync.ensure_notion_project_schema()
         notion_project_sync._last_sync_monotonic.clear()
+        task_tools._notion_sync = None
 
     def tearDown(self) -> None:
+        task_tools._notion_sync = None
         self.config_patch.stop()
         self.db_patch.stop()
         self.temp_dir.cleanup()
@@ -89,6 +94,7 @@ class NotionAdapterV2Tests(unittest.TestCase):
                 "ステータス": {"status": {"name": "進行中"}},
                 "オーナー": self.people("notion-user-soso"),
                 "優先度": {"select": {"name": "高"}},
+                "エリア": {"select": {"name": "個人"}},
                 "期間": {"date": {"start": "2026-07-01", "end": "2026-07-31"}},
                 "要約": self.rich_text("個人AIアシスタント"),
                 "タスク": self.relation("task-a", "task-b"),
@@ -108,7 +114,8 @@ class NotionAdapterV2Tests(unittest.TestCase):
                 "ステータス": {"status": {"name": "進行中"}},
                 "期限": {"date": {"start": "2026-07-20", "end": None}},
                 "優先度": {"select": {"name": "高"}},
-                "タグ": {"multi_select": [{"name": "改善"}]},
+                "タグ": {"multi_select": [{"name": "Sch"}]},
+                "エリア": {"select": {"name": "大学"}},
                 "理由": self.rich_text("Relationを失わないため"),
                 "完了日": {"date": None},
                 "要約": self.rich_text("プロジェクトとタスクを同期する"),
@@ -119,9 +126,11 @@ class NotionAdapterV2Tests(unittest.TestCase):
             },
         }
 
-    def test_project_parser_preserves_people_period_and_relations(self) -> None:
+    def test_project_parser_preserves_people_period_relations_and_area(self) -> None:
         parsed = notion_client.parse_project_page(self.project_page())
         self.assertEqual(parsed["title"], "PETIT")
+        self.assertEqual(parsed["area"], "personal")
+        self.assertEqual(parsed["area_source"], "explicit")
         self.assertEqual(parsed["owner_external_ids"], ["notion-user-soso"])
         self.assertEqual(parsed["period_start"], "2026-07-01")
         self.assertEqual(parsed["period_end"], "2026-07-31")
@@ -129,14 +138,23 @@ class NotionAdapterV2Tests(unittest.TestCase):
         self.assertEqual(parsed["blocked_by_external_ids"], ["notion-project-blocker"])
         self.assertEqual(parsed["source_updated_at"], "2026-07-18T01:00:00.000Z")
 
-    def test_task_parser_preserves_project_assignees_and_hierarchy(self) -> None:
+    def test_task_parser_preserves_project_hierarchy_and_area(self) -> None:
         parsed = notion_client.parse_task_page(self.task_page())
+        self.assertEqual(parsed["area"], "university")
+        self.assertEqual(parsed["area_source"], "explicit")
         self.assertEqual(parsed["project_external_id"], "notion-project-petit")
         self.assertEqual(parsed["project_external_ids"], ["notion-project-petit"])
         self.assertEqual(parsed["assignee_external_ids"], ["notion-user-soso", "notion-user-helper"])
         self.assertEqual(parsed["parent_external_id"], "task-parent")
         self.assertEqual(parsed["subtask_external_ids"], ["task-child-a", "task-child-b"])
         self.assertEqual(parsed["summary"], "プロジェクトとタスクを同期する")
+
+    def test_legacy_category_derives_area_without_new_property(self) -> None:
+        page = self.task_page("legacy-area-task")
+        page["properties"].pop("エリア")
+        parsed = notion_client.parse_task_page(page)
+        self.assertEqual(parsed["area"], "university")
+        self.assertEqual(parsed["area_source"], "legacy_category")
 
     def test_same_name_creates_candidate_but_does_not_auto_link(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
@@ -169,17 +187,19 @@ class NotionAdapterV2Tests(unittest.TestCase):
         self.assertEqual(candidate_row["status"], "linked")
         self.assertEqual(candidate_row["project_id"], "petit")
 
-    def test_confirmed_source_link_resolves_project_and_task(self) -> None:
+    def test_confirmed_source_link_resolves_project_task_and_area(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
         project_continuity.link_project_source("petit", "notion", "notion-project-petit", external_url="https://notion.so/notion-project-petit", confirmed=True)
         notion_project_sync.upsert_projects([notion_client.parse_project_page(self.project_page())])
         notion_project_sync.upsert_tasks([notion_client.parse_task_page(self.task_page())])
         with db.get_connection() as conn:
-            project = conn.execute("SELECT internal_project_id FROM notion_projects_cache WHERE external_id='notion-project-petit'").fetchone()
-            task = conn.execute("SELECT project_id, project_external_id, assignee_external_ids, parent_external_id, subtask_external_ids, summary FROM tasks_cache WHERE external_id='task-a'").fetchone()
+            project = conn.execute("SELECT internal_project_id, area FROM notion_projects_cache WHERE external_id='notion-project-petit'").fetchone()
+            task = conn.execute("SELECT project_id, project_external_id, area, assignee_external_ids, parent_external_id, subtask_external_ids, summary FROM tasks_cache WHERE external_id='task-a'").fetchone()
         self.assertEqual(project["internal_project_id"], "petit")
+        self.assertEqual(project["area"], "personal")
         self.assertEqual(task["project_id"], "petit")
         self.assertEqual(task["project_external_id"], "notion-project-petit")
+        self.assertEqual(task["area"], "university")
         self.assertEqual(json.loads(task["assignee_external_ids"]), ["notion-user-soso", "notion-user-helper"])
         self.assertEqual(task["parent_external_id"], "task-parent")
         self.assertEqual(json.loads(task["subtask_external_ids"]), ["task-child-a", "task-child-b"])
@@ -193,6 +213,22 @@ class NotionAdapterV2Tests(unittest.TestCase):
             task = conn.execute("SELECT project_id, project_external_id FROM tasks_cache WHERE external_id='task-a'").fetchone()
         self.assertIsNone(task["project_id"])
         self.assertEqual(task["project_external_id"], "notion-project-petit")
+
+    def test_local_create_and_get_tasks_support_area(self) -> None:
+        task_tools._notion_sync = lambda: {"configured": False, "ok": False}
+        with patch.object(config, "NOTION_API_KEY", ""):
+            created = task_tools.create_task(
+                title="PETITのタスク管理を実装",
+                due_date="2026-07-21",
+                area="personal",
+                category="Create",
+            )
+        self.assertTrue(created["created"])
+        self.assertEqual(created["task"]["area"], "personal")
+        result = task_tools.get_tasks(area="personal")
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["tasks"][0]["area"], "personal")
+        self.assertEqual(result["filters"]["area"], "personal")
 
     def test_partial_failure_keeps_project_cache_and_replaces_successful_task_source(self) -> None:
         first = notion_project_sync.sync_all_if_configured(force=True, project_loader=lambda: [notion_client.parse_project_page(self.project_page())], task_loader=lambda: [notion_client.parse_task_page(self.task_page("task-a"))])
@@ -228,10 +264,11 @@ class NotionAdapterV2Tests(unittest.TestCase):
 
     def test_legacy_flat_task_page_stays_parseable(self) -> None:
         page = self.task_page("legacy-task")
-        for key in ("プロジェクト", "担当者", "親タスク", "サブタスク", "要約"):
+        for key in ("エリア", "プロジェクト", "担当者", "親タスク", "サブタスク", "要約"):
             page["properties"].pop(key)
         parsed = notion_client._parse_page(page)
         self.assertEqual(parsed["title"], "Notion Adapter v2を実装")
+        self.assertEqual(parsed["area"], "university")
         self.assertEqual(parsed["project_external_ids"], [])
         self.assertEqual(parsed["assignee_external_ids"], [])
         self.assertIsNone(parsed["parent_external_id"])

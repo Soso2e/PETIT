@@ -10,6 +10,7 @@ from typing import Any, Callable
 import httpx
 
 from . import config
+from .task_taxonomy import resolve_area
 
 _BASE = "https://api.notion.com/v1"
 _NOTION_VERSION = "2022-06-28"
@@ -146,11 +147,14 @@ def parse_project_page(page: dict[str, Any]) -> dict[str, Any]:
     """Convert one project database page while preserving source Relations."""
     props = page.get("properties") or {}
     period_start, period_end = _extract_date_range(props.get(config.NOTION_PROJECT_PROP_PERIOD))
+    area, area_source = resolve_area(_extract_select(props.get(config.NOTION_PROJECT_PROP_AREA)))
     return _page_meta(page) | {
         "title": _extract_text(props.get(config.NOTION_PROJECT_PROP_TITLE)),
         "status": _extract_select(props.get(config.NOTION_PROJECT_PROP_STATUS)) or "unknown",
         "owner_external_ids": _extract_people_ids(props.get(config.NOTION_PROJECT_PROP_OWNER)),
         "priority": _extract_select(props.get(config.NOTION_PROJECT_PROP_PRIORITY)) or None,
+        "area": area,
+        "area_source": area_source,
         "period_start": period_start,
         "period_end": period_end,
         "summary": _extract_text(props.get(config.NOTION_PROJECT_PROP_SUMMARY)) or None,
@@ -163,6 +167,8 @@ def parse_task_page(page: dict[str, Any]) -> dict[str, Any]:
     """Convert one task page, preserving Project, assignee, and task hierarchy."""
     props = page.get("properties") or {}
     categories = _extract_multi_select(props.get(config.NOTION_PROP_CATEGORY))
+    category = ", ".join(categories) if categories else None
+    area, area_source = resolve_area(_extract_select(props.get(config.NOTION_PROP_AREA)), category)
     project_ids = _extract_relation_ids(props.get(config.NOTION_TASK_PROP_PROJECT))
     parent_ids = _extract_relation_ids(props.get(config.NOTION_TASK_PROP_PARENT))
     return _page_meta(page) | {
@@ -170,7 +176,9 @@ def parse_task_page(page: dict[str, Any]) -> dict[str, Any]:
         "status": _extract_select(props.get(config.NOTION_PROP_STATUS)) or "unknown",
         "due_date": _extract_date(props.get(config.NOTION_PROP_DUE)),
         "priority": _extract_select(props.get(config.NOTION_PROP_PRIORITY)) or None,
-        "category": ", ".join(categories) if categories else None,
+        "category": category,
+        "area": area,
+        "area_source": area_source,
         "reason": _extract_text(props.get(config.NOTION_PROP_REASON)) or None,
         "done_date": _extract_date(props.get(config.NOTION_PROP_DONE_DATE)),
         "summary": _extract_text(props.get(config.NOTION_TASK_PROP_SUMMARY)) or None,
@@ -217,12 +225,18 @@ def _multi_select_prop(values: list[str] | None) -> dict[str, Any]:
     return {"multi_select": [{"name": value} for value in (values or []) if value]}
 
 
+def _relation_prop(values: list[str] | None) -> dict[str, Any]:
+    return {"relation": [{"id": value} for value in (values or []) if value]}
+
+
 def _task_properties(
     title: str | None = None,
     status: str | None = None,
     due_date: str | None = None,
     priority: str | None = None,
     categories: list[str] | None = None,
+    area: str | None = None,
+    project_external_ids: list[str] | None = None,
     reason: str | None = None,
     done_date: str | None = None,
 ) -> dict[str, Any]:
@@ -237,6 +251,10 @@ def _task_properties(
         props[config.NOTION_PROP_PRIORITY] = _select_prop(priority)
     if categories is not None:
         props[config.NOTION_PROP_CATEGORY] = _multi_select_prop(categories)
+    if area is not None:
+        props[config.NOTION_PROP_AREA] = _select_prop(area)
+    if project_external_ids is not None:
+        props[config.NOTION_TASK_PROP_PROJECT] = _relation_prop(project_external_ids)
     if reason is not None:
         props[config.NOTION_PROP_REASON] = _rich_text_prop(reason)
     if done_date is not None:
@@ -323,6 +341,8 @@ def create_task_page(
     due_date: str | None = None,
     priority: str | None = None,
     categories: list[str] | None = None,
+    area: str | None = None,
+    project_external_ids: list[str] | None = None,
     reason: str | None = None,
     status: str | None = None,
     db_id: str | None = None,
@@ -336,6 +356,8 @@ def create_task_page(
             due_date=due_date,
             priority=priority,
             categories=categories,
+            area=area,
+            project_external_ids=project_external_ids,
             reason=reason,
         ),
     }
@@ -348,6 +370,8 @@ def update_task_page(
     due_date: str | None = None,
     priority: str | None = None,
     categories: list[str] | None = None,
+    area: str | None = None,
+    project_external_ids: list[str] | None = None,
     reason: str | None = None,
     done_date: str | None = None,
 ) -> dict[str, Any]:
@@ -356,6 +380,8 @@ def update_task_page(
         due_date=due_date,
         priority=priority,
         categories=categories,
+        area=area,
+        project_external_ids=project_external_ids,
         reason=reason,
         done_date=done_date,
     )

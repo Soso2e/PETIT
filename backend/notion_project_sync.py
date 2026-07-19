@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS notion_projects_cache (
     status TEXT NOT NULL DEFAULT 'unknown',
     owner_external_ids TEXT NOT NULL DEFAULT '[]',
     priority TEXT,
+    area TEXT,
     period_start TEXT,
     period_end TEXT,
     summary TEXT,
@@ -59,6 +60,7 @@ ON notion_source_candidates(status, source_type, updated_at);
 """
 
 _TASK_COLUMNS = {
+    "area": "TEXT",
     "project_external_id": "TEXT",
     "project_external_ids": "TEXT NOT NULL DEFAULT '[]'",
     "project_id": "TEXT",
@@ -68,6 +70,10 @@ _TASK_COLUMNS = {
     "subtask_external_ids": "TEXT NOT NULL DEFAULT '[]'",
     "summary": "TEXT",
     "source_updated_at": "TEXT",
+}
+
+_PROJECT_COLUMNS = {
+    "area": "TEXT",
 }
 
 
@@ -82,6 +88,7 @@ def ensure_notion_project_schema() -> None:
     project_continuity.ensure_project_schema()
     with db.get_connection() as conn:
         conn.executescript(_SCHEMA)
+        _ensure_columns(conn, "notion_projects_cache", _PROJECT_COLUMNS)
         _ensure_columns(conn, "tasks_cache", _TASK_COLUMNS)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_tasks_cache_project_id ON tasks_cache(project_id, status)"
@@ -119,6 +126,7 @@ def _upsert_candidate(
     metadata = {
         "status": project.get("status"),
         "priority": project.get("priority"),
+        "area": project.get("area"),
         "period_start": project.get("period_start"),
         "period_end": project.get("period_end"),
         "summary": project.get("summary"),
@@ -179,11 +187,11 @@ def upsert_projects(projects: list[dict[str, Any]]) -> int:
             internal_project_id = _confirmed_internal_project(conn, external_id)
             conn.execute(
                 "INSERT INTO notion_projects_cache "
-                "(external_id, internal_project_id, title, status, owner_external_ids, priority, period_start, period_end, summary, "
+                "(external_id, internal_project_id, title, status, owner_external_ids, priority, area, period_start, period_end, summary, "
                 "task_external_ids, blocked_by_external_ids, url, source_created_at, source_updated_at, synced_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(external_id) DO UPDATE SET internal_project_id=excluded.internal_project_id, title=excluded.title, "
-                "status=excluded.status, owner_external_ids=excluded.owner_external_ids, priority=excluded.priority, "
+                "status=excluded.status, owner_external_ids=excluded.owner_external_ids, priority=excluded.priority, area=excluded.area, "
                 "period_start=excluded.period_start, period_end=excluded.period_end, summary=excluded.summary, "
                 "task_external_ids=excluded.task_external_ids, blocked_by_external_ids=excluded.blocked_by_external_ids, "
                 "url=excluded.url, source_created_at=excluded.source_created_at, source_updated_at=excluded.source_updated_at, "
@@ -195,6 +203,7 @@ def upsert_projects(projects: list[dict[str, Any]]) -> int:
                     project.get("status") or "unknown",
                     _json(project.get("owner_external_ids") or []),
                     project.get("priority"),
+                    project.get("area"),
                     project.get("period_start"),
                     project.get("period_end"),
                     project.get("summary"),
@@ -241,6 +250,7 @@ def upsert_tasks(tasks: list[dict[str, Any]]) -> int:
                 task.get("due_date"),
                 task.get("priority"),
                 task.get("category"),
+                task.get("area"),
                 task.get("reason"),
                 task.get("url"),
                 task.get("done_date"),
@@ -262,7 +272,7 @@ def upsert_tasks(tasks: list[dict[str, Any]]) -> int:
             ).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE tasks_cache SET title=?, status=?, due_date=?, priority=?, category=?, reason=?, url=?, done_date=?, "
+                    "UPDATE tasks_cache SET title=?, status=?, due_date=?, priority=?, category=?, area=?, reason=?, url=?, done_date=?, "
                     "project_external_id=?, project_external_ids=?, project_id=?, assignee_external_ids=?, parent_external_id=?, "
                     "parent_external_ids=?, subtask_external_ids=?, summary=?, source_updated_at=?, updated_at=? "
                     "WHERE source='notion' AND external_id=?",
@@ -271,10 +281,10 @@ def upsert_tasks(tasks: list[dict[str, Any]]) -> int:
             else:
                 conn.execute(
                     "INSERT INTO tasks_cache "
-                    "(source, title, status, due_date, priority, category, reason, url, done_date, project_external_id, "
+                    "(source, title, status, due_date, priority, category, area, reason, url, done_date, project_external_id, "
                     "project_external_ids, project_id, assignee_external_ids, parent_external_id, parent_external_ids, "
                     "subtask_external_ids, summary, source_updated_at, updated_at, external_id) "
-                    "VALUES ('notion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "VALUES ('notion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     values,
                 )
         _delete_missing(conn, "tasks_cache", "external_id", seen_ids, where="source='notion'")

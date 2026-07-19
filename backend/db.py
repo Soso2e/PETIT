@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS tasks_cache (
     due_date    TEXT,
     priority    TEXT,
     category    TEXT,
+    area        TEXT,
     reason      TEXT,
     external_id TEXT,
     url         TEXT,
@@ -163,11 +164,13 @@ def init_db() -> None:
             "tasks_cache",
             {
                 "category": "TEXT",
+                "area": "TEXT",
                 "reason": "TEXT",
                 "url": "TEXT",
                 "done_date": "TEXT",
             },
         )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_cache_area ON tasks_cache(area, status)")
         _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER"})
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id, id)")
