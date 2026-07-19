@@ -28,15 +28,15 @@ jobs:
       - name: Candidate upsert
         run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_candidate_upsert_round_trips
       - name: Discovery success
-        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_reports_success 2>&1 | tee discovery-success.log
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_reports_success
+      - name: Discovery count
+        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_returns_one_candidate 2>&1 | tee discovery-count.log
       - name: Upload discovery diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: brain-discovery-log
-          path: discovery-success.log
-      - name: Discovery count
-        run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_returns_one_candidate
+          path: discovery-count.log
       - name: Discovery path
         run: python -m unittest tests.test_brain_candidate_discovery.BrainCandidateDiscoveryTests.test_discovery_candidate_has_expected_path
       - name: Candidate exclusion boundary
