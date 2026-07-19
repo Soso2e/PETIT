@@ -226,7 +226,7 @@ def _project_search_terms(project_id: str) -> list[str]:
     terms = [str(project["name"])]
     with db.get_connection() as conn:
         rows = conn.execute(
-            "SELECT alias FROM project_aliases WHERE project_id=? ORDER BY id",
+            "SELECT alias FROM project_aliases WHERE project_id=? ORDER BY created_at, normalized_alias",
             (project_id,),
         ).fetchall()
     terms.extend(str(row["alias"]) for row in rows)
