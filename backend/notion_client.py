@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 import httpx
+
 from . import config
 from .task_taxonomy import resolve_area
 
@@ -224,6 +225,10 @@ def _multi_select_prop(values: list[str] | None) -> dict[str, Any]:
     return {"multi_select": [{"name": value} for value in (values or []) if value]}
 
 
+def _relation_prop(values: list[str] | None) -> dict[str, Any]:
+    return {"relation": [{"id": value} for value in (values or []) if value]}
+
+
 def _task_properties(
     title: str | None = None,
     status: str | None = None,
@@ -231,6 +236,7 @@ def _task_properties(
     priority: str | None = None,
     categories: list[str] | None = None,
     area: str | None = None,
+    project_external_ids: list[str] | None = None,
     reason: str | None = None,
     done_date: str | None = None,
 ) -> dict[str, Any]:
@@ -247,6 +253,8 @@ def _task_properties(
         props[config.NOTION_PROP_CATEGORY] = _multi_select_prop(categories)
     if area is not None:
         props[config.NOTION_PROP_AREA] = _select_prop(area)
+    if project_external_ids is not None:
+        props[config.NOTION_TASK_PROP_PROJECT] = _relation_prop(project_external_ids)
     if reason is not None:
         props[config.NOTION_PROP_REASON] = _rich_text_prop(reason)
     if done_date is not None:
@@ -334,6 +342,7 @@ def create_task_page(
     priority: str | None = None,
     categories: list[str] | None = None,
     area: str | None = None,
+    project_external_ids: list[str] | None = None,
     reason: str | None = None,
     status: str | None = None,
     db_id: str | None = None,
@@ -348,6 +357,7 @@ def create_task_page(
             priority=priority,
             categories=categories,
             area=area,
+            project_external_ids=project_external_ids,
             reason=reason,
         ),
     }
@@ -361,6 +371,7 @@ def update_task_page(
     priority: str | None = None,
     categories: list[str] | None = None,
     area: str | None = None,
+    project_external_ids: list[str] | None = None,
     reason: str | None = None,
     done_date: str | None = None,
 ) -> dict[str, Any]:
@@ -370,6 +381,7 @@ def update_task_page(
         priority=priority,
         categories=categories,
         area=area,
+        project_external_ids=project_external_ids,
         reason=reason,
         done_date=done_date,
     )
