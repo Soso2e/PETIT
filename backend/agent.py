@@ -1,7 +1,7 @@
 """Minimal conversation flow for PETIT.
 
-The default path is deliberately boring: one chat-model call, a short prompt,
-and only the last five conversation turns. Retrieval and situation gathering
+The default path is deliberately boring: one chat-model call, a compact prompt,
+and only the last three conversation exchanges. Retrieval and situation gathering
 are opt-in through explicit tool routing.
 """
 from __future__ import annotations
@@ -14,12 +14,20 @@ from typing import Any
 from . import config, db, model_router, project_router, recall, situation, tools  # recall/situation kept import-compatible; never used for chat
 from .lmstudio_client import LMStudioError, chat_completion
 
-SYSTEM_PROMPT = (
-    "あなたはPETIT。ユーザー専用の相棒です。自然で短い日本語で答えてください。"
-    "聞かれていない情報や長い説明は足さず、通常は1〜3文で返してください。"
-    "ツール結果がある場合だけ、その事実を使って答えてください。"
-    "書き込みを頼まれたら対象確認後に書き込みツールを呼び、実行結果なしに完了したと言わないでください。"
+CHAT_SYSTEM_PROMPT = (
+    "あなたはPETIT。ユーザーの相棒として、自然で短い日本語を1〜2文で返してください。"
+    "質問に直接答え、思考過程や不要な前置きは出さないでください。"
 )
+AGENT_SYSTEM_PROMPT = (
+    CHAT_SYSTEM_PROMPT
+    + "ツール結果がある場合だけ、その事実を使ってください。"
+    "書き込みは対象確認後にツールで実行し、実行結果なしに完了したと言わないでください。"
+)
+# Compatibility alias for modules/tests that still import the old name.
+SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
+
+_HISTORY_MAX_MESSAGES = 6
+_HISTORY_MAX_CHARS = 2400
 
 _NAME_PREFIXES = ("petit", "PETIT", "Petit", "プチ", "ぺち")
 _GREETING_REPLIES = {
@@ -92,7 +100,7 @@ def _instant_reply(user_message: str) -> dict[str, Any] | None:
 
 
 def _recent_history(history: list[dict[str, str]] | None) -> list[dict[str, str]]:
-    """Keep five valid exchanges and discard orphan assistant openers."""
+    """Keep at most three valid exchanges within a small character budget."""
     clean: list[dict[str, str]] = []
     for item in history or []:
         role = item.get("role")
@@ -105,7 +113,22 @@ def _recent_history(history: list[dict[str, str]] | None) -> list[dict[str, str]
             clean[-1]["content"] += "\n" + content
         else:
             clean.append({"role": role, "content": content})
-    return clean[-10:]
+
+    bounded_reversed: list[dict[str, str]] = []
+    remaining = _HISTORY_MAX_CHARS
+    for item in reversed(clean[-_HISTORY_MAX_MESSAGES:]):
+        if remaining <= 0:
+            break
+        content = item["content"]
+        if len(content) > remaining:
+            content = ("…" + content[-(remaining - 1):]) if remaining > 1 else "…"
+        bounded_reversed.append({"role": item["role"], "content": content})
+        remaining -= len(content)
+
+    bounded = list(reversed(bounded_reversed))
+    while bounded and bounded[0]["role"] == "assistant":
+        bounded.pop(0)
+    return bounded
 
 
 def _related_tool_names(message: str) -> list[str]:
@@ -289,8 +312,8 @@ def _run_planning_consultation(user_message: str, history: list[dict[str, str]] 
         results.append({"name": name, "content": content})
         used_tools.append({"name": name, "arguments": json.dumps(args, ensure_ascii=False)})
 
-    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(_recent_history(history))
+    messages: list[dict[str, Any]] = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+    messages.extend(history or [])
     messages.append(_tool_result_message(user_message, results))
     answer, actual, fallback_reason = _complete(messages, tools_schema=None, route="agent", allow_chat_fallback=True)
     return {
@@ -316,8 +339,8 @@ def _run_forced_read(
     else:
         args = {"query": user_message, "limit": 5}
     content = tools.dispatch(name, args)
-    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(_recent_history(history))
+    messages: list[dict[str, Any]] = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+    messages.extend(history or [])
     messages.append(_tool_result_message(user_message, [{"name": name, "content": content}]))
     answer, actual, fallback_reason = _complete(messages, tools_schema=None, route="agent", allow_chat_fallback=True)
     reply = _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent")
@@ -331,15 +354,16 @@ def _run_forced_read(
 
 def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow_defer: bool = True) -> dict[str, Any]:
     del allow_defer  # Kept for worker/API compatibility; deferred chat is removed.
+    recent_history = _recent_history(history)
     project_turn = project_router.try_handle_project_turn(
         user_message,
         user_id=config.PETIT_OWNER_ID,
-        recent_history=history,
+        recent_history=recent_history,
     )
     if project_turn:
         return project_turn
 
-    route_decision = model_router.choose(user_message, history)
+    route_decision = model_router.choose(user_message, recent_history)
     tool_names = _related_tool_names(user_message)
     write_requested = any(tools.requires_confirmation(name) for name in tool_names)
     if "edit_brain_note" in tool_names:
@@ -347,9 +371,9 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
         if direct_brain_edit:
             return direct_brain_edit
     if _PLANNING_PATTERN.search(user_message):
-        return _run_planning_consultation(user_message, history)
+        return _run_planning_consultation(user_message, recent_history)
     if not write_requested and len(tool_names) == 1 and tool_names[0] in {"get_tasks", "get_schedule", "search_brain_notes"}:
-        return _run_forced_read(user_message, history, tool_names[0])
+        return _run_forced_read(user_message, recent_history, tool_names[0])
     # Current time is deterministic and does not need an LLM at all.
     if tool_names == ["get_current_time"]:
         raw = tools.dispatch("get_current_time", {})
@@ -357,14 +381,15 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
         if direct:
             return {"reply": direct, "used_tools": [{"name": "get_current_time", "arguments": "{}"}], "model_route": {"kind": "direct", "model": None}}
 
-    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(_recent_history(history))
-    messages.append({"role": "user", "content": user_message})
     selected_tools = _selected_schemas(tool_names)
     used_tools: list[dict[str, Any]] = []
     attempted_tool_names: set[str] = set()
     had_tool_failure = False
     requested_route = "agent" if tool_names or route_decision["kind"] == "agent" else "chat"
+    prompt = AGENT_SYSTEM_PROMPT if requested_route == "agent" else CHAT_SYSTEM_PROMPT
+    messages: list[dict[str, Any]] = [{"role": "system", "content": prompt}]
+    messages.extend(recent_history)
+    messages.append({"role": "user", "content": user_message})
 
     # One call for normal chat. Explicit tool requests may need one additional
     # call to phrase the tool result; they still never receive unrelated tools.
