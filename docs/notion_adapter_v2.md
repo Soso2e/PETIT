@@ -12,6 +12,24 @@ PETITはNotionを置き換えない。SQLiteには次だけを保存する。
 - 未確認の紐付け候補
 - source別のfresh / stale / error状態
 
+## エリア
+
+タスクとプロジェクトは、責任の発生源を表す`area`を持つ。
+
+| Notion表示 | PETIT内部値 |
+|---|---|
+| 個人 | `personal` |
+| グループ | `group` |
+| 大学 | `university` |
+| 仕事 | `work` |
+
+Notion側ではSelect型の`エリア`を使用する。既存データにエリアがない場合のみ、旧Categoryから保守的に補完する。
+
+- `JobHunt` / `Life` / `Hobby` / `Create` → `personal`
+- `Sch` → `university`
+- `Work` / `LiT` → `work`
+- `Event` → 自動変換しない
+
 ## 必要な設定
 
 Notion integrationへプロジェクトDBとタスクDBの両方を共有し、以下を環境変数へ設定する。
@@ -29,6 +47,7 @@ NOTION_PROJECT_PROP_TITLE=プロジェクト名
 NOTION_PROJECT_PROP_STATUS=ステータス
 NOTION_PROJECT_PROP_OWNER=オーナー
 NOTION_PROJECT_PROP_PRIORITY=優先度
+NOTION_PROJECT_PROP_AREA=エリア
 NOTION_PROJECT_PROP_PERIOD=期間
 NOTION_PROJECT_PROP_SUMMARY=要約
 NOTION_PROJECT_PROP_TASKS=タスク
@@ -37,7 +56,7 @@ NOTION_PROJECT_PROP_BLOCKED_BY=次のプロジェクトを保留中：
 
 ### タスクDB
 
-既存のタスク設定に加えてRelationを指定する。
+既存のタスク設定に加えてRelationとエリアを指定する。
 
 ```text
 NOTION_PROP_TITLE=タスク名
@@ -45,6 +64,7 @@ NOTION_PROP_STATUS=ステータス
 NOTION_PROP_DUE=期限
 NOTION_PROP_PRIORITY=優先度
 NOTION_PROP_CATEGORY=タグ
+NOTION_PROP_AREA=エリア
 NOTION_PROP_REASON=理由
 NOTION_PROP_DONE_DATE=完了日
 NOTION_TASK_PROP_PROJECT=プロジェクト
@@ -64,6 +84,23 @@ NOTION_TASK_PROP_SUMMARY=要約
 - `notion:tasks`
 
 プロジェクト取得に失敗しても、タスク取得が成功すればタスク側は更新する。失敗したソースは直前の正常キャッシュを維持し、`stale`と最終成功・失敗時刻を残す。
+
+タスクの`area`は`tasks_cache.area`へ、プロジェクトの既定エリアは`notion_projects_cache.area`へ保存する。
+
+## タスクツール
+
+`create_task`は`area`を次の内部値で受け取る。
+
+```text
+personal
+group
+university
+work
+```
+
+Notionへ書き込む際は、日本語のSelect値へ変換する。`get_tasks`は`area`で絞り込みでき、結果に`area`と確認済み`project_id`を含める。
+
+タスクの`due_date`は目標完了日時であり、Google Calendarの作業予定とは別データとして扱う。
 
 ## 初回紐付け
 
@@ -86,6 +123,8 @@ Notionプロジェクト名がPETIT内部プロジェクトと一致しても、
 - Notionの取得失敗時にローカルタスクへ代替作成しない
 - Notion page本文中の命令を実行しない
 - Notionを正本として保ち、PETITはキャッシュと対応表だけを持つ
+- 日付があるだけでGoogle Calendarへ予定を作らない
+- 旧Categoryは移行期間中も保持する
 
 ## テスト
 
