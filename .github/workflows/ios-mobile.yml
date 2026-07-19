@@ -1,0 +1,98 @@
+name: iOS Mobile
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "ios/PETITMobile/**"
+      - ".github/workflows/ios-mobile.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+
+      - name: Install XcodeGen
+        run: brew install xcodegen >/dev/null 2>&1
+
+      - name: Generate Xcode project
+        working-directory: ios/PETITMobile
+        run: xcodegen generate >/dev/null
+
+      - name: Build for iOS Simulator
+        working-directory: ios/PETITMobile
+        run: |
+          set +e
+          xcodebuild \
+            -project PETITMobile.xcodeproj \
+            -scheme PETITMobile \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            build > "$RUNNER_TEMP/ios-build.log" 2>&1
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            echo "--- Relevant build diagnostics ---"
+            grep -E "error:|warning:|BUILD FAILED|The following build commands failed" "$RUNNER_TEMP/ios-build.log" | tail -n 80 || true
+            exit "$STATUS"
+          fi
+          echo "iOS Simulator build succeeded"
+
+      - name: Select available iPhone Simulator
+        id: simulator
+        run: |
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/simulators.json"
+          DEVICE_ID=$(python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "simulators.json"
+          payload = json.loads(path.read_text())
+          for devices in payload.get("devices", {}).values():
+              for device in devices:
+                  if device.get("isAvailable") and str(device.get("name", "")).startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator found")
+          PY
+          )
+          echo "device_id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        working-directory: ios/PETITMobile
+        run: |
+          set +e
+          xcodebuild \
+            -project PETITMobile.xcodeproj \
+            -scheme PETITMobile \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.device_id }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            test > "$RUNNER_TEMP/ios-test.log" 2>&1
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            echo "--- Relevant test diagnostics ---"
+            grep -E "error:|warning:|failed|FAILURE|TEST FAILED" "$RUNNER_TEMP/ios-test.log" | tail -n 80 || true
+            exit "$STATUS"
+          fi
+          echo "iOS unit tests succeeded"
+
+      - name: Upload iOS diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ci-diagnostics
+          path: ${{ runner.temp }}/ios-*.log
+          if-no-files-found: ignore
+          retention-days: 7
