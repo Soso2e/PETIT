@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS tasks_cache (
     due_date    TEXT,
     priority    TEXT,
     category    TEXT,
+    area        TEXT,
     reason      TEXT,
     external_id TEXT,
     url         TEXT,
@@ -163,11 +164,13 @@ def init_db() -> None:
             "tasks_cache",
             {
                 "category": "TEXT",
+                "area": "TEXT",
                 "reason": "TEXT",
                 "url": "TEXT",
                 "done_date": "TEXT",
             },
         )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_cache_area ON tasks_cache(area, status)")
         _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER"})
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id, id)")
@@ -257,263 +260,6 @@ def recent_conversations(limit: int = 20, session_id: str | None = None) -> list
         else:
             rows = conn.execute(
                 "SELECT id, timestamp, user_text, assistant_text, used_tools, session_id "
-                "FROM conversations ORDER BY id DESC LIMIT ?",
-                (limit,),
+                "FROM conversations ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
-    return [dict(r) for r in reversed(rows)]
-
-
-def all_memory() -> list[dict[str, Any]]:
-    with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, created_at, type, content, source, content_hash, embedding_model, embedding_version, indexed_at FROM memory ORDER BY id ASC"
-        ).fetchall()
-    return [dict(r) for r in rows]
-
-
-def normalized_hash(content: str) -> str:
-    import hashlib
-    normalized = " ".join(content.casefold().split())
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-
-
-def save_memory_item(content: str, mem_type: str, source: str) -> tuple[int, bool]:
-    """Save a durable fact once. Exact normalized duplicates remain one record."""
-    digest = normalized_hash(content)
-    with get_connection() as conn:
-        row = conn.execute("SELECT id FROM memory WHERE content_hash = ?", (digest,)).fetchone()
-        if row:
-            return int(row["id"]), False
-        cur = conn.execute(
-            "INSERT INTO memory (created_at, type, content, source, content_hash) VALUES (?, ?, ?, ?, ?)",
-            (now_iso(), mem_type, content.strip(), source, digest),
-        )
-        return int(cur.lastrowid), True
-
-
-def update_memory_indexed(memory_id: int, model: str, version: str) -> None:
-    with get_connection() as conn:
-        conn.execute("UPDATE memory SET embedding_model=?, embedding_version=?, indexed_at=? WHERE id=?", (model, version, now_iso(), memory_id))
-
-
-def pending_episode_groups() -> list[list[dict[str, Any]]]:
-    """Unfinalized turns grouped by browser session; never includes an episode twice."""
-    with get_connection() as conn:
-        rows = conn.execute("SELECT id, timestamp, user_text, assistant_text, used_tools, session_id FROM conversations WHERE episode_id IS NULL ORDER BY id ASC").fetchall()
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for row in rows:
-        item = dict(row)
-        groups.setdefault(item.get("session_id") or "legacy", []).append(item)
-    return list(groups.values())
-
-
-def save_episode(data: dict[str, Any]) -> int:
-    now = now_iso()
-    with get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO conversation_episodes (started_at, ended_at, title, summary, decisions, facts, work_in_progress, next_action, source_conversation_ids, content_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (data["started_at"], data["ended_at"], data["title"], data["summary"], data["decisions"], data["facts"], data["work_in_progress"], data["next_action"], data["source_ids"], data["content_hash"], now, now),
-        )
-        episode_id = int(cur.lastrowid)
-        ids = json.loads(data["source_ids"])
-        conn.executemany("UPDATE conversations SET episode_id=? WHERE id=? AND episode_id IS NULL", [(episode_id, item) for item in ids])
-        return episode_id
-
-
-def recent_episodes(limit: int = 20) -> list[dict[str, Any]]:
-    with get_connection() as conn:
-        rows = conn.execute("SELECT * FROM conversation_episodes ORDER BY episode_id DESC LIMIT ?", (limit,)).fetchall()
     return [dict(row) for row in reversed(rows)]
-
-
-def all_episodes() -> list[dict[str, Any]]:
-    with get_connection() as conn:
-        rows = conn.execute("SELECT * FROM conversation_episodes ORDER BY episode_id ASC").fetchall()
-    return [dict(row) for row in rows]
-
-
-def update_episode_indexed(episode_id: int, model: str, version: str) -> None:
-    with get_connection() as conn:
-        conn.execute("UPDATE conversation_episodes SET embedding_model=?, embedding_version=?, indexed_at=?, updated_at=? WHERE episode_id=?", (model, version, now_iso(), now_iso(), episode_id))
-
-
-# --- Summaries ---------------------------------------------------------------
-
-def last_summarized_conv_id() -> int:
-    """Highest conversation id that has already been folded into a summary."""
-    with get_connection() as conn:
-        row = conn.execute("SELECT MAX(last_conv_id) AS m FROM summaries").fetchone()
-    return int(row["m"]) if row and row["m"] is not None else 0
-
-
-def conversations_after(conv_id: int, limit: int = 500) -> list[dict[str, Any]]:
-    """Conversation turns newer than conv_id, oldest first (chronological)."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, timestamp, user_text, assistant_text, used_tools "
-            "FROM conversations WHERE id > ? ORDER BY id ASC LIMIT ?",
-            (conv_id, limit),
-        ).fetchall()
-    return [dict(r) for r in rows]
-
-
-def save_summary(
-    summary: str,
-    facts: str | None,
-    kind: str,
-    period_start: str | None,
-    period_end: str | None,
-    last_conv_id: int,
-    conv_count: int,
-) -> int:
-    with get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO summaries "
-            "(created_at, kind, period_start, period_end, last_conv_id, conv_count, summary, facts) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (now_iso(), kind, period_start, period_end, last_conv_id, conv_count, summary, facts),
-        )
-        return int(cur.lastrowid)
-
-
-def recent_summaries(limit: int = 20) -> list[dict[str, Any]]:
-    with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, created_at, kind, period_start, period_end, conv_count, summary, facts "
-            "FROM summaries ORDER BY id DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-    return [dict(r) for r in reversed(rows)]
-
-
-# --- Handoff notes -----------------------------------------------------------
-
-def save_handoff_note(
-    current_project: str | None,
-    stopped_at: str | None,
-    next_action: str,
-    blockers: str | None,
-    note: str | None,
-    source: str = "manual",
-) -> int:
-    with get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO handoff_notes "
-            "(created_at, current_project, stopped_at, next_action, blockers, note, source) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (now_iso(), current_project, stopped_at, next_action, blockers, note, source),
-        )
-        return int(cur.lastrowid)
-
-
-def recent_handoff_notes(limit: int = 5) -> list[dict[str, Any]]:
-    with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, created_at, current_project, stopped_at, next_action, blockers, note, source "
-            "FROM handoff_notes ORDER BY id DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
-    return [dict(r) for r in reversed(rows)]
-
-
-# --- Background jobs ---------------------------------------------------------
-
-def create_job(
-    job_type: str,
-    input_json: str,
-    *,
-    session_id: str | None = None,
-    request_id: str | None = None,
-) -> int:
-    if session_id is None or request_id is None:
-        try:
-            from . import request_context
-
-            current_request, current_session = request_context.current_ids()
-        except Exception:  # noqa: BLE001
-            current_request, current_session = None, None
-        request_id = request_id or current_request
-        session_id = session_id or current_session
-    ts = now_iso()
-    with get_connection() as conn:
-        cur = conn.execute(
-            "INSERT INTO jobs (type, status, input_json, session_id, request_id, created_at, updated_at) "
-            "VALUES (?, 'queued', ?, ?, ?, ?, ?)",
-            (job_type, input_json, session_id, request_id, ts, ts),
-        )
-        return int(cur.lastrowid)
-
-
-def claim_next_job() -> dict[str, Any] | None:
-    with get_connection() as conn:
-        row = conn.execute(
-            "SELECT id, type, input_json, session_id, request_id FROM jobs "
-            "WHERE status = 'queued' ORDER BY id ASC LIMIT 1"
-        ).fetchone()
-        if row is None:
-            return None
-        claimed_at = now_iso()
-        updated = conn.execute(
-            "UPDATE jobs SET status = 'running', claimed_at = ?, updated_at = ? "
-            "WHERE id = ? AND status = 'queued'",
-            (claimed_at, claimed_at, row["id"]),
-        ).rowcount
-        if not updated:
-            return None
-        return dict(row)
-
-
-def finish_job(job_id: int, result_text: str) -> None:
-    with get_connection() as conn:
-        conn.execute(
-            "UPDATE jobs SET status = 'done', result_text = ?, error = NULL, updated_at = ? "
-            "WHERE id = ?",
-            (result_text, now_iso(), job_id),
-        )
-
-
-def fail_job(job_id: int, error: str) -> None:
-    with get_connection() as conn:
-        conn.execute(
-            "UPDATE jobs SET status = 'failed', error = ?, updated_at = ? WHERE id = ?",
-            (error, now_iso(), job_id),
-        )
-
-
-def undelivered_jobs(limit: int = 10, session_id: str | None = None) -> list[dict[str, Any]]:
-    limit = max(1, min(int(limit), 100))
-    with get_connection() as conn:
-        if session_id:
-            rows = conn.execute(
-                "SELECT id, type, status, result_text, error, session_id, request_id, created_at, updated_at "
-                "FROM jobs WHERE delivered = 0 AND session_id = ? AND status IN ('done', 'failed') "
-                "ORDER BY id ASC LIMIT ?",
-                (session_id, limit),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT id, type, status, result_text, error, session_id, request_id, created_at, updated_at "
-                "FROM jobs WHERE delivered = 0 AND status IN ('done', 'failed') "
-                "ORDER BY id ASC LIMIT ?",
-                (limit,),
-            ).fetchall()
-    return [dict(r) for r in rows]
-
-
-def mark_jobs_delivered(job_ids: list[int], session_id: str | None = None) -> None:
-    if not job_ids:
-        return
-    placeholders = ",".join("?" for _ in job_ids)
-    delivered_at = now_iso()
-    with get_connection() as conn:
-        if session_id:
-            conn.execute(
-                f"UPDATE jobs SET delivered = 1, delivered_at = ?, updated_at = ? "
-                f"WHERE session_id = ? AND id IN ({placeholders})",
-                [delivered_at, delivered_at, session_id, *job_ids],
-            )
-        else:
-            conn.execute(
-                f"UPDATE jobs SET delivered = 1, delivered_at = ?, updated_at = ? WHERE id IN ({placeholders})",
-                [delivered_at, delivered_at, *job_ids],
-            )
