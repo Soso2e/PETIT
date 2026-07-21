@@ -77,3 +77,4 @@
 | 2026-07-18 | 17:03 | #47 | 調査完了: LM Studio未接続はSona Agent Core化ではなく、`169.254.83.107:1234`へのネットワーク経路不在が直接原因。稼働中PETITの正しいURL参照と`ConnectError`、正しい`/v1/models`への疎通失敗、該当Wi-Fi切断を確認。さらにディスク上`.env`のURLで`/`欠落を確認。設定・コード修正および復旧後E2Eは未実施。 |
 | 2026-07-18 | 17:19 | #48 | 調査完了: 同一PCのLM Studio `127.0.0.1:1234/v1/models`は正常応答し、6モデルを確認。`.env`が到達不能な`169.254.83.107`を参照し、PETITプロセスは停止中。直接原因を設定先の不一致に確定。localhostへの変更・再起動・ブラウザE2Eは未実施。 |
 | 2026-07-18 | 18:09 | #49 | Core hardeningを実装。model_routerを実経路へ接続、エピソード要約のAgent endpoint修正、briefing/proactiveのepisode優先、Notion成功同期のsource置換、SQLite WAL/busy timeout、session履歴復元、jobのsession/request紐付けと明示ack、回帰テスト・検証手順を追加。変更ファイルのpy_compileとfrontendのnode構文確認成功、全CIと実ブラウザE2Eは未確認。 |
+| 2026-07-21 | 11:43 | #50 | Issue #49対応として`AGENTS.md`を整理。PETIT固有の概要・技術構成・安全境界・Progress Logを維持し、調査・Issue・テスト・PR・禁止事項を追加、Git運用を`main` + 専用ブランチ + PRへ統一。文書差分のみでコードテストは未実施。 |
