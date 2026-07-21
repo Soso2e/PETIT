@@ -26,16 +26,17 @@ _NOTION_READ_TERMS = (
 
 
 def _sync_legacy_globals() -> None:
-    """Propagate monkey-patched dependencies before delegating to legacy code."""
+    """Propagate monkey-patched and dynamically installed dependencies."""
     for name in (
         "config", "db", "model_router", "project_router", "recall", "situation", "tools",
-        "chat_completion", "parse_schedule_date", "has_schedule_date_expression",
+        "chat_completion", "parse_schedule_date", "has_schedule_date_expression", "_TOOL_SIGNALS",
     ):
         if name in globals():
             setattr(_legacy, name, globals()[name])
 
 
 def _notion_read_requested(message: str) -> bool:
+    _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
     text = str(message or "").casefold()
     if not any(marker in text for marker in _NOTION_SOURCE_MARKERS):
         return False
@@ -47,6 +48,7 @@ def _notion_read_requested(message: str) -> bool:
 
 def _related_tool_names(message: str) -> list[str]:
     """Expose the new read tool without changing any legacy signal behavior."""
+    _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
     names = list(_legacy._related_tool_names(message))
     if _notion_read_requested(message):
         names.append("search_notion")
