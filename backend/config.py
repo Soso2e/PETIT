@@ -68,6 +68,17 @@ AI_MEMORY_DIR = _path_from_env("PETIT_AI_MEMORY_DIR", PETIT_VAULT_ROOT / "Memory
 HOST = os.getenv("PETIT_HOST", "127.0.0.1")
 PORT = int(os.getenv("PETIT_PORT", "8000"))
 
+# AivisSpeech text-to-speech.
+TTS_PROVIDER = os.getenv("PETIT_TTS_PROVIDER", "aivis").strip().lower() or "aivis"
+TTS_BASE_URL = os.getenv("PETIT_TTS_BASE_URL", "http://127.0.0.1:10101").strip().rstrip("/")
+_tts_style_id = os.getenv("PETIT_TTS_STYLE_ID", "").strip()
+TTS_STYLE_ID = int(_tts_style_id) if _tts_style_id else None
+TTS_TIMEOUT = float(os.getenv("PETIT_TTS_TIMEOUT", "30"))
+TTS_MAX_CHARS = int(os.getenv("PETIT_TTS_MAX_CHARS", "1000"))
+TTS_SPEED_SCALE = float(os.getenv("PETIT_TTS_SPEED_SCALE", "1.0"))
+TTS_INTONATION_SCALE = float(os.getenv("PETIT_TTS_INTONATION_SCALE", "1.0"))
+TTS_VOLUME_SCALE = float(os.getenv("PETIT_TTS_VOLUME_SCALE", "1.0"))
+
 # LM Studio (OpenAI-compatible endpoint)
 # LM Studio default local server: http://localhost:1234/v1
 LM_BASE_URL = os.getenv("PETIT_LM_BASE_URL", "http://localhost:1234/v1")

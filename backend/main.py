@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -19,7 +19,7 @@ import threading
 import time
 from uuid import uuid4
 
-from . import agent, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, request_context, scheduler, tools, vault_indexer, worker
+from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, request_context, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -90,6 +90,10 @@ class JobAck(BaseModel):
     session_id: str
 
 
+class TTSRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=config.TTS_MAX_CHARS)
+
+
 _pending_actions: dict[str, dict[str, Any]] = {}
 _pending_actions_lock = threading.Lock()
 _PENDING_ACTION_TTL_SECONDS = 600
@@ -146,7 +150,30 @@ def health() -> dict[str, Any]:
         "brain": vault_indexer.status(),
         "memory": {"episodes": len(db.recent_episodes(limit=1000)), "long_term": len(db.all_memory())},
         "model_routing": {"chat_model": config.CHAT_MODEL, "agent_model": config.AGENT_MODEL},
+        "tts": aivis_speech.status(check_engine=False),
     }
+
+
+@app.get("/api/tts/status")
+def tts_status() -> dict[str, Any]:
+    return aivis_speech.status(check_engine=True)
+
+
+@app.post("/api/tts")
+def synthesize_speech(payload: TTSRequest) -> Response:
+    try:
+        audio, style_id = aivis_speech.synthesize(payload.text)
+    except aivis_speech.AivisSpeechError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=503)
+    return Response(
+        content=audio,
+        media_type="audio/wav",
+        headers={
+            "Cache-Control": "no-store",
+            "X-PETIT-TTS-Provider": "aivis",
+            "X-PETIT-TTS-Style-ID": str(style_id),
+        },
+    )
 
 
 @app.post("/api/chat", response_model=ChatResponse)
