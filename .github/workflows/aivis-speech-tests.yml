@@ -1,0 +1,33 @@
+name: AivisSpeech TTS tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/aivis_speech.py"
+      - "backend/config.py"
+      - "backend/main.py"
+      - "frontend/voice.js"
+      - "tests/test_aivis_speech.py"
+      - ".github/workflows/aivis-speech-tests.yml"
+      - ".env.example"
+      - "README.md"
+      - "PROGRESS.md"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet httpx
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Check voice JavaScript syntax
+        run: node --check frontend/voice.js
+      - name: Run AivisSpeech tests
+        run: python -m unittest tests.test_aivis_speech -v
