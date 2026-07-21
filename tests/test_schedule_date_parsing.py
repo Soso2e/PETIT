@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import sys
 import unittest
 from datetime import date, timedelta
-from unittest.mock import patch
+from types import ModuleType
+from unittest.mock import Mock, patch
 
 from backend import agent, config
 from backend.date_parser import has_schedule_date_expression, parse_schedule_date
@@ -112,12 +114,14 @@ class ForcedScheduleReadTests(unittest.TestCase):
             registry.dispatch("get_schedule", target)
         legacy.assert_called_once_with(date="2026-07-13")
 
+        fake_core = ModuleType("backend.sona_core_schedule")
+        fake_core.dispatch_get_schedule = Mock(return_value="{}")
         with (
             patch.object(config, "USE_SONA_CORE", True),
-            patch("backend.sona_core_schedule.dispatch_get_schedule", return_value="{}") as core,
+            patch.dict(sys.modules, {"backend.sona_core_schedule": fake_core}),
         ):
             registry.dispatch("get_schedule", target)
-        core.assert_called_once_with(target)
+        fake_core.dispatch_get_schedule.assert_called_once_with(target)
 
 
 if __name__ == "__main__":
