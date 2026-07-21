@@ -1,0 +1,6 @@
+{
+  "name": "PETIT",
+  "version": "0.2.0",
+  "release": "ai-router",
+  "includes": ["PR #44 lightweight AI routing"]
+}
