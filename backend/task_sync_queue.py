@@ -1,22 +1,17 @@
-"""Durable Notion task write queue.
-
-Notion remains canonical. PETIT stores an optimistic local mirror after the user
-has approved a write, then synchronizes that approved payload in the background.
-Failures stay visible and retryable; remote changes are never overwritten when a
-conflict is detected.
-"""
+"""Durable Notion task write queue with optimistic local task updates."""
 from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from . import db, notion_project_sync
-from .notion_client import NotionError, create_task_page, update_task_page
+from . import db, notion_client, notion_project_sync
+from .notion_client import NotionError, create_task_page
 from .task_taxonomy import resolve_area
 
 SYNC_STATES = ("pending", "synced", "failed", "conflict")
 _MAX_ATTEMPTS = 5
+_SYNC_GUARD_INSTALLED = False
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS task_sync_queue (
@@ -98,6 +93,7 @@ def _set_task_sync(
     attempts: int | None = None,
     last_synced_at: str | None = None,
     remote_snapshot_json: str | None = None,
+    clear_snapshot: bool = False,
 ) -> None:
     assignments = ["sync_status=?", "sync_error=?", "updated_at=?"]
     values: list[Any] = [status, error, db.now_iso()]
@@ -113,6 +109,8 @@ def _set_task_sync(
     if remote_snapshot_json is not None:
         assignments.append("remote_snapshot_json=?")
         values.append(remote_snapshot_json)
+    elif clear_snapshot:
+        assignments.append("remote_snapshot_json=NULL")
     values.append(task_id)
     conn.execute(f"UPDATE tasks_cache SET {', '.join(assignments)} WHERE id=?", values)
 
@@ -126,7 +124,6 @@ def _active_operation(conn: Any, task_id: int, operation: str) -> Any | None:
 
 
 def enqueue_create(task_id: int, payload: dict[str, Any]) -> int:
-    """Queue or coalesce a Notion create for an optimistic local task."""
     ensure_task_sync_schema()
     now = db.now_iso()
     with db.get_connection() as conn:
@@ -147,7 +144,7 @@ def enqueue_create(task_id: int, payload: dict[str, Any]) -> int:
                 (task_id, _json(payload), now, now, now),
             )
             operation_id = int(cur.lastrowid)
-        _set_task_sync(conn, task_id, "pending", operation_id=operation_id, error=None, attempts=0)
+        _set_task_sync(conn, task_id, "pending", operation_id=operation_id, attempts=0, clear_snapshot=True)
     return operation_id
 
 
@@ -157,7 +154,6 @@ def enqueue_update(
     *,
     base_source_updated_at: str | None,
 ) -> int:
-    """Queue an update, coalescing into an unsent create/update when possible."""
     ensure_task_sync_schema()
     now = db.now_iso()
     with db.get_connection() as conn:
@@ -175,7 +171,7 @@ def enqueue_update(
                     "last_error=NULL, updated_at=? WHERE id=?",
                     (_json(merged), now, now, operation_id),
                 )
-                _set_task_sync(conn, task_id, "pending", operation_id=operation_id, error=None, attempts=0)
+                _set_task_sync(conn, task_id, "pending", operation_id=operation_id, attempts=0, clear_snapshot=True)
                 return operation_id
 
         existing = _active_operation(conn, task_id, "update")
@@ -196,7 +192,7 @@ def enqueue_update(
                 (task_id, _json(payload), base_source_updated_at, now, now, now),
             )
             operation_id = int(cur.lastrowid)
-        _set_task_sync(conn, task_id, "pending", operation_id=operation_id, error=None, attempts=0)
+        _set_task_sync(conn, task_id, "pending", operation_id=operation_id, attempts=0, clear_snapshot=True)
     return operation_id
 
 
@@ -310,6 +306,25 @@ def _apply_remote_result(operation: dict[str, Any], remote: dict[str, Any]) -> N
         )
 
 
+def _update_remote_task(page_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    props = notion_client._task_properties(
+        title=payload.get("title"),
+        status=payload.get("status"),
+        due_date=payload.get("due_date"),
+        priority=payload.get("priority"),
+        categories=payload.get("categories"),
+        area=payload.get("area"),
+        project_external_ids=payload.get("project_external_ids"),
+        reason=payload.get("reason"),
+        done_date=payload.get("done_date"),
+    )
+    if not props:
+        raise NotionError("更新するNotionプロパティがありません。")
+    return notion_client.parse_task_page(
+        notion_client._patch(f"/pages/{page_id}", {"properties": props}, timeout=20)
+    )
+
+
 def _execute(operation: dict[str, Any]) -> None:
     task = _task(int(operation["task_id"]))
     if task is None:
@@ -320,10 +335,8 @@ def _execute(operation: dict[str, Any]) -> None:
         remote = create_task_page(**payload)
         _apply_remote_result(operation, remote)
         return
-
     if operation["operation"] != "update":
         raise ValueError(f"未対応のタスク同期操作です: {operation['operation']}")
-
     if task.get("sync_status") == "conflict":
         _mark_conflict(operation, task, task.get("sync_error") or "Notion側の更新と競合しています。")
         return
@@ -333,22 +346,19 @@ def _execute(operation: dict[str, Any]) -> None:
     if base and current and str(base) != str(current):
         _mark_conflict(operation, task, "Notion側がローカル編集後に更新されたため、自動上書きを停止しました。")
         return
-
     external_id = str(task.get("external_id") or "").strip()
     if not external_id:
         raise NotionError("Notionページ作成が未完了のため、更新を後で再試行します。")
-    remote = update_task_page(page_id=external_id, **payload)
-    _apply_remote_result(operation, remote)
+    _apply_remote_result(operation, _update_remote_task(external_id, payload))
 
 
 def process_next() -> bool:
-    """Process one due queue item. Returns whether an item was claimed."""
     operation = _claim_next()
     if operation is None:
         return False
     try:
         _execute(operation)
-    except Exception as exc:  # noqa: BLE001 - durable queue records failures
+    except Exception as exc:  # noqa: BLE001 - queue retains failure details
         _mark_failed(operation, exc)
     return True
 
@@ -367,7 +377,7 @@ def retry_task(task_id: int) -> dict[str, Any]:
             return {
                 "queued": False,
                 "conflict": True,
-                "error": "Notion側の変更と競合しています。最新内容を確認してから編集し直してください。",
+                "error": "Notion側の変更と競合しています。同期状態を確認してから編集し直してください。",
                 "task_id": int(task_id),
                 "operation_id": int(row["id"]),
             }
@@ -375,7 +385,7 @@ def retry_task(task_id: int) -> dict[str, Any]:
             "UPDATE task_sync_queue SET status='pending', attempts=0, next_attempt_at=?, last_error=NULL, updated_at=? WHERE id=?",
             (now, now, row["id"]),
         )
-        _set_task_sync(conn, int(task_id), "pending", operation_id=int(row["id"]), error=None, attempts=0)
+        _set_task_sync(conn, int(task_id), "pending", operation_id=int(row["id"]), attempts=0)
     return {"queued": True, "task_id": int(task_id), "operation_id": int(row["id"]), "sync_status": "pending"}
 
 
@@ -393,10 +403,121 @@ def status(*, task_id: int | None = None, limit: int = 20) -> dict[str, Any]:
                 "FROM task_sync_queue ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
+            task_data = None
         else:
             rows = conn.execute(
                 "SELECT id, task_id, operation, status, attempts, next_attempt_at, last_error, created_at, updated_at, synced_at "
                 "FROM task_sync_queue WHERE task_id=? ORDER BY id DESC LIMIT ?",
                 (int(task_id), limit),
             ).fetchall()
-    return {"counts": counts, "operations": [dict(row) for row in rows], "task_id": task_id}
+            task_row = conn.execute(
+                "SELECT id, source, external_id, title, status, due_date, priority, area, project_id, "
+                "sync_status, sync_error, sync_attempts, last_synced_at, source_updated_at, remote_snapshot_json "
+                "FROM tasks_cache WHERE id=?",
+                (int(task_id),),
+            ).fetchone()
+            task_data = dict(task_row) if task_row else None
+    if task_data and task_data.get("remote_snapshot_json"):
+        task_data["remote_snapshot"] = _loads(task_data.pop("remote_snapshot_json"))
+    elif task_data:
+        task_data.pop("remote_snapshot_json", None)
+    return {"counts": counts, "operations": [dict(row) for row in rows], "task_id": task_id, "task": task_data}
+
+
+def upsert_tasks_with_conflict_guard(tasks: list[dict[str, Any]]) -> int:
+    """Merge Notion reads without overwriting approved local pending edits."""
+    ensure_task_sync_schema()
+    now = db.now_iso()
+    seen_ids: list[str] = []
+    with db.get_connection() as conn:
+        for task in tasks:
+            external_id = str(task.get("external_id") or "").strip()
+            title = str(task.get("title") or "").strip()
+            if not external_id or not title:
+                continue
+            seen_ids.append(external_id)
+            project_external_ids = [str(item) for item in task.get("project_external_ids") or [] if str(item).strip()]
+            parent_external_ids = [str(item) for item in task.get("parent_external_ids") or [] if str(item).strip()]
+            project_id = notion_project_sync._resolve_task_project(conn, project_external_ids)
+            existing = conn.execute(
+                "SELECT * FROM tasks_cache WHERE source='notion' AND external_id=?",
+                (external_id,),
+            ).fetchone()
+
+            if existing and str(existing["sync_status"] or "synced") in {"pending", "failed", "conflict"}:
+                previous_remote_time = existing["source_updated_at"]
+                incoming_remote_time = task.get("source_updated_at")
+                if previous_remote_time and incoming_remote_time and str(previous_remote_time) != str(incoming_remote_time):
+                    message = "Notion側にも更新があるため、ローカル編集の自動上書きを停止しました。"
+                    conn.execute(
+                        "UPDATE tasks_cache SET sync_status='conflict', sync_error=?, remote_snapshot_json=?, updated_at=? WHERE id=?",
+                        (message, _json(task), now, existing["id"]),
+                    )
+                    conn.execute(
+                        "UPDATE task_sync_queue SET status='conflict', last_error=?, next_attempt_at=NULL, updated_at=? "
+                        "WHERE task_id=? AND status IN ('pending','failed','processing')",
+                        (message, now, existing["id"]),
+                    )
+                continue
+
+            area, _ = resolve_area(task.get("area"), task.get("category"))
+            values = (
+                title,
+                task.get("status") or "unknown",
+                task.get("due_date"),
+                task.get("priority"),
+                task.get("category"),
+                area,
+                task.get("reason"),
+                task.get("url"),
+                task.get("done_date"),
+                project_external_ids[0] if project_external_ids else None,
+                json.dumps(project_external_ids, ensure_ascii=False),
+                project_id,
+                json.dumps(task.get("assignee_external_ids") or [], ensure_ascii=False),
+                parent_external_ids[0] if parent_external_ids else None,
+                json.dumps(parent_external_ids, ensure_ascii=False),
+                json.dumps(task.get("subtask_external_ids") or [], ensure_ascii=False),
+                task.get("summary"),
+                task.get("source_updated_at"),
+                now,
+                now,
+                external_id,
+            )
+            if existing:
+                conn.execute(
+                    "UPDATE tasks_cache SET title=?, status=?, due_date=?, priority=?, category=?, area=?, reason=?, url=?, done_date=?, "
+                    "project_external_id=?, project_external_ids=?, project_id=?, assignee_external_ids=?, parent_external_id=?, "
+                    "parent_external_ids=?, subtask_external_ids=?, summary=?, source_updated_at=?, updated_at=?, "
+                    "sync_status='synced', sync_error=NULL, last_synced_at=?, remote_snapshot_json=NULL "
+                    "WHERE source='notion' AND external_id=?",
+                    values,
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO tasks_cache "
+                    "(source, title, status, due_date, priority, category, area, reason, url, done_date, project_external_id, "
+                    "project_external_ids, project_id, assignee_external_ids, parent_external_id, parent_external_ids, "
+                    "subtask_external_ids, summary, source_updated_at, updated_at, last_synced_at, external_id, sync_status) "
+                    "VALUES ('notion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')",
+                    values,
+                )
+
+        if seen_ids:
+            placeholders = ",".join("?" for _ in seen_ids)
+            conn.execute(
+                "DELETE FROM tasks_cache WHERE source='notion' AND sync_status='synced' "
+                f"AND (external_id IS NULL OR external_id NOT IN ({placeholders}))",
+                seen_ids,
+            )
+        else:
+            conn.execute("DELETE FROM tasks_cache WHERE source='notion' AND sync_status='synced'")
+    return len(seen_ids)
+
+
+def install_sync_guard() -> None:
+    global _SYNC_GUARD_INSTALLED
+    if _SYNC_GUARD_INSTALLED:
+        return
+    notion_project_sync.upsert_tasks = upsert_tasks_with_conflict_guard
+    _SYNC_GUARD_INSTALLED = True
