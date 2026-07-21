@@ -36,7 +36,17 @@ jobs:
         run: node --check frontend/app.js
 
       - name: Run existing core hardening tests
-        run: python -m unittest tests.test_core_hardening -v
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m unittest tests.test_core_hardening -v 2>&1 | tee core-test-output.txt
+
+      - name: Upload core test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-test-output
+          path: core-test-output.txt
 
       - name: Run chat context budget tests
         run: python -m unittest tests.test_chat_context_budget -v
