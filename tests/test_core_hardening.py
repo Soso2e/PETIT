@@ -17,8 +17,16 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
             calls.append({"tools": tools, "model": model, "route": route})
             return {"role": "assistant", "content": "設計を分析しました"}
 
+        route = {
+            "kind": "agent",
+            "model": "agent-test",
+            "reasons": ["tools_or_reasoning"],
+            "router_source": "test",
+            "router_confidence": 1.0,
+        }
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
+            patch.object(agent.model_router, "choose", return_value=route),
             patch.object(config, "CHAT_MODEL", "chat-test"),
             patch.object(config, "AGENT_MODEL", "agent-test"),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
