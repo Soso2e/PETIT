@@ -1,4 +1,4 @@
-// PETIT voice mode — browser speech input/output layered over the existing chat UI.
+// PETIT voice mode — browser speech input + AivisSpeech output layered over the existing chat UI.
 (() => {
   const messagesEl = document.getElementById("messages");
   const formEl = document.getElementById("chat-form");
@@ -12,7 +12,8 @@
 
   const SpeechRecognitionApi = window.SpeechRecognition || window.webkitSpeechRecognition;
   const speechRecognitionSupported = Boolean(SpeechRecognitionApi);
-  const speechSynthesisSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+  const browserSpeechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+  const audioPlaybackSupported = typeof Audio !== "undefined" && typeof fetch === "function";
 
   let voiceReplyEnabled = localStorage.getItem("petit_voice_reply_enabled") === "1";
   let recognition = null;
@@ -20,6 +21,9 @@
   let finalTranscript = "";
   let draftBeforeListening = "";
   let observerReady = false;
+  let currentAudio = null;
+  let currentAudioUrl = null;
+  let currentTtsRequest = null;
 
   function setVoiceState(message, { error = false } = {}) {
     voiceStateEl.textContent = message || "";
@@ -27,7 +31,7 @@
   }
 
   function updateVoiceToggle() {
-    if (!speechSynthesisSupported) {
+    if (!audioPlaybackSupported && !browserSpeechSupported) {
       voiceReplyEnabled = false;
       voiceToggleEl.disabled = true;
       voiceToggleEl.textContent = "音声応答 非対応";
@@ -63,32 +67,105 @@
   }
 
   function findJapaneseVoice() {
+    if (!browserSpeechSupported) return null;
     const voices = window.speechSynthesis.getVoices();
     return voices.find((voice) => voice.lang === "ja-JP")
       || voices.find((voice) => voice.lang && voice.lang.toLowerCase().startsWith("ja"))
       || null;
   }
 
-  function stopSpeaking() {
-    if (speechSynthesisSupported) window.speechSynthesis.cancel();
+  function releaseAudio() {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.src = "";
+      currentAudio = null;
+    }
+    if (currentAudioUrl) {
+      URL.revokeObjectURL(currentAudioUrl);
+      currentAudioUrl = null;
+    }
   }
 
-  function speakText(text, { force = false } = {}) {
-    if (!speechSynthesisSupported || (!voiceReplyEnabled && !force)) return;
-    const spoken = normalizeSpeechText(text);
-    if (!spoken) return;
+  function stopSpeaking() {
+    if (currentTtsRequest) {
+      currentTtsRequest.abort();
+      currentTtsRequest = null;
+    }
+    releaseAudio();
+    if (browserSpeechSupported) window.speechSynthesis.cancel();
+  }
 
-    stopSpeaking();
-    const utterance = new SpeechSynthesisUtterance(spoken);
+  function speakWithBrowser(text) {
+    if (!browserSpeechSupported) return false;
+    const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "ja-JP";
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
     const voice = findJapaneseVoice();
     if (voice) utterance.voice = voice;
-    utterance.onstart = () => setVoiceState("PETITが話しています…");
+    utterance.onstart = () => setVoiceState("AivisSpeechに接続できないため、ブラウザ音声で再生しています…");
     utterance.onend = () => setVoiceState("");
     utterance.onerror = () => setVoiceState("音声の再生に失敗しました。", { error: true });
     window.speechSynthesis.speak(utterance);
+    return true;
+  }
+
+  async function speakText(text, { force = false } = {}) {
+    if (!voiceReplyEnabled && !force) return;
+    const spoken = normalizeSpeechText(text);
+    if (!spoken) return;
+
+    stopSpeaking();
+    if (!audioPlaybackSupported) {
+      if (!speakWithBrowser(spoken)) setVoiceState("音声再生に対応していません。", { error: true });
+      return;
+    }
+
+    const controller = new AbortController();
+    currentTtsRequest = controller;
+    setVoiceState("AivisSpeechで音声を生成しています…");
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: spoken }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        let detail = "";
+        try {
+          detail = (await response.json()).error || "";
+        } catch (_error) {
+          detail = "";
+        }
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      if (controller.signal.aborted || currentTtsRequest !== controller) return;
+      currentTtsRequest = null;
+      currentAudioUrl = URL.createObjectURL(blob);
+      currentAudio = new Audio(currentAudioUrl);
+      currentAudio.onplay = () => setVoiceState("PETITが話しています…");
+      currentAudio.onended = () => {
+        releaseAudio();
+        setVoiceState("");
+      };
+      currentAudio.onerror = () => {
+        releaseAudio();
+        setVoiceState("AivisSpeech音声の再生に失敗しました。", { error: true });
+      };
+      await currentAudio.play();
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      currentTtsRequest = null;
+      releaseAudio();
+      if (!speakWithBrowser(spoken)) {
+        const message = error instanceof Error ? error.message : "AivisSpeechへ接続できません。";
+        setVoiceState(`音声を再生できませんでした。${message}`, { error: true });
+      }
+    }
   }
 
   function enhanceAssistantMessage(message, { autoSpeak = false } = {}) {
@@ -97,7 +174,7 @@
     if (!bubble || bubble.classList.contains("typing") || bubble.classList.contains("bubble--error")) return;
 
     message.dataset.voiceEnhanced = "1";
-    const replyText = bubble.childNodes[0] ? bubble.childNodes[0].textContent : bubble.textContent;
+    const replyText = bubble.textContent || "";
     if (!replyText.trim()) return;
 
     const replay = document.createElement("button");
@@ -106,10 +183,10 @@
     replay.textContent = "🔊";
     replay.setAttribute("aria-label", "この返答を読み上げる");
     replay.title = "読み上げる";
-    replay.addEventListener("click", () => speakText(replyText, { force: true }));
+    replay.addEventListener("click", () => void speakText(replyText, { force: true }));
     message.appendChild(replay);
 
-    if (autoSpeak && observerReady) speakText(replyText);
+    if (autoSpeak && observerReady) void speakText(replyText);
   }
 
   const messageObserver = new MutationObserver((mutations) => {
@@ -208,12 +285,12 @@
   }
 
   voiceToggleEl.addEventListener("click", () => {
-    if (!speechSynthesisSupported) return;
+    if (!audioPlaybackSupported && !browserSpeechSupported) return;
     voiceReplyEnabled = !voiceReplyEnabled;
     localStorage.setItem("petit_voice_reply_enabled", voiceReplyEnabled ? "1" : "0");
     if (!voiceReplyEnabled) stopSpeaking();
     updateVoiceToggle();
-    setVoiceState(voiceReplyEnabled ? "音声応答を有効にしました。" : "音声応答を無効にしました。");
+    setVoiceState(voiceReplyEnabled ? "AivisSpeech音声応答を有効にしました。" : "音声応答を無効にしました。");
   });
 
   micEl.addEventListener("click", toggleListening);
