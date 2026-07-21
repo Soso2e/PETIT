@@ -78,3 +78,4 @@
 | 2026-07-18 | 17:19 | #48 | 調査完了: 同一PCのLM Studio `127.0.0.1:1234/v1/models`は正常応答し、6モデルを確認。`.env`が到達不能な`169.254.83.107`を参照し、PETITプロセスは停止中。直接原因を設定先の不一致に確定。localhostへの変更・再起動・ブラウザE2Eは未実施。 |
 | 2026-07-18 | 18:09 | #49 | Core hardeningを実装。model_routerを実経路へ接続、エピソード要約のAgent endpoint修正、briefing/proactiveのepisode優先、Notion成功同期のsource置換、SQLite WAL/busy timeout、session履歴復元、jobのsession/request紐付けと明示ack、回帰テスト・検証手順を追加。変更ファイルのpy_compileとfrontendのnode構文確認成功、全CIと実ブラウザE2Eは未確認。 |
 | 2026-07-21 | 11:43 | #50 | Issue #49対応として`AGENTS.md`を整理。PETIT固有の概要・技術構成・安全境界・Progress Logを維持し、調査・Issue・テスト・PR・禁止事項を追加、Git運用を`main` + 専用ブランチ + PRへ統一。文書差分のみでコードテストは未実施。 |
+| 2026-07-21 | 12:14 | #51 | Issue #6の予定日付解析を実会話経路へ接続。今日・明日・昨日、ISO、日本語年月日、月日を解釈し、不正・曖昧日付は確認要求、Legacy/Coreで同一日付、モデル停止時の簡易予定表示、専用回帰テストとCI対象追加を実装。CI確認中、実ブラウザE2Eは未実施。 |
