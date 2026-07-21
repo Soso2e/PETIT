@@ -13,6 +13,7 @@ from . import (
     memory,
     notion,
     notion_projects,
+    notion_search,
     project_completion,
     project_registration,
     schedule,
