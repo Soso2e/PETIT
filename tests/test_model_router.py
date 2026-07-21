@@ -6,25 +6,36 @@ def _reply(content: str):
     return {"role": "assistant", "content": content}
 
 
-def test_ai_router_keeps_casual_message_on_chat(monkeypatch) -> None:
+def test_one_pass_router_generates_chat_reply(monkeypatch) -> None:
+    prefetched: list[tuple[str, str]] = []
     monkeypatch.setattr(
         model_router,
         "chat_completion",
-        lambda *args, **kwargs: _reply('{"route":"chat","confidence":0.97,"reason":"感想のみ"}'),
+        lambda *args, **kwargs: _reply(
+            '{"type":"reply","reply":"やっほー。どうした？","confidence":0.98}'
+        ),
+    )
+    monkeypatch.setattr(
+        model_router,
+        "set_prefetched_chat",
+        lambda user, reply: prefetched.append((user, reply)),
     )
 
-    route = model_router.choose("会話しやすさはかなり改善した")
+    route = model_router.choose("やっほー")
 
     assert route["kind"] == "chat"
-    assert route["router_source"] == "ai"
-    assert route["router_confidence"] == 0.97
+    assert route["prefetched_reply"] is True
+    assert route["router_confidence"] == 0.98
+    assert prefetched == [("やっほー", "やっほー。どうした？")]
 
 
-def test_ai_router_sends_reasoning_request_to_agent(monkeypatch) -> None:
+def test_one_pass_router_requests_agent(monkeypatch) -> None:
     monkeypatch.setattr(
         model_router,
         "chat_completion",
-        lambda *args, **kwargs: _reply('{"route":"agent","confidence":0.91,"reason":"設計評価が必要"}'),
+        lambda *args, **kwargs: _reply(
+            '{"type":"agent","reason":"設計評価が必要","confidence":0.91}'
+        ),
     )
 
     route = model_router.choose("このエージェント設計を評価して")
@@ -33,16 +44,19 @@ def test_ai_router_sends_reasoning_request_to_agent(monkeypatch) -> None:
     assert "ai_router:agent" in route["reasons"]
 
 
-def test_ai_router_sends_context_request_to_agent(monkeypatch) -> None:
+def test_one_pass_router_returns_tool_suggestions(monkeypatch) -> None:
     monkeypatch.setattr(
         model_router,
         "chat_completion",
-        lambda *args, **kwargs: _reply('{"route":"tool","confidence":0.94,"reason":"予定取得が必要"}'),
+        lambda *args, **kwargs: _reply(
+            '{"type":"tool","tools":["get_schedule"],"reason":"予定取得が必要","confidence":0.94}'
+        ),
     )
 
     route = model_router.choose("明日の予定を教えて")
 
     assert route["kind"] == "agent"
+    assert route["suggested_tools"] == ["get_schedule"]
     assert "ai_router:tool" in route["reasons"]
 
 
@@ -50,10 +64,13 @@ def test_router_accepts_json_code_fence(monkeypatch) -> None:
     monkeypatch.setattr(
         model_router,
         "chat_completion",
-        lambda *args, **kwargs: _reply('```json\n{"route":"chat","confidence":1,"reason":"雑談"}\n```'),
+        lambda *args, **kwargs: _reply(
+            '```json\n{"type":"reply","reply":"了解。","confidence":1}\n```'
+        ),
     )
+    monkeypatch.setattr(model_router, "set_prefetched_chat", lambda *args: None)
 
-    assert model_router.choose("やっほー")["kind"] == "chat"
+    assert model_router.choose("了解")['kind'] == "chat"
 
 
 def test_malformed_router_output_uses_fallback(monkeypatch) -> None:
