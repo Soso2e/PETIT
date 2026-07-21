@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 from . import config, db, model_router, project_router, recall, situation, tools  # recall/situation kept import-compatible; never used for chat
+from .date_parser import has_schedule_date_expression, parse_schedule_date
 from .lmstudio_client import LMStudioError, chat_completion
 
 CHAT_SYSTEM_PROMPT = (
@@ -257,18 +258,19 @@ def _confirmation_text(name: str, args: dict[str, Any]) -> str:
 
 
 def _fallback_read_reply(name: str, content: str) -> str:
-    """Keep safe schedule reads usable when the local model returns no text."""
+    """Keep safe schedule reads usable when both local model routes are unavailable."""
     if name != "get_schedule":
         return ""
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
         return ""
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or data.get("error"):
         return ""
     events = data.get("events") or []
     sync = data.get("calendar_sync") or {}
-    lines = [f"予定は{len(events)}件あります。"]
+    target = str(data.get("date") or "指定日")
+    lines = [f"{target}の予定はありません。" if not events else f"{target}の予定は{len(events)}件あります。"]
     for event in events:
         title = str(event.get("title") or "タイトルなし")
         start = str(event.get("start_time") or "時刻未設定")
@@ -331,8 +333,23 @@ def _run_forced_read(
 ) -> dict[str, Any]:
     args: dict[str, Any]
     if name == "get_schedule":
-        target = date.today() + (timedelta(days=1) if "明日" in user_message else timedelta())
-        args = {"date": target.isoformat()}
+        target = parse_schedule_date(user_message)
+        if target is None and has_schedule_date_expression(user_message):
+            return {
+                "reply": "日付を特定できませんでした。2026-07-13、2026年7月13日、7月13日のように指定してください。",
+                "used_tools": [],
+                "persist": False,
+                "model_route": {
+                    "kind": "clarification",
+                    "requested_route": "deterministic",
+                    "actual_route": "deterministic",
+                    "fallback_reason": "invalid_or_ambiguous_schedule_date",
+                    "model": None,
+                    "base_url_id": None,
+                    "tools": [],
+                },
+            }
+        args = {"date": (target or date.today()).isoformat()}
     elif name == "get_tasks":
         limit_match = re.search(r"(\d+)件", user_message)
         args = {"limit": int(limit_match.group(1))} if limit_match else {"limit": 10}
@@ -342,13 +359,28 @@ def _run_forced_read(
     messages: list[dict[str, Any]] = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
     messages.extend(history or [])
     messages.append(_tool_result_message(user_message, [{"name": name, "content": content}]))
-    answer, actual, fallback_reason = _complete(messages, tools_schema=None, route="agent", allow_chat_fallback=True)
-    reply = _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent")
+    try:
+        answer, actual, fallback_reason = _complete(messages, tools_schema=None, route="agent", allow_chat_fallback=True)
+        reply = _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent")
+        model_route = _route_meta("agent", actual, [name], fallback_reason) | {"kind": "forced_read"}
+    except LMStudioError:
+        reply = _fallback_read_reply(name, content)
+        if not reply:
+            raise
+        model_route = {
+            "kind": "forced_read",
+            "requested_route": "agent",
+            "actual_route": "deterministic",
+            "fallback_reason": "models_unavailable",
+            "model": None,
+            "base_url_id": None,
+            "tools": [name],
+        }
     return {
         "reply": reply or _fallback_read_reply(name, content),
         "used_tools": [{"name": name, "arguments": json.dumps(args, ensure_ascii=False)}],
         "persist": not _tool_failed(content),
-        "model_route": _route_meta("agent", actual, [name], fallback_reason) | {"kind": "forced_read"},
+        "model_route": model_route,
     }
 
 
