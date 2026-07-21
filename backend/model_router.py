@@ -5,13 +5,57 @@ from typing import Any
 
 from . import config
 
-_AGENT_SIGNALS = (
-    "タスク", "予定", "カレンダー", "notion", "brain", "記憶", "覚えて",
-    "調べ", "検索", "ニュース", "天気", "ツール", "同期", "実装", "修正",
-    "分析", "比較", "設計", "計画", "優先", "今週", "明日", "今日何", "何すれば",
-    "どこまで", "続き", "まとめ", "プロジェクト", "決定", "方針", "レビュー",
-    "検証", "原因", "問題", "改善", "コード", "仕様", "要件", "デバッグ",
-    "今何時", "今日何日", "現在時刻", "完了", "終わった", "中断", "復帰",
+# Tool requests are routed separately in ``agent.py``. This router only decides
+# whether a tool-free turn needs the stronger reasoning model. Keep the signals
+# phrase-based so casual lines such as 「問題ないよ」 or 「今日は改善した」 stay
+# in the fast, natural chat path.
+_AGENT_PHRASES = (
+    "原因を教えて",
+    "原因を考えて",
+    "問題を分析",
+    "問題点を",
+    "改善案",
+    "改善方法",
+    "どう改善",
+    "比較して",
+    "違いを比較",
+    "設計して",
+    "設計を考えて",
+    "計画を立て",
+    "優先順位",
+    "レビューして",
+    "検証して",
+    "デバッグして",
+    "実装して",
+    "修正して",
+    "要件を整理",
+    "仕様を整理",
+    "なぜ",
+    "どうして",
+)
+
+_REASONING_DOMAINS = (
+    "コード",
+    "実装",
+    "設計",
+    "仕様",
+    "要件",
+    "アーキテクチャ",
+    "プロジェクト",
+    "モデル",
+    "ai",
+    "エージェント",
+)
+
+_REASONING_ACTIONS = (
+    "考えて",
+    "分析して",
+    "評価して",
+    "整理して",
+    "提案して",
+    "見直して",
+    "レビューして",
+    "比較して",
 )
 
 
@@ -21,15 +65,23 @@ def choose(
 ) -> dict[str, Any]:
     """Return the selected model plus transparent routing reasons.
 
-    Tool selection remains separate. This router also catches pure reasoning turns
-    that do not expose any tool schema, such as code review or architecture analysis.
+    Tool selection remains separate. This router catches only tool-free reasoning
+    turns such as code review or architecture analysis without promoting ordinary
+    conversation merely because it contains a broad word like ``問題``.
     """
     del history  # Reserved for future conversation-aware routing.
     text = user_message.strip()
     reasons: list[str] = []
     lowered = text.casefold()
-    if any(signal.casefold() in lowered for signal in _AGENT_SIGNALS):
-        reasons.append("tools_or_reasoning")
+
+    if any(phrase.casefold() in lowered for phrase in _AGENT_PHRASES):
+        reasons.append("explicit_reasoning")
+    elif (
+        any(domain.casefold() in lowered for domain in _REASONING_DOMAINS)
+        and any(action.casefold() in lowered for action in _REASONING_ACTIONS)
+    ):
+        reasons.append("domain_reasoning")
+
     if text.count("\n") >= 4 or sum(text.count(mark) for mark in ("、", "。", "* ", "- ")) >= 8:
         reasons.append("multi_part")
 
