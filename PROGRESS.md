@@ -11,6 +11,7 @@
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
+- Notion会話検索: 明示的なNotion参照をルーターLLM前に決定論的検出し、共有済みページを最大3件検索、プロパティ・本文抜粋・更新日時・URLを取得する。結果ありはAgent 1回、未設定・0件・API失敗はLLMなしで区別する。実Notion／ブラウザE2Eは未確認。
 - タスク管理: area・確認済みproject Relationに加え、承認後のSQLite即時保存、`pending / synced / failed / conflict`、Notion書き込みキュー、指数バックオフ、手動再試行、タスク編集、競合スナップショットを実装。全回帰CI成功、実Notion／ブラウザE2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
@@ -20,7 +21,7 @@
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: AivisSpeech Engineを実起動し、話者選択・自動読み上げ・停止・fallbackをブラウザで確認する。その後、実Notionとブラウザでタスク作成・編集・失敗再試行・競合確認をE2E検証する。
+- 次にやること: PR #59のCI成功後、実Notionとブラウザで「Notionから卒研に関する情報あったら、今どんな感じか教えて」を実行し、`search_notion`表示、LLM 1回、参照URL、0件・API停止時の区別を確認する。その後AivisSpeechとタスク同期E2Eへ戻る。
 
 ## 履歴
 
@@ -56,10 +57,10 @@
 | 2026-07-12 | 13:56 | #25 | Google Calendar向けICS読み取り同期を実装。`sync_calendar`ツール、`/api/calendar/sync`、朝ブリーフィング/状況注入への同期、README/.env例、単体テストを追加。実Google iCal URLでのE2Eは未確認。 |
 | 2026-07-12 | 17:09 | #26 | 軽量モデル即答 + `agent_followup` Job追記を実装。読み取り系の重い相談を遅延実行できるようにし、構文確認と標準 unittest 7件を確認。実LM Studio + ブラウザ体感は未確認。 |
 | 2026-07-12 | 17:28 | #27 | LM StudioのJinjaテンプレート互換性対策として、tool実行結果を`role: tool`ではなくユーザーfollow-up形式で再投入するよう修正。構文確認と標準 unittest 8件は確認済み、実モデル完走はReadTimeoutで未確認。 |
-| 2026-07-12 | 18:19 | #28 | 純粋な挨拶のLLM非依存即答と、会話保存後のChroma/Markdown反映のバックグラウンド化を実装。構文確認・標準 unittest 9件・一時DBでの即答スモークを確認、ブラウザ体感は未確認。 |
-| 2026-07-12 | 18:32 | #29 | BRAIN/vault同期のEmbedding重複対策を実装。同期開始時のダミー検索Embeddingを廃止し、チャンク `content_hash` 比較・変更分バッチUpsert・削除差分処理・Embedding統計/単調時計計測を追加。構文確認、標準 unittest 12件、モック計測を確認。実LM Studio + ブラウザ体感は未確認。 |
+| 2026-07-12 | 18:19 | #28 | 純粋な挨拶のLLM非依存即答と、会話保存後のChroma/Markdown反映のバックグラウンド化を実装。構文確認・標準unittest 9件・一時DBでの即答スモークを確認、ブラウザ体感は未確認。 |
+| 2026-07-12 | 18:32 | #29 | BRAIN/vault同期のEmbedding重複対策を実装。同期開始時のダミー検索Embeddingを廃止し、チャンク `content_hash` 比較・変更分バッチUpsert・削除差分処理・Embedding統計/単調時計計測を追加。構文確認、標準unittest 12件、モック計測を確認。実LM Studio + ブラウザE2Eは未確認。 |
 | 2026-07-12 | 18:45 | #30 | Git運用ルールを更新。Codexは検証済みの作業単位を原則随時コミットし、Pushは明示依頼時のみ行う方針を `AGENTS.md` に追記。 |
-| 2026-07-12 | 19:01 | #31 | 会話処理を最小化。通常会話を会話モデル1回・直近5会話・短いsystem promptへ固定し、関連ツール限定、時刻の直接ルーティング、Embedding重複キャッシュ、軽量回答100トークン、遅延フォローアップ停止を実装。構文・標準テスト12件・モック計測を確認、実ブラウザE2Eは未確認。 |
+| 2026-07-12 | 19:01 | #31 | 会話処理を最小化。通常会話を会話モデル1回・直近5会話・短いsystem promptへ固定し、関連ツール限定、時刻の直接ルーティング、Embedding重複キャッシュ、軽量回答100トークン、遅延フォローアップ停止を実装。構文・標準テスト12件・モック計測を確認、実LM Studio + ブラウザE2Eは未確認。 |
 | 2026-07-12 | 19:08 | #32 | `PETIT_LIGHT_MAX_TOKENS` の既定値を 512 に変更し、README の設定表も更新。設定反映のみで実動作は未確認。 |
 | 2026-07-12 | 19:23 | #33 | 通常会話を9B/Thinking OFF/LLM 1回へ統一し、関連ツール限定の27B経路、空回答再試行、messages user検証、空回答保存抑止、request ID、healthキャッシュ、Embedding重複ロックを実装。標準テスト15件・compileall・diffチェックを確認、実LM Studio + ブラウザE2Eは未確認。 |
 | 2026-07-12 | 20:11 | #34 | 動作確認済み: 意図別の限定取得、書き込み承認キュー、BRAIN安全編集、Calendar read/write分離、失敗保存抑止を実装。標準テスト30件と実ブラウザ+LM Studioで雑談/時刻/天気/Notion取得・作成・完了/BRAIN検索・追記/予定取得・追加をE2E確認。実Google ICSと別27Bモデルは未確認。 |
@@ -83,3 +84,4 @@
 | 2026-07-21 | 12:14 | #51 | Issue #6の予定日付解析を実会話経路へ接続。今日・明日・昨日、ISO、日本語年月日、月日を解釈し、不正・曖昧日付は確認要求、Legacy/Coreで同一日付、モデル停止時の簡易予定表示、専用回帰テストとCI対象追加を実装。全CI成功後にPR #52をmainへ統合、実ブラウザE2Eは未実施。 |
 | 2026-07-21 | 13:05 | #52 | Issue #40 Phase 2を実装。承認後のSQLite即時保存、Notion非同期create/update、pending/synced/failed/conflict、指数バックオフ、手動再試行、タスク編集、競合保護、Worker配線、Agent経路、専用テストと設計文書を追加。全6系統CI成功、実Notion／ブラウザE2Eは未実施。 |
 | 2026-07-21 | 14:18 | #53 | Issue #56でAivisSpeech Engine TTSを実装。FastAPIの`/api/tts`・状態確認、話者自動選択、話速・感情・音量設定、WAV再生・中断・ブラウザTTS fallback、専用テスト5件とCIを追加。ローカルのunittest・compileall・node構文確認成功、実Engine／ブラウザE2Eは未確認。 |
+| 2026-07-21 | 19:40 | #54 | Issue #58対応として読み取り専用`search_notion`、明示Notion参照の決定論ルーティング、上位3ページのプロパティ・本文抜粋取得、0件／未設定／API失敗の分離、モデル停止時の事実一覧fallback、回帰テスト・CI・README・設計文書を追加。構文確認済み、CIと実Notion／ブラウザE2Eは未確認。 |
