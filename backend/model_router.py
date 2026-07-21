@@ -1,4 +1,4 @@
-"""AI-assisted routing between PETIT's chat and agent models."""
+"""One-pass Chat response and route selection for PETIT."""
 from __future__ import annotations
 
 import json
@@ -6,21 +6,29 @@ import re
 from typing import Any
 
 from . import config
-from .lmstudio_client import LMStudioError, chat_completion
+from .lmstudio_client import LMStudioError, chat_completion, set_prefetched_chat
 
-_ROUTER_SYSTEM_PROMPT = """あなたはPETITの軽量ルーターです。
-ユーザーのメッセージを処理する経路だけ判定してください。
+_ROUTER_SYSTEM_PROMPT = """あなたはPETITです。ユーザーへ自然で短い日本語で応答してください。
+同時に、現在のメッセージをChatだけで完了できるか判断してください。
 
-- chat: 普通の会話、短い質問、感想、相づち。外部情報や深い分析が不要
-- agent: 分析、比較、設計、評価、計画、コードレビューなど、強い推論が必要
-- tool: 現在時刻、天気、予定、タスク、記憶、BRAIN、ニュースなど、PETIT外または保存済み情報の取得・変更が必要
+- 普通の会話、感想、相づち、一般知識で答えられる短い質問は reply
+- 保存済み情報や外部情報の取得・変更が必要なら tool
+- 設計、分析、比較、コードレビューなど強い推論が必要なら agent
 
-必ず次のJSONだけを返してください。説明やMarkdownは禁止です。
-{"route":"chat|agent|tool","confidence":0.0,"reason":"短い理由"}
-書き込みの実行可否やツール引数は判定しないでください。"""
+必ずJSONだけを返してください。Markdownは禁止です。
+Chatで完了できる場合:
+{"type":"reply","reply":"ユーザーへ返す自然な文章","confidence":0.0}
+ツールが必要な場合:
+{"type":"tool","tools":["ツール名"],"reason":"短い理由","confidence":0.0}
+強い推論が必要な場合:
+{"type":"agent","reason":"短い理由","confidence":0.0}
 
-# The fallback is intentionally conservative. It is used only when the routing
-# model is unavailable or returns malformed output; normal routing is semantic.
+利用可能な代表ツール名:
+get_current_time, get_weather, get_schedule, get_tasks, search_memory,
+search_brain_notes, search_news, create_task, complete_task, add_schedule,
+save_memory, edit_brain_note, sync_notion_tasks, sync_calendar
+ツール引数や実行結果は作らないでください。"""
+
 _FALLBACK_AGENT_PHRASES = (
     "改善案", "比較して", "設計して", "評価して", "分析して", "計画を立て",
     "レビューして", "検証して", "デバッグして", "実装して", "修正して",
@@ -43,6 +51,13 @@ def _extract_json(content: str) -> dict[str, Any] | None:
     except (json.JSONDecodeError, TypeError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def _confidence(data: dict[str, Any]) -> float | None:
+    try:
+        return max(0.0, min(1.0, float(data.get("confidence"))))
+    except (TypeError, ValueError):
+        return None
 
 
 def _fallback(user_message: str) -> dict[str, Any]:
@@ -72,27 +87,26 @@ def choose(
     user_message: str,
     history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Classify a turn semantically, with a deterministic failure fallback.
-
-    Tool selection and every write approval remain separate in ``agent.py``. The
-    router only decides whether ordinary Chat is enough or the Agent path is needed.
-    """
-    del history  # Keep the classifier small and independent from conversation size.
+    """Generate a Chat reply or request Agent/tool handling in one model call."""
     text = user_message.strip()
     if not text:
         return _fallback(text)
 
-    messages = [
-        {"role": "system", "content": _ROUTER_SYSTEM_PROMPT},
-        {"role": "user", "content": f"メッセージ: {text}"},
-    ]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": _ROUTER_SYSTEM_PROMPT}]
+    for item in (history or [])[-4:]:
+        role = item.get("role")
+        content = str(item.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": f"メッセージ: {text}"})
+
     try:
         response = chat_completion(
             messages,
             tools=None,
-            temperature=0,
+            temperature=0.2,
             model=config.CHAT_MODEL,
-            max_tokens=96,
+            max_tokens=192,
             route="chat",
         )
         parsed = _extract_json(str(response.get("content") or ""))
@@ -102,22 +116,39 @@ def choose(
     if not parsed:
         return _fallback(text)
 
-    route = str(parsed.get("route") or "").strip().casefold()
-    if route not in {"chat", "agent", "tool"}:
+    route_type = str(parsed.get("type") or "").strip().casefold()
+    confidence = _confidence(parsed)
+
+    if route_type == "reply":
+        reply = str(parsed.get("reply") or "").strip()
+        if not reply:
+            return _fallback(text)
+        set_prefetched_chat(text, reply)
+        return {
+            "kind": "chat",
+            "model": config.CHAT_MODEL,
+            "reasons": ["ai_router:reply"],
+            "router_source": "ai",
+            "router_confidence": confidence,
+            "prefetched_reply": True,
+        }
+
+    if route_type not in {"tool", "agent"}:
         return _fallback(text)
 
-    kind = "agent" if route in {"agent", "tool"} else "chat"
-    try:
-        confidence = max(0.0, min(1.0, float(parsed.get("confidence"))))
-    except (TypeError, ValueError):
-        confidence = None
-    reason = str(parsed.get("reason") or route).strip()[:120]
+    reason = str(parsed.get("reason") or route_type).strip()[:120]
+    suggested_tools = [
+        str(name).strip()
+        for name in (parsed.get("tools") or [])
+        if isinstance(name, str) and str(name).strip()
+    ][:5]
     return {
-        "kind": kind,
-        "model": config.AGENT_MODEL if kind == "agent" else config.CHAT_MODEL,
-        "reasons": [f"ai_router:{route}", reason],
+        "kind": "agent",
+        "model": config.AGENT_MODEL,
+        "reasons": [f"ai_router:{route_type}", reason],
         "router_source": "ai",
         "router_confidence": confidence,
+        "suggested_tools": suggested_tools,
     }
 
 
