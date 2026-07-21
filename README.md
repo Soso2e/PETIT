@@ -79,8 +79,9 @@ storage/   SQLite などの実行時データ（git 管理外）
 | `PETIT_GITHUB_MAX_CHECK_COMMITS` | `50` | 1回でcheckを確認するcommit数の上限 |
 | `PETIT_GITHUB_MAX_DEPLOYMENTS` | `20` | 1回でstatusを確認する最近のdeployment数 |
 
-Notion Adapter v2、Linkraft、GitHub evidenceの詳細設定は、
+Notion Adapter v2、Notion会話検索、Linkraft、GitHub evidenceの詳細設定は、
 [`docs/notion_adapter_v2.md`](docs/notion_adapter_v2.md)、
+[`docs/notion_search.md`](docs/notion_search.md)、
 [`docs/linkraft_owner_sync.md`](docs/linkraft_owner_sync.md)、
 [`docs/github_evidence.md`](docs/github_evidence.md) を参照してください。
 
@@ -99,6 +100,7 @@ Notion Adapter v2、Linkraft、GitHub evidenceの詳細設定は、
 - `get_weather` / `search_news` / `start_background_research` — 天気・ニュース・調査キュー
 - `create_internal_project` / `activate_internal_project` / `add_internal_project_alias` — 確認後に内部プロジェクトを登録・切替・別名追加
 - `save_project_completion` — 確認済み到達状態をcheckpointとイベントへ保存
+- `search_notion` — 共有済みNotionページを限定検索し、プロパティ・本文抜粋・更新日時・URLを取得
 - `sync_notion_tasks` / `get_notion_project_candidates` / `link_notion_project_candidate` — Notion Relation同期と確認付き紐付け
 - `sync_linkraft_projects` / `get_linkraft_project_candidates` / `link_linkraft_project_candidate` — Linkraft owner-only同期と確認付き紐付け
 - `inspect_github_repository` / `sync_github_evidence` — GitHub repository候補の読取と確認済みrepositoryの証拠同期
@@ -199,6 +201,8 @@ SQLiteは外部正本を置き換えず、内部ID、別名、確認状態、che
 
 GitHubの一般的な雑談ではツールを公開しません。`owner/name`やGitHub URLの登録・紐付け、候補確認、明示的な同期依頼だけをGitHub evidenceツールへルーティングします。
 
+「Notionから〜を調べて」のような明示的なNotion参照は、ルーターLLMを通さず`search_notion`を実行します。検索結果がある場合だけAgentを1回呼んで整理し、未設定・0件・API失敗はPython側で区別して直接返します。通常会話ではNotion APIを呼びません。
+
 明確なタスク・予定・検索などだけ、発話に関係するツール定義を絞って渡します。「今日何からやる？」のような計画相談では、未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理します。
 
 会話のEmbeddingとMarkdown出力は応答後のバックグラウンド処理です。Embeddingは同一テキストをプロセス内キャッシュで重複送信せず、Vaultは内容が変わったファイルだけ再Embeddingします。
@@ -253,6 +257,7 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
     tests.test_github_evidence_routing
   ```
 
+- Notion会話検索テスト: `python -m unittest tests.test_notion_search -v`
 - 全Python構文確認: `python -m compileall backend tests`
 - 変更のたびに`PROGRESS.md`へ追記する。
 - ルール詳細は[`CLAUDE.md`](./CLAUDE.md)。
