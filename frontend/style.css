@@ -19,6 +19,8 @@ body {
   color: var(--text);
 }
 
+button { font: inherit; }
+
 .app {
   max-width: 760px;
   margin: 0 auto;
@@ -41,6 +43,12 @@ body {
   letter-spacing: 0.08em;
 }
 
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
 .status {
   font-size: 12px;
   padding: 3px 10px;
@@ -51,6 +59,22 @@ body {
 .status--ok { color: var(--ok); }
 .status--bad { color: var(--bad); }
 
+.voice-toggle {
+  border: 1px solid #343a49;
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.voice-toggle--on {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.18);
+  color: #bfdbfe;
+}
+.voice-toggle:disabled { opacity: 0.5; cursor: default; }
+
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -60,7 +84,7 @@ body {
   gap: 14px;
 }
 
-.msg { display: flex; }
+.msg { display: flex; align-items: flex-end; gap: 6px; }
 .msg--user { justify-content: flex-end; }
 .msg--assistant { justify-content: flex-start; }
 
@@ -76,6 +100,19 @@ body {
 .msg--assistant .bubble { background: var(--assistant); border-bottom-left-radius: 4px; }
 
 .bubble--error { background: #3a1d22; color: #fca5a5; }
+
+.replay {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #343a49;
+  border-radius: 999px;
+  background: #171a21;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0.75;
+}
+.replay:hover { opacity: 1; }
 
 .tools {
   font-size: 11px;
@@ -98,10 +135,18 @@ body {
 .action-confirm button:last-child { background: transparent; }
 .action-confirm button:disabled { opacity: 0.5; cursor: default; }
 
+.voice-state {
+  min-height: 24px;
+  padding: 4px 20px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.voice-state--error { color: #fca5a5; }
+
 .composer {
   display: flex;
   gap: 10px;
-  padding: 14px 20px;
+  padding: 10px 20px 14px;
   border-top: 1px solid #222633;
 }
 
@@ -119,14 +164,29 @@ body {
 }
 .input:focus { outline: none; border-color: var(--user); }
 
+.mic,
 .send {
-  background: var(--user);
   color: #fff;
   border: none;
   border-radius: 12px;
-  padding: 0 20px;
   font-size: 15px;
   cursor: pointer;
+}
+
+.mic {
+  width: 48px;
+  flex: 0 0 48px;
+  background: #2b303c;
+}
+.mic--listening {
+  background: #b91c1c;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+.mic:disabled { opacity: 0.4; cursor: default; }
+
+.send {
+  background: var(--user);
+  padding: 0 20px;
 }
 .send:disabled { opacity: 0.5; cursor: default; }
 
@@ -141,3 +201,18 @@ body {
 
 .action-preview dt { font-weight: 700; }
 .action-preview dd { margin: 0; overflow-wrap: anywhere; }
+
+@keyframes mic-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@media (max-width: 560px) {
+  .header { flex-wrap: wrap; padding: 12px 14px; }
+  .header-actions { margin-left: 0; }
+  .messages { padding: 14px; }
+  .bubble { max-width: 86%; }
+  .composer { padding: 10px 14px 12px; gap: 8px; }
+  .send { padding: 0 14px; }
+  .voice-state { padding-inline: 14px; }
+}
