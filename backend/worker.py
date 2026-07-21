@@ -4,10 +4,9 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import time
 from typing import Any
 
-from . import db, web_sources
+from . import db, task_sync_queue, web_sources
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +20,12 @@ class JobWorker:
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
+        # Agent is fully imported by startup time, so Phase 2 routes can be
+        # installed without participating in the agent -> tools import cycle.
+        from .tools import tasks_phase2
+
+        tasks_phase2.install_agent_routes()
+        task_sync_queue.ensure_task_sync_schema()
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="petit-job-worker", daemon=True)
         self._thread.start()
@@ -34,10 +39,12 @@ class JobWorker:
         while not self._stop.is_set():
             try:
                 job = db.claim_next_job()
-                if job is None:
-                    self._stop.wait(self.interval_seconds)
+                if job is not None:
+                    _process_job(job)
                     continue
-                _process_job(job)
+                if task_sync_queue.process_next():
+                    continue
+                self._stop.wait(self.interval_seconds)
             except Exception as exc:  # noqa: BLE001
                 log.exception("Job worker loop failed: %s", exc)
                 self._stop.wait(self.interval_seconds)
