@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from types import ModuleType
 from unittest.mock import Mock, patch
 
+import backend
 from backend import agent, config
 from backend.date_parser import has_schedule_date_expression, parse_schedule_date
 from backend.lmstudio_client import LMStudioError
@@ -119,6 +120,7 @@ class ForcedScheduleReadTests(unittest.TestCase):
         with (
             patch.object(config, "USE_SONA_CORE", True),
             patch.dict(sys.modules, {"backend.sona_core_schedule": fake_core}),
+            patch.object(backend, "sona_core_schedule", fake_core, create=True),
         ):
             registry.dispatch("get_schedule", target)
         fake_core.dispatch_get_schedule.assert_called_once_with(target)
