@@ -17,6 +17,7 @@ from . import (
     project_registration,
     schedule,
     tasks,
+    tasks_phase2,
 )  # noqa: F401  (import for side-effect registration)
 from .. import web_tools  # noqa: F401  (register web/news/weather tools)
 from .registry import dispatch, openai_tools_schema, parse_arguments, registered_names, requires_confirmation
