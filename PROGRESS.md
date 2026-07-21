@@ -5,6 +5,7 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
+- 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallbackを実装。実AivisSpeechモデルとブラウザでのE2Eは未確認。
 - モデル経路: Chat/AgentのURL・モデル・APIキーを独立設定できる。`model_router`を実会話経路へ接続し、ツールなしの設計・分析・コードレビューもAgentへ送る。安全に取得済みの読み取り結果だけAgent停止時にChat整形でき、ツール選択・書き込みは黙って省略しない。実1モデル／2モデルE2Eは未確認。
 - 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
@@ -19,7 +20,7 @@
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: PR #54を統合後、実Notionとブラウザで作成・編集・失敗再試行・競合確認をE2E検証する。その後、Issue #40 Phase 3のGoogle Calendar書き込みと統合表示へ進む。
+- 次にやること: AivisSpeech Engineを実起動し、話者選択・自動読み上げ・停止・fallbackをブラウザで確認する。その後、実Notionとブラウザでタスク作成・編集・失敗再試行・競合確認をE2E検証する。
 
 ## 履歴
 
@@ -81,3 +82,4 @@
 | 2026-07-21 | 11:43 | #50 | Issue #49対応として`AGENTS.md`を整理。PETIT固有の概要・技術構成・安全境界・Progress Logを維持し、調査・Issue・テスト・PR・禁止事項を追加、Git運用を`main` + 専用ブランチ + PRへ統一。文書差分のみでコードテストは未実施。 |
 | 2026-07-21 | 12:14 | #51 | Issue #6の予定日付解析を実会話経路へ接続。今日・明日・昨日、ISO、日本語年月日、月日を解釈し、不正・曖昧日付は確認要求、Legacy/Coreで同一日付、モデル停止時の簡易予定表示、専用回帰テストとCI対象追加を実装。全CI成功後にPR #52をmainへ統合、実ブラウザE2Eは未実施。 |
 | 2026-07-21 | 13:05 | #52 | Issue #40 Phase 2を実装。承認後のSQLite即時保存、Notion非同期create/update、pending/synced/failed/conflict、指数バックオフ、手動再試行、タスク編集、競合保護、Worker配線、Agent経路、専用テストと設計文書を追加。全6系統CI成功、実Notion／ブラウザE2Eは未実施。 |
+| 2026-07-21 | 14:18 | #53 | Issue #56でAivisSpeech Engine TTSを実装。FastAPIの`/api/tts`・状態確認、話者自動選択、話速・感情・音量設定、WAV再生・中断・ブラウザTTS fallback、専用テスト5件とCIを追加。ローカルのunittest・compileall・node構文確認成功、実Engine／ブラウザE2Eは未確認。 |
