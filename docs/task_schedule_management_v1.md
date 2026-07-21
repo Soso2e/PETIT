@@ -1,18 +1,20 @@
 # PETIT タスク・スケジュール管理 v1
 
-更新日: 2026-07-20
+更新日: 2026-07-21
 
 ## 目的
 
-Notionをタスク・プロジェクトの正本、SQLiteを高速なローカルミラー、Google Calendarを固定予定の正本として扱い、PETITから自然言語で操作できるようにする。
+- Notion: 個人タスク・プロジェクトの正本
+- SQLite: 高速表示と承認済み変更のローカルミラー
+- Google Calendar: 固定予定の正本（Phase 3）
 
-既存のNotion Adapter v2、`tasks_cache`、Project Continuity Engineを壊さずに拡張する。
+タスクの期限と、実際に時間を確保する予定は別データとして扱う。
 
 ## 概念
 
 ### エリア
 
-作業を行う責任の発生源。
+責任の発生源を表す。
 
 - `personal`: 個人
 - `group`: グループ
@@ -21,13 +23,11 @@ Notionをタスク・プロジェクトの正本、SQLiteを高速なローカ�
 
 ### プロジェクト
 
-複数のタスクで達成するまとまり。PETIT内部プロジェクトとNotionプロジェクトの確認済み対応関係を利用する。
+複数タスクで達成するまとまり。PETIT内部プロジェクトと、確認済みNotion Project Relationを利用する。
 
 ### タスク
 
-実際に行う一つの行動。
-
-初期フィールド:
+主なフィールド:
 
 - `title`
 - `status`
@@ -38,75 +38,22 @@ Notionをタスク・プロジェクトの正本、SQLiteを高速なローカ�
 - `priority`
 - `reason`
 - `done_date`
+- `sync_status`
 
 ### 予定
 
-実行日時を確保したイベント。タスクの期限とは分離し、既存のcalendar cacheと将来のGoogle Calendar書き込みへ接続する。
+実行日時を確保したイベント。タスク期限とは分離する。
 
-## 既存実装との対応
+## Phase 1 — エリア・プロジェクト分類（完了）
 
-現在のPETITには以下が存在する。
+- `tasks_cache.area`
+- Notionタスク・プロジェクトの`エリア`
+- 旧Categoryからの保守的なarea変換
+- `create_task`のarea・確認済みproject Relation
+- `get_tasks`のarea・project絞り込み
+- 既存DBとの後方互換
 
-- `tasks_cache`: Notionとローカルタスクの統合キャッシュ
-- `create_task` / `get_tasks` / `complete_task`
-- Notion Adapter v2によるプロジェクトRelation保持
-- `project_source_links`による確認済み外部プロジェクト紐付け
-- `calendar_events_cache`
-
-v1ではこれらを置き換えず、足りない`area`と同期状態を追加する。
-
-## Phase 1: area対応の最小縦切り
-
-### SQLite
-
-`tasks_cache`へ追加する。
-
-```sql
-area TEXT
-sync_status TEXT NOT NULL DEFAULT 'synced'
-last_synced_at TEXT
-sync_error TEXT
-```
-
-`area`は4値だけを受け付ける。
-
-```text
-personal
-group
-university
-work
-```
-
-### 設定
-
-追加候補:
-
-```text
-NOTION_PROP_AREA=エリア
-NOTION_PROJECT_PROP_AREA=エリア
-```
-
-プロパティがNotion側に存在しない期間も旧DBを読み書きできるよう、area書き込みは明示設定時のみ有効にする。
-
-### Notion Adapter
-
-- タスクページから`area`をselect/statusとして読み取る
-- プロジェクトページから既定areaを読み取る
-- タスク自身にareaがなければ、確認済みプロジェクトの既定areaを利用する
-- 未確認Relationから内部projectやareaを推測しない
-
-優先順位:
-
-```text
-明示されたタスクarea
-→ 確認済みプロジェクトの既定area
-→ 旧Category変換
-→ unknown
-```
-
-### 旧Category移行
-
-暫定変換:
+旧Categoryは削除せず、次の暫定変換だけを行う。
 
 ```text
 Sch      → university
@@ -119,111 +66,133 @@ JobHunt  → personal
 Event    → unknown
 ```
 
-`Create`は共同制作か判定できないため、自動で`group`にしない。
+`Create`を共同制作と決めつけて`group`へ変換しない。
 
-### create_task
+## Phase 2 — ローカル即時保存とNotion非同期同期（実装済み）
 
-引数に追加する。
-
-```json
-{
-  "area": "personal | group | university | work",
-  "project_id": "PETIT内部project id（任意）"
-}
-```
-
-動作:
-
-1. areaが明示された場合はその値を使用
-2. project_idに確認済みNotion source linkがある場合、Notion Relationを付与
-3. area省略時は確認済みプロジェクトの既定areaを利用
-4. 分類不能なら勝手に決めず、areaなしで保存する
-5. Notion失敗時にローカルへ黙って代替保存しない既存境界を維持する
-
-### get_tasks
-
-返却項目に追加する。
+### 基本フロー
 
 ```text
-area
-project_id
-project_external_id
-sync_status
+ユーザーが変更内容を確認
+→ SQLiteへ即時反映
+→ sync_status=pending
+→ Notion書き込みキュー
+→ 成功: synced
+→ 通信失敗: failed
+→ Notion側にも変更: conflict
 ```
 
-絞り込み候補:
+承認前にはSQLite・Notionのどちらも変更しない。
 
-```text
-area
-project_id
-status
-due_before
-due_after
-```
+### 同期状態
 
-## Phase 2: 非同期同期キュー
+| 状態 | 意味 |
+|---|---|
+| `pending` | ローカル反映済み、Notion同期待ち |
+| `synced` | Notionと同期済み |
+| `failed` | 通信・API失敗。ローカル内容とエラーを保持 |
+| `conflict` | ローカル編集中にNotion側も更新。自動上書きを停止 |
 
-Phase 1完了後に実装する。
+`tasks_cache`には次を保持する。
 
-- ローカル書き込みを即時成功として返す
-- Notion書き込みを`pending`としてキューへ入れる
-- 成功時`sync_status=synced`
-- 失敗時`failed`と`sync_error`を保持
-- Notionとローカル両方が更新された場合`conflict`
+- `sync_status`
+- `sync_error`
+- `sync_operation_id`
+- `sync_attempts`
+- `last_synced_at`
+- `remote_snapshot_json`
 
-この段階で初めて、Notion障害時のローカル先行保存を許可する。
+### 書き込みキュー
 
-## Phase 3: スケジュール
+`task_sync_queue`へ次を保存する。
 
-- Google Calendar書き込みアダプター
-- タスク期限と作業予定を別データで保持
-- タスクと予定の関連付け
-- `今日何する？`で固定予定、期限、期限切れ、次の一手を統合表示
+- 対象タスク
+- `create` / `update`
+- 承認済みpayload
+- 編集開始時のNotion更新時刻
+- 試行回数
+- 次回再試行時刻
+- エラー
+- 同期完了時刻
+
+失敗時は指数バックオフで最大5回まで再試行する。手動再試行では試行回数をリセットする。
+
+### 作成
+
+Notion設定時の`create_task`:
+
+1. SQLiteへ`source=notion`、`sync_status=pending`で作成
+2. 確認済みProject Relationだけをpayloadへ含める
+3. Notion作成成功後、同じSQLite行へpage ID・URL・source更新時刻を反映
+
+Notion未設定時は従来どおり`source=local`で保存する。
+
+### 編集・完了
+
+- `update_task`: 名前、状態、期限、優先度、エリア、プロジェクト、Category、理由、完了日を編集
+- `complete_task`: ローカルへ即時完了反映し、Notion更新をキューへ追加
+- Notionへ未送信のcreateがある場合、後続編集を同じcreate payloadへ統合
+- ローカルタスクはNotionキューを作らない
+
+### 失敗・再試行
+
+- `get_task_sync_status`: 状態、失敗理由、試行回数、競合時のNotion側スナップショットを取得
+- `retry_task_sync`: `failed`操作を確認付きで再試行
+- `conflict`は自動再試行しない
+
+### 競合
+
+Notion読取同期でsource更新時刻が変わっており、ローカルに未同期変更がある場合:
+
+1. ローカル編集内容を維持
+2. Notion側の最新値を`remote_snapshot_json`へ保存
+3. `sync_status=conflict`
+4. キューを停止
+5. ユーザーが両方を確認して`update_task`を再実行
+
+Notion側の新しい内容を無言で上書きしない。
+
+### 表示
+
+`get_tasks`は外部同期を待たずSQLiteから返し、各タスクへ同期状態を含める。明示的なNotion同期は`sync_notion_tasks`で実行する。
+
+## Phase 3 — Google Calendar連携（未実装）
+
+- Google Calendar OAuth書き込み
+- タスク期限と作業予定の関連付け
+- 固定予定・期限・期限切れ・次の一手の統合表示
+
+日付があるだけでCalendarへ予定を作成しない。
 
 ## 安全境界
 
-- エリアとプロジェクトを同じ分類として扱わない
-- 日付があるだけでGoogle Calendarへ登録しない
-- 未確認Notion RelationをPETIT内部projectへ変換しない
-- 類似名称だけでプロジェクトを自動統合しない
-- NotionとSQLiteの両方を正本にしない
-- 既存Categoryを即削除しない
-- DB移行は追加カラムから始め、既存データを保持する
+- NotionとSQLiteを両方正本にしない
+- 未確認Relationを内部projectへ変換しない
+- 名称類似だけでプロジェクトを統合しない
+- 既存Categoryを削除しない
+- Notion側の更新を無言で上書きしない
+- conflictを自動解決しない
+- タスク期限とCalendar予定を混同しない
+- DB移行は追加テーブル・追加カラムで行う
 
 ## テスト
 
-Phase 1で追加するテスト:
-
-- area明示でローカルタスクを作成できる
-- 不正areaを拒否する
-- 旧Categoryからareaへ暫定変換できる
-- タスクareaがプロジェクト既定areaより優先される
-- 未確認Relationからareaを推測しない
-- Notion areaプロパティ未設定でも既存同期が動く
-- `get_tasks`がareaとproject情報を返す
-- DB初期化で既存`tasks_cache`へ安全にカラム追加できる
-
-実行:
-
 ```bash
 python -m compileall backend tests
-python -m unittest tests.test_tasks tests.test_notion_adapter_v2 tests.test_project_resume
+python -m unittest \
+  tests.test_notion_adapter_v2 \
+  tests.test_project_resume \
+  tests.test_task_write_queue -v
 ```
 
-## 実装順
+主な回帰項目:
 
-1. `config.py`へarea設定を追加
-2. `db.py`で`tasks_cache`へarea・同期状態を追加
-3. `notion_client.py`のparse/writeへarea・project Relationを追加
-4. `backend/tools/tasks.py`へarea引数、解決規則、返却値を追加
-5. Notion Adapter v2のキャッシュ更新へareaを通す
-6. テスト追加
-7. READMEと`.env.example`更新
-
-## 完了条件
-
-- 既存Notion DB構成のまま回帰テストが通る
-- `エリア`プロパティを追加したNotion DBでも読み書きできる
-- PETITから作成したタスクにareaと確認済みproject Relationが保存される
-- `get_tasks`がSQLiteから即時にarea付きタスクを返す
-- タスク期限と予定日時を混同しない
+- 作成直後にSQLiteから取得できる
+- 成功時に同じ行が`synced`になる
+- 失敗時にタスクとエラーが失われない
+- 手動再試行できる
+- 編集・完了がpendingキューへ入る
+- 未送信createへ編集を統合できる
+- Notion側変更を`conflict`として検出する
+- conflict時にローカル内容を維持する
+- ローカルタスクはNotionへ送らない
