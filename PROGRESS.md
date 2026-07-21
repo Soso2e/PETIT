@@ -10,15 +10,16 @@
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
+- タスク管理: area・確認済みproject Relationに加え、承認後のSQLite即時保存、`pending / synced / failed / conflict`、Notion書き込みキュー、指数バックオフ、手動再試行、タスク編集、競合スナップショットを実装。全回帰CI成功、実Notion／ブラウザE2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
-- BRAIN / RAG: 実vault限定検索と確認付き安全編集を実装済み。`_private`・Vault外・Markdown以外は拒否。内部project idとの確認付きノート紐付けは未実装。
-- Calendar: ICSは読み取り専用、`add_schedule`はPETITローカル予定のみ。Google private iCal実E2Eと将来のOAuth書き込みproviderは未対応。
-- Project Continuity: 内部project台帳、alias、確認済みsource link、episode Relation、active state、checkpoint、handoff、resume直前source refreshを統合済み。実ブラウザでの登録・切替・終了・再起動復元は未確認。
+- BRAIN / RAG: 実vault限定検索と確認付き安全編集を実装済み。`_private`・Vault外・Markdown以外は拒否。確認付きproject mappingを実装済み、実vault E2Eは#53で確認する。
+- Calendar: ICSは読み取り専用、`add_schedule`はPETITローカル予定のみ。任意日付の予定確認を実装済み。Google private iCal実E2Eと将来のOAuth書き込みproviderは未対応。
+- Project Continuity: 内部project台帳、alias、確認済みsource link、episode Relation、active state、checkpoint、handoff、cache-first resumeを統合済み。Phase 1/2 Issueは完了し、実外部サービスE2Eだけを#53で追跡する。
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: このcore hardening PRのCIを通し、`.env`をlocalhostへ直して1モデル構成のブラウザE2Eを完了する。その後だけAgent別endpointを検証し、BRAIN project mapping／project-aware briefingへ進む。
+- 次にやること: PR #54を統合後、実Notionとブラウザで作成・編集・失敗再試行・競合確認をE2E検証する。その後、Issue #40 Phase 3のGoogle Calendar書き込みと統合表示へ進む。
 
 ## 履歴
 
@@ -78,4 +79,5 @@
 | 2026-07-18 | 17:19 | #48 | 調査完了: 同一PCのLM Studio `127.0.0.1:1234/v1/models`は正常応答し、6モデルを確認。`.env`が到達不能な`169.254.83.107`を参照し、PETITプロセスは停止中。直接原因を設定先の不一致に確定。localhostへの変更・再起動・ブラウザE2Eは未実施。 |
 | 2026-07-18 | 18:09 | #49 | Core hardeningを実装。model_routerを実経路へ接続、エピソード要約のAgent endpoint修正、briefing/proactiveのepisode優先、Notion成功同期のsource置換、SQLite WAL/busy timeout、session履歴復元、jobのsession/request紐付けと明示ack、回帰テスト・検証手順を追加。変更ファイルのpy_compileとfrontendのnode構文確認成功、全CIと実ブラウザE2Eは未確認。 |
 | 2026-07-21 | 11:43 | #50 | Issue #49対応として`AGENTS.md`を整理。PETIT固有の概要・技術構成・安全境界・Progress Logを維持し、調査・Issue・テスト・PR・禁止事項を追加、Git運用を`main` + 専用ブランチ + PRへ統一。文書差分のみでコードテストは未実施。 |
-| 2026-07-21 | 12:14 | #51 | Issue #6の予定日付解析を実会話経路へ接続。今日・明日・昨日、ISO、日本語年月日、月日を解釈し、不正・曖昧日付は確認要求、Legacy/Coreで同一日付、モデル停止時の簡易予定表示、専用回帰テストとCI対象追加を実装。CI確認中、実ブラウザE2Eは未実施。 |
+| 2026-07-21 | 12:14 | #51 | Issue #6の予定日付解析を実会話経路へ接続。今日・明日・昨日、ISO、日本語年月日、月日を解釈し、不正・曖昧日付は確認要求、Legacy/Coreで同一日付、モデル停止時の簡易予定表示、専用回帰テストとCI対象追加を実装。全CI成功後にPR #52をmainへ統合、実ブラウザE2Eは未実施。 |
+| 2026-07-21 | 13:05 | #52 | Issue #40 Phase 2を実装。承認後のSQLite即時保存、Notion非同期create/update、pending/synced/failed/conflict、指数バックオフ、手動再試行、タスク編集、競合保護、Worker配線、Agent経路、専用テストと設計文書を追加。全6系統CI成功、実Notion／ブラウザE2Eは未実施。 |
