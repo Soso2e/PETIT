@@ -19,6 +19,49 @@ for _export_name in dir(_legacy):
     if not _export_name.startswith("__"):
         globals()[_export_name] = getattr(_legacy, _export_name)
 
+# Keep recurring prompts compact because they are sent on every model request.
+CHAT_SYSTEM_PROMPT = (
+    "あなたはPETIT。自然で短い日本語を1〜2文で返す。"
+    "Markdownは使わず、質問に直接答える。"
+)
+AGENT_SYSTEM_PROMPT = (
+    "あなたはPETIT。結論から必要十分な日本語で答える。Markdownは使わない。"
+    "事実と判断を分け、外部情報はツール結果だけを使う。"
+    "書き込みは実行結果なしに完了と言わない。"
+)
+SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
+_legacy.CHAT_SYSTEM_PROMPT = CHAT_SYSTEM_PROMPT
+_legacy.AGENT_SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
+_legacy.SYSTEM_PROMPT = SYSTEM_PROMPT
+
+# Install task-edit signals before the background worker starts. This keeps
+# natural phrasing deterministic instead of relying only on the lightweight
+# model router.
+_TASK_TOOL_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "update_task",
+        (
+            "タスクを編集", "タスクを変更", "タスク名を変更", "期限を変更",
+            "優先度を変更", "締切を変", "締切を延ば", "日付を変",
+            "内容を変更", "メモを変更", "エリアを変更", "プロジェクトを変更",
+            "未完了に戻",
+        ),
+    ),
+    (
+        "retry_task_sync",
+        ("タスク同期を再試行", "Notion同期を再試行", "同期をやり直"),
+    ),
+    (
+        "get_task_sync_status",
+        ("タスク同期状態", "タスクの同期状況", "同期エラー", "同期の失敗理由"),
+    ),
+)
+_existing_signal_names = {name for name, _signals in _TOOL_SIGNALS}
+_TOOL_SIGNALS = tuple(_TOOL_SIGNALS) + tuple(
+    item for item in _TASK_TOOL_SIGNALS if item[0] not in _existing_signal_names
+)
+_legacy._TOOL_SIGNALS = _TOOL_SIGNALS
+
 _NOTION_SOURCE_MARKERS = ("notion", "ノーション")
 _NOTION_READ_TERMS = (
     "から", "で検索", "で調べ", "で探", "内から", "内で", "を検索", "を調べ", "を探",
@@ -75,6 +118,8 @@ def _related_tool_names(message: str) -> list[str]:
         names.append("review_github_activity")
     if "sync_notion_tasks" in names:
         names = [name for name in names if name != "search_notion"]
+    if any(name in names for name in ("update_task", "retry_task_sync", "get_task_sync_status")):
+        names = [name for name in names if name != "get_tasks"]
     return list(dict.fromkeys(names))
 
 
