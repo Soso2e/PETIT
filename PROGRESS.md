@@ -15,13 +15,14 @@
 - タスク管理: area・確認済みproject Relationに加え、承認後のSQLite即時保存、`pending / synced / failed / conflict`、Notion書き込みキュー、指数バックオフ、手動再試行、タスク編集、競合スナップショットを実装。全回帰CI成功、実Notion／ブラウザE2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
+- GitHub Daily Review: access可能な全repositoryを横断し、前回cursor以降のcommit／PR／checkと`PROGRESS.md`を朝ブリーフィング・明示会話でレビューする。CIは成功済み。実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。
 - BRAIN / RAG: 実vault限定検索と確認付き安全編集を実装済み。`_private`・Vault外・Markdown以外は拒否。確認付きproject mappingを実装済み、実vault E2Eは#53で確認する。
 - Calendar: ICSは読み取り専用、`add_schedule`はPETITローカル予定のみ。任意日付の予定確認を実装済み。Google private iCal実E2Eと将来のOAuth書き込みproviderは未対応。
 - Project Continuity: 内部project台帳、alias、確認済みsource link、episode Relation、active state、checkpoint、handoff、cache-first resumeを統合済み。Phase 1/2 Issueは完了し、実外部サービスE2Eだけを#53で追跡する。
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: Issue #60のPRでCI成功後、実LM Studioとブラウザで①挨拶・時刻のルーター省略、②「傘いる？」から`get_weather`提案、③標準tool message、④Jinja互換fallback、⑤2段以上のツール利用を確認する。その後Notion・AivisSpeech・タスク同期E2Eへ戻る。
+- 次にやること: Issue #60の実LM Studio／ブラウザE2Eと、Issue #62の実Fine-grained PATによる全repository朝レビューE2Eを確認する。その後Notion・AivisSpeech・タスク同期E2Eへ戻る。
 
 ## 履歴
 
@@ -86,3 +87,4 @@
 | 2026-07-21 | 14:18 | #53 | Issue #56でAivisSpeech Engine TTSを実装。FastAPIの`/api/tts`・状態確認、話者自動選択、話速・感情・音量設定、WAV再生・中断・ブラウザTTS fallback、専用テスト5件とCIを追加。ローカルのunittest・compileall・node構文確認成功、実Engine／ブラウザE2Eは未確認。 |
 | 2026-07-21 | 19:40 | #54 | Issue #58対応として読み取り専用`search_notion`、明示Notion参照の決定論ルーティング、上位3ページのプロパティ・本文抜粋取得、0件／未設定／API失敗の分離、モデル停止時の事実一覧fallback、回帰テスト・CI・README・設計文書を追加。構文確認済み、CIと実Notion／ブラウザE2Eは未確認。 |
 | 2026-07-22 | 01:35 | #55 | Issue #60対応として決定論的経路をAIルーター前へ移動し、ルーター提案ツールの許可・登録検証、Chat/Agent prompt分離、標準tool messageとJinja互換fallback、最大3ツールラウンド＋最終回答、重複呼び出し防止、観測情報、回帰テスト・設定例・設計文書を追加。構文・簡易ハーネス確認済み、CIと実LM Studio／ブラウザE2Eは未確認。 |
+| 2026-07-22 | 11:35 | #56 | Issue #62対応として全GitHub repositoryの朝差分レビューを実装。global cursor、archived／empty／fork除外、commit／PR／check、`PROGRESS.md`参照、部分失敗時cursor維持、LM Studio fallback、朝briefing、決定論会話routing、scheduler、設定・テスト・文書を追加。全6系統CI成功、実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。 |
