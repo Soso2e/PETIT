@@ -5,11 +5,15 @@ const formEl = document.getElementById("chat-form");
 const inputEl = document.getElementById("input");
 const sendEl = document.getElementById("send");
 const statusEl = document.getElementById("status");
+const chatModelSelectEl = document.getElementById("chat-model-select");
+const agentModelSelectEl = document.getElementById("agent-model-select");
+const modelRoutingStateEl = document.getElementById("model-routing-state");
 
 // Conversation history restored from SQLite and sent back to the model.
 const history = [];
 const sessionId = localStorage.getItem("petit_session_id") || crypto.randomUUID();
 localStorage.setItem("petit_session_id", sessionId);
+let modelRoutingSnapshot = null;
 
 function freshnessLabel(status, label) {
   if (!status || !status.configured) return `${label}: 未使用`;
@@ -80,6 +84,8 @@ function addMessage(role, text, { tools, error, actions, modelRoute } = {}) {
     body.textContent = [
       `経路: ${o.actual_route || "instant"}`,
       `モデル: ${o.model || "LLM未使用"}`,
+      `プロファイル: ${o.profile || "なし"}`,
+      `Provider: ${o.provider || "なし"}`,
       `ツール: ${(o.tools || []).join(", ") || "なし"}`,
       freshnessLabel(o.notion_sync, "Notion"),
       freshnessLabel(o.calendar_sync, "Calendar"),
@@ -133,6 +139,93 @@ function setTyping(on) {
   }
 }
 
+function setModelRoutingBusy(on) {
+  if (chatModelSelectEl) chatModelSelectEl.disabled = on;
+  if (agentModelSelectEl) agentModelSelectEl.disabled = on;
+}
+
+function optionLabel(option) {
+  if (option.configured) return option.label;
+  return `${option.label}（未設定）`;
+}
+
+function renderRouteSelect(route, selectEl, snapshot) {
+  if (!selectEl) return;
+  const routeState = snapshot.routes && snapshot.routes[route];
+  if (!routeState) return;
+  selectEl.replaceChildren();
+  for (const option of routeState.options || []) {
+    const element = document.createElement("option");
+    element.value = option.profile;
+    element.textContent = optionLabel(option);
+    element.disabled = !option.configured;
+    selectEl.appendChild(element);
+  }
+  selectEl.value = routeState.selected;
+  selectEl.title = routeState.active && routeState.active.external
+    ? "外部APIへ会話内容が送信されます"
+    : "ローカルPC内で処理します";
+}
+
+function renderModelRouting(snapshot) {
+  modelRoutingSnapshot = snapshot;
+  renderRouteSelect("chat", chatModelSelectEl, snapshot);
+  renderRouteSelect("agent", agentModelSelectEl, snapshot);
+}
+
+async function loadModelRouting() {
+  if (!chatModelSelectEl || !agentModelSelectEl) return;
+  setModelRoutingBusy(true);
+  try {
+    const res = await fetch("/api/model-routing", { cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    renderModelRouting(data);
+    modelRoutingStateEl.textContent = "";
+  } catch (e) {
+    modelRoutingStateEl.textContent = "モデル設定を取得できません";
+    modelRoutingStateEl.className = "model-routing__state model-routing__state--error";
+  } finally {
+    setModelRoutingBusy(false);
+  }
+}
+
+async function updateModelRouting(route, profile) {
+  const previous = modelRoutingSnapshot && modelRoutingSnapshot.selections
+    ? modelRoutingSnapshot.selections[route]
+    : "local";
+  setModelRoutingBusy(true);
+  modelRoutingStateEl.textContent = "切り替え中…";
+  modelRoutingStateEl.className = "model-routing__state";
+  try {
+    const res = await fetch("/api/model-routing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [route]: profile }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+    renderModelRouting(data);
+    const active = data.routes[route].active;
+    modelRoutingStateEl.textContent = `${route === "chat" ? "Chat" : "Agent"}を${active.label}へ切替済み`;
+    await checkHealth();
+  } catch (e) {
+    const selectEl = route === "chat" ? chatModelSelectEl : agentModelSelectEl;
+    if (selectEl) selectEl.value = previous;
+    modelRoutingStateEl.textContent = "⚠️ " + e.message;
+    modelRoutingStateEl.className = "model-routing__state model-routing__state--error";
+  } finally {
+    setModelRoutingBusy(false);
+  }
+}
+
+if (chatModelSelectEl) {
+  chatModelSelectEl.addEventListener("change", () => updateModelRouting("chat", chatModelSelectEl.value));
+}
+if (agentModelSelectEl) {
+  agentModelSelectEl.addEventListener("change", () => updateModelRouting("agent", agentModelSelectEl.value));
+}
+
 async function acknowledgeJobs(ids) {
   if (!ids.length) return;
   await fetch("/api/jobs/ack", {
@@ -168,14 +261,18 @@ async function pollJobs() {
 
 async function checkHealth() {
   try {
-    const res = await fetch("/api/health");
+    const res = await fetch("/api/health", { cache: "no-store" });
     const data = await res.json();
-    if (data.chat_model && data.chat_model.server_ok) {
-      const fallback = data.agent_model && !data.agent_model.server_ok ? " / Agentフォールバック可" : "";
-      statusEl.textContent = "Chat 接続OK" + fallback;
+    const chat = data.chat_model || {};
+    const agent = data.agent_model || {};
+    if (chat.server_ok && agent.server_ok) {
+      statusEl.textContent = `Chat: ${chat.label || chat.model} / Agent: ${agent.label || agent.model}`;
       statusEl.className = "status status--ok";
+    } else if (chat.server_ok) {
+      statusEl.textContent = "Chat接続OK / Agent未接続";
+      statusEl.className = "status status--unknown";
     } else {
-      statusEl.textContent = "LM Studio 未接続";
+      statusEl.textContent = `Chat未接続${chat.label ? ` (${chat.label})` : ""}`;
       statusEl.className = "status status--bad";
     }
   } catch (e) {
@@ -289,6 +386,7 @@ async function loadOpener() {
 }
 
 async function initialize() {
+  await loadModelRouting();
   await checkHealth();
   const restored = await restoreHistory();
   if (!restored) await loadOpener();
