@@ -20,7 +20,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: pip install -r requirements.txt
       - run: python -m unittest tests.test_voice_task_interaction -v
       - run: python -m py_compile backend/agent.py backend/model_router.py
       - run: node --check frontend/voice.js
