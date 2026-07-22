@@ -170,7 +170,7 @@ def get_model_routing() -> dict[str, Any]:
 
 
 @app.post("/api/model-routing")
-def update_model_routing(payload: ModelRoutingUpdate) -> dict[str, Any] | JSONResponse:
+def update_model_routing(payload: ModelRoutingUpdate) -> Any:
     updates = {
         route: value
         for route, value in (("chat", payload.chat), ("agent", payload.agent))
