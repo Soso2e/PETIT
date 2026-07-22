@@ -87,8 +87,9 @@ class TaskCancelStatusTests(unittest.TestCase):
 
         self.assertIn("total_count", schema["description"])
         self.assertIn("has_more", schema["description"])
+        self.assertIn("returned_countだけを全件数と断定しない", schema["description"])
         self.assertIn("キャンセルを進行中として扱わず", schema["description"])
-        self.assertIn("全件と断定", result["response_guidance"] + "全件と断定しない")
+        self.assertIn("全件数と断定しない", result["response_guidance"])
         self.assertIn("キャンセルは進行中・未完了に数えず", result["response_guidance"])
 
 
