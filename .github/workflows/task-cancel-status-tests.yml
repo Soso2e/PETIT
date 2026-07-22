@@ -1,0 +1,29 @@
+name: Task cancel status tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/tools/task_reads.py"
+      - "backend/tools/__init__.py"
+      - "tests/test_task_cancel_status.py"
+      - "docs/task_status_handling.md"
+      - "PROGRESS.md"
+      - ".github/workflows/task-cancel-status-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Run task status tests
+        run: python -m unittest tests.test_task_cancel_status -v
