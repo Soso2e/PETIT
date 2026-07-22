@@ -1,8 +1,8 @@
 """Minimal conversation flow for PETIT.
 
-The default path is deliberately boring: one chat-model call, a compact prompt,
-and only the last three conversation exchanges. Retrieval and situation gathering
-are opt-in through explicit tool routing.
+The default path keeps ordinary chat to one lightweight model call. Deterministic
+commands and explicit tool requests are handled before the AI router; ambiguous
+natural-language requests can still use the router's bounded tool suggestions.
 """
 from __future__ import annotations
 
@@ -20,9 +20,13 @@ CHAT_SYSTEM_PROMPT = (
     "質問に直接答え、思考過程や不要な前置きは出さないでください。"
 )
 AGENT_SYSTEM_PROMPT = (
-    CHAT_SYSTEM_PROMPT
-    + "ツール結果がある場合だけ、その事実を使ってください。"
+    "あなたはPETIT。ユーザーの生活・制作・開発を支える実務的な相棒です。"
+    "まず結論を示し、その後に必要な理由・手順・注意点を、要求に十分な長さで説明してください。"
+    "設計、分析、比較、レビューでは、短さより正確さと実用性を優先し、必要なら箇条書きを使ってください。"
+    "内部の思考過程は出さず、確認できた事実と判断を分けてください。"
+    "ツール結果がある場合だけ、その事実を使ってください。"
     "書き込みは対象確認後にツールで実行し、実行結果なしに完了したと言わないでください。"
+    "最後に、役立つ場合だけ次の具体的な一手を示してください。"
 )
 # Compatibility alias for modules/tests that still import the old name.
 SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
@@ -97,7 +101,18 @@ def _instant_reply(user_message: str) -> dict[str, Any] | None:
     reply = _GREETING_REPLIES.get(compact)
     if reply is None:
         return None
-    return {"reply": reply, "used_tools": [], "model_route": {"kind": "instant", "model": None, "reasons": ["instant_greeting"]}}
+    return {
+        "reply": reply,
+        "used_tools": [],
+        "model_route": {
+            "kind": "instant",
+            "requested_route": "deterministic",
+            "actual_route": "deterministic",
+            "model": None,
+            "reasons": ["instant_greeting"],
+            "tools": [],
+        },
+    }
 
 
 def _recent_history(history: list[dict[str, str]] | None) -> list[dict[str, str]]:
@@ -149,8 +164,7 @@ def _related_tool_names(message: str) -> list[str]:
     if "link_github_repository_candidate" in names or "ignore_github_repository_candidate" in names:
         names = [name for name in names if name != "get_github_repository_candidates"]
     # Natural consultations are intents rather than explicit source commands.
-    # Expose only the three relevant read tools and let the agent choose among
-    # them; no retrieval happens merely because a schema was exposed.
+    # Expose only the relevant read tools and let the agent choose among them.
     if _PLANNING_PATTERN.search(message):
         names.extend(("get_tasks", "get_schedule", "search_memory"))
     if _RECALL_PATTERN.search(message):
@@ -168,9 +182,45 @@ def _related_tool_names(message: str) -> list[str]:
     return list(dict.fromkeys(names))
 
 
+def _validated_router_tool_names(route_decision: dict[str, Any]) -> list[str]:
+    if route_decision.get("decision_type") != "tool":
+        return []
+    registered = set(tools.registered_names())
+    return [
+        name
+        for name in model_router.validate_suggested_tools(route_decision.get("suggested_tools"))
+        if name in registered
+    ]
+
+
 def _selected_schemas(names: list[str]) -> list[dict[str, Any]]:
     allowed = set(names)
     return [item for item in tools.openai_tools_schema() if item["function"]["name"] in allowed]
+
+
+def _deterministic_route(tool_names: list[str], reason: str) -> dict[str, Any]:
+    return {
+        "kind": "agent",
+        "decision_type": "tool",
+        "model": config.AGENT_MODEL,
+        "reasons": [reason],
+        "router_source": "deterministic",
+        "router_confidence": 1.0,
+        "suggested_tools": [],
+        "selected_tools": list(tool_names),
+    }
+
+
+def _route_details(route_decision: dict[str, Any], selected_tools: list[str], tool_result_mode: str) -> dict[str, Any]:
+    return {
+        "reasons": list(route_decision.get("reasons") or []),
+        "router_source": route_decision.get("router_source"),
+        "router_confidence": route_decision.get("router_confidence"),
+        "router_decision": route_decision.get("decision_type"),
+        "suggested_tools": list(route_decision.get("suggested_tools") or []),
+        "selected_tools": list(selected_tools),
+        "tool_result_mode": tool_result_mode,
+    }
 
 
 def _format_direct_time(result: str) -> str | None:
@@ -191,6 +241,68 @@ def _tool_result_message(user_message: str, results: list[dict[str, str]]) -> di
     for item in results:
         lines.append(f"\nツール: {item['name']}\n結果: {item['content']}")
     return {"role": "user", "content": "\n".join(lines)}
+
+
+def _normalize_tool_calls(message: dict[str, Any], tool_round: int) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for index, raw_call in enumerate(message.get("tool_calls") or []):
+        if not isinstance(raw_call, dict):
+            continue
+        function = raw_call.get("function") or {}
+        if not isinstance(function, dict):
+            continue
+        name = str(function.get("name") or "").strip()
+        arguments = function.get("arguments", "{}")
+        if not isinstance(arguments, str):
+            arguments = json.dumps(arguments or {}, ensure_ascii=False)
+        call_id = str(raw_call.get("id") or f"petit_tool_{tool_round}_{index}")
+        normalized.append(
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {"name": name, "arguments": arguments},
+            }
+        )
+    return normalized
+
+
+def _append_standard_tool_results(
+    messages: list[dict[str, Any]],
+    assistant_message: dict[str, Any],
+    tool_calls: list[dict[str, Any]],
+    results: list[dict[str, str]],
+) -> None:
+    messages.append(
+        {
+            "role": "assistant",
+            "content": assistant_message.get("content") or None,
+            "tool_calls": tool_calls,
+        }
+    )
+    for item in results:
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": item["call_id"],
+                "name": item["name"],
+                "content": item["content"],
+            }
+        )
+
+
+def _tool_template_compatibility_error(exc: LMStudioError) -> bool:
+    text = str(exc).casefold()
+    return any(
+        marker in text
+        for marker in (
+            "error rendering prompt",
+            "jinja",
+            "no user query found",
+            "role=tool",
+            "role 'tool'",
+            "tool message",
+        )
+    )
 
 
 def _answer(message: dict[str, Any], messages: list[dict[str, Any]], model: str, route: str | None = None) -> str:
@@ -322,7 +434,7 @@ def _run_planning_consultation(user_message: str, history: list[dict[str, str]] 
         "reply": _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent"),
         "used_tools": used_tools,
         "persist": not failed,
-        "model_route": _route_meta("agent", actual, [name for name, _ in calls], fallback_reason) | {"kind": "planning"},
+        "model_route": _route_meta("agent", actual, [name for name, _ in calls], fallback_reason) | {"kind": "planning", "tool_result_mode": "user_context"},
     }
 
 
@@ -362,7 +474,7 @@ def _run_forced_read(
     try:
         answer, actual, fallback_reason = _complete(messages, tools_schema=None, route="agent", allow_chat_fallback=True)
         reply = _answer(answer, messages, config.CHAT_MODEL if actual == "chat_fallback" else config.AGENT_MODEL, "chat" if actual == "chat_fallback" else "agent")
-        model_route = _route_meta("agent", actual, [name], fallback_reason) | {"kind": "forced_read"}
+        model_route = _route_meta("agent", actual, [name], fallback_reason) | {"kind": "forced_read", "tool_result_mode": "user_context"}
     except LMStudioError:
         reply = _fallback_read_reply(name, content)
         if not reply:
@@ -375,6 +487,7 @@ def _run_forced_read(
             "model": None,
             "base_url_id": None,
             "tools": [name],
+            "tool_result_mode": "deterministic_fallback",
         }
     return {
         "reply": reply or _fallback_read_reply(name, content),
@@ -395,7 +508,12 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
     if project_turn:
         return project_turn
 
-    route_decision = model_router.choose(user_message, recent_history)
+    instant = _instant_reply(user_message)
+    if instant:
+        return instant
+
+    # Explicit and deterministic tool signals are resolved before paying for the
+    # lightweight AI router. The AI router is reserved for ambiguous language.
     tool_names = _related_tool_names(user_message)
     write_requested = any(tools.requires_confirmation(name) for name in tool_names)
     if "edit_brain_note" in tool_names:
@@ -406,86 +524,165 @@ def run(user_message: str, history: list[dict[str, str]] | None = None, *, allow
         return _run_planning_consultation(user_message, recent_history)
     if not write_requested and len(tool_names) == 1 and tool_names[0] in {"get_tasks", "get_schedule", "search_brain_notes"}:
         return _run_forced_read(user_message, recent_history, tool_names[0])
-    # Current time is deterministic and does not need an LLM at all.
     if tool_names == ["get_current_time"]:
         raw = tools.dispatch("get_current_time", {})
         direct = _format_direct_time(raw)
         if direct:
-            return {"reply": direct, "used_tools": [{"name": "get_current_time", "arguments": "{}"}], "model_route": {"kind": "direct", "model": None}}
+            return {
+                "reply": direct,
+                "used_tools": [{"name": "get_current_time", "arguments": "{}"}],
+                "model_route": {
+                    "kind": "direct",
+                    "requested_route": "deterministic",
+                    "actual_route": "deterministic",
+                    "model": None,
+                    "tools": ["get_current_time"],
+                    "reasons": ["deterministic_current_time"],
+                    "tool_result_mode": "direct",
+                },
+            }
+
+    if tool_names:
+        route_decision = _deterministic_route(tool_names, "deterministic_tool_signal")
+    else:
+        route_decision = model_router.choose(user_message, recent_history)
+        tool_names = _validated_router_tool_names(route_decision)
+        write_requested = any(tools.requires_confirmation(name) for name in tool_names)
 
     selected_tools = _selected_schemas(tool_names)
+    selected_tool_names = {item["function"]["name"] for item in selected_tools}
     used_tools: list[dict[str, Any]] = []
-    attempted_tool_names: set[str] = set()
+    attempted_calls: set[tuple[str, str]] = set()
     had_tool_failure = False
     requested_route = "agent" if tool_names or route_decision["kind"] == "agent" else "chat"
     prompt = AGENT_SYSTEM_PROMPT if requested_route == "agent" else CHAT_SYSTEM_PROMPT
-    messages: list[dict[str, Any]] = [{"role": "system", "content": prompt}]
-    messages.extend(recent_history)
-    messages.append({"role": "user", "content": user_message})
+    base_messages: list[dict[str, Any]] = [{"role": "system", "content": prompt}]
+    base_messages.extend(recent_history)
+    base_messages.append({"role": "user", "content": user_message})
+    standard_messages = list(base_messages)
+    compatibility_messages = list(base_messages)
+    active_transport = "user" if config.TOOL_RESULT_MODE == "user" else "tool"
+    tool_result_mode = "none"
+    tool_rounds = 0
 
-    # One call for normal chat. Explicit tool requests may need one additional
-    # call to phrase the tool result; they still never receive unrelated tools.
-    for _ in range(min(config.MAX_TOOL_ITERATIONS, 2)):
-        message, actual_route, fallback_reason = _complete(
-            messages,
-            tools_schema=selected_tools or None,
-            route=requested_route,
-            # Pure reasoning can safely degrade to Chat. Tool selection and writes cannot.
-            allow_chat_fallback=requested_route == "agent" and not tool_names,
-        )
-        tool_calls = message.get("tool_calls") or []
+    while True:
+        call_messages = compatibility_messages if active_transport == "user" else standard_messages
+        try:
+            message, actual_route, fallback_reason = _complete(
+                call_messages,
+                tools_schema=selected_tools or None,
+                route=requested_route,
+                # Pure reasoning can safely degrade to Chat. Tool selection and writes cannot.
+                allow_chat_fallback=requested_route == "agent" and not tool_names,
+            )
+        except LMStudioError as exc:
+            can_fallback_transport = (
+                config.TOOL_RESULT_MODE == "auto"
+                and active_transport == "tool"
+                and standard_messages != compatibility_messages
+                and _tool_template_compatibility_error(exc)
+            )
+            if not can_fallback_transport:
+                raise
+            active_transport = "user"
+            tool_result_mode = "user_fallback"
+            call_messages = compatibility_messages
+            message, actual_route, fallback_reason = _complete(
+                call_messages,
+                tools_schema=selected_tools or None,
+                route=requested_route,
+                allow_chat_fallback=False,
+            )
+
+        tool_calls = _normalize_tool_calls(message, tool_rounds + 1)
         if not tool_calls:
             model = (
                 config.CHAT_MODEL
                 if actual_route == "chat_fallback"
                 else (config.AGENT_MODEL if requested_route == "agent" else config.CHAT_MODEL)
             )
+            route_meta = _route_meta(requested_route, actual_route, tool_names, fallback_reason)
+            route_meta.update(_route_details(route_decision, tool_names, tool_result_mode))
             if write_requested:
                 return {
-                    "reply": "対象は確認できましたが、安全な変更案を確定できませんでした。対象ファイルと変更内容をもう少し具体的にしてください。",
+                    "reply": "対象は確認できましたが、安全な変更案を確定できませんでした。対象と変更内容をもう少し具体的にしてください。",
                     "used_tools": used_tools,
                     "persist": False,
-                    "model_route": _route_meta(requested_route, actual_route, tool_names, fallback_reason) | {"reasons": route_decision["reasons"]},
+                    "model_route": route_meta,
                 }
             return {
-                "reply": _answer(message, messages, model, "chat" if actual_route == "chat_fallback" else requested_route),
+                "reply": _answer(message, call_messages, model, "chat" if actual_route == "chat_fallback" else requested_route),
                 "used_tools": used_tools,
                 "persist": not had_tool_failure,
-                "model_route": _route_meta(requested_route, actual_route, tool_names, fallback_reason) | {"reasons": route_decision["reasons"]},
+                "model_route": route_meta,
             }
+
+        if tool_rounds >= config.MAX_TOOL_ITERATIONS:
+            route_meta = _route_meta(requested_route, actual_route, tool_names, "tool_iteration_limit")
+            route_meta.update(_route_details(route_decision, tool_names, tool_result_mode))
+            return {
+                "reply": "必要な確認が多段になったため、ここで停止しました。対象を絞ってもう一度頼んでください。",
+                "used_tools": used_tools,
+                "persist": False,
+                "model_route": route_meta,
+            }
+        tool_rounds += 1
+
         results: list[dict[str, str]] = []
         for call in tool_calls:
-            function = call.get("function", {})
-            name = function.get("name", "")
-            args = function.get("arguments", "{}")
+            function = call["function"]
+            name = function["name"]
+            args = function["arguments"]
+            call_id = call["id"]
+
+            if name not in selected_tool_names:
+                result = json.dumps(
+                    {"error": "tool_not_allowed", "tool": name},
+                    ensure_ascii=False,
+                )
+                had_tool_failure = True
+                results.append({"name": name or "unknown", "content": result, "call_id": call_id})
+                continue
+
+            try:
+                parsed_args = tools.parse_arguments(name, args)
+            except ValueError:
+                result = json.dumps(
+                    {"error": "invalid_tool_arguments", "tool": name},
+                    ensure_ascii=False,
+                )
+                had_tool_failure = True
+                results.append({"name": name, "content": result, "call_id": call_id})
+                continue
+
+            signature = (name, json.dumps(parsed_args, ensure_ascii=False, sort_keys=True, default=str))
+            if signature in attempted_calls:
+                result = json.dumps(
+                    {"error": "duplicate_tool_call", "tool": name, "message": "同じ引数の再実行を停止しました。"},
+                    ensure_ascii=False,
+                )
+                had_tool_failure = True
+                results.append({"name": name, "content": result, "call_id": call_id})
+                continue
+            attempted_calls.add(signature)
+
             if tools.requires_confirmation(name):
-                try:
-                    parsed_args = tools.parse_arguments(name, args)
-                except ValueError:
-                    return {
-                        "reply": "書き込み内容を解釈できませんでした。内容を具体的にしてもう一度お願いします。",
-                        "used_tools": [],
-                        "persist": False,
-                        "model_route": _route_meta("agent", "agent", tool_names),
-                    }
+                route_meta = _route_meta("agent", "agent", tool_names)
+                route_meta.update(_route_details(route_decision, tool_names, tool_result_mode))
                 return {
                     "reply": _confirmation_text(name, parsed_args),
                     "used_tools": used_tools,
                     "pending_actions": [{"name": name, "arguments": parsed_args}],
                     "persist": True,
-                    "model_route": _route_meta("agent", "agent", tool_names),
+                    "model_route": route_meta,
                 }
-            result = tools.dispatch(name, args)
-            attempted_tool_names.add(name)
-            had_tool_failure = had_tool_failure or _tool_failed(result)
-            used_tools.append({"name": name, "arguments": args})
-            results.append({"name": name, "content": result})
-        messages.append(_tool_result_message(user_message, results))
-        selected_tools = _selected_schemas([name for name in tool_names if name not in attempted_tool_names])
 
-    return {
-        "reply": "確認した結果を短くまとめられませんでした。",
-        "used_tools": used_tools,
-        "persist": False,
-        "model_route": _route_meta(requested_route, requested_route, tool_names) | {"reasons": route_decision["reasons"]},
-    }
+            result = tools.dispatch(name, parsed_args)
+            had_tool_failure = had_tool_failure or _tool_failed(result)
+            used_tools.append({"name": name, "arguments": json.dumps(parsed_args, ensure_ascii=False)})
+            results.append({"name": name, "content": result, "call_id": call_id})
+
+        _append_standard_tool_results(standard_messages, message, tool_calls, results)
+        compatibility_messages.append(_tool_result_message(user_message, results))
+        if tool_result_mode == "none":
+            tool_result_mode = "user" if active_transport == "user" else "tool"
