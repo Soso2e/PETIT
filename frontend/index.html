@@ -17,6 +17,18 @@
       </div>
     </header>
 
+    <section class="model-routing" aria-label="使用モデルの切り替え">
+      <label class="model-routing__field" for="chat-model-select">
+        <span>Chat:</span>
+        <select id="chat-model-select" aria-label="Chatモデル"></select>
+      </label>
+      <label class="model-routing__field" for="agent-model-select">
+        <span>Agent:</span>
+        <select id="agent-model-select" aria-label="Agentモデル"></select>
+      </label>
+      <span id="model-routing-state" class="model-routing__state" role="status" aria-live="polite"></span>
+    </section>
+
     <main id="messages" class="messages">
       <div class="msg msg--assistant" id="greeting">
         <div class="bubble">こんにちは。PETIT です。今日のタスクや予定、覚えておきたいことなど、なんでも話しかけてください。</div>
