@@ -1,6 +1,6 @@
 """Daily briefing generation for PETIT.
 
-予定・タスク・直近エピソードを集めて、「今日まず何をするか」まで絞る。
+予定・タスク・直近エピソード・GitHub開発差分を集めて、「今日まず何をするか」まで絞る。
 LM Studio が使える場合は自然文に整え、落ちている場合は定型文で返す。
 """
 from __future__ import annotations
@@ -10,17 +10,19 @@ from datetime import date as date_type
 from datetime import datetime
 from typing import Any
 
-from . import calendar_sync, db
+from . import calendar_sync, db, github_daily_review
 from .lmstudio_client import LMStudioError, chat_completion
 
 log = logging.getLogger(__name__)
 
 _SYSTEM = """あなたはユーザー専用アシスタント「PETIT」。
-今日の予定・タスク・最近の流れを見て、朝のブリーフィングを短く作ってください。
+今日の予定・タスク・最近の流れ・GitHub開発差分を見て、朝のブリーフィングを短く作ってください。
 
 ルール:
 - 日本語で自然に。1〜4文。
 - 情報を並べすぎず、「今やる1個」を必ず最後に入れる。
+- 失敗したCIがある場合は優先して触れる。
+- GitHubのcommitやPRだけでプロジェクト全体の完了を断定しない。
 - 予定やタスクが無い場合は、無いことを軽く伝えて次の一手を提案する。
 - 医療・生活改善スコアのような評価はしない。"""
 
@@ -39,7 +41,8 @@ def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
     events = _events_for(day)
     tasks = _open_tasks(day)
     recent_context = _recent_context(limit=2)
-    next_action = _pick_next_action(events, tasks, recent_context)
+    github_review = github_daily_review.review_for_briefing(day)
+    next_action = _pick_next_action(events, tasks, recent_context, github_review)
     context = {
         "date": day,
         "events": events,
@@ -47,6 +50,7 @@ def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
         "recent_context": recent_context,
         # Compatibility for older callers; values now come from episodes first.
         "recent_summaries": recent_context,
+        "github_review": github_review,
         "next_action": next_action,
         "notion_sync": notion_sync,
         "calendar_sync": calendar_sync_status,
@@ -68,7 +72,11 @@ def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
     except LMStudioError as exc:
         log.debug("daily briefing via LLM failed: %s", exc)
 
-    return {**context, "message": _fallback_message(day, events, tasks, next_action), "kind": "template"}
+    return {
+        **context,
+        "message": _fallback_message(day, events, tasks, github_review, next_action),
+        "kind": "template",
+    }
 
 
 def _events_for(day: str) -> list[dict[str, Any]]:
@@ -117,11 +125,16 @@ def _pick_next_action(
     events: list[dict[str, Any]],
     tasks: list[dict[str, Any]],
     recent_context: list[dict[str, Any]],
+    github_review: dict[str, Any],
 ) -> str:
+    if github_review.get("priority") == "high" and github_review.get("next_action"):
+        return str(github_review["next_action"])
     if tasks:
         return f"まず「{tasks[0]['title']}」から始める"
     if events:
         return f"次の予定「{events[0]['title']}」の準備をする"
+    if github_review.get("changed_count") and github_review.get("next_action"):
+        return str(github_review["next_action"])
     if recent_context:
         summary = str(recent_context[-1].get("summary", "")).strip()
         if summary:
@@ -153,6 +166,17 @@ def _format_context(context: dict[str, Any]) -> str:
     if not context["recent_context"]:
         lines.append("- なし")
 
+    github = context.get("github_review") or {}
+    lines.append("GitHub開発差分:")
+    if github.get("status") in {"found", "partial"}:
+        lines.append(str(github.get("message") or "")[:1800])
+    elif github.get("status") == "no_changes":
+        lines.append("- 前回以降の変更なし")
+    elif github.get("status") not in {"disabled", "not_configured", "skipped_non_today"}:
+        lines.append(f"- 取得状態: {github.get('status')} / {github.get('message', '')}")
+    else:
+        lines.append(f"- {github.get('status')}")
+
     lines.append(f"今やる1個: {context['next_action']}")
     return "\n".join(lines)
 
@@ -161,12 +185,22 @@ def _fallback_message(
     day: str,
     events: list[dict[str, Any]],
     tasks: list[dict[str, Any]],
+    github_review: dict[str, Any],
     next_action: str,
 ) -> str:
     event_text = f"予定は{len(events)}件" if events else "予定は今のところなし"
     task_text = f"未完了タスクは{len(tasks)}件" if tasks else "期限つきの未完了タスクはなし"
+    changed = int(github_review.get("changed_count") or 0)
+    if changed:
+        github_text = f"GitHubは{changed}リポジトリに更新あり"
+    elif github_review.get("status") == "no_changes":
+        github_text = "GitHubは前回以降の差分なし"
+    elif github_review.get("status") in {"not_configured", "disabled", "skipped_non_today"}:
+        github_text = "GitHubレビューは未使用"
+    else:
+        github_text = "GitHubレビューは取得エラー"
     action = next_action.removeprefix("まず")
-    return f"おはよう。今日は{day}、{event_text}で、{task_text}。まず{action}のがよさそう。"
+    return f"おはよう。今日は{day}、{event_text}で、{task_text}。{github_text}。まず{action}のがよさそう。"
 
 
 def _hm(value: str | None) -> str:
