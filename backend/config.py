@@ -96,7 +96,11 @@ LIGHT_MAX_TOKENS = int(os.getenv("PETIT_LIGHT_MAX_TOKENS", "512"))
 ENABLE_THINKING = os.getenv("PETIT_ENABLE_THINKING", "0") not in ("0", "false", "False")
 
 # Agent
-MAX_TOOL_ITERATIONS = int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "2"))
+# Maximum number of tool execution rounds. A final answer call is allowed after them.
+MAX_TOOL_ITERATIONS = max(1, min(int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "3")), 6))
+TOOL_RESULT_MODE = os.getenv("PETIT_TOOL_RESULT_MODE", "auto").strip().lower() or "auto"
+if TOOL_RESULT_MODE not in {"auto", "tool", "user"}:
+    TOOL_RESULT_MODE = "auto"
 
 # Sona Agent Core is opt-in while PETIT validates the first vertical slice.
 USE_SONA_CORE = os.getenv("PETIT_USE_SONA_CORE", "0") not in ("0", "false", "False")
