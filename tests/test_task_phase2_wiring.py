@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend import agent, config, db, task_sync_queue, worker
-from backend.tools import registry, task_reads, tasks_phase2
+from backend.tools import registry, task_defaults, task_reads, tasks_phase2
 
 
 class TaskPhase2WiringTests(unittest.TestCase):
@@ -23,10 +23,11 @@ class TaskPhase2WiringTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_phase2_handlers_override_legacy_registry_entries(self) -> None:
-        # Read behavior is tightened after Phase 2 registration; write handlers
-        # remain owned by Phase 2 so optimistic writes and queueing are unchanged.
+        # Read behavior is tightened after Phase 2 registration. create_task adds
+        # only conversation defaults and delegates the actual optimistic write and
+        # queueing to Phase 2; the other write handlers remain directly owned there.
         self.assertIs(registry._REGISTRY["get_tasks"].handler, task_reads.get_tasks)
-        self.assertIs(registry._REGISTRY["create_task"].handler, tasks_phase2.create_task)
+        self.assertIs(registry._REGISTRY["create_task"].handler, task_defaults.create_task)
         self.assertIs(registry._REGISTRY["complete_task"].handler, tasks_phase2.complete_task)
         self.assertIs(registry._REGISTRY["update_task"].handler, tasks_phase2.update_task)
         self.assertTrue(registry._REGISTRY["update_task"].requires_confirmation)

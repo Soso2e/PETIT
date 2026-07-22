@@ -27,8 +27,8 @@ _CANCELLED_STATUS_KEYS = frozenset(_CANCELLED_STATUS_ALIASES)
 TASK_RESPONSE_GUIDANCE = (
     "タスク件数はtotal_countを条件一致の総数、returned_countを今回表示した件数として扱う。"
     "returned_countや互換用countだけを見て全件数と断定しない。"
-    "has_more=trueなら一部取得と明記する。キャンセルは進行中・未完了に数えず、"
-    "status_summary.cancelledとして分けて説明する。"
+    "has_more=trueなら一部取得と明記する。タスクはHigh、Mid、Low、未設定の順で返る。"
+    "キャンセルは進行中・未完了に数えず、status_summary.cancelledとして分けて説明する。"
 )
 
 
@@ -84,6 +84,7 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
     description=(
         "タスク一覧を取得する。既定ではDoneとキャンセル状態（NotionのChancel等）を除いた"
         "アクティブタスクだけを返す。status=allで全状態、status指定でその状態だけを返す。"
+        "取得上限を適用する前にHigh、Mid、Low、未設定の順で並べ、同じ優先度では期限順に返す。"
         "total_countは条件一致総数、returned_countは今回の表示件数で、has_more=trueなら一部取得。"
         "returned_countだけを全件数と断定しない。キャンセルを進行中として扱わず、"
         "status_summaryで分けて説明する。"
@@ -153,7 +154,10 @@ def get_tasks(
             "SELECT id, source, title, status, due_date, priority, category, area, reason, url, done_date, "
             "project_id, project_external_id FROM tasks_cache"
             + where
-            + " ORDER BY (due_date IS NULL), due_date ASC, id ASC LIMIT ?",
+            + " ORDER BY CASE LOWER(TRIM(COALESCE(priority, ''))) "
+            "WHEN 'high' THEN 0 WHEN 'mid' THEN 1 WHEN 'medium' THEN 1 "
+            "WHEN 'low' THEN 2 ELSE 3 END, "
+            "(due_date IS NULL), due_date ASC, id ASC LIMIT ?",
             [*params, bounded_limit],
         ).fetchall()
         summary_rows = conn.execute(
