@@ -37,7 +37,21 @@ jobs:
         run: node --check frontend/app.js
 
       - name: Run existing core hardening tests
-        run: python -m unittest tests.test_core_hardening -v
+        run: |
+          set +e
+          python -m unittest tests.test_core_hardening -v > core-hardening.log 2>&1
+          status=$?
+          cat core-hardening.log
+          exit $status
+
+      - name: Upload failed core test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-hardening-failure-log
+          path: core-hardening.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run chat context budget tests
         run: python -m unittest tests.test_chat_context_budget -v
