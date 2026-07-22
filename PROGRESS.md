@@ -13,7 +13,7 @@
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
 - Notion会話検索: 明示的なNotion参照をルーターLLM前に決定論的検出し、共有済みページを最大3件検索、プロパティ・本文抜粋・更新日時・URLを取得する。結果ありはAgent 1回、未設定・0件・API失敗はLLMなしで区別する。実Notion／ブラウザE2Eは未確認。
-- タスク管理: area・確認済みproject Relationに加え、承認後のSQLite即時保存、`pending / synced / failed / conflict`、Notion書き込みキュー、指数バックオフ、手動再試行、タスク編集、競合スナップショットを実装。全回帰CI成功、実Notion／ブラウザE2Eは未確認。
+- タスク管理: area・確認済みproject Relation、承認後のSQLite即時保存、Notion書き込みキュー、タスク編集・競合保護に加え、既定取得で`Done`と`Chancel`等をアクティブ一覧から除外し、`returned_count / total_count / has_more / status_summary`とタスク取得時だけの出力ガイダンスを追加。専用・既存回帰を含む全8系統CI成功、実Notion／DeepSeek／ブラウザE2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
 - GitHub Daily Review: access可能な全repositoryを横断し、前回cursor以降のcommit／PR／checkと`PROGRESS.md`を朝ブリーフィング・明示会話でレビューする。CIは成功済み。実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。
@@ -91,3 +91,5 @@
 | 2026-07-22 | 11:35 | #56 | Issue #62対応として全GitHub repositoryの朝差分レビューを実装。global cursor、archived／empty／fork除外、commit／PR／check、`PROGRESS.md`参照、部分失敗時cursor維持、LM Studio fallback、朝briefing、決定論会話routing、scheduler、設定・テスト・文書を追加。全6系統CI成功、実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。 |
 | 2026-07-22 | 14:04 | #57 | Issue #64対応としてWebのChat／Agent個別切替、ローカル／DeepSeek Flash／Proプロファイル、選択値の永続化、APIキー非公開、provider別payload、実モデル観測、設定・文書・専用テスト5件・CIを追加。ローカルunittest・Python／JavaScript構文確認成功、実DeepSeek／ブラウザE2Eは未確認。 |
 | 2026-07-22 | 15:12 | #58 | Issue #66対応としてAivisSpeech上流エラー詳細、429／502／503／504の1回再試行、合成直列化、状態APIの診断項目、スマホ向け音声アンロック、専用テスト8件、CI・文書を追加。ローカルunittest・Python／JavaScript構文確認成功、実AivisSpeech／スマホE2Eは未確認。 |
+| 2026-07-22 | 15:59 | #59 | Issue #69対応としてNotion「たすく」DBの`Done / Chancel`完了グループを確認し、既定の`get_tasks`から完了・キャンセル状態を除外、取得件数と条件一致総数を分離、キャンセル集計とタスク取得時だけの出力ガイダンス、専用テスト・CI・文書を追加。GitHub Actionsと実Notion／DeepSeek／ブラウザE2Eは未確認。 |
+| 2026-07-22 | 16:06 | #60 | Issue #69の専用タスク状態テストと既存Notion／Core／Project Continuity／Linkraft／GitHub evidence／BRAIN／AivisSpeech回帰を含む全8系統CI成功。実Notion同期後のDeepSeek／ブラウザE2Eだけ未確認。 |

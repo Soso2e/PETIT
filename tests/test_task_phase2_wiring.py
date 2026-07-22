@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend import agent, config, db, task_sync_queue, worker
-from backend.tools import registry, tasks_phase2
+from backend.tools import registry, task_reads, tasks_phase2
 
 
 class TaskPhase2WiringTests(unittest.TestCase):
@@ -23,7 +23,9 @@ class TaskPhase2WiringTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_phase2_handlers_override_legacy_registry_entries(self) -> None:
-        self.assertIs(registry._REGISTRY["get_tasks"].handler, tasks_phase2.get_tasks)
+        # Read behavior is tightened after Phase 2 registration; write handlers
+        # remain owned by Phase 2 so optimistic writes and queueing are unchanged.
+        self.assertIs(registry._REGISTRY["get_tasks"].handler, task_reads.get_tasks)
         self.assertIs(registry._REGISTRY["create_task"].handler, tasks_phase2.create_task)
         self.assertIs(registry._REGISTRY["complete_task"].handler, tasks_phase2.complete_task)
         self.assertIs(registry._REGISTRY["update_task"].handler, tasks_phase2.update_task)
