@@ -11,6 +11,7 @@ import json
 from typing import Any
 
 from . import agent_legacy as _legacy
+from . import task_conversation
 
 # Re-export the existing module surface, including compatibility helpers used by
 # tests and other backend modules. The functions below intentionally replace the
@@ -260,6 +261,9 @@ def run(
     allow_defer: bool = True,
 ) -> dict[str, Any]:
     _sync_legacy_globals()
+    task_turn = task_conversation.try_handle_task_activity(user_message)
+    if task_turn:
+        return task_turn
     notion_read = _notion_read_requested(user_message)
     github_review = _github_review_requested(user_message)
     if not notion_read and not github_review:
