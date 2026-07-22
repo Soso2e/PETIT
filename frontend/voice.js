@@ -14,6 +14,28 @@
   const speechRecognitionSupported = Boolean(SpeechRecognitionApi);
   const browserSpeechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
   const audioPlaybackSupported = typeof Audio !== "undefined" && typeof fetch === "function";
+  const voiceApprovePhrases = new Set([
+    "はい", "うん", "お願い", "お願いします", "やって", "やってください",
+    "実行", "実行して", "実行してください", "それで", "それでお願い",
+    "ok", "okay", "オーケー",
+  ]);
+  const voiceCancelPhrases = new Set([
+    "いいえ", "いや", "やめて", "やめる", "キャンセル", "取り消し",
+    "実行しない", "しないで", "中止",
+  ]);
+  const completedActionReplies = {
+    create_task: "タスクを追加しました。",
+    add_task: "タスクを追加しました。",
+    update_task: "タスクを変更しました。",
+    complete_task: "タスクを完了にしました。",
+    retry_task_sync: "タスク同期を再試行しました。",
+    add_schedule: "予定を追加しました。",
+    save_memory: "記憶に保存しました。",
+    create_handoff_note: "引き継ぎメモを保存しました。",
+    edit_brain_note: "BRAINノートを変更しました。",
+    link_github_repository_candidate: "GitHubリポジトリを紐付けました。",
+    ignore_github_repository_candidate: "GitHubリポジトリ候補を無視しました。",
+  };
 
   let voiceReplyEnabled = localStorage.getItem("petit_voice_reply_enabled") === "1";
   let recognition = null;
@@ -64,6 +86,69 @@
       .replace(/[`*_>#\[\]()]/g, "")
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function normalizeVoiceCommand(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/[\s、。,.!！?？]/g, "")
+      .trim();
+  }
+
+  function directReplyText(bubble) {
+    return Array.from(bubble.childNodes)
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent || "")
+      .join("")
+      .trim();
+  }
+
+  function replaceDirectReplyText(bubble, text) {
+    const textNodes = Array.from(bubble.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE);
+    if (!textNodes.length) {
+      bubble.prepend(document.createTextNode(text));
+      return;
+    }
+    textNodes[0].textContent = text;
+    for (const node of textNodes.slice(1)) node.remove();
+  }
+
+  function naturalizeCompletedAction(bubble) {
+    const raw = directReplyText(bubble);
+    if (!raw.startsWith("確認された内容を実行しました。")) return raw;
+    const toolsText = bubble.querySelector(".tools")?.textContent || "";
+    const actionName = Object.keys(completedActionReplies).find((name) => toolsText.includes(name));
+    const friendly = actionName ? completedActionReplies[actionName] : "変更を実行しました。";
+    replaceDirectReplyText(bubble, friendly);
+    return friendly;
+  }
+
+  function pendingActionControls() {
+    const candidates = Array.from(messagesEl.querySelectorAll(".action-confirm")).reverse();
+    for (const controls of candidates) {
+      const buttons = controls.querySelectorAll("button");
+      if (buttons.length >= 2 && !buttons[0].disabled && !buttons[1].disabled) {
+        return { approve: buttons[0], cancel: buttons[1] };
+      }
+    }
+    return null;
+  }
+
+  function handlePendingVoiceDecision(transcript) {
+    const pending = pendingActionControls();
+    if (!pending) return false;
+    const command = normalizeVoiceCommand(transcript);
+    if (voiceApprovePhrases.has(command)) {
+      setVoiceState("確認された操作を実行します。");
+      pending.approve.click();
+      return true;
+    }
+    if (voiceCancelPhrases.has(command)) {
+      setVoiceState("操作をキャンセルします。");
+      pending.cancel.click();
+      return true;
+    }
+    return false;
   }
 
   function findJapaneseVoice() {
@@ -174,7 +259,7 @@
     if (!bubble || bubble.classList.contains("typing") || bubble.classList.contains("bubble--error")) return;
 
     message.dataset.voiceEnhanced = "1";
-    const replyText = bubble.textContent || "";
+    const replyText = naturalizeCompletedAction(bubble);
     if (!replyText.trim()) return;
 
     const replay = document.createElement("button");
@@ -253,6 +338,11 @@
         inputEl.value = transcript;
         inputEl.dispatchEvent(new Event("input"));
         setVoiceState(`聞き取り: ${transcript}`);
+        if (handlePendingVoiceDecision(transcript)) {
+          inputEl.value = "";
+          inputEl.dispatchEvent(new Event("input"));
+          return;
+        }
         formEl.requestSubmit();
       } else if (!inputEl.value.trim()) {
         inputEl.value = draftBeforeListening;
