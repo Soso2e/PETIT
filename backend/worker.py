@@ -6,7 +6,7 @@ import logging
 import threading
 from typing import Any
 
-from . import db, github_daily_review, task_sync_queue, web_sources
+from . import config, daily_index, db, github_daily_review, task_sync_queue, web_sources
 
 log = logging.getLogger(__name__)
 
@@ -27,14 +27,19 @@ class JobWorker:
         tasks_phase2.install_agent_routes()
         task_sync_queue.ensure_task_sync_schema()
         github_daily_review.ensure_schema()
+        daily_index.ensure_schema()
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="petit-job-worker", daemon=True)
         self._thread.start()
         github_daily_review.get_scheduler().start()
+        if config.DAILY_INDEX_ENABLED:
+            daily_index.get_scheduler().start()
 
     def stop(self) -> None:
         self._stop.set()
         github_daily_review.get_scheduler().stop()
+        if config.DAILY_INDEX_ENABLED:
+            daily_index.get_scheduler().stop()
         if self._thread:
             self._thread.join(timeout=3)
 
