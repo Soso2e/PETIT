@@ -20,12 +20,16 @@ class FakeResponse:
     def json(self):
         return self._json_data
 
+    @property
+    def text(self) -> str:
+        return "" if self._json_data is None else str(self._json_data)
+
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
             raise httpx.HTTPStatusError(
                 "failed",
                 request=self.request,
-                response=httpx.Response(self.status_code, request=self.request),
+                response=httpx.Response(self.status_code, request=self.request, json=self._json_data),
             )
 
 
@@ -52,6 +56,18 @@ class FakeClient:
         return self._next()
 
 
+class FakeLock:
+    def __init__(self) -> None:
+        self.entered = 0
+
+    def __enter__(self):
+        self.entered += 1
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
 class AivisSpeechTests(unittest.TestCase):
     def _config_patches(self, **overrides):
         values = {
@@ -67,15 +83,18 @@ class AivisSpeechTests(unittest.TestCase):
         values.update(overrides)
         return [patch.object(config, name, value) for name, value in values.items()]
 
+    def _start_config_patches(self, **overrides) -> None:
+        patches = self._config_patches(**overrides)
+        for item in patches:
+            item.start()
+        self.addCleanup(lambda: [item.stop() for item in reversed(patches)])
+
     def test_synthesize_uses_configured_style_and_adjusts_query(self) -> None:
         client = FakeClient([
             FakeResponse(json_data={"speedScale": 1.0, "intonationScale": 1.0, "volumeScale": 1.0}),
             FakeResponse(content=b"RIFF-audio"),
         ])
-        patches = self._config_patches()
-        for item in patches:
-            item.start()
-        self.addCleanup(lambda: [item.stop() for item in reversed(patches)])
+        self._start_config_patches()
 
         with patch.object(aivis_speech.httpx, "Client", return_value=client):
             audio, style_id = aivis_speech.synthesize("こんにちは")
@@ -95,10 +114,7 @@ class AivisSpeechTests(unittest.TestCase):
             FakeResponse(json_data={}),
             FakeResponse(content=b"RIFF"),
         ])
-        patches = self._config_patches(TTS_STYLE_ID=None)
-        for item in patches:
-            item.start()
-        self.addCleanup(lambda: [item.stop() for item in reversed(patches)])
+        self._start_config_patches(TTS_STYLE_ID=None)
 
         with patch.object(aivis_speech.httpx, "Client", return_value=client):
             _audio, style_id = aivis_speech.synthesize("テスト")
@@ -107,25 +123,79 @@ class AivisSpeechTests(unittest.TestCase):
         self.assertEqual(client.calls[0][0], "GET")
         self.assertTrue(client.calls[0][1].endswith("/speakers"))
 
+    def test_synthesize_retries_transient_503_once(self) -> None:
+        client = FakeClient([
+            FakeResponse(json_data={"detail": "engine busy"}, status_code=503),
+            FakeResponse(json_data={}),
+            FakeResponse(content=b"RIFF"),
+        ])
+        self._start_config_patches()
+
+        with (
+            patch.object(aivis_speech.httpx, "Client", return_value=client),
+            patch.object(aivis_speech.time, "sleep") as sleep,
+        ):
+            audio, _style_id = aivis_speech.synthesize("再試行")
+
+        self.assertEqual(audio, b"RIFF")
+        self.assertEqual([call[0] for call in client.calls], ["POST", "POST", "POST"])
+        sleep.assert_called_once()
+
+    def test_synthesize_preserves_upstream_503_detail(self) -> None:
+        client = FakeClient([
+            FakeResponse(json_data={"detail": "model is loading"}, status_code=503),
+            FakeResponse(json_data={"detail": "model is loading"}, status_code=503),
+        ])
+        self._start_config_patches()
+
+        with (
+            patch.object(aivis_speech.httpx, "Client", return_value=client),
+            patch.object(aivis_speech.time, "sleep"),
+            self.assertRaises(aivis_speech.AivisSpeechError) as raised,
+        ):
+            aivis_speech.synthesize("失敗")
+
+        self.assertEqual(raised.exception.code, "aivis_http_503")
+        self.assertTrue(raised.exception.retryable)
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertIn("model is loading", str(raised.exception))
+        self.assertIn("/audio_query", str(raised.exception))
+
+    def test_synthesize_serializes_engine_access(self) -> None:
+        client = FakeClient([
+            FakeResponse(json_data={}),
+            FakeResponse(content=b"RIFF"),
+        ])
+        lock = FakeLock()
+        self._start_config_patches()
+
+        with (
+            patch.object(aivis_speech.httpx, "Client", return_value=client),
+            patch.object(aivis_speech, "_synthesis_lock", lock),
+        ):
+            aivis_speech.synthesize("直列化")
+
+        self.assertEqual(lock.entered, 1)
+
     def test_synthesize_rejects_too_long_text(self) -> None:
-        patches = self._config_patches(TTS_MAX_CHARS=3)
-        for item in patches:
-            item.start()
-        self.addCleanup(lambda: [item.stop() for item in reversed(patches)])
+        self._start_config_patches(TTS_MAX_CHARS=3)
 
         with self.assertRaisesRegex(aivis_speech.AivisSpeechError, "3文字以内"):
             aivis_speech.synthesize("1234")
 
     def test_status_reports_unavailable_engine_without_raising(self) -> None:
-        patches = self._config_patches()
-        for item in patches:
-            item.start()
-        self.addCleanup(lambda: [item.stop() for item in reversed(patches)])
+        self._start_config_patches()
 
-        with patch.object(aivis_speech.httpx, "Client", side_effect=httpx.ConnectError("offline")):
+        with patch.object(
+            aivis_speech.httpx,
+            "Client",
+            side_effect=httpx.ConnectError("offline", request=httpx.Request("GET", "http://test")),
+        ):
             result = aivis_speech.status(check_engine=True)
 
         self.assertFalse(result["available"])
+        self.assertEqual(result["error_code"], "aivis_connection_failed")
+        self.assertTrue(result["retryable"])
         self.assertIn("offline", result["error"])
 
     def test_main_declares_tts_routes(self) -> None:
