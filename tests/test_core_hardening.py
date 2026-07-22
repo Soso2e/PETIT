@@ -213,7 +213,7 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         self.assertEqual(result["reply"], "2日分を比較しました。")
 
     def test_agent_prompt_allows_complete_analysis(self) -> None:
-        self.assertIn("必要な長さ", agent.AGENT_SYSTEM_PROMPT)
+        self.assertIn("十分な長さ", agent.AGENT_SYSTEM_PROMPT)
         self.assertIn("結論", agent.AGENT_SYSTEM_PROMPT)
         self.assertNotIn("1〜2文", agent.AGENT_SYSTEM_PROMPT)
 
