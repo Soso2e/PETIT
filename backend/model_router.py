@@ -20,7 +20,10 @@ _SUGGESTIBLE_TOOLS = (
     "create_daily_briefing",
     "restore_context",
     "create_task",
+    "update_task",
     "complete_task",
+    "get_task_sync_status",
+    "retry_task_sync",
     "add_schedule",
     "save_memory",
     "create_handoff_note",
@@ -29,24 +32,16 @@ _SUGGESTIBLE_TOOLS = (
     "sync_calendar",
     "sync_obsidian_vault",
 )
-_ROUTER_SYSTEM_PROMPT = f"""あなたはPETITです。ユーザーへ自然で短い日本語で応答してください。
-同時に、現在のメッセージをChatだけで完了できるか判断してください。
-
-- 普通の会話、感想、相づち、一般知識で答えられる短い質問は reply
-- 保存済み情報や外部情報の取得・変更が必要なら tool
-- 設計、分析、比較、コードレビューなど強い推論が必要なら agent
-
-必ずJSONだけを返してください。Markdownは禁止です。
-Chatで完了できる場合:
-{{"type":"reply","reply":"ユーザーへ返す自然な文章","confidence":0.0}}
-ツールが必要な場合:
-{{"type":"tool","tools":["ツール名"],"reason":"短い理由","confidence":0.0}}
-強い推論が必要な場合:
-{{"type":"agent","reason":"短い理由","confidence":0.0}}
-
-利用可能なツール名:
-{', '.join(_SUGGESTIBLE_TOOLS)}
-一覧外のツール名、ツール引数、実行結果は作らないでください。"""
+_ROUTER_SYSTEM_PROMPT = f"""PETITの経路選択器。JSONだけ返し、Markdownは禁止。
+reply=通常会話や一般知識を短く返す。
+tool=保存済み・外部情報の取得または変更。
+agent=設計、分析、比較、レビュー。
+形式:
+{{"type":"reply","reply":"返答","confidence":0.0}}
+{{"type":"tool","tools":["ツール名"],"reason":"理由","confidence":0.0}}
+{{"type":"agent","reason":"理由","confidence":0.0}}
+ツール: {', '.join(_SUGGESTIBLE_TOOLS)}
+一覧外のツール、引数、実行結果は作らない。"""
 
 _FALLBACK_AGENT_PHRASES = (
     "改善案", "比較して", "設計して", "評価して", "分析して", "計画を立て",

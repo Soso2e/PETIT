@@ -1,0 +1,25 @@
+name: Voice task interaction tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/agent.py"
+      - "backend/model_router.py"
+      - "frontend/voice.js"
+      - "tests/test_voice_task_interaction.py"
+      - ".github/workflows/voice-task-interaction-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: python -m unittest tests.test_voice_task_interaction -v
+      - run: python -m py_compile backend/agent.py backend/model_router.py
+      - run: node --check frontend/voice.js
