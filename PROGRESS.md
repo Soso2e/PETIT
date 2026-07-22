@@ -7,6 +7,7 @@
 - プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
 - 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallbackを実装。実AivisSpeechモデルとブラウザでのE2Eは未確認。
 - モデル経路: Chat/AgentのURL・モデル・APIキーを独立設定できる。明示ツール・挨拶・時刻はルーター前に決定論処理し、曖昧な自然文だけChatルーターの提案を許可リストと登録済みツールで検証する。Agentは標準`role=tool`を優先し、Jinja非対応時だけuser follow-upへ退避、既定3ツールラウンド後に最終回答できる。実LM Studio 1／2モデル・標準tool／互換fallback・ブラウザE2Eは未確認。
+- モデル切替: WebからChat／Agentを個別にローカルLM Studio・DeepSeek V4 Flash・DeepSeek V4 Proへ切替でき、選択だけをローカル保存する。DeepSeek APIキーはブラウザや保存ファイルへ返さず、Embeddingはローカルのまま。専用テスト5件成功、実DeepSeek／ブラウザE2Eは未確認。
 - 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
@@ -22,7 +23,7 @@
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: Issue #60の実LM Studio／ブラウザE2Eと、Issue #62の実Fine-grained PATによる全repository朝レビューE2Eを確認する。その後Notion・AivisSpeech・タスク同期E2Eへ戻る。
+- 次にやること: Issue #64の実DeepSeek API／ブラウザ切替E2Eを確認し、その後Issue #60の実LM Studio、Issue #62の実Fine-grained PATによる朝レビューE2Eへ進む。
 
 ## 履歴
 
@@ -88,3 +89,4 @@
 | 2026-07-21 | 19:40 | #54 | Issue #58対応として読み取り専用`search_notion`、明示Notion参照の決定論ルーティング、上位3ページのプロパティ・本文抜粋取得、0件／未設定／API失敗の分離、モデル停止時の事実一覧fallback、回帰テスト・CI・README・設計文書を追加。構文確認済み、CIと実Notion／ブラウザE2Eは未確認。 |
 | 2026-07-22 | 01:35 | #55 | Issue #60対応として決定論的経路をAIルーター前へ移動し、ルーター提案ツールの許可・登録検証、Chat/Agent prompt分離、標準tool messageとJinja互換fallback、最大3ツールラウンド＋最終回答、重複呼び出し防止、観測情報、回帰テスト・設定例・設計文書を追加。構文・簡易ハーネス確認済み、CIと実LM Studio／ブラウザE2Eは未確認。 |
 | 2026-07-22 | 11:35 | #56 | Issue #62対応として全GitHub repositoryの朝差分レビューを実装。global cursor、archived／empty／fork除外、commit／PR／check、`PROGRESS.md`参照、部分失敗時cursor維持、LM Studio fallback、朝briefing、決定論会話routing、scheduler、設定・テスト・文書を追加。全6系統CI成功、実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。 |
+| 2026-07-22 | 14:04 | #57 | Issue #64対応としてWebのChat／Agent個別切替、ローカル／DeepSeek Flash／Proプロファイル、選択値の永続化、APIキー非公開、provider別payload、実モデル観測、設定・文書・専用テスト5件・CIを追加。ローカルunittest・Python／JavaScript構文確認成功、実DeepSeek／ブラウザE2Eは未確認。 |
