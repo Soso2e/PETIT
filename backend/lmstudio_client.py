@@ -1,4 +1,4 @@
-"""Thin client for the LM Studio OpenAI-compatible chat completions endpoint."""
+"""OpenAI-compatible model client for local LM Studio and external providers."""
 from __future__ import annotations
 
 import logging
@@ -8,14 +8,14 @@ from contextvars import ContextVar
 from typing import Any
 
 import httpx
-from . import config
 
+from . import config, model_routing
 
 log = logging.getLogger(__name__)
 
 
 class LMStudioError(RuntimeError):
-    """Raised when LM Studio is unreachable or returns an error."""
+    """Raised when the selected model endpoint is unavailable or invalid."""
 
 
 _health_cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -27,7 +27,7 @@ _EMPTY_REPLY_FALLBACK = "うまく返答を生成できなかった。もう一�
 
 @contextmanager
 def observe_turn() -> Any:
-    metrics_token = _turn_metrics.set({"llm_calls": 0, "models": [], "endpoint_ids": []})
+    metrics_token = _turn_metrics.set({"llm_calls": 0, "models": [], "endpoint_ids": [], "profiles": []})
     prefetch_token = _prefetched_chat.set(None)
     try:
         yield _turn_metrics.get()
@@ -69,19 +69,26 @@ def _take_prefetched_chat(messages: list[dict[str, Any]], *, route: str, tools: 
     }
 
 
-def endpoint(route: str) -> dict[str, str]:
-    if route == "agent":
-        return {"route": "agent", "base_url": config.AGENT_BASE_URL, "api_key": config.AGENT_API_KEY, "model": config.AGENT_MODEL}
-    return {"route": "chat", "base_url": config.CHAT_BASE_URL, "api_key": config.CHAT_API_KEY, "model": config.CHAT_MODEL}
+def endpoint(route: str) -> dict[str, Any]:
+    return model_routing.endpoint(route)
 
 
-def _record_model_call(route: str, model: str) -> None:
+def clear_health_cache() -> None:
+    _health_cache.clear()
+
+
+def _record_model_call(route: str, target: dict[str, Any], model: str) -> None:
     metrics = _turn_metrics.get()
     if metrics is None:
         return
     metrics["llm_calls"] += 1
     metrics["models"].append(model)
     metrics["endpoint_ids"].append(route)
+    metrics["profiles"].append(target["profile"])
+
+
+def _provider_name(target: dict[str, Any]) -> str:
+    return str(target.get("label") or target.get("provider") or "モデルAPI")
 
 
 def _post_completion(
@@ -90,36 +97,39 @@ def _post_completion(
     payload: dict[str, Any],
     headers: dict[str, str],
     route: str,
+    target: dict[str, Any],
 ) -> dict[str, Any]:
+    provider_name = _provider_name(target)
     try:
         resp = httpx.post(url, json=payload, headers=headers, timeout=config.LM_TIMEOUT)
         resp.raise_for_status()
     except httpx.ConnectError as exc:
         raise LMStudioError(
-            f"{route} モデルに接続できませんでした ({endpoint(route)['base_url']})。"
-            "ローカルサーバーが起動しているか確認してください。"
+            f"{route}の{provider_name}に接続できませんでした ({target['base_url']})。"
+            "接続先、起動状態、ネットワークを確認してください。"
         ) from exc
     except httpx.HTTPStatusError as exc:
-        raise LMStudioError(
-            f"LM Studio がエラーを返しました: {exc.response.status_code} {exc.response.text[:200]}"
-        ) from exc
+        status = exc.response.status_code
+        body = exc.response.text[:200]
+        hint = " APIキーと残高を確認してください。" if target.get("provider") == "deepseek" and status in {401, 402, 403} else ""
+        raise LMStudioError(f"{provider_name}がエラーを返しました: {status} {body}{hint}") from exc
     except httpx.HTTPError as exc:
-        raise LMStudioError(f"LM Studio との通信に失敗しました: {exc}") from exc
+        raise LMStudioError(f"{provider_name}との通信に失敗しました: {exc}") from exc
 
     try:
         return resp.json()
     except ValueError as exc:
-        raise LMStudioError("LM Studio の応答がJSONではありませんでした。") from exc
+        raise LMStudioError(f"{provider_name}の応答がJSONではありませんでした。") from exc
 
 
-def _parse_choice(data: dict[str, Any]) -> dict[str, Any]:
+def _parse_choice(data: dict[str, Any], target: dict[str, Any]) -> dict[str, Any]:
     try:
         choice = data["choices"][0]
         message = dict(choice["message"])
         message["_finish_reason"] = choice.get("finish_reason")
         return message
     except (KeyError, IndexError, TypeError) as exc:
-        raise LMStudioError(f"LM Studio の応答を解釈できませんでした: {data}") from exc
+        raise LMStudioError(f"{_provider_name(target)}の応答を解釈できませんでした: {data}") from exc
 
 
 def _has_usable_output(message: dict[str, Any]) -> bool:
@@ -142,6 +152,36 @@ def _recovery_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return compact or messages
 
 
+def _selected_model(route: str, requested_model: str | None, target: dict[str, Any]) -> str:
+    """Use runtime profile model when callers pass the route's static default."""
+    static_default = config.AGENT_MODEL if route == "agent" else config.CHAT_MODEL
+    if requested_model is None or requested_model == static_default:
+        return str(target["model"])
+    return requested_model
+
+
+def _base_payload(
+    target: dict[str, Any],
+    *,
+    selected_model: str,
+    temperature: float | None,
+    max_tokens: int | None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "model": selected_model,
+        "temperature": config.LM_TEMPERATURE if temperature is None else temperature,
+        "stream": False,
+        "max_tokens": max_tokens if max_tokens is not None else config.LIGHT_MAX_TOKENS,
+    }
+    if target["provider"] == "lm_studio":
+        payload["chat_template_kwargs"] = {"enable_thinking": config.ENABLE_THINKING}
+    elif target["provider"] == "deepseek":
+        # Tool-call continuation needs reasoning_content when thinking is enabled.
+        # Keep the first switcher release in non-thinking mode for predictable tools.
+        payload["thinking"] = {"type": "disabled"}
+    return payload
+
+
 def chat_completion(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
@@ -150,7 +190,7 @@ def chat_completion(
     max_tokens: int | None = None,
     route: str = "chat",
 ) -> dict[str, Any]:
-    """Call LM Studio, reusing a one-pass Chat reply when available."""
+    """Call the active OpenAI-compatible endpoint for Chat or Agent."""
     if not any(
         message.get("role") == "user" and str(message.get("content") or "").strip()
         for message in messages
@@ -162,16 +202,20 @@ def chat_completion(
         return prefetched
 
     target = endpoint(route)
-    selected_model = model or target["model"]
+    if not target.get("configured"):
+        if target.get("provider") == "deepseek":
+            raise LMStudioError(f"{route}のDeepSeek APIキーが未設定です。PETIT_DEEPSEEK_API_KEYを.envに追加してください。")
+        raise LMStudioError(f"{route}の{_provider_name(target)}が未設定です。")
+
+    selected_model = _selected_model(route, model, target)
     url = f"{target['base_url'].rstrip('/')}/chat/completions"
     headers = {"Authorization": f"Bearer {target['api_key']}"}
-    base_payload: dict[str, Any] = {
-        "model": selected_model,
-        "temperature": config.LM_TEMPERATURE if temperature is None else temperature,
-        "stream": False,
-        "chat_template_kwargs": {"enable_thinking": config.ENABLE_THINKING},
-        "max_tokens": max_tokens if max_tokens is not None else config.LIGHT_MAX_TOKENS,
-    }
+    base_payload = _base_payload(
+        target,
+        selected_model=selected_model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
     if tools:
         base_payload["tools"] = tools
         base_payload["tool_choice"] = "auto"
@@ -182,18 +226,22 @@ def chat_completion(
         payload["messages"] = attempt_messages
         if retry_count:
             payload["temperature"] = 0
-            payload["chat_template_kwargs"] = {"enable_thinking": False}
+            if target["provider"] == "lm_studio":
+                payload["chat_template_kwargs"] = {"enable_thinking": False}
+            elif target["provider"] == "deepseek":
+                payload["thinking"] = {"type": "disabled"}
 
-        _record_model_call(route, selected_model)
+        _record_model_call(route, target, selected_model)
         try:
-            data = _post_completion(url=url, payload=payload, headers=headers, route=route)
-            message = _parse_choice(data)
+            data = _post_completion(url=url, payload=payload, headers=headers, route=route, target=target)
+            message = _parse_choice(data, target)
         except LMStudioError:
             if retry_count == 0:
                 raise
             log.warning(
-                "empty-response retry failed route=%s model=%s retry_count=%s",
+                "empty-response retry failed route=%s profile=%s model=%s retry_count=%s",
                 route,
+                target["profile"],
                 selected_model,
                 retry_count,
                 exc_info=True,
@@ -206,9 +254,10 @@ def chat_completion(
             return message
 
         log.warning(
-            "empty model response route=%s model=%s finish_reason=%s content_length=%s "
+            "empty model response route=%s profile=%s model=%s finish_reason=%s content_length=%s "
             "reasoning_content_length=%s retry_count=%s raw_message_keys=%s",
             route,
+            target["profile"],
             selected_model,
             message.get("_finish_reason"),
             len(str(message.get("content") or "")),
@@ -226,12 +275,33 @@ def chat_completion(
 
 
 def health(route: str = "chat") -> dict[str, Any]:
-    """Lightweight, cached /models health check for one configured endpoint."""
+    """Lightweight, cached /models health check for the active route profile."""
+    target = endpoint(route)
+    cache_key = f"{route}:{target['profile']}:{target['base_url']}:{target['model']}"
     now = time.monotonic()
-    cached = _health_cache.get(route)
+    cached = _health_cache.get(cache_key)
     if cached and now - cached[0] < _HEALTH_CACHE_SECONDS:
         return dict(cached[1])
-    target = endpoint(route)
+
+    base = {
+        "provider": target["provider"],
+        "profile": target["profile"],
+        "label": target["label"],
+        "base_url": target["base_url"],
+        "model": target["model"],
+    }
+    if not target.get("configured"):
+        result = {
+            **base,
+            "server_ok": False,
+            "model_loaded": False,
+            "latency_ms": 0,
+            "models": [],
+            "error": "not_configured",
+        }
+        _health_cache[cache_key] = (now, result)
+        return dict(result)
+
     url = f"{target['base_url'].rstrip('/')}/models"
     headers = {"Authorization": f"Bearer {target['api_key']}"}
     started = time.monotonic()
@@ -239,10 +309,21 @@ def health(route: str = "chat") -> dict[str, Any]:
         resp = httpx.get(url, headers=headers, timeout=10)
         resp.raise_for_status()
         models = [m.get("id") for m in resp.json().get("data", [])]
-        result = {"server_ok": True, "base_url": target["base_url"], "model": target["model"], "model_loaded": target["model"] in models, "latency_ms": round((time.monotonic() - started) * 1000), "models": models}
-        _health_cache[route] = (now, result)
-        return dict(result)
+        result = {
+            **base,
+            "server_ok": True,
+            "model_loaded": target["model"] in models,
+            "latency_ms": round((time.monotonic() - started) * 1000),
+            "models": models,
+        }
     except httpx.HTTPError as exc:
-        result = {"server_ok": False, "base_url": target["base_url"], "model": target["model"], "model_loaded": False, "latency_ms": round((time.monotonic() - started) * 1000), "error": type(exc).__name__}
-        _health_cache[route] = (now, result)
-        return dict(result)
+        result = {
+            **base,
+            "server_ok": False,
+            "model_loaded": False,
+            "latency_ms": round((time.monotonic() - started) * 1000),
+            "models": [],
+            "error": type(exc).__name__,
+        }
+    _health_cache[cache_key] = (now, result)
+    return dict(result)

@@ -19,7 +19,7 @@ import threading
 import time
 from uuid import uuid4
 
-from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, proactive, request_context, scheduler, tools, vault_indexer, worker
+from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, model_routing, proactive, request_context, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -94,6 +94,11 @@ class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=config.TTS_MAX_CHARS)
 
 
+class ModelRoutingUpdate(BaseModel):
+    chat: str | None = None
+    agent: str | None = None
+
+
 _pending_actions: dict[str, dict[str, Any]] = {}
 _pending_actions_lock = threading.Lock()
 _PENDING_ACTION_TTL_SECONDS = 600
@@ -120,6 +125,7 @@ def health() -> dict[str, Any]:
     with db.get_connection() as conn:
         calendar_cached = int(conn.execute("SELECT COUNT(*) FROM calendar_events_cache").fetchone()[0])
 
+    routing_status = model_routing.public_status()
     return {
         "status": "ok",
         "tools": tools.registered_names(),
@@ -149,9 +155,33 @@ def health() -> dict[str, Any]:
         },
         "brain": vault_indexer.status(),
         "memory": {"episodes": len(db.recent_episodes(limit=1000)), "long_term": len(db.all_memory())},
-        "model_routing": {"chat_model": config.CHAT_MODEL, "agent_model": config.AGENT_MODEL},
+        "model_routing": {
+            **routing_status,
+            "chat_model": chat_health["model"],
+            "agent_model": agent_health["model"],
+        },
         "tts": aivis_speech.status(check_engine=False),
     }
+
+
+@app.get("/api/model-routing")
+def get_model_routing() -> dict[str, Any]:
+    return model_routing.public_status()
+
+
+@app.post("/api/model-routing")
+def update_model_routing(payload: ModelRoutingUpdate) -> Any:
+    updates = {
+        route: value
+        for route, value in (("chat", payload.chat), ("agent", payload.agent))
+        if value is not None
+    }
+    try:
+        result = model_routing.update_selection(updates)
+    except model_routing.ModelRoutingError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    lmstudio_client.clear_health_cache()
+    return result
 
 
 @app.get("/api/tts/status")
@@ -209,11 +239,18 @@ def chat(req: ChatRequest) -> ChatResponse:
             request_id=request_id,
         )
     tool_names = [str(item.get("name")) for item in used_tools]
+    actual_route = model_route.get("actual_route", model_route.get("kind", "instant"))
+    used_endpoint_route = "chat" if actual_route in {"chat", "chat_fallback"} else ("agent" if actual_route == "agent" else None)
+    active_target = lmstudio_client.endpoint(used_endpoint_route) if used_endpoint_route else None
+    observed_model = turn_metrics["models"][-1] if turn_metrics.get("models") else model_route.get("model")
+    observed_profile = turn_metrics["profiles"][-1] if turn_metrics.get("profiles") else (active_target or {}).get("profile")
     model_route["observability"] = {
         "request_id": request_id,
         "requested_route": model_route.get("requested_route", model_route.get("kind", "instant")),
-        "actual_route": model_route.get("actual_route", model_route.get("kind", "instant")),
-        "model": model_route.get("model"),
+        "actual_route": actual_route,
+        "model": observed_model,
+        "profile": observed_profile,
+        "provider": (active_target or {}).get("provider"),
         "base_url_id": model_route.get("base_url_id"),
         "tools": tool_names,
         "llm_calls": turn_metrics["llm_calls"],

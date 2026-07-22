@@ -1,0 +1,35 @@
+name: Model route switcher tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/model_routing.py"
+      - "backend/lmstudio_client.py"
+      - "backend/main.py"
+      - "frontend/index.html"
+      - "frontend/app.js"
+      - "frontend/style.css"
+      - "tests/test_model_route_switcher.py"
+      - ".env.example"
+      - "docs/model_route_switcher.md"
+      - ".github/workflows/model-route-switcher-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Check frontend JavaScript
+        run: node --check frontend/app.js
+      - name: Run model route switcher tests
+        run: python -m unittest tests.test_model_route_switcher -v
