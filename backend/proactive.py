@@ -57,6 +57,7 @@ def generate_opener() -> dict[str, Any]:
     tod = _time_of_day()
     if tod == "朝":
         daily = briefing.create_daily_briefing()
+        github = daily.get("github_review") or {}
         return {
             "message": daily["message"],
             "kind": "morning_briefing",
@@ -66,6 +67,11 @@ def generate_opener() -> dict[str, Any]:
                 "events": len(daily.get("events", [])),
                 "notion_sync": daily.get("notion_sync"),
                 "calendar": daily.get("calendar_source_status"),
+                "github": {
+                    "status": github.get("status"),
+                    "changed_repositories": int(github.get("changed_count") or 0),
+                    "cached": bool(github.get("cached")),
+                },
             },
         }
     latest, wip = _context_block()
