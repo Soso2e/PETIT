@@ -157,34 +157,50 @@ use the existing pending-action confirmation path.
 
 1. Check the deterministic Project Continuity path.
 2. For an explicit project resume, refresh only its confirmed external sources.
-3. Classify the remaining request locally.
-4. Route a short simple turn to the chat model; route tools, planning,
-   personal-history work, analysis, and implementation requests to the agent model.
-5. Search BRAIN and memory only when the turn can benefit from personal context.
-6. For planning turns, refresh Notion read-only and load bounded task/calendar
-   context.
-7. Expose GitHub tools only for an explicit repository registration, candidate
-   action, or evidence-sync request; ordinary GitHub chat remains tool-free.
-8. Let the selected model use only related tools if it is an agent turn.
-9. Return a short answer with a next action when useful.
-10. Convert write tool calls into an expiring preview. Execute the exact stored
+3. Handle pure greetings, current time, explicit Notion reads, planning consultations,
+   and unambiguous task/schedule/BRAIN commands before the AI router.
+4. If an explicit tool signal exists, expose only those related schemas to Agent.
+5. Otherwise ask the lightweight Chat router for one of: direct reply, bounded tool
+   suggestions, or Agent reasoning.
+6. Validate router suggestions against a fixed allowlist and the live tool registry;
+   discard hallucinated, privileged, or unregistered names.
+7. Route a short simple turn to Chat; route tools, planning, personal-history work,
+   analysis, and implementation requests to Agent.
+8. Search BRAIN and memory only when the turn can benefit from personal context.
+9. Expose GitHub tools only for explicit repository registration, candidate action,
+   or evidence-sync requests; ordinary GitHub chat remains tool-free.
+10. For model-selected tools, preserve the assistant `tool_calls`, execute only the
+    exposed tools, and return results as standard `role=tool` messages.
+11. When LM Studio's prompt template rejects standard tool messages, `auto` mode
+    retries the same turn with the compatibility user follow-up format.
+12. Allow up to `PETIT_MAX_TOOL_ITERATIONS` tool execution rounds, then one final
+    answer call. Different arguments may reuse a tool; exact duplicate calls stop.
+13. Convert every write tool call into an expiring preview. Execute the exact stored
     arguments once only after the user presses the confirmation button.
+14. Return a concise answer for ordinary chat and a complete, conclusion-first answer
+    for analysis or implementation work, with a next action only when useful.
 
 ## Model routing
 
 - `PETIT_CHAT_BASE_URL` / `PETIT_CHAT_MODEL` / `PETIT_CHAT_API_KEY`: short
-  conversation and natural-language presentation endpoint.
+  conversation, one-pass route selection, and natural-language presentation endpoint.
 - `PETIT_AGENT_BASE_URL` / `PETIT_AGENT_MODEL` / `PETIT_AGENT_API_KEY`: tool
   calling, multi-step reasoning, BRAIN/Notion/calendar work, analysis, and
   implementation requests.
-- Project Continuity's start/end/register/resume and confirmed-source refresh path
-  does not require a model.
+- Project Continuity's start/end/register/resume, explicit deterministic reads, and
+  confirmed-source refresh do not require a router model.
 - Routing is intent/source based, not a raw message/history length threshold.
+- `PETIT_TOOL_RESULT_MODE=auto` prefers OpenAI-standard tool messages and falls back
+  only for prompt-template incompatibility. `tool` and `user` force either mode.
+- `PETIT_MAX_TOOL_ITERATIONS` is a tool-round limit, not the total LLM call limit;
+  the final synthesis call is allowed after the last tool round.
 - Agent `/models` health is cached. If it is unavailable, only a read result
   that PETIT has already obtained safely may be presented by Chat. Tool choice
   and all writes remain unavailable rather than being silently skipped.
 - `/api/health` and each response's `model_route.observability` expose route,
   model endpoint ID, tool list, calls, freshness, fallback and elapsed time.
+  `model_route` also records router decision/source/confidence, suggested tools,
+  selected tools, and the tool-result transport actually used.
 
 All Chat/Agent settings fall back to their `PETIT_LM_*` counterpart, so a
 one-model setup remains valid and an Agent can instead run on another PC/GPU.
@@ -216,8 +232,8 @@ one-model setup remains valid and an Agent can instead run on another PC/GPU.
 ## Current limitations
 
 - Automated tests and compile checks cover the continuity and source adapters, but
-  real Notion, Linkraft, and GitHub credentials plus browser approval/cancel/restart
-  E2E remain required.
+  real Notion, Linkraft, GitHub, LM Studio tool-template behavior, and browser
+  approval/cancel/restart E2E remain required.
 - BRAIN project mappings are not yet connected to internal project IDs.
 - GitHub evidence is bounded polling rather than webhook delivery. Check and
   deployment status changes become visible on the next permitted refresh.

@@ -47,6 +47,8 @@ storage/   SQLite などの実行時データ（git 管理外）
 | `PETIT_CHAT_BASE_URL` / `PETIT_CHAT_MODEL` / `PETIT_CHAT_API_KEY` | 各 `PETIT_LM_*` | 雑談・短い確認用の接続先・モデル |
 | `PETIT_AGENT_BASE_URL` / `PETIT_AGENT_MODEL` / `PETIT_AGENT_API_KEY` | 各 `PETIT_LM_*` | ツール・計画・BRAIN/Notion/予定用の接続先・モデル |
 | `PETIT_LIGHT_MAX_TOKENS` | `512` | 軽量回答の最大生成量 |
+| `PETIT_MAX_TOOL_ITERATIONS` | `3` | 1ターンで許可するツール実行ラウンド数。最終回答用のLLM呼び出しは別に許可 |
+| `PETIT_TOOL_RESULT_MODE` | `auto` | `role=tool`を優先し、LM Studioのテンプレート非対応時だけ互換user follow-upへ退避。`tool` / `user`固定も可能 |
 | `PETIT_USE_SONA_CORE` | `0` | `1`の場合のみ、予定取得とローカル予定追加をSona Agent Core経由で実行 |
 | `PETIT_OWNER_ID` / `PETIT_PERSONAL_SCOPE_ID` | `soso` / `soso` | PETIT内部ユーザー、Core Actor、`personal` Scopeの識別子 |
 | `PETIT_SONA_CORE_AUDIT_PATH` | `storage/audit/sona_agent_core.jsonl` | Core Tool実行の監査ログ |
@@ -195,21 +197,27 @@ SQLiteは外部正本を置き換えず、内部ID、別名、確認状態、che
 
 ## 会話処理の最小フロー
 
-通常の雑談は、短いsystem prompt・直近5会話・ユーザー発話だけを渡し、会話モデルを1回だけ呼びます。ツール、RAG、Embedding、外部同期、要約は実行しません。
+通常の雑談は、短いsystem prompt・直近3往復以内・ユーザー発話だけを渡し、会話モデルを1回だけ呼びます。ツール、RAG、Embedding、外部同期、要約は実行しません。
 
-明確なプロジェクト開始・終了・登録は、通常モデルより前に決定論的なProject Continuity経路で処理します。外部source refreshは、確認済みプロジェクトを開始・再開するときだけ行います。
+明確なプロジェクト開始・終了・登録、純粋な挨拶、現在時刻、明示的なタスク・予定・BRAIN要求は、AIルーターより前に決定論的に処理します。これにより、明確な要求で経路判定用LLMを余分に呼びません。
+
+明示的なツール語がない「傘を持つべき？」のような発話だけ、軽量Chatルーターが許可リスト内の候補ツールを提案します。提案は登録済みツールと照合し、未許可・未登録名を捨ててからAgentへ公開します。
 
 GitHubの一般的な雑談ではツールを公開しません。`owner/name`やGitHub URLの登録・紐付け、候補確認、明示的な同期依頼だけをGitHub evidenceツールへルーティングします。
 
 「Notionから〜を調べて」のような明示的なNotion参照は、ルーターLLMを通さず`search_notion`を実行します。検索結果がある場合だけAgentを1回呼んで整理し、未設定・0件・API失敗はPython側で区別して直接返します。通常会話ではNotion APIを呼びません。
 
-明確なタスク・予定・検索などだけ、発話に関係するツール定義を絞って渡します。「今日何からやる？」のような計画相談では、未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理します。
+ツール呼び出し後は、標準の`assistant.tool_calls`と`role: tool`で結果を戻します。LM StudioのJinjaテンプレートがこの形式を拒否した場合だけ、同じターン内で従来のuser follow-up形式へ自動的に切り替えます。
+
+Agentは既定で最大3回のツール実行ラウンドを行え、その後に最終回答を生成できます。同じツールでも引数が異なれば再実行でき、完全一致する重複呼び出しは停止します。書き込みツールは従来どおり確認待ちへ変換され、即時実行されません。
+
+「今日何からやる？」のような計画相談では、未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理します。
 
 会話のEmbeddingとMarkdown出力は応答後のバックグラウンド処理です。Embeddingは同一テキストをプロセス内キャッシュで重複送信せず、Vaultは内容が変わったファイルだけ再Embeddingします。
 
 ChatとAgentはURL・APIキー・モデルを個別設定できます。Agent停止時は、安全に取得済みの読み取り結果だけChatモデルで整形できます。ツール選択や書き込みを勝手に省略しません。
 
-`/api/health` と各応答の詳細欄では、経路、モデル、ツール、同期鮮度、LLM/Embedding回数、Agentフォールバック、Project Continuityの参照件数、source refreshのattempted/failed/skippedを確認できます。
+`/api/health` と各応答の詳細欄では、経路、モデル、ツール、同期鮮度、LLM/Embedding回数、Agentフォールバック、Project Continuityの参照件数、source refreshのattempted/failed/skippedを確認できます。`model_route`にはAIルーターの判断、提案ツール、実際に公開したツール、tool結果の伝達方式も含まれます。
 
 ## Calendar
 

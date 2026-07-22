@@ -8,7 +8,28 @@ from typing import Any
 from . import config
 from .lmstudio_client import LMStudioError, chat_completion, set_prefetched_chat
 
-_ROUTER_SYSTEM_PROMPT = """あなたはPETITです。ユーザーへ自然で短い日本語で応答してください。
+_SUGGESTIBLE_TOOLS = (
+    "get_current_time",
+    "get_weather",
+    "get_schedule",
+    "get_tasks",
+    "search_memory",
+    "search_brain_notes",
+    "search_notion",
+    "search_news",
+    "create_daily_briefing",
+    "restore_context",
+    "create_task",
+    "complete_task",
+    "add_schedule",
+    "save_memory",
+    "create_handoff_note",
+    "edit_brain_note",
+    "sync_notion_tasks",
+    "sync_calendar",
+    "sync_obsidian_vault",
+)
+_ROUTER_SYSTEM_PROMPT = f"""あなたはPETITです。ユーザーへ自然で短い日本語で応答してください。
 同時に、現在のメッセージをChatだけで完了できるか判断してください。
 
 - 普通の会話、感想、相づち、一般知識で答えられる短い質問は reply
@@ -17,17 +38,15 @@ _ROUTER_SYSTEM_PROMPT = """あなたはPETITです。ユーザーへ自然で短
 
 必ずJSONだけを返してください。Markdownは禁止です。
 Chatで完了できる場合:
-{"type":"reply","reply":"ユーザーへ返す自然な文章","confidence":0.0}
+{{"type":"reply","reply":"ユーザーへ返す自然な文章","confidence":0.0}}
 ツールが必要な場合:
-{"type":"tool","tools":["ツール名"],"reason":"短い理由","confidence":0.0}
+{{"type":"tool","tools":["ツール名"],"reason":"短い理由","confidence":0.0}}
 強い推論が必要な場合:
-{"type":"agent","reason":"短い理由","confidence":0.0}
+{{"type":"agent","reason":"短い理由","confidence":0.0}}
 
-利用可能な代表ツール名:
-get_current_time, get_weather, get_schedule, get_tasks, search_memory,
-search_brain_notes, search_news, create_task, complete_task, add_schedule,
-save_memory, edit_brain_note, sync_notion_tasks, sync_calendar
-ツール引数や実行結果は作らないでください。"""
+利用可能なツール名:
+{', '.join(_SUGGESTIBLE_TOOLS)}
+一覧外のツール名、ツール引数、実行結果は作らないでください。"""
 
 _FALLBACK_AGENT_PHRASES = (
     "改善案", "比較して", "設計して", "評価して", "分析して", "計画を立て",
@@ -37,6 +56,26 @@ _FALLBACK_TOOL_TERMS = (
     "タスク", "予定", "カレンダー", "notion", "brain", "記憶", "覚えて",
     "検索", "ニュース", "天気", "今何時", "今日何日", "同期", "github",
 )
+
+
+def suggestible_tool_names() -> tuple[str, ...]:
+    """Return the bounded set that the lightweight router may suggest."""
+    return _SUGGESTIBLE_TOOLS
+
+
+def validate_suggested_tools(values: Any) -> list[str]:
+    """Drop hallucinated, duplicate, or privileged tool names from router output."""
+    allowed = set(_SUGGESTIBLE_TOOLS)
+    names: list[str] = []
+    for value in values or []:
+        if not isinstance(value, str):
+            continue
+        name = value.strip()
+        if name in allowed and name not in names:
+            names.append(name)
+        if len(names) >= 5:
+            break
+    return names
 
 
 def _extract_json(content: str) -> dict[str, Any] | None:
@@ -64,22 +103,28 @@ def _fallback(user_message: str) -> dict[str, Any]:
     lowered = user_message.casefold()
     if any(term.casefold() in lowered for term in _FALLBACK_TOOL_TERMS):
         kind = "agent"
+        decision_type = "tool"
         reason = "fallback_tool_or_context"
     elif any(phrase.casefold() in lowered for phrase in _FALLBACK_AGENT_PHRASES):
         kind = "agent"
+        decision_type = "agent"
         reason = "fallback_reasoning"
     elif user_message.count("\n") >= 4:
         kind = "agent"
+        decision_type = "agent"
         reason = "fallback_multi_part"
     else:
         kind = "chat"
+        decision_type = "reply"
         reason = "fallback_simple_conversation"
     return {
         "kind": kind,
+        "decision_type": decision_type,
         "model": config.AGENT_MODEL if kind == "agent" else config.CHAT_MODEL,
         "reasons": [reason],
         "router_source": "fallback",
         "router_confidence": None,
+        "suggested_tools": [],
     }
 
 
@@ -126,10 +171,12 @@ def choose(
         set_prefetched_chat(text, reply)
         return {
             "kind": "chat",
+            "decision_type": "reply",
             "model": config.CHAT_MODEL,
             "reasons": ["ai_router:reply"],
             "router_source": "ai",
             "router_confidence": confidence,
+            "suggested_tools": [],
             "prefetched_reply": True,
         }
 
@@ -137,13 +184,10 @@ def choose(
         return _fallback(text)
 
     reason = str(parsed.get("reason") or route_type).strip()[:120]
-    suggested_tools = [
-        str(name).strip()
-        for name in (parsed.get("tools") or [])
-        if isinstance(name, str) and str(name).strip()
-    ][:5]
+    suggested_tools = validate_suggested_tools(parsed.get("tools")) if route_type == "tool" else []
     return {
         "kind": "agent",
+        "decision_type": route_type,
         "model": config.AGENT_MODEL,
         "reasons": [f"ai_router:{route_type}", reason],
         "router_source": "ai",
