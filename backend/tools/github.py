@@ -1,7 +1,7 @@
-"""Read-only GitHub evidence and confirmation tools."""
+"""Read-only GitHub evidence, daily review, and confirmation tools."""
 from __future__ import annotations
 
-from .. import github_project_links, github_sync
+from .. import github_daily_review, github_project_links, github_sync
 from .registry import tool
 
 
@@ -31,6 +31,25 @@ def inspect_github_repository(repository: str):
 )
 def sync_github_evidence():
     return github_sync.sync_if_configured(force=True)
+
+
+@tool(
+    name="review_github_activity",
+    description="アクセス可能な全GitHub repositoryを横断し、前回確認以降のcommit・PR・checkとPROGRESS.mdを読み取り専用でレビューする。",
+    parameters={
+        "type": "object",
+        "properties": {
+            "force": {
+                "type": "boolean",
+                "default": False,
+                "description": "同日のキャッシュを使わず、前回cursor以降を今すぐ再取得する。",
+            }
+        },
+        "additionalProperties": False,
+    },
+)
+def review_github_activity(force: bool = False):
+    return github_daily_review.run_review(force=force)
 
 
 @tool(
