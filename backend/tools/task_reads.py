@@ -1,7 +1,7 @@
 """Status-aware read path for task lists.
 
 This module is imported after the legacy task modules and intentionally
-re-registers ``get_tasks``.  Writes remain in ``tasks`` / ``tasks_phase2``;
+re-registers ``get_tasks``. Writes remain in ``tasks`` / ``tasks_phase2``;
 only the read contract is tightened here so existing callers stay compatible.
 """
 from __future__ import annotations
@@ -13,20 +13,20 @@ from ..task_taxonomy import AREAS, resolve_area
 from . import tasks as legacy_tasks
 from .registry import tool
 
-_CANCELLED_STATUS_ALIASES = frozenset(
-    {
-        "chancel",  # Current Notion database value.
-        "cancel",
-        "canceled",
-        "cancelled",
-        "キャンセル",
-        "取消",
-        "取り消し",
-    }
+_CANCELLED_STATUS_ALIASES = (
+    "chancel",  # Current Notion database value.
+    "cancel",
+    "canceled",
+    "cancelled",
+    "キャンセル",
+    "取消",
+    "取り消し",
 )
+_CANCELLED_STATUS_KEYS = frozenset(_CANCELLED_STATUS_ALIASES)
 
 TASK_RESPONSE_GUIDANCE = (
     "タスク件数はtotal_countを条件一致の総数、returned_countを今回表示した件数として扱う。"
+    "returned_countや互換用countだけを見て全件数と断定しない。"
     "has_more=trueなら一部取得と明記する。キャンセルは進行中・未完了に数えず、"
     "status_summary.cancelledとして分けて説明する。"
 )
@@ -64,7 +64,7 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
         normalized = _normalize_status(raw_status)
         if normalized == done_status:
             completed += count
-        elif normalized in _CANCELLED_STATUS_ALIASES:
+        elif normalized in _CANCELLED_STATUS_KEYS:
             cancelled += count
             cancelled_statuses.append(raw_status)
         else:
@@ -85,7 +85,8 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
         "タスク一覧を取得する。既定ではDoneとキャンセル状態（NotionのChancel等）を除いた"
         "アクティブタスクだけを返す。status=allで全状態、status指定でその状態だけを返す。"
         "total_countは条件一致総数、returned_countは今回の表示件数で、has_more=trueなら一部取得。"
-        "キャンセルを進行中として扱わず、status_summaryで分けて説明する。"
+        "returned_countだけを全件数と断定しない。キャンセルを進行中として扱わず、"
+        "status_summaryで分けて説明する。"
     ),
     parameters={
         "type": "object",
