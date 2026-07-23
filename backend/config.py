@@ -109,17 +109,37 @@ SONA_CORE_APPROVAL_TTL_SECONDS = int(os.getenv("PETIT_SONA_CORE_APPROVAL_TTL_SEC
 PETIT_OWNER_ID = os.getenv("PETIT_OWNER_ID", "soso").strip() or "soso"
 PETIT_PERSONAL_SCOPE_ID = os.getenv("PETIT_PERSONAL_SCOPE_ID", "soso").strip() or "soso"
 
-# Autonomous summarization (background scheduler)
-# 何時間おきに会話を自動でまとめて蓄積するか。2〜3時間 / 1日 などを想定。
+# Autonomous episode summarization (existing background scheduler).
 AUTO_SUMMARY_ENABLED = os.getenv("PETIT_AUTO_SUMMARY_ENABLED", "1") not in ("0", "false", "False")
 SUMMARY_INTERVAL_HOURS = float(os.getenv("PETIT_SUMMARY_INTERVAL_HOURS", "3"))
-# この件数未満の未処理会話しかなければ要約をスキップする（無駄なLLM呼び出し回避）
 SUMMARY_MIN_CONVERSATIONS = int(os.getenv("PETIT_SUMMARY_MIN_CONVERSATIONS", "1"))
-# Episodes are finalized only after a useful boundary.  This deliberately keeps
-# ordinary chat on its one-call path; these values are consumed asynchronously.
 EPISODE_IDLE_MINUTES = int(os.getenv("PETIT_EPISODE_IDLE_MINUTES", "20"))
 EPISODE_MAX_TURNS = int(os.getenv("PETIT_EPISODE_MAX_TURNS", "8"))
 EMBEDDING_VERSION = os.getenv("PETIT_EMBEDDING_VERSION", "1")
+
+# Once-per-day life index. This always uses the local endpoint, even when the Web UI
+# selects an external Chat/Agent profile.
+DAILY_INDEX_ENABLED = os.getenv("PETIT_DAILY_INDEX_ENABLED", "1") not in ("0", "false", "False")
+DAILY_INDEX_TIMEZONE = os.getenv("PETIT_DAILY_INDEX_TIMEZONE", "Asia/Tokyo").strip() or "Asia/Tokyo"
+DAILY_INDEX_HOUR = max(0, min(int(os.getenv("PETIT_DAILY_INDEX_HOUR", "0")), 23))
+DAILY_INDEX_MINUTE = max(0, min(int(os.getenv("PETIT_DAILY_INDEX_MINUTE", "10")), 59))
+DAILY_INDEX_POLL_MINUTES = max(1.0, float(os.getenv("PETIT_DAILY_INDEX_POLL_MINUTES", "10")))
+DAILY_INDEX_CATCHUP_DAYS = max(1, min(int(os.getenv("PETIT_DAILY_INDEX_CATCHUP_DAYS", "7")), 31))
+DAILY_INDEX_BASE_URL = os.getenv(
+    "PETIT_DAILY_INDEX_BASE_URL",
+    os.getenv("PETIT_LOCAL_AGENT_BASE_URL", AGENT_BASE_URL),
+).strip() or AGENT_BASE_URL
+DAILY_INDEX_MODEL = os.getenv(
+    "PETIT_DAILY_INDEX_MODEL",
+    os.getenv("PETIT_LOCAL_AGENT_MODEL", AGENT_MODEL),
+).strip() or AGENT_MODEL
+DAILY_INDEX_API_KEY = os.getenv(
+    "PETIT_DAILY_INDEX_API_KEY",
+    os.getenv("PETIT_LOCAL_AGENT_API_KEY", AGENT_API_KEY),
+)
+DAILY_INDEX_MAX_INPUT_CHARS = max(1000, int(os.getenv("PETIT_DAILY_INDEX_MAX_INPUT_CHARS", "12000")))
+DAILY_INDEX_MAX_TOKENS = max(256, int(os.getenv("PETIT_DAILY_INDEX_MAX_TOKENS", "1200")))
+DAILY_INDEX_ASSISTANT_MAX_CHARS = max(0, int(os.getenv("PETIT_DAILY_INDEX_ASSISTANT_MAX_CHARS", "240")))
 
 # Embeddings (for RAG search via LM Studio)
 # Load a dedicated embedding model in LM Studio (e.g. nomic-embed-text, bge-m3)

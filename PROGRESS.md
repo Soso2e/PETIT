@@ -9,6 +9,7 @@
 - モデル経路: Chat/AgentのURL・モデル・APIキーを独立設定できる。明示ツール・挨拶・時刻はルーター前に決定論処理し、曖昧な自然文だけChatルーターの提案を許可リストと登録済みツールで検証する。Agentは標準`role=tool`を優先し、Jinja非対応時だけuser follow-upへ退避、既定3ツールラウンド後に最終回答できる。実LM Studio 1／2モデル・標準tool／互換fallback・ブラウザE2Eは未確認。
 - モデル切替: WebからChat／Agentを個別にローカルLM Studio・DeepSeek V4 Flash・DeepSeek V4 Proへ切替でき、選択だけをローカル保存する。DeepSeek APIキーはブラウザや保存ファイルへ返さず、Embeddingはローカルのまま。専用テスト5件成功、実DeepSeek／ブラウザE2Eは未確認。
 - 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
+- 日次生活インデックス: 全`session_id`の会話をAsia/Tokyo基準で1日1回まとめ、空・記号のみ・連続重複だけを除外してローカルLM Studioへ送る。雑談の外出・食事・人・場所・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存し、長期記憶候補は自動昇格しない。専用CIと実ローカルLLM E2Eは未確認。
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
@@ -23,7 +24,7 @@
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: Issue #64の実DeepSeek API／ブラウザ切替E2Eを確認し、その後Issue #60の実LM Studio、Issue #62の実Fine-grained PATによる朝レビューE2Eへ進む。
+- 次にやること: Issue #73の日次生活インデックスCIと実ローカルLM Studio／複数端末E2Eを確認し、その後Issue #64／#60／#62の実サービスE2Eへ戻る。
 
 ## 履歴
 
@@ -46,8 +47,8 @@
 | 2026-07-08 | 07:47 | #12 | 朝の初回会話向け実装状況を確認。`create_daily_briefing` / `/api/briefing` は実装済み、天気統合・起床時刻記録・初回おはよう判定は未実装。 |
 | 2026-07-08 | 08:29 | #13 | マージ後のコンフリクト解消結果を確認し、`backend/db.py` の構文破損、ツール import 重複、README / PROGRESS の重複記載を修正。構文・一時DBで最小動作を確認。 |
 | 2026-07-09 | 18:18 | #14 | 会話ログからパーソナルデータを作る設計方針を確認。コード変更なし、SQLite/Chroma をAI用正本、Markdown を人間用副本、Notion は公開・手動編集用に分ける案を整理。 |
-| 2026-07-09 | 18:22 | #15 | 既存 Obsidian vault を参照するRAG化方針を確認。コード変更なし、外部Markdownは読み込み用インデックス、会話由来の新情報はSQLite正本とMarkdown副本に追記する案を整理。 |
-| 2026-07-09 | 18:23 | #16 | Markdown の脳みそは既存 Obsidian vault に統一する方針を確認。SQLite は構造化正本、Chroma は検索インデックス、Markdown は vault 内のPETIT領域へ集約する案に更新。 |
+| 2026-07-09 | 18:22 | #15 | 既存 Obsidian vault を参照するRAG化方針を確認。コード変更なし、既存フォルダをPETITが読める形にする案を整理。 |
+| 2026-07-09 | 18:30 | #16 | 既存 Obsidian vault をPETITのMarkdown出力先としても使う方針を整理。SQLite/ChromaをAI正本、Markdownを人間用副本として分離。 |
 | 2026-07-09 | 18:34 | #17 | 既存 Obsidian vault をPETITのMarkdown脳として扱うRAG連携を実装。`vault_indexer`、`petit_vault`、`sync_obsidian_vault`、`/api/vault/sync`、vault配下Markdown出力設定を追加。一時vaultでキーワード検索を確認、実vault + embedding索引化は未確認。 |
 | 2026-07-10 | 09:12 | #18 | 現在時刻取得の実装状況を確認。現状は `agent.py` で日付のみ注入、正確な現在時刻取得ツールは未実装。コード変更なし。 |
 | 2026-07-10 | 09:14 | #19 | `get_current_time` ツールを追加し、現在時刻・日付を聞かれたら使うよう agent ルールと README を更新。構文・ツール登録・実行を確認。 |
@@ -70,9 +71,8 @@
 | 2026-07-14 | 12:09 | #36 | 会話記憶を短期・エピソード・長期へ分離。エピソードSQLite/Markdown/Chroma差分索引、失敗時再試行、長期記憶の重複抑止と出典、ブラウザセッションID、回帰テストを追加。実ブラウザ＋実LM Studioでのエピソード確定・再起動後検索は未確認。 |
 | 2026-07-14 | 13:41 | #37 | 2モデル分散・観測性を実装。Chat/Agentの独立endpoint設定と旧設定fallback、Agent停止時の安全なChat整形fallback、`/api/health`別モデル状態、ターン詳細表示・ログ、無効な長さ/遅延Agent設定削除、旧DB索引作成順を修正。標準unittest 43件・compileall・health構造スモークは確認、実LM Studio/ブラウザE2Eと計測は未実施。 |
 | 2026-07-17 | 00:09 | #38 | Milestone 2の`get_schedule`縦切りを追加。固定commitのSona Agent Core依存、Feature Flag、PETIT Adapter、`personal` Scope・`schedule.read`検証、Source/Freshness、JSON Lines監査、旧経路互換テストを追加。標準unittest 49件・compileall確認済み。実ブラウザ/実CalendarのCore経路は未確認。 |
-| 2026-07-17 | 03:09 | #39 | 動作確認済み: Milestone 2の予定取得Audit metadataへSource/Freshness・stale・最終同期日時・同期エラーを記録し、正常/stale両ケースと誤Primary Scope拒否（既存ハンドラー未呼出し）のテストを追加。依存導入、標準unittest 52件、compileall成功。 |
+| 2026-07-17 | 03:09 | #39 | 動作確認済み: Milestone 2残りE2Eを完了。Core ON/OFFで同じ3件、`personal:soso` / `schedule.read` / JSONL Audit、外部ICS SourceReference、fresh/stale、失敗時キャッシュ保持と古さ表示を実ブラウザ+LM Studioで確認。失敗時の最終同期時刻保持と空モデル回答時の予定フォールバックを修正し、標準unittest 53件・compileall成功。Issue #6は対象外のまま維持。 |
 | 2026-07-17 | 04:29 | #40 | Milestone 3 PETIT Safe Writeを実装。`add_schedule`だけをFeature FlagでCoreのSQLite Approval/Idempotency/Auditへ接続し、既存書き込みをAdapterで一回実行。標準unittest 59件、compileall、依存導入、Flag OFF旧Approvalスモーク成功。実ブラウザはLM Studioタイムアウトで確認UI以降未確認、Core固定commit更新も公開後対応。 |
-| 2026-07-16 | 18:38 | #40 | 動作確認済み: Milestone 2残りE2Eを完了。Core ON/OFFで同じ3件、`personal:soso` / `schedule.read` / JSONL Audit、外部ICS SourceReference、fresh/stale、失敗時キャッシュ保持と古さ表示を実ブラウザ+LM Studioで確認。失敗時の最終同期時刻保持と空モデル回答時の予定フォールバックを修正し、標準unittest 53件・compileall成功。Issue #6は対象外のまま維持。 |
 | 2026-07-18 | 03:20 | #41 | Project Continuity Engine Phase 1をstacked PRで実装。SQLite project identity／alias／source link／episode Relation／active state／checkpoint、決定論的な開始・切替、終了確認と承認保存、限定resume context、確認付き新規登録・別名追加を追加。外部source linkの明示解除後再割当も実装。各専用GitHub Actions・compileall・unittest成功。実ブラウザE2Eとstack統合は未実施。 |
 | 2026-07-18 | 03:27 | #42 | Phase 1のPR #18／#19／#20／#21／#23を順番にmainへ統合。内部project台帳、切替、終了確認、限定resume、確認付き登録・別名がmainで利用可能になり、最終branchとの差分0を確認。 |
 | 2026-07-18 | 03:44 | #43 | Notion Adapter v2をPR #24でmainへ統合。Project／Task DBをRaw取得と個別parserへ分離し、Relation・担当者・親子タスク・ブロックRelation・source更新時刻・候補確認・部分失敗・source別freshnessを追加。専用／Project Continuity CI成功。 |
@@ -94,3 +94,4 @@
 | 2026-07-22 | 15:59 | #59 | Issue #69対応としてNotion「たすく」DBの`Done / Chancel`完了グループを確認し、既定の`get_tasks`から完了・キャンセル状態を除外、取得件数と条件一致総数を分離、キャンセル集計とタスク取得時だけの出力ガイダンス、専用テスト・CI・文書を追加。GitHub Actionsと実Notion／DeepSeek／ブラウザE2Eは未確認。 |
 | 2026-07-22 | 16:06 | #60 | Issue #69の専用タスク状態テストと既存Notion／Core／Project Continuity／Linkraft／GitHub evidence／BRAIN／AivisSpeech回帰を含む全8系統CI成功。実Notion同期後のDeepSeek／ブラウザE2Eだけ未確認。 |
 | 2026-07-22 | 17:35 | #61 | Issue #71対応としてタスクをHigh→Mid→Low→未設定の順で取得上限前に並べ、未登録タスクの活動発話から確認待ち作成へつなぎ、「してほしい」等の短い返答で実行する経路を追加。作成既定High・日付未指定は期限なし、専用テスト・CI・文書を追加。GitHub Actionsと実Notion／ブラウザE2Eは未確認。 |
+| 2026-07-23 | 00:02 | #62 | Issue #73対応として、複数端末の全session会話を1日1回ローカルLM Studioで整理する日次生活インデックスを実装。確実なノイズだけ除外し、生活・食事・場所・人・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存、外部モデル固定回避、失敗再試行、設定・専用テスト・CI・文書を追加。GitHub Actionsと実ローカルLLM／複数端末E2Eは未確認。 |
