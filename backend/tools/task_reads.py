@@ -87,6 +87,8 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
         "SQLiteの統合タスク一覧を即時取得する。通常会話ではNotion APIを待たない。"
         "既定ではDone、キャンセル、Notionで削除済みのタスクを除いたアクティブタスクだけを返す。"
         "status=allで全状態、status指定でその状態だけを返す。取得上限前にHigh、Mid、Low、未設定の順。"
+        "total_countは条件一致総数、returned_countは今回返した件数、has_more=trueは一部取得を示す。"
+        "キャンセルはstatus_summary.cancelledとして進行中から分離する。"
         "同期鮮度、未送信、失敗、競合はsyncで確認する。明示的な最新確認だけsync_notion_tasksを使う。"
     ),
     parameters={
