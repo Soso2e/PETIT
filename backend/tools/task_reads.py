@@ -1,16 +1,15 @@
-"""Status-aware read path for task lists.
+"""Status-aware local read path for task lists.
 
 This module is imported after the legacy task modules and intentionally
 re-registers ``get_tasks``. Writes remain in ``tasks`` / ``tasks_phase2``;
-only the read contract is tightened here so existing callers stay compatible.
+reads never wait for Notion and expose live-sync freshness separately.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from .. import config, db, task_sync_queue
+from .. import config, db, notion_task_sync, task_sync_queue
 from ..task_taxonomy import AREAS, resolve_area
-from . import tasks as legacy_tasks
 from .registry import tool
 
 _CANCELLED_STATUS_ALIASES = (
@@ -29,6 +28,8 @@ TASK_RESPONSE_GUIDANCE = (
     "returned_countや互換用countだけを見て全件数と断定しない。"
     "has_more=trueなら一部取得と明記する。タスクはHigh、Mid、Low、未設定の順で返る。"
     "キャンセルは進行中・未完了に数えず、status_summary.cancelledとして分けて説明する。"
+    "通常はSQLiteの統合ビューを即答に使い、sync.tasks.pending_writes/failed_writes/conflictsがある時だけ"
+    "未同期・競合を明示する。明示的に最新確認を求められた場合だけsync_notion_tasksを使う。"
 )
 
 
@@ -82,12 +83,10 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
 @tool(
     name="get_tasks",
     description=(
-        "タスク一覧を取得する。既定ではDoneとキャンセル状態（NotionのChancel等）を除いた"
-        "アクティブタスクだけを返す。status=allで全状態、status指定でその状態だけを返す。"
-        "取得上限を適用する前にHigh、Mid、Low、未設定の順で並べ、同じ優先度では期限順に返す。"
-        "total_countは条件一致総数、returned_countは今回の表示件数で、has_more=trueなら一部取得。"
-        "returned_countだけを全件数と断定しない。キャンセルを進行中として扱わず、"
-        "status_summaryで分けて説明する。"
+        "SQLiteの統合タスク一覧を即時取得する。通常会話ではNotion APIを待たない。"
+        "既定ではDone、キャンセル、Notionで削除済みのタスクを除いたアクティブタスクだけを返す。"
+        "status=allで全状態、status指定でその状態だけを返す。取得上限前にHigh、Mid、Low、未設定の順。"
+        "同期鮮度、未送信、失敗、競合はsyncで確認する。明示的な最新確認だけsync_notion_tasksを使う。"
     ),
     parameters={
         "type": "object",
@@ -115,13 +114,13 @@ def get_tasks(
     project_id: str | None = None,
     limit: int = 20,
 ) -> dict[str, Any]:
-    sync = legacy_tasks._try_notion_sync()  # noqa: SLF001 - preserve the existing sync boundary
     task_sync_queue.ensure_task_sync_schema()
+    notion_task_sync.ensure_schema()
     normalized_area, _ = resolve_area(area)
     normalized_status = _normalize_status(status)
     active_only = not normalized_status
 
-    scope_conditions: list[str] = []
+    scope_conditions: list[str] = ["COALESCE(remote_deleted_at, '') = ''"]
     scope_params: list[Any] = []
     if normalized_area:
         scope_conditions.append("area = ?")
@@ -152,7 +151,8 @@ def get_tasks(
         )
         rows = conn.execute(
             "SELECT id, source, title, status, due_date, priority, category, area, reason, url, done_date, "
-            "project_id, project_external_id FROM tasks_cache"
+            "project_id, project_external_id, sync_status, sync_error, source_updated_at, last_synced_at "
+            "FROM tasks_cache"
             + where
             + " ORDER BY CASE LOWER(TRIM(COALESCE(priority, ''))) "
             "WHEN 'high' THEN 0 WHEN 'mid' THEN 1 WHEN 'medium' THEN 1 "
@@ -182,8 +182,9 @@ def get_tasks(
             "area": normalized_area,
             "project_id": project_id,
             "active_only": active_only,
+            "remote_deleted_excluded": True,
         },
         "excluded_statuses": list(_terminal_statuses()) if active_only else [],
         "response_guidance": TASK_RESPONSE_GUIDANCE,
-        "sync": sync,
+        "sync": notion_task_sync.status(),
     }
