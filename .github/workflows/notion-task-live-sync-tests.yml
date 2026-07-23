@@ -33,10 +33,22 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall backend tests
       - name: Run task sync tests
-        run: >-
-          python -m unittest
-          tests.test_notion_task_live_sync
-          tests.test_task_phase2_wiring
-          tests.test_task_conversation_flow
-          tests.test_task_cancel_status
-          -v
+        id: task-tests
+        shell: bash
+        run: |
+          set +e
+          python -m unittest \
+            tests.test_notion_task_live_sync \
+            tests.test_task_phase2_wiring \
+            tests.test_task_conversation_flow \
+            tests.test_task_cancel_status \
+            -v 2>&1 | tee notion-task-live-sync-test-output.txt
+          status=${PIPESTATUS[0]}
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notion-task-live-sync-test-output
+          path: notion-task-live-sync-test-output.txt
