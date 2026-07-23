@@ -10,6 +10,7 @@ from typing import Any
 
 from .. import config, db, notion_task_sync, task_sync_queue
 from ..task_taxonomy import AREAS, resolve_area
+from . import tasks as legacy_tasks  # Backward-compatible test/caller surface; no implicit sync call.
 from .registry import tool
 
 _CANCELLED_STATUS_ALIASES = (
