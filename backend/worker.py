@@ -11,6 +11,10 @@ from . import config, daily_index, db, github_daily_review, notion_task_sync, ta
 log = logging.getLogger(__name__)
 
 
+def _notion_task_sync_enabled() -> bool:
+    return bool(config.NOTION_TASK_BACKGROUND_SYNC_ENABLED and config.notion_configured())
+
+
 class JobWorker:
     def __init__(self, interval_seconds: float = 2.0) -> None:
         self.interval_seconds = interval_seconds
@@ -26,8 +30,9 @@ class JobWorker:
 
         tasks_phase2.install_agent_routes()
         task_sync_queue.ensure_task_sync_schema()
-        notion_task_sync.ensure_schema()
-        notion_task_sync.request_startup_sync()
+        if _notion_task_sync_enabled():
+            notion_task_sync.ensure_schema()
+            notion_task_sync.request_startup_sync()
         github_daily_review.ensure_schema()
         daily_index.ensure_schema()
         self._stop.clear()
@@ -56,10 +61,11 @@ class JobWorker:
                 # Notion quickly. Webhook inbox and repair pulls run afterwards.
                 if task_sync_queue.process_next():
                     continue
-                if notion_task_sync.process_inbox_next():
-                    continue
-                if notion_task_sync.run_due_sync():
-                    continue
+                if _notion_task_sync_enabled():
+                    if notion_task_sync.process_inbox_next():
+                        continue
+                    if notion_task_sync.run_due_sync():
+                        continue
                 self._stop.wait(self.interval_seconds)
             except Exception as exc:  # noqa: BLE001
                 log.exception("Job worker loop failed: %s", exc)
