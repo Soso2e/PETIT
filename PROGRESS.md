@@ -14,7 +14,7 @@
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
 - Notion会話検索: 明示的なNotion参照をルーターLLM前に決定論的検出し、共有済みページを最大3件検索、プロパティ・本文抜粋・更新日時・URLを取得する。結果ありはAgent 1回、未設定・0件・API失敗はLLMなしで区別する。実Notion／ブラウザE2Eは未確認。
-- タスク管理: area・確認済みproject Relation、承認後のSQLite即時保存、Notion書き込みキュー、タスク編集・競合保護に加え、既定取得で`Done`と`Chancel`等を除外し、High→Mid→Low→未設定を取得上限より前に適用する。未登録タスクの活動発話から確認待ち作成へつなぎ、短い肯定で実行する。作成時は既定High、日付未指定は期限なし。実Notion／DeepSeek／ブラウザE2Eは未確認。
+- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、作成既定High・日付未指定は期限なし。実Notion Webhook／Tunnel／ブラウザE2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
 - GitHub Daily Review: access可能な全repositoryを横断し、前回cursor以降のcommit／PR／checkと`PROGRESS.md`を朝ブリーフィング・明示会話でレビューする。CIは成功済み。実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。
@@ -24,7 +24,7 @@
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: Issue #73の日次生活インデックスCIと実ローカルLM Studio／複数端末E2Eを確認し、その後Issue #64／#60／#62の実サービスE2Eへ戻る。
+- 次にやること: Issue #75のCIと実Notion Webhook／公開HTTPS／ブラウザE2Eを確認し、その後Issue #73／#64／#60／#62の実サービスE2Eへ戻る。
 
 ## 履歴
 
@@ -51,7 +51,7 @@
 | 2026-07-09 | 18:30 | #16 | 既存 Obsidian vault をPETITのMarkdown出力先としても使う方針を整理。SQLite/ChromaをAI正本、Markdownを人間用副本として分離。 |
 | 2026-07-09 | 18:34 | #17 | 既存 Obsidian vault をPETITのMarkdown脳として扱うRAG連携を実装。`vault_indexer`、`petit_vault`、`sync_obsidian_vault`、`/api/vault/sync`、vault配下Markdown出力設定を追加。一時vaultでキーワード検索を確認、実vault + embedding索引化は未確認。 |
 | 2026-07-10 | 09:12 | #18 | 現在時刻取得の実装状況を確認。現状は `agent.py` で日付のみ注入、正確な現在時刻取得ツールは未実装。コード変更なし。 |
-| 2026-07-10 | 09:14 | #19 | `get_current_time` ツールを追加し、現在時刻・日付を聞かれたら使うよう agent ルールと README を更新。構文・ツール登録・実行を確認。 |
+| 2026-07-10 | 09:14 | #19 | `get_current_time` ツールを追加し、現在時刻・日付を聞かれたら使うよう agent ルールと README を更新。 |
 | 2026-07-12 | 18:44 | #20 | NotionタスクDBの`.env`設定を更新し、完了日プロパティ`DoneDate`をコード・サンプル設定・READMEへ反映。実Notion E2Eは未確認。 |
 | 2026-07-12 | 18:49 | #21 | プロジェクトルートの`.env`をPETIT起動時に自動読込する処理を追加。明示的なOS環境変数を優先。構文と設定読込のスモーク確認済み。 |
 | 2026-07-11 | 19:31 | #22 | LM Studioの実エンドポイントを確認し、`.env` の `PETIT_LM_BASE_URL` に `/v1` を追加。モデル一覧取得と単純なチャット応答を確認済み。PETITブラウザ画面での再確認は未実施。 |
@@ -95,3 +95,4 @@
 | 2026-07-22 | 16:06 | #60 | Issue #69の専用タスク状態テストと既存Notion／Core／Project Continuity／Linkraft／GitHub evidence／BRAIN／AivisSpeech回帰を含む全8系統CI成功。実Notion同期後のDeepSeek／ブラウザE2Eだけ未確認。 |
 | 2026-07-22 | 17:35 | #61 | Issue #71対応としてタスクをHigh→Mid→Low→未設定の順で取得上限前に並べ、未登録タスクの活動発話から確認待ち作成へつなぎ、「してほしい」等の短い返答で実行する経路を追加。作成既定High・日付未指定は期限なし、専用テスト・CI・文書を追加。GitHub Actionsと実Notion／ブラウザE2Eは未確認。 |
 | 2026-07-23 | 00:02 | #62 | Issue #73対応として、複数端末の全session会話を1日1回ローカルLM Studioで整理する日次生活インデックスを実装。確実なノイズだけ除外し、生活・食事・場所・人・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存、外部モデル固定回避、失敗再試行、設定・専用テスト・CI・文書を追加。GitHub Actionsと実ローカルLLM／複数端末E2Eは未確認。 |
+| 2026-07-23 | 17:40 | #63 | Issue #75対応としてNotionタスクのローカルファースト双方向同期を実装。既存Outbox、署名検証Webhook Inbox、URL共有secret、5分差分・起動時・日次全件補修、remote snapshot、フィールド単位三者マージ、論理削除、同期鮮度、設定・専用テスト・CI・設計文書を追加。実Notion Webhook／公開HTTPS／ブラウザE2Eは未確認。 |
