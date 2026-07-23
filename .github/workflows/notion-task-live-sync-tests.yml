@@ -12,6 +12,7 @@ on:
       - "backend/tools/task_reads.py"
       - "tests/test_notion_task_live_sync.py"
       - "tests/test_task_phase2_wiring.py"
+      - "tests/test_daily_life_index.py"
       - "docs/notion_task_live_sync.md"
       - ".env.example"
       - "PROGRESS.md"
@@ -42,6 +43,7 @@ jobs:
             tests.test_task_phase2_wiring \
             tests.test_task_conversation_flow \
             tests.test_task_cancel_status \
+            tests.test_daily_life_index \
             -v 2>&1 | tee notion-task-live-sync-test-output.txt
           status=${PIPESTATUS[0]}
           echo "status=$status" >> "$GITHUB_OUTPUT"
