@@ -3,5 +3,6 @@ uvicorn[standard]>=0.29
 httpx>=0.27
 pydantic>=2.6
 chromadb>=0.5
+tzdata>=2025.2
 timetree-exporter
 sona-agent-core @ git+https://github.com/Soso2e/Sona-Agent-Core.git@0e220a2ec2d1227256495690eefed00beb4e2b5a
