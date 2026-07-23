@@ -1,0 +1,32 @@
+name: Daily life index tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/config.py"
+      - "backend/daily_index.py"
+      - "backend/worker.py"
+      - "tests/test_daily_life_index.py"
+      - "docs/daily_life_index.md"
+      - ".env.example"
+      - "requirements.txt"
+      - "PROGRESS.md"
+      - ".github/workflows/daily-life-index-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet fastapi httpx pydantic chromadb tzdata timetree-exporter
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Run daily index tests
+        run: python -m unittest tests.test_daily_life_index -v
