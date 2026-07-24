@@ -23,11 +23,23 @@ _CANCELLED_STATUS_ALIASES = (
     "取り消し",
 )
 _CANCELLED_STATUS_KEYS = frozenset(_CANCELLED_STATUS_ALIASES)
+_PRIORITY_FILTERS = {
+    "high": ("high",),
+    "mid": ("mid", "medium"),
+    "medium": ("mid", "medium"),
+    "low": ("low",),
+    "later": ("mid", "medium", "low"),
+    "all": (),
+}
 
 TASK_RESPONSE_GUIDANCE = (
     "タスク件数はtotal_countを条件一致の総数、returned_countを今回表示した件数として扱う。"
     "returned_countや互換用countだけを見て全件数と断定しない。"
-    "has_more=trueなら一部取得と明記する。タスクはHigh、Mid、Low、未設定の順で返る。"
+    "has_more=trueなら一部取得と明記する。"
+    "通常のタスク確認はpriority=high（省略時に自動適用）でHighだけを返す。"
+    "暇・やりたいこと・後回し候補はpriority=laterでMid/MediumとLowを返し、"
+    "全部のタスクを求められた時だけpriority=allを使う。"
+    "タスクはHigh、Mid、Low、未設定の順で返る。"
     "キャンセルは進行中・未完了に数えず、status_summary.cancelledとして分けて説明する。"
     "通常はSQLiteの統合ビューを即答に使い、sync.tasks.pending_writes/failed_writes/conflictsがある時だけ"
     "未同期・競合を明示する。明示的に最新確認を求められた場合だけsync_notion_tasksを使う。"
@@ -45,6 +57,14 @@ def _done_status() -> str:
 def _terminal_statuses() -> tuple[str, ...]:
     values = [_done_status(), *_CANCELLED_STATUS_ALIASES]
     return tuple(dict.fromkeys(value for value in values if value))
+
+
+def _normalize_priority(value: Any) -> tuple[str, tuple[str, ...]]:
+    normalized = str(value or "").strip().casefold() or "high"
+    if normalized not in _PRIORITY_FILTERS:
+        allowed = ", ".join(_PRIORITY_FILTERS)
+        raise ValueError(f"priority must be one of: {allowed}")
+    return normalized, _PRIORITY_FILTERS[normalized]
 
 
 def _where_clause(conditions: list[str]) -> str:
@@ -85,7 +105,11 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
     name="get_tasks",
     description=(
         "SQLiteの統合タスク一覧を即時取得する。通常会話ではNotion APIを待たない。"
-        "既定ではDone、キャンセル、Notionで削除済みのタスクを除いたアクティブタスクだけを返す。"
+        "既定ではPriority=Highかつ、Done、キャンセル、Notionで削除済みを除いたアクティブタスクだけを返す。"
+        "日常的な『タスクは？』『何に追われてる？』ではpriorityを省略する。"
+        "『暇』『やりたいこと』『後回し候補』ではpriority=later、"
+        "『全部』『すべてのタスク』ではpriority=allを指定する。"
+        "priority=mid/medium/lowで個別優先度も指定できる。"
         "status=allで全状態、status指定でその状態だけを返す。取得上限前にHigh、Mid、Low、未設定の順。"
         "total_countは条件一致総数、returned_countは今回返した件数、has_more=trueは一部取得を示す。"
         "returned_countだけを全件数と断定しない。キャンセルを進行中として扱わず、"
@@ -98,6 +122,15 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
             "status": {
                 "type": "string",
                 "description": "絞り込むステータス。省略でアクティブのみ、allで完了・キャンセルを含む全状態。",
+            },
+            "priority": {
+                "type": "string",
+                "enum": ["high", "mid", "medium", "low", "later", "all"],
+                "description": (
+                    "優先度範囲。省略/highはHighのみ。laterはMid/MediumとLow。"
+                    "allは未設定を含む全優先度。全部を求められた場合だけallを使う。"
+                ),
+                "default": "high",
             },
             "area": {
                 "type": "string",
@@ -114,6 +147,7 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
 )
 def get_tasks(
     status: str | None = None,
+    priority: str | None = None,
     area: str | None = None,
     project_id: str | None = None,
     limit: int = 20,
@@ -122,6 +156,7 @@ def get_tasks(
     notion_task_sync.ensure_schema()
     normalized_area, _ = resolve_area(area)
     normalized_status = _normalize_status(status)
+    normalized_priority, priority_values = _normalize_priority(priority)
     active_only = not normalized_status
 
     scope_conditions: list[str] = ["COALESCE(remote_deleted_at, '') = ''"]
@@ -133,8 +168,17 @@ def get_tasks(
         scope_conditions.append("project_id = ?")
         scope_params.append(project_id)
 
-    conditions = list(scope_conditions)
-    params = list(scope_params)
+    priority_conditions = list(scope_conditions)
+    priority_params = list(scope_params)
+    if priority_values:
+        placeholders = ", ".join("?" for _ in priority_values)
+        priority_conditions.append(
+            f"LOWER(TRIM(COALESCE(priority, ''))) IN ({placeholders})"
+        )
+        priority_params.extend(priority_values)
+
+    conditions = list(priority_conditions)
+    params = list(priority_params)
     if normalized_status and normalized_status != "all":
         conditions.append("LOWER(TRIM(status)) = ?")
         params.append(normalized_status)
@@ -166,9 +210,9 @@ def get_tasks(
         ).fetchall()
         summary_rows = conn.execute(
             "SELECT status, COUNT(*) AS count FROM tasks_cache"
-            + _where_clause(scope_conditions)
+            + _where_clause(priority_conditions)
             + " GROUP BY status ORDER BY status",
-            scope_params,
+            priority_params,
         ).fetchall()
 
     tasks = [dict(row) for row in rows]
@@ -183,6 +227,8 @@ def get_tasks(
         "status_summary": _status_summary(summary_rows),
         "filters": {
             "status": status,
+            "priority": normalized_priority,
+            "priority_defaulted": not str(priority or "").strip(),
             "area": normalized_area,
             "project_id": project_id,
             "active_only": active_only,
