@@ -28,7 +28,8 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
     def test_manifest_is_valid_and_standalone(self) -> None:
         manifest = json.loads((FRONTEND / "manifest.webmanifest").read_text(encoding="utf-8"))
         self.assertEqual(manifest["display"], "standalone")
-        self.assertEqual(manifest["start_url"], "/?source=pwa")
+        self.assertEqual(manifest["start_url"], "/static/index.html?source=pwa")
+        self.assertEqual(manifest["scope"], "/static/")
         self.assertTrue(manifest["icons"])
 
     def test_session_split_and_internal_prompt_filter_are_present(self) -> None:
