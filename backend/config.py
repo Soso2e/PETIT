@@ -155,6 +155,7 @@ CHROMA_PATH = Path(os.getenv("PETIT_CHROMA_PATH", STORAGE_DIR / "chroma"))
 NOTION_API_KEY = os.getenv("NOTION_API_KEY", "")
 NOTION_PROJECTS_DB_ID = os.getenv("NOTION_PROJECTS_DB_ID", "")
 NOTION_TASKS_DB_ID = os.getenv("NOTION_TASKS_DB_ID", "")
+NOTION_TASKS_DATA_SOURCE_ID = os.getenv("NOTION_TASKS_DATA_SOURCE_ID", "")
 
 # Legacy task property names remain valid for create/update and flat task-only DBs.
 NOTION_PROP_TITLE = os.getenv("NOTION_PROP_TITLE", "name")
@@ -188,6 +189,17 @@ NOTION_TASK_PROP_SUMMARY = os.getenv("NOTION_TASK_PROP_SUMMARY", "要約")
 NOTION_DEFAULT_STATUS = os.getenv("NOTION_DEFAULT_STATUS", "Yet")
 NOTION_DONE_STATUS = os.getenv("NOTION_DONE_STATUS", "Done")
 NOTION_SYNC_TTL_SECONDS = float(os.getenv("NOTION_SYNC_TTL_SECONDS", "300"))
+
+# Local-first Notion task synchronization.
+NOTION_TASK_BACKGROUND_SYNC_ENABLED = os.getenv("NOTION_TASK_BACKGROUND_SYNC_ENABLED", "1") not in ("0", "false", "False")
+NOTION_TASK_SYNC_ON_STARTUP = os.getenv("NOTION_TASK_SYNC_ON_STARTUP", "1") not in ("0", "false", "False")
+NOTION_TASK_PULL_INTERVAL_SECONDS = max(30.0, float(os.getenv("NOTION_TASK_PULL_INTERVAL_SECONDS", "300")))
+NOTION_TASK_FULL_SYNC_INTERVAL_SECONDS = max(300.0, float(os.getenv("NOTION_TASK_FULL_SYNC_INTERVAL_SECONDS", "86400")))
+NOTION_TASK_SYNC_OVERLAP_SECONDS = max(0.0, float(os.getenv("NOTION_TASK_SYNC_OVERLAP_SECONDS", "120")))
+NOTION_WEBHOOK_ENDPOINT_SECRET = os.getenv("NOTION_WEBHOOK_ENDPOINT_SECRET", "").strip()
+NOTION_WEBHOOK_VERIFICATION_TOKEN = os.getenv("NOTION_WEBHOOK_VERIFICATION_TOKEN", "").strip()
+NOTION_WEBHOOK_REQUIRE_SIGNATURE = os.getenv("NOTION_WEBHOOK_REQUIRE_SIGNATURE", "1") not in ("0", "false", "False")
+NOTION_WEBHOOK_ALLOW_TOKEN_ROTATION = os.getenv("NOTION_WEBHOOK_ALLOW_TOKEN_ROTATION", "0") not in ("0", "false", "False")
 
 # Calendar read-only sync.
 # Google Calendar can expose private iCal/ICS URLs; local .ics files are also accepted.

@@ -4,6 +4,20 @@ on:
   push:
     branches: [feat/brain-project-mapping]
   pull_request:
+    paths:
+      - "backend/brain*.py"
+      - "backend/vault_indexer.py"
+      - "backend/project_source_refresh.py"
+      - "backend/project_resume.py"
+      - "backend/tools/brain*.py"
+      - "tests/test_brain*.py"
+      - "tests/test_project_source_refresh.py"
+      - "tests/test_project_resume.py"
+      - ".github/workflows/brain-project-mapping-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

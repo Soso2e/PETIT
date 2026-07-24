@@ -6,9 +6,13 @@ import logging
 import threading
 from typing import Any
 
-from . import config, daily_index, db, github_daily_review, task_sync_queue, web_sources
+from . import config, daily_index, db, github_daily_review, notion_task_sync, task_sync_queue, web_sources
 
 log = logging.getLogger(__name__)
+
+
+def _notion_task_sync_enabled() -> bool:
+    return bool(config.NOTION_TASK_BACKGROUND_SYNC_ENABLED and config.notion_configured())
 
 
 class JobWorker:
@@ -26,6 +30,9 @@ class JobWorker:
 
         tasks_phase2.install_agent_routes()
         task_sync_queue.ensure_task_sync_schema()
+        if _notion_task_sync_enabled():
+            notion_task_sync.ensure_schema()
+            notion_task_sync.request_startup_sync()
         github_daily_review.ensure_schema()
         daily_index.ensure_schema()
         self._stop.clear()
@@ -50,8 +57,15 @@ class JobWorker:
                 if job is not None:
                     _process_job(job)
                     continue
+                # Outbound writes remain highest priority so PETIT changes reach
+                # Notion quickly. Webhook inbox and repair pulls run afterwards.
                 if task_sync_queue.process_next():
                     continue
+                if _notion_task_sync_enabled():
+                    if notion_task_sync.process_inbox_next():
+                        continue
+                    if notion_task_sync.run_due_sync():
+                        continue
                 self._stop.wait(self.interval_seconds)
             except Exception as exc:  # noqa: BLE001
                 log.exception("Job worker loop failed: %s", exc)

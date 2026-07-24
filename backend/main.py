@@ -8,18 +8,19 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import hmac
 import json
 import logging
 import threading
 import time
 from uuid import uuid4
 
-from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, model_routing, proactive, request_context, scheduler, tools, vault_indexer, worker
+from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, model_routing, notion_task_sync, proactive, request_context, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -137,6 +138,7 @@ def health() -> dict[str, Any]:
         "notion": {
             "configured": config.notion_configured(),
             "sync": __import__("backend.tools.notion", fromlist=["status"]).status(),
+            "task_live_sync": notion_task_sync.status(),
         },
         "rag": rag_info,
         "auto_summary": {
@@ -182,6 +184,33 @@ def update_model_routing(payload: ModelRoutingUpdate) -> Any:
         return JSONResponse({"error": str(exc)}, status_code=400)
     lmstudio_client.clear_health_cache()
     return result
+
+
+@app.post("/api/notion/webhook")
+async def notion_webhook(request: Request) -> JSONResponse:
+    """Receive Notion webhook verification and signed task change events."""
+    endpoint_secret = str(config.NOTION_WEBHOOK_ENDPOINT_SECRET or "").strip()
+    supplied_secret = str(request.query_params.get("key") or "").strip()
+    if endpoint_secret and not hmac.compare_digest(endpoint_secret, supplied_secret):
+        return JSONResponse({"accepted": False, "error": "Invalid webhook endpoint key"}, status_code=404)
+    raw_body = await request.body()
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JSONResponse({"accepted": False, "error": "Invalid JSON payload"}, status_code=400)
+    if not isinstance(payload, dict):
+        return JSONResponse({"accepted": False, "error": "JSON object is required"}, status_code=400)
+
+    verification_token = str(payload.get("verification_token") or "").strip()
+    if verification_token:
+        result = notion_task_sync.accept_verification_token(verification_token)
+        return JSONResponse(result, status_code=200 if result.get("accepted") else 409)
+
+    signature = request.headers.get("x-notion-signature")
+    if not notion_task_sync.verify_webhook_signature(raw_body, signature):
+        return JSONResponse({"accepted": False, "error": "Invalid Notion webhook signature"}, status_code=401)
+    result = notion_task_sync.enqueue_webhook_event(payload)
+    return JSONResponse(result, status_code=200 if result.get("accepted") else 400)
 
 
 @app.get("/api/tts/status")
@@ -256,6 +285,7 @@ def chat(req: ChatRequest) -> ChatResponse:
         "llm_calls": turn_metrics["llm_calls"],
         "embedding_calls": 0,
         "notion_sync": __import__("backend.tools.notion", fromlist=["status"]).status(),
+        "notion_task_live_sync": notion_task_sync.status(),
         "calendar_sync": calendar_sync.status(),
         "brain_references": int("search_brain_notes" in tool_names),
         "memory_references": int("search_memory" in tool_names),

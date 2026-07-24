@@ -4,6 +4,22 @@ on:
   push:
     branches: [feat/github-evidence, feat/github-daily-review]
   pull_request:
+    paths:
+      - "backend/config.py"
+      - "backend/github*.py"
+      - "backend/project_source_refresh.py"
+      - "backend/project_resume.py"
+      - "backend/briefing.py"
+      - "backend/proactive.py"
+      - "backend/tools/github*.py"
+      - "tests/test_github*.py"
+      - "tests/test_project_source_refresh.py"
+      - "tests/test_project_resume.py"
+      - ".github/workflows/github-evidence-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
