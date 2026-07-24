@@ -2,9 +2,16 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1115" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PETIT" />
   <title>PETIT — Personal AI Assistant</title>
+  <link rel="manifest" href="/static/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/static/icon.svg" />
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/companion.css" />
 </head>
 <body>
   <div class="app">
@@ -15,7 +22,52 @@
       <div class="header-actions">
         <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
       </div>
+      <div class="header-meta">
+        <span id="session-label" class="session-label">現在の会話</span>
+        <button id="history-toggle" type="button" class="history-toggle" aria-expanded="false" hidden>履歴を見る</button>
+      </div>
     </header>
+
+    <section id="companion-dashboard" class="companion-dashboard" aria-label="制作伴走ダッシュボード">
+      <article class="companion-card companion-card--work">
+        <div class="companion-card__head">
+          <h2 class="companion-card__title">今やってること</h2>
+          <span id="work-state-label" class="companion-card__state">待機中</span>
+        </div>
+        <input id="work-task" class="work-task" type="text" maxlength="160" placeholder="例：Unityの壁塗り処理を実装" />
+        <div class="work-main-row">
+          <strong id="work-elapsed" class="work-elapsed">0分</strong>
+          <select id="work-frequency" class="work-frequency" aria-label="PETITの声かけ頻度">
+            <option value="10">10分ごと</option>
+            <option value="20">20分ごと</option>
+            <option value="boundary">区切りだけ</option>
+            <option value="quiet">静かにする</option>
+          </select>
+        </div>
+        <div class="work-actions">
+          <button id="work-toggle" type="button" class="work-button">作業開始</button>
+          <button id="work-pause" type="button" class="work-secondary" hidden>一時停止</button>
+          <button id="work-check-now" type="button" class="work-secondary" hidden>今声かけて</button>
+          <button id="work-end" type="button" class="work-secondary" hidden>終了</button>
+        </div>
+      </article>
+
+      <article class="companion-card">
+        <div class="companion-card__head">
+          <h2 class="companion-card__title">次にやる</h2>
+          <button id="dashboard-refresh" type="button" class="dashboard-refresh" aria-label="今日の情報を更新">更新</button>
+        </div>
+        <p id="dashboard-next" class="dashboard-line">今日の次の一手を取得中…</p>
+        <p id="dashboard-schedule" class="dashboard-line">予定を取得中…</p>
+      </article>
+
+      <article class="companion-card">
+        <div class="companion-card__head">
+          <h2 class="companion-card__title">Highタスク</h2>
+        </div>
+        <ul id="dashboard-tasks" class="dashboard-list"><li>取得中…</li></ul>
+      </article>
+    </section>
 
     <section class="model-routing" aria-label="使用モデルの切り替え">
       <label class="model-routing__field" for="chat-model-select">
@@ -43,10 +95,12 @@
       <button id="send" type="submit" class="send">送信</button>
     </form>
   </div>
+  <script src="/static/session.js"></script>
   <script src="/static/version.js"></script>
   <script src="/static/app.js"></script>
   <script src="/static/action_confirm.js"></script>
   <script src="/static/mobile_audio_unlock.js"></script>
   <script src="/static/voice.js"></script>
+  <script src="/static/companion.js"></script>
 </body>
 </html>
