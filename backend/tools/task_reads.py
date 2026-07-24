@@ -147,10 +147,10 @@ def _status_summary(rows: list[Any]) -> dict[str, Any]:
 )
 def get_tasks(
     status: str | None = None,
-    priority: str | None = None,
     area: str | None = None,
     project_id: str | None = None,
     limit: int = 20,
+    priority: str | None = None,
 ) -> dict[str, Any]:
     task_sync_queue.ensure_task_sync_schema()
     notion_task_sync.ensure_schema()
