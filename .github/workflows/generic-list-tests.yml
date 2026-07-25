@@ -1,0 +1,34 @@
+name: Generic list tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/agent.py"
+      - "backend/list_conversation.py"
+      - "backend/tools/__init__.py"
+      - "backend/tools/lists.py"
+      - "tests/test_generic_lists.py"
+      - "docs/generic_lists.md"
+      - ".github/workflows/generic-list-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Run generic list tests
+        run: python -m unittest tests.test_generic_lists -v

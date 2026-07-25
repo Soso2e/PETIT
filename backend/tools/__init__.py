@@ -10,6 +10,7 @@ from . import (
     current_time,
     github,
     linkraft,
+    lists,
     memory,
     notion,
     notion_projects,
