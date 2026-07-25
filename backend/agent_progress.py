@@ -29,13 +29,16 @@ def emit(
         "details": details or {},
     }
     now = db.now_iso()
-    with db.get_connection() as conn:
-        conn.execute(
-            "INSERT INTO jobs "
-            "(type, status, input_json, result_text, delivered, session_id, request_id, created_at, updated_at) "
-            "VALUES ('agent_progress', 'done', '{}', ?, 0, ?, ?, ?, ?)",
-            (json.dumps(payload, ensure_ascii=False, default=str), session_id, request_id, now, now),
-        )
+    try:
+        with db.get_connection() as conn:
+            conn.execute(
+                "INSERT INTO jobs "
+                "(type, status, input_json, result_text, delivered, session_id, request_id, created_at, updated_at) "
+                "VALUES ('agent_progress', 'done', '{}', ?, 0, ?, ?, ?, ?)",
+                (json.dumps(payload, ensure_ascii=False, default=str), session_id, request_id, now, now),
+            )
+    except Exception:  # noqa: BLE001 - progress must never fail the user's request.
+        return
 
 
 _TOOL_PROGRESS = {
