@@ -49,8 +49,8 @@ class TaskCancelStatusTests(unittest.TestCase):
     def _dispatch(arguments: dict[str, object]) -> dict[str, object]:
         return json.loads(tools.dispatch("get_tasks", arguments))
 
-    def test_default_returns_only_active_tasks_and_separates_counts(self) -> None:
-        result = self._dispatch({"limit": 2})
+    def test_default_status_returns_only_active_tasks_and_separates_counts(self) -> None:
+        result = self._dispatch({"priority": "all", "limit": 2})
 
         self.assertEqual(result["returned_count"], 2)
         self.assertEqual(result["count"], 2)
@@ -67,8 +67,10 @@ class TaskCancelStatusTests(unittest.TestCase):
         )
 
     def test_all_and_explicit_cancel_status_remain_available(self) -> None:
-        all_result = self._dispatch({"status": "all", "limit": 20})
-        cancelled_result = self._dispatch({"status": "Chancel", "limit": 20})
+        all_result = self._dispatch({"status": "all", "priority": "all", "limit": 20})
+        cancelled_result = self._dispatch(
+            {"status": "Chancel", "priority": "all", "limit": 20}
+        )
 
         self.assertEqual(all_result["total_count"], 6)
         self.assertEqual(all_result["returned_count"], 6)
@@ -77,18 +79,25 @@ class TaskCancelStatusTests(unittest.TestCase):
         self.assertEqual(cancelled_result["total_count"], 1)
         self.assertEqual(cancelled_result["tasks"][0]["title"], "旧キャンセル")
 
-    def test_tool_contract_tells_model_how_to_describe_counts_and_cancelled_tasks(self) -> None:
+    def test_tool_contract_tells_model_how_to_describe_counts_priorities_and_cancelled_tasks(self) -> None:
         schema = next(
             item["function"]
             for item in tools.openai_tools_schema()
             if item["function"]["name"] == "get_tasks"
         )
-        result = self._dispatch({"limit": 10})
+        result = self._dispatch({"priority": "all", "limit": 10})
 
         self.assertIn("total_count", schema["description"])
         self.assertIn("has_more", schema["description"])
         self.assertIn("returned_countだけを全件数と断定しない", schema["description"])
         self.assertIn("キャンセルを進行中として扱わず", schema["description"])
+        self.assertIn("Priority=High", schema["description"])
+        self.assertIn("priority=later", schema["description"])
+        self.assertIn("priority=all", schema["description"])
+        self.assertEqual(
+            schema["parameters"]["properties"]["priority"]["default"],
+            "high",
+        )
         self.assertIn("全件数と断定しない", result["response_guidance"])
         self.assertIn("キャンセルは進行中・未完了に数えず", result["response_guidance"])
 

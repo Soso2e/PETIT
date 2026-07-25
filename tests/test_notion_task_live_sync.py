@@ -190,7 +190,7 @@ class NotionTaskLiveSyncTests(unittest.TestCase):
     def test_get_tasks_reads_sqlite_without_calling_notion(self) -> None:
         notion_task_sync.merge_remote_task(self.remote())
         with patch.object(notion_client, "query_tasks_database_v2", side_effect=AssertionError("network called")) as query:
-            result = task_reads.get_tasks()
+            result = task_reads.get_tasks(priority="all")
         query.assert_not_called()
         self.assertEqual(result["returned_count"], 1)
         self.assertEqual(result["tasks"][0]["title"], "卒研資料")

@@ -14,7 +14,7 @@
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
 - Notion会話検索: 明示的なNotion参照をルーターLLM前に決定論的検出し、共有済みページを最大3件検索、プロパティ・本文抜粋・更新日時・URLを取得する。結果ありはAgent 1回、未設定・0件・API失敗はLLMなしで区別する。実Notion／ブラウザE2Eは未確認。
-- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、作成既定High・日付未指定は期限なし。実Notion Webhook／Tunnel／ブラウザE2Eは未確認。
+- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、既定でHighのみ、暇・やりたいこと候補はMid/Medium＋Low、全件要求時だけ未設定を含む全優先度を返す。作成既定High・日付未指定は期限なし。実Notion Webhook／Tunnel／ブラウザE2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
 - GitHub Daily Review: access可能な全repositoryを横断し、前回cursor以降のcommit／PR／checkと`PROGRESS.md`を朝ブリーフィング・明示会話でレビューする。CIは成功済み。実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。
@@ -96,3 +96,4 @@
 | 2026-07-22 | 17:35 | #61 | Issue #71対応としてタスクをHigh→Mid→Low→未設定の順で取得上限前に並べ、未登録タスクの活動発話から確認待ち作成へつなぎ、「してほしい」等の短い返答で実行する経路を追加。作成既定High・日付未指定は期限なし、専用テスト・CI・文書を追加。GitHub Actionsと実Notion／ブラウザE2Eは未確認。 |
 | 2026-07-23 | 00:02 | #62 | Issue #73対応として、複数端末の全session会話を1日1回ローカルLM Studioで整理する日次生活インデックスを実装。確実なノイズだけ除外し、生活・食事・場所・人・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存、外部モデル固定回避、失敗再試行、設定・専用テスト・CI・文書を追加。GitHub Actionsと実ローカルLLM／複数端末E2Eは未確認。 |
 | 2026-07-23 | 17:40 | #63 | Issue #75対応としてNotionタスクのローカルファースト双方向同期を実装。既存Outbox、署名検証Webhook Inbox、URL共有secret、5分差分・起動時・日次全件補修、remote snapshot、フィールド単位三者マージ、論理削除、同期鮮度、設定・専用テスト・CI・設計文書を追加。実Notion Webhook／公開HTTPS／ブラウザE2Eは未確認。 |
+| 2026-07-24 | 13:59 | #64 | Issue #78対応として`get_tasks`を既定Highに変更し、`priority=later`でMid/Medium＋Low、`priority=all`で未設定を含む全優先度を取得できるようにした。重複確認は全優先度を参照し、優先度別・既存状態・Notion同期の回帰テストを更新。ローカル仮DBでSQL動作と変更ファイルの構文を確認、GitHub Actionsと実会話E2Eは未確認。 |
