@@ -28,7 +28,7 @@ class TaskConversationFlowTests(unittest.TestCase):
         self.db_patch.stop()
         self.temp_dir.cleanup()
 
-    def test_get_tasks_applies_priority_order_before_limit(self) -> None:
+    def test_get_tasks_defaults_to_high_and_supports_later_and_all_priority_scopes(self) -> None:
         rows = [
             ("低1", "Now", "2026-07-20", "Low"),
             ("中1", "Now", "2026-07-21", "Mid"),
@@ -50,22 +50,43 @@ class TaskConversationFlowTests(unittest.TestCase):
                 [(title, status, due_date, priority, db.now_iso()) for title, status, due_date, priority in rows],
             )
 
-        result = json.loads(tools.dispatch("get_tasks", {"limit": 3}))
+        high_result = json.loads(tools.dispatch("get_tasks", {"limit": 3}))
+        later_result = json.loads(tools.dispatch("get_tasks", {"priority": "later", "limit": 3}))
+        all_result = json.loads(tools.dispatch("get_tasks", {"priority": "all", "limit": 3}))
 
-        self.assertEqual(result["total_count"], 12)
-        self.assertTrue(result["has_more"])
+        self.assertEqual(high_result["total_count"], 2)
+        self.assertFalse(high_result["has_more"])
         self.assertEqual(
-            [task["title"] for task in result["tasks"]],
+            [task["title"] for task in high_result["tasks"]],
+            ["高・期限あり", "高・期限なし"],
+        )
+        self.assertEqual(high_result["filters"]["priority"], "high")
+        self.assertTrue(high_result["filters"]["priority_defaulted"])
+
+        self.assertEqual(later_result["total_count"], 9)
+        self.assertTrue(later_result["has_more"])
+        self.assertEqual(
+            [task["title"] for task in later_result["tasks"]],
+            ["中1", "中3", "中4"],
+        )
+        self.assertEqual(later_result["filters"]["priority"], "later")
+
+        self.assertEqual(all_result["total_count"], 12)
+        self.assertTrue(all_result["has_more"])
+        self.assertEqual(
+            [task["title"] for task in all_result["tasks"]],
             ["高・期限あり", "高・期限なし", "中1"],
         )
-        self.assertIn("High、Mid、Low、未設定", result["response_guidance"])
+        self.assertIn("priority=high", all_result["response_guidance"])
+        self.assertIn("priority=later", all_result["response_guidance"])
+        self.assertIn("priority=all", all_result["response_guidance"])
 
     def test_unregistered_activity_creates_high_priority_proposal_without_due_date(self) -> None:
         with patch.object(
             task_conversation.tools,
             "dispatch",
             return_value=json.dumps({"tasks": [], "total_count": 0}, ensure_ascii=False),
-        ):
+        ) as dispatch:
             result = task_conversation.try_handle_task_activity("卒研って言うタスクやってるんだ")
 
         self.assertIsNotNone(result)
@@ -75,6 +96,10 @@ class TaskConversationFlowTests(unittest.TestCase):
         self.assertEqual(arguments, {"title": "卒研", "priority": "High"})
         self.assertNotIn("due_date", arguments)
         self.assertNotIn("category", arguments)
+        dispatch.assert_called_once_with(
+            "get_tasks",
+            {"status": "all", "priority": "all", "limit": 100},
+        )
 
     def test_existing_activity_does_not_offer_duplicate_task(self) -> None:
         payload = {"tasks": [{"title": "PETIT", "status": "Now"}], "total_count": 1}

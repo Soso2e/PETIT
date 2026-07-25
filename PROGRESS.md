@@ -11,10 +11,11 @@
 - 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
 - 日次生活インデックス: 全`session_id`の会話をAsia/Tokyo基準で1日1回まとめ、空・記号のみ・連続重複だけを除外してローカルLM Studioへ送る。雑談の外出・食事・人・場所・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存し、長期記憶候補は自動昇格しない。専用CIと実ローカルLLM E2Eは未確認。
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
+- 制作伴走Web UI: 作業モード、経過時間、一時停止・終了、10分／20分ごとの前景限定自律声かけ、Highタスク・次の予定・次の一手、直近3ラリー表示、2時間アイドルでのセッション分離、途中経過メッセージ、PWAを実装。5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eとバックグラウンド通知は未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
 - Notion会話検索: 明示的なNotion参照をルーターLLM前に決定論的検出し、共有済みページを最大3件検索、プロパティ・本文抜粋・更新日時・URLを取得する。結果ありはAgent 1回、未設定・0件・API失敗はLLMなしで区別する。実Notion／ブラウザE2Eは未確認。
-- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、作成既定High・日付未指定は期限なし。実Notion Webhook／Tunnel／ブラウザE2Eは未確認。
+- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、既定でHighのみ、暇・やりたいこと候補はMid/Medium＋Low、全件要求時だけ未設定を含む全優先度を返す。作成既定High・日付未指定は期限なし。実Notion Webhook／Tunnel／ブラウザE2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
 - GitHub Daily Review: access可能な全repositoryを横断し、前回cursor以降のcommit／PR／checkと`PROGRESS.md`を朝ブリーフィング・明示会話でレビューする。CIは成功済み。実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。
@@ -24,7 +25,7 @@
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: Issue #75のCIと実Notion Webhook／公開HTTPS／ブラウザE2Eを確認し、その後Issue #73／#64／#60／#62の実サービスE2Eへ戻る。
+- 次にやること: Issue #80の実ブラウザ／LM Studio／AivisSpeech／iPhoneホーム画面E2Eを確認し、その後Issue #75の実Notion Webhook／公開HTTPS／ブラウザE2EとIssue #73／#64／#60／#62の実サービスE2Eへ戻る。
 
 ## 履歴
 
@@ -36,7 +37,7 @@
 | 2026-06-25 | 09:05 | #2 | Notion 連携実装: notion_client.py（REST APIクライアント・ページパース・ページネーション対応）、tools/notion.py（sync_notion_tasks ツール + upsert）、get_tasks が Notion 設定時に自動同期、/api/health に Notion 設定状況を追加、.env.example 作成。`feat/notion` ブランチ。 |
 | 2026-06-25 | 13:20 | #3 | RAG検索実装: chroma_client.py（ChromaDB永続化 + LM Studio embeddings カスタム関数 + graceful fallback）、search_memory がセマンティック検索→キーワード自動フォールバック、save_memory と会話ターンを Chroma に自動索引化、起動時に既存SQLiteデータをバックグラウンド同期、/api/health に RAG ステータス追加。`feat/rag` ブランチ。 |
 | 2026-06-25 | 17:50 | #4 | Progress Log を1ファイルに整理: 詳細ログ `progress.md` を削除し、進捗記録を `PROGRESS.md`（表形式）に一本化。CLAUDE.md の Progress Log ルールとディレクトリ構成を更新。 |
-| 2026-06-25 | 18:10 | #5 | PROGRESS.md に「現在の状態 / 未確認・TODO」セクション（上書き可）を追加し、履歴表（追記専用）と2部構成に。CLAUDE.md の作業開始/終了ルールを同期。 |
+| 2026-06-25 | 18:10 | #5 | PROGRESS.md に「現在の状態 / 未確認・TODO」セクション（上書き可）を追加し、履歴表（追記専用）と2部構成に。CLAUDE.md の Progress Log ルールを同期。 |
 | 2026-06-25 | 18:30 | #6 | 自律的な会話蓄積を実装: N時間おきの自動要約 scheduler.py、summarizer.py、Obsidian形式の markdown_export.py、summaries テーブル、summarize_now ツール、/api/summarize・`/api/summaries`、search_memory の要約検索対応を追加。`claude/autonomous-conversation-md-db-tlyat4` ブランチ。 |
 | 2026-06-25 | 18:28 | #7 | 「人間っぽく喋る」実装: recall.py で毎ターン関連記憶+直近要約を注入、proactive.py + `/api/proactive` で開いた瞬間の話しかけ、agent.py の相棒口調プロンプト、フロントの opener 表示を追加。`claude/autonomous-conversation-md-db-tlyat4` ブランチ。 |
 | 2026-06-30 | 10:08 | #8 | Notion タスク作成/完了更新、引き継ぎメモ、中断復帰ツールを実装。一時DBでローカル fallback と復帰ツールの最小動作を確認。実 Notion E2E は未確認。 |
@@ -96,3 +97,5 @@
 | 2026-07-22 | 17:35 | #61 | Issue #71対応としてタスクをHigh→Mid→Low→未設定の順で取得上限前に並べ、未登録タスクの活動発話から確認待ち作成へつなぎ、「してほしい」等の短い返答で実行する経路を追加。作成既定High・日付未指定は期限なし、専用テスト・CI・文書を追加。GitHub Actionsと実Notion／ブラウザE2Eは未確認。 |
 | 2026-07-23 | 00:02 | #62 | Issue #73対応として、複数端末の全session会話を1日1回ローカルLM Studioで整理する日次生活インデックスを実装。確実なノイズだけ除外し、生活・食事・場所・人・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存、外部モデル固定回避、失敗再試行、設定・専用テスト・CI・文書を追加。GitHub Actionsと実ローカルLLM／複数端末E2Eは未確認。 |
 | 2026-07-23 | 17:40 | #63 | Issue #75対応としてNotionタスクのローカルファースト双方向同期を実装。既存Outbox、署名検証Webhook Inbox、URL共有secret、5分差分・起動時・日次全件補修、remote snapshot、フィールド単位三者マージ、論理削除、同期鮮度、設定・専用テスト・CI・設計文書を追加。実Notion Webhook／公開HTTPS／ブラウザE2Eは未確認。 |
+| 2026-07-24 | 13:59 | #64 | Issue #78対応として`get_tasks`を既定Highに変更し、`priority=later`でMid/Medium＋Low、`priority=all`で未設定を含む全優先度を取得できるようにした。重複確認は全優先度を参照し、優先度別・既存状態・Notion同期の回帰テストを更新。ローカル仮DBでSQL動作と変更ファイルの構文を確認、GitHub Actionsと実会話E2Eは未確認。 |
+| 2026-07-25 | 06:34 | #65 | Issue #80対応としてスマホ向け制作伴走モードを実装し、PR #81をmainへ統合。作業トラッキング、10分／20分ごとの前景限定自律声かけ、Highタスク・予定・次の一手、直近3ラリー、2時間セッション分離、途中経過メッセージ、PWAを追加。Mobile work companion／AivisSpeech／Task conversation flow／Core hardening／Model route switcherの全5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eとバックグラウンド通知は未確認。 |

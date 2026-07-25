@@ -34,7 +34,7 @@ def try_handle_task_activity(message: str) -> dict[str, Any] | None:
     if title is None:
         return None
 
-    args = {"status": "all", "limit": 100}
+    args = {"status": "all", "priority": "all", "limit": 100}
     content = tools.dispatch("get_tasks", args)
     try:
         data = json.loads(content)

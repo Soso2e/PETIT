@@ -1,0 +1,38 @@
+name: Mobile work companion tests
+
+on:
+  pull_request:
+    paths:
+      - "frontend/index.html"
+      - "frontend/session.js"
+      - "frontend/companion.js"
+      - "frontend/companion.css"
+      - "frontend/manifest.webmanifest"
+      - "frontend/sw.js"
+      - "frontend/icon.svg"
+      - "tests/test_mobile_work_companion.py"
+      - "docs/mobile_work_companion.md"
+      - ".github/workflows/mobile-work-companion-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check JavaScript syntax
+        run: |
+          node --check frontend/session.js
+          node --check frontend/companion.js
+          node --check frontend/sw.js
+      - name: Run static regression tests
+        run: python -m unittest tests.test_mobile_work_companion -v
