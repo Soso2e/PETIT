@@ -1,8 +1,9 @@
 """PETIT conversation entrypoint backed by the contextual bounded Agent runtime.
 
 The legacy module remains re-exported for compatibility with existing tests and
-callers. Project continuity and instant greetings stay deterministic; normal
-conversation, reads, and writes are interpreted from context by the LLM runtime.
+callers. Project continuity, greetings, and exact current-time reads stay
+deterministic; normal conversation, reads, and writes are interpreted from
+context by the LLM runtime.
 """
 from __future__ import annotations
 
@@ -16,12 +17,17 @@ for _export_name in dir(_legacy):
     if not _export_name.startswith("__"):
         globals()[_export_name] = getattr(_legacy, _export_name)
 
+# Tests and older callers patch agent.model_router.choose. Point that compatibility
+# surface at the new Capability Router rather than the retired Tool-name router.
+model_router = capability_router
+
 CHAT_SYSTEM_PROMPT = (
     "あなたはPETIT。親しみやすく、柔らかく自然な日本語で直接答える。"
     "Markdownは使わない。"
 )
 AGENT_SYSTEM_PROMPT = (
-    "あなたはPETIT。会話文脈から目的を理解し、必要なToolだけを使う。"
+    "あなたはPETIT。まず結論を示し、必要に応じて十分な長さで答える。"
+    "会話文脈から目的を理解し、必要なToolだけを使う。"
     "Tool結果を踏まえて目的を満たしたか判断し、書き込みは確認なしに実行しない。"
     "Markdownは使わない。"
 )
@@ -36,7 +42,6 @@ def _sync_legacy_globals() -> None:
     for name in (
         "config",
         "db",
-        "model_router",
         "project_router",
         "recall",
         "situation",
@@ -48,6 +53,10 @@ def _sync_legacy_globals() -> None:
     ):
         if name in globals():
             setattr(_legacy, name, globals()[name])
+    # The live runtime must use the same patched objects exposed from agent.py.
+    agent_runtime.chat_completion = globals()["chat_completion"]
+    agent_runtime.tools = globals()["tools"]
+    agent_runtime.capability_router = model_router
 
 
 # Compatibility helpers retained for callers that inspect the old routing layer.
@@ -96,6 +105,24 @@ def run(
     instant = _legacy._instant_reply(user_message)
     if instant:
         return instant
+
+    # Exact current-time reads are stable, local, and do not benefit from an LLM.
+    if _legacy._related_tool_names(user_message) == ["get_current_time"]:
+        raw = tools.dispatch("get_current_time", {})
+        direct = _legacy._format_direct_time(raw)
+        if direct:
+            return {
+                "reply": direct,
+                "used_tools": [{"name": "get_current_time", "arguments": "{}"}],
+                "model_route": {
+                    "kind": "direct",
+                    "requested_route": "deterministic",
+                    "actual_route": "deterministic",
+                    "model": None,
+                    "tools": ["get_current_time"],
+                    "reasons": ["deterministic_current_time"],
+                },
+            }
 
     return agent_runtime.run(user_message, history=recent_history)
 
