@@ -94,6 +94,66 @@ class GenericListConversationTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["pending_actions"][0]["arguments"], {"name": "アニメ"})
 
+    def test_topic_followup_is_not_misread_as_a_new_list_name(self) -> None:
+        json.loads(tools.dispatch("create_list", {"name": "科学大キャンプ"}))
+        history = [
+            {"role": "user", "content": "新しくリスト作りたい"},
+            {
+                "role": "assistant",
+                "content": "今は、タスク（Notion）、科学大キャンプリスト（ローカル）があるよ。ほかに作る？",
+            },
+        ]
+
+        result = list_conversation.try_handle_list_turn("科学大キャンプについて", history=history)
+
+        self.assertIsNone(result)
+
+    def test_target_first_colloquial_item_add_routes_to_custom_list(self) -> None:
+        created = json.loads(tools.dispatch("create_list", {"name": "科学大キャンプ"}))
+        list_id = created["list"]["id"]
+
+        result = list_conversation.try_handle_list_turn(
+            "科学大キャンプリストに、iPhoneコースガイド見るって追加"
+        )
+
+        self.assertIsNotNone(result)
+        action = result["pending_actions"][0]
+        self.assertEqual(action["name"], "add_list_item")
+        self.assertEqual(
+            action["arguments"],
+            {"title": "iPhoneコースガイド見る", "list_id": str(list_id)},
+        )
+        self.assertNotIn("project_id", action["arguments"])
+        self.assertIn("科学大キャンプリストに追加する？", result["reply"])
+
+        added = json.loads(tools.dispatch(action["name"], action["arguments"]))
+        items = json.loads(tools.dispatch("get_list_items", {"list_id": str(list_id)}))
+        self.assertTrue(added["added"])
+        self.assertEqual(items["items"][0]["title"], "iPhoneコースガイド見る")
+
+    def test_item_first_phrase_routes_to_custom_list(self) -> None:
+        created = json.loads(tools.dispatch("create_list", {"name": "アニメ"}))
+
+        result = list_conversation.try_handle_list_turn(
+            "葬送のフリーレンをアニメリストに追加して"
+        )
+
+        self.assertIsNotNone(result)
+        action = result["pending_actions"][0]
+        self.assertEqual(action["name"], "add_list_item")
+        self.assertEqual(action["arguments"]["title"], "葬送のフリーレン")
+        self.assertEqual(action["arguments"]["list_id"], str(created["list"]["id"]))
+
+    def test_missing_list_item_target_does_not_fall_back_to_task_creation(self) -> None:
+        result = list_conversation.try_handle_list_turn(
+            "存在しないリストに、iPhoneコースガイド見るって追加"
+        )
+
+        self.assertIsNotNone(result)
+        self.assertNotIn("pending_actions", result)
+        self.assertIn("見つからない", result["reply"])
+        self.assertNotIn("create_task", result["model_route"]["tools"])
+
     def test_unrelated_task_activity_is_not_intercepted(self) -> None:
         result = list_conversation.try_handle_list_turn("卒研っていうタスクやってるんだ")
         self.assertIsNone(result)
