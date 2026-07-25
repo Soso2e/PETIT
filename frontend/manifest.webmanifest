@@ -1,0 +1,29 @@
+{
+  "name": "PETIT — Personal AI Assistant",
+  "short_name": "PETIT",
+  "description": "生活と制作を見守る自分専用AIアシスタント",
+  "lang": "ja",
+  "start_url": "/static/index.html?source=pwa",
+  "scope": "/static/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "PETITに話す",
+      "short_name": "話す",
+      "description": "PETITを開いて音声入力する",
+      "url": "/static/index.html?mode=voice",
+      "icons": [{ "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

@@ -1,0 +1,250 @@
+:root {
+  --companion-border: #2a2f3d;
+  --companion-soft: rgba(37, 99, 235, 0.12);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+body {
+  overscroll-behavior: none;
+}
+
+.app {
+  min-height: 100dvh;
+  height: 100dvh;
+  padding-top: var(--safe-top);
+}
+
+.header {
+  position: relative;
+  z-index: 5;
+  background: rgba(15, 17, 21, 0.94);
+  backdrop-filter: blur(16px);
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.session-label {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-toggle,
+.dashboard-refresh,
+.work-button,
+.work-secondary {
+  border: 1px solid #343a49;
+  border-radius: 10px;
+  background: #20242d;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.history-toggle {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.history-toggle[hidden] { display: none; }
+
+.companion-dashboard {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #222633;
+  background: rgba(23, 26, 33, 0.76);
+}
+
+.companion-card {
+  border: 1px solid var(--companion-border);
+  border-radius: 14px;
+  padding: 12px;
+  background: #151922;
+  min-width: 0;
+}
+
+.companion-card--work {
+  grid-row: span 2;
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.2), #151922 52%);
+}
+
+.companion-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.companion-card__title {
+  margin: 0;
+  font-size: 12px;
+  color: #bfdbfe;
+  letter-spacing: 0.04em;
+}
+
+.companion-card__state {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.work-task {
+  width: 100%;
+  border: 1px solid #343a49;
+  border-radius: 10px;
+  padding: 10px 11px;
+  background: rgba(15, 17, 21, 0.78);
+  color: var(--text);
+  font: inherit;
+}
+
+.work-task:focus {
+  outline: none;
+  border-color: var(--user);
+}
+
+.work-main-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.work-elapsed {
+  font-size: 24px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  min-width: 82px;
+}
+
+.work-frequency {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #343a49;
+  border-radius: 9px;
+  padding: 7px 8px;
+  background: #171a21;
+  color: var(--text);
+}
+
+.work-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.work-button,
+.work-secondary {
+  padding: 8px 11px;
+  font-size: 12px;
+}
+
+.work-button {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
+}
+
+.work-button.is-active {
+  background: #17469b;
+}
+
+.work-secondary[hidden] { display: none; }
+
+.dashboard-line {
+  margin: 0;
+  line-height: 1.45;
+  font-size: 13px;
+}
+
+.dashboard-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dashboard-refresh {
+  margin-left: auto;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.msg--status .bubble {
+  background: transparent;
+  border: 1px dashed #3b4254;
+  color: var(--muted);
+  font-size: 12px;
+  padding-block: 8px;
+}
+
+.msg--history-hidden {
+  display: none !important;
+}
+
+.composer {
+  padding-bottom: calc(14px + var(--safe-bottom));
+  background: rgba(15, 17, 21, 0.96);
+  backdrop-filter: blur(16px);
+}
+
+@media (display-mode: standalone) {
+  .app {
+    max-width: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .companion-dashboard {
+    grid-template-columns: 1fr 1fr;
+    padding: 10px 14px;
+  }
+  .companion-card--work {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .header {
+    gap: 8px;
+  }
+  .header-meta {
+    order: 3;
+    width: 100%;
+  }
+  .session-label {
+    flex: 1;
+  }
+  .companion-dashboard {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 8px;
+  }
+  .companion-card {
+    flex: 0 0 78vw;
+    scroll-snap-align: start;
+  }
+  .companion-card--work {
+    flex-basis: 88vw;
+  }
+  .model-routing {
+    max-height: 94px;
+    overflow-y: auto;
+  }
+  .messages {
+    padding-top: 10px;
+  }
+}
