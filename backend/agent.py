@@ -11,6 +11,7 @@ import json
 from typing import Any
 
 from . import agent_legacy as _legacy
+from . import list_conversation
 from . import task_conversation
 
 # Re-export the existing module surface, including compatibility helpers used by
@@ -57,9 +58,29 @@ _TASK_TOOL_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ("タスク同期状態", "タスクの同期状況", "同期エラー", "同期の失敗理由"),
     ),
 )
+_LIST_TOOL_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "get_lists",
+        ("リスト一覧", "どんなリスト", "リストがある", "リストを見せ"),
+    ),
+    (
+        "get_list_items",
+        ("リストの中身", "リストに何", "一覧の中身"),
+    ),
+    (
+        "create_list",
+        ("リストを作", "リスト作って", "新しいリスト", "リストを増や"),
+    ),
+    (
+        "add_list_item",
+        ("リストに追加", "一覧に追加"),
+    ),
+)
 _existing_signal_names = {name for name, _signals in _TOOL_SIGNALS}
 _TOOL_SIGNALS = tuple(_TOOL_SIGNALS) + tuple(
-    item for item in _TASK_TOOL_SIGNALS if item[0] not in _existing_signal_names
+    item
+    for item in (*_TASK_TOOL_SIGNALS, *_LIST_TOOL_SIGNALS)
+    if item[0] not in _existing_signal_names
 )
 _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
 
@@ -261,6 +282,9 @@ def run(
     allow_defer: bool = True,
 ) -> dict[str, Any]:
     _sync_legacy_globals()
+    list_turn = list_conversation.try_handle_list_turn(user_message, history=history)
+    if list_turn:
+        return list_turn
     task_turn = task_conversation.try_handle_task_activity(user_message)
     if task_turn:
         return task_turn
