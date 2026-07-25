@@ -3,6 +3,7 @@
 Importing this package registers all built-in tools.
 """
 from . import (
+    agent_actions,
     brain,
     brain_projects,
     briefing,
