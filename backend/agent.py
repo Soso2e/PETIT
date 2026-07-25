@@ -21,6 +21,37 @@ for _export_name in dir(_legacy):
 # surface at the new Capability Router rather than the retired Tool-name router.
 model_router = capability_router
 
+# Legacy route introspection remains available for old tests and extension hooks,
+# but the live run() path does not use these keyword signals for intent selection.
+_COMPAT_TASK_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "update_task",
+        (
+            "タスクを編集",
+            "タスクを変更",
+            "タスク名を変更",
+            "期限を変更",
+            "優先度を変更",
+            "締切を延ば",
+            "日付を変",
+            "未完了に戻",
+        ),
+    ),
+    (
+        "retry_task_sync",
+        ("タスク同期を再試行", "Notion同期を再試行", "同期をやり直"),
+    ),
+    (
+        "get_task_sync_status",
+        ("タスク同期状態", "タスクの同期状況", "同期エラー", "同期の失敗理由"),
+    ),
+)
+_existing_signal_names = {name for name, _signals in _TOOL_SIGNALS}
+_TOOL_SIGNALS = tuple(_TOOL_SIGNALS) + tuple(
+    item for item in _COMPAT_TASK_SIGNALS if item[0] not in _existing_signal_names
+)
+_legacy._TOOL_SIGNALS = _TOOL_SIGNALS
+
 CHAT_SYSTEM_PROMPT = (
     "あなたはPETIT。親しみやすく、柔らかく自然な日本語で直接答える。"
     "Markdownは使わない。"
@@ -72,6 +103,7 @@ def _github_review_requested(message: str) -> bool:
 
 def _related_tool_names(message: str) -> list[str]:
     """Legacy introspection only; the live route uses Capability Router."""
+    _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
     return list(_legacy._related_tool_names(message))
 
 
