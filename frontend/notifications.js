@@ -67,7 +67,7 @@
   }
 
   function renderStatus() {
-    const permission = Notification.permission;
+    const supported = isSupported();
     const subscribed = Boolean(subscription);
     toggleButton.textContent = subscribed ? "通知 ON" : "通知 OFF";
     toggleButton.classList.toggle("notification-toggle--on", subscribed);
@@ -76,21 +76,26 @@
     disableButton.hidden = !subscribed;
     testButton.disabled = !subscribed;
 
-    if (!isSupported()) {
+    if (!supported) {
       setState("このブラウザはWeb Pushに対応していません。", true);
       setBusy(true);
       return;
     }
+
+    const permission = Notification.permission;
     if (!serverStatus?.configured) {
       setState("サーバー側のVAPID設定が未設定です。", true);
+      enableButton.disabled = true;
       return;
     }
     if (!serverStatus?.dependency_available) {
       setState("サーバーにpywebpushがインストールされていません。", true);
+      enableButton.disabled = true;
       return;
     }
     if (permission === "denied") {
       setState("通知がブラウザ設定で拒否されています。設定から許可してください。", true);
+      enableButton.disabled = true;
       return;
     }
     if (subscribed) {
