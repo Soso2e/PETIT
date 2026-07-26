@@ -352,9 +352,10 @@ formEl.addEventListener("submit", (e) => {
   sendMessage(text);
 });
 
-// Enter to send, Shift+Enter for newline.
+// Enter to send, Shift+Enter for newline. IME confirmation must not submit.
 inputEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
+  const isComposing = e.isComposing || e.keyCode === 229;
+  if (e.key === "Enter" && !e.shiftKey && !isComposing) {
     e.preventDefault();
     formEl.requestSubmit();
   }
