@@ -40,6 +40,34 @@ storage/   SQLite などの実行時データ（git 管理外）
 
 4. ブラウザで <http://127.0.0.1:8000> を開く。
 
+## 音声読み上げを使う
+
+PETITの音声読み上げは、追加料金なしで次の2方式を使います。
+
+- **ブラウザ標準TTS**: AivisSpeech未準備・停止中でも使える高速なフォールバック
+- **AivisSpeech**: ローカルで高品質な日本語音声を生成
+
+AivisSpeechを使う場合は、先に初期セットアップが必要です。
+インストール、音声モデル追加、Engine起動、`.env`設定、診断CLI、WAV再生までの手順は
+[`docs/aivis_speech.md`](docs/aivis_speech.md) を参照してください。
+
+最初に次を実行し、結果の `stage` を確認します。
+
+```bash
+python scripts/diagnose_aivis_speech.py
+```
+
+成功条件は次です。
+
+```json
+{
+  "ok": true,
+  "stage": "complete"
+}
+```
+
+AivisSpeechが使えなくても、PETITのテキスト会話は継続し、対応ブラウザでは標準TTSへ切り替わります。
+
 ## 環境変数（主なもの）
 
 | 変数 | 既定値 | 説明 |
@@ -151,136 +179,3 @@ confirmed_at IS NOT NULL
 5. 確認済み外部source linkのfresh/stale状態
 
 別プロジェクトの記憶や未確認Relationは混ぜません。別名が衝突する場合は候補を出し、勝手に切り替えません。詳細は [`docs/project_source_refresh.md`](docs/project_source_refresh.md) を参照してください。
-
-### 終了確認
-
-```text
-終わった
-実装だけ終わった。ブラウザ確認はまだ
-テストも通った。次は実画面確認
-デプロイしたけど本番確認はまだ
-今日はここまで
-```
-
-`終わった`を即座に完全完了へせず、実装・自動テスト・実画面・デプロイ・本番確認のどこまで到達したかを確認します。明示された事実だけを証拠として扱い、プレビュー承認後に一度だけ保存します。
-
-保存状態は最低限、`implemented`、`automated_tests_verified`、`ui_verified`、`deployed`、`production_verified`、`paused`、`blocked`、`completed`を区別します。
-
-### GitHub evidenceと完了状態の境界
-
-GitHub上の事実は、PETIT checkpointを自動で上書きしません。
-
-- commit存在は、特定のrevisionが存在する証拠であり、実装全体の完了証明ではありません。
-- check successは、そのcheckが対象SHAで成功した証拠です。実画面・本番確認は証明しません。
-- PR mergeはbase branchへ統合された証拠です。deployは証明しません。
-- deployment successはGitHubがenvironment/refへの配布成功を報告した証拠です。本番機能確認は証明しません。
-
-同じcheckが`in_progress`から`success`へ変わる場合はdefault branch headを再確認し、deployment本体の作成後にstatusだけ変わった場合も最近のdeployment statusを再確認します。
-
-### 新規登録・別名
-
-```text
-Roomies開発する
-「Cooking Combat」をプロジェクト登録して
-「プチ」をPETITの別名にして
-```
-
-未登録名は自動作成せず、登録プレビューを表示します。承認後に`projects`と`project_aliases`へ一度だけ保存し、必要なら現在プロジェクトへ切り替えます。別名衝突は事前に明示し、承認して追加した場合も以降のルーティングでは候補確認を維持します。
-
-### 外部ソース
-
-SQLiteは外部正本を置き換えず、内部ID、別名、確認状態、checkpoint、source link、正規化イベント、キャッシュを保持します。source linkは未確認候補として登録でき、確認・解除・再割り当てが可能です。
-
-現在接続済み:
-
-- 個人プロジェクト・個人タスク: Notion Adapter v2
-- Life is Tech／教え子向けプロジェクト: Linkraft（そそ本人所有のみ）
-- コード・PR・CI・deploymentの事実: GitHub evidence Adapter
-
-次の対象:
-
-- 長期知識・設計: BRAIN / Obsidian
-
-## 会話処理の最小フロー
-
-通常の雑談は、短いsystem prompt・直近3往復以内・ユーザー発話だけを渡し、会話モデルを1回だけ呼びます。ツール、RAG、Embedding、外部同期、要約は実行しません。
-
-明確なプロジェクト開始・終了・登録、純粋な挨拶、現在時刻、明示的なタスク・予定・BRAIN要求は、AIルーターより前に決定論的に処理します。これにより、明確な要求で経路判定用LLMを余分に呼びません。
-
-明示的なツール語がない「傘を持つべき？」のような発話だけ、軽量Chatルーターが許可リスト内の候補ツールを提案します。提案は登録済みツールと照合し、未許可・未登録名を捨ててからAgentへ公開します。
-
-GitHubの一般的な雑談ではツールを公開しません。`owner/name`やGitHub URLの登録・紐付け、候補確認、明示的な同期依頼だけをGitHub evidenceツールへルーティングします。
-
-「Notionから〜を調べて」のような明示的なNotion参照は、ルーターLLMを通さず`search_notion`を実行します。検索結果がある場合だけAgentを1回呼んで整理し、未設定・0件・API失敗はPython側で区別して直接返します。通常会話ではNotion APIを呼びません。
-
-ツール呼び出し後は、標準の`assistant.tool_calls`と`role: tool`で結果を戻します。LM StudioのJinjaテンプレートがこの形式を拒否した場合だけ、同じターン内で従来のuser follow-up形式へ自動的に切り替えます。
-
-Agentは既定で最大3回のツール実行ラウンドを行え、その後に最終回答を生成できます。同じツールでも引数が異なれば再実行でき、完全一致する重複呼び出しは停止します。書き込みツールは従来どおり確認待ちへ変換され、即時実行されません。
-
-「今日何からやる？」のような計画相談では、未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理します。
-
-会話のEmbeddingとMarkdown出力は応答後のバックグラウンド処理です。Embeddingは同一テキストをプロセス内キャッシュで重複送信せず、Vaultは内容が変わったファイルだけ再Embeddingします。
-
-ChatとAgentはURL・APIキー・モデルを個別設定できます。Agent停止時は、安全に取得済みの読み取り結果だけChatモデルで整形できます。ツール選択や書き込みを勝手に省略しません。
-
-`/api/health` と各応答の詳細欄では、経路、モデル、ツール、同期鮮度、LLM/Embedding回数、Agentフォールバック、Project Continuityの参照件数、source refreshのattempted/failed/skippedを確認できます。`model_route`にはAIルーターの判断、提案ツール、実際に公開したツール、tool結果の伝達方式も含まれます。
-
-## Web Push通知
-
-Service Worker、Push API、VAPIDを使い、ブラウザを閉じている場合もPETITの通知を受け取れます。購読情報、カテゴリ別設定、通知イベント、端末ごとの配信結果はSQLiteへ保存します。
-
-通知カテゴリはすべて初期OFFです。ヘッダーの通知設定から端末を購読し、必要な種類だけ有効にしてください。通知生成側は`dispatch_notification()`を呼び、配信先は`NotificationProvider`境界へ分離しているため、将来は同じ通知判断ロジックへAPNs Providerを追加できます。
-
-VAPID未設定・依存未導入・通知無効時も既存チャットは動作します。設定、API、実iPhone PWA確認手順は[`docs/web_push_notifications.md`](docs/web_push_notifications.md)を参照してください。
-
-## Calendar
-
-Google CalendarのCodex/MCP接続はPETITプロセスへ自動共有されません。PETIT側で読むには`PETIT_CALENDAR_ICS_URLS`に非公開iCal URLを設定するか、`PETIT_CALENDAR_ICS_FILES`にエクスポート済み`.ics`を指定します。
-
-同期結果はSQLiteの`sync_state`へソース別に保存し、取得失敗時は直前の正常キャッシュを維持します。TimeTreeは`TIMETREE_EMAIL` / `TIMETREE_PASSWORD` / `TIMETREE_CALENDAR_CODE`を設定した場合だけ読み取り専用ICSソースとして同期します。
-
-`add_schedule`はICSやGoogle Calendar本体へは書かず、現在はPETITローカル予定だけへ追加します。
-
-## 書き込み確認
-
-Notionタスク作成・完了、ローカル予定追加、長期記憶、引き継ぎ、BRAIN修正、プロジェクト登録・別名追加・終了checkpoint保存、外部プロジェクト候補の紐付けは、ツール呼び出し時点では実行されません。
-
-ブラウザに対象と変更内容、および「実行する / キャンセル」を表示し、`POST /api/actions/{approval_id}`で確認された操作だけを1回実行します。確認待ちは10分で期限切れになります。
-
-BRAIN編集は設定済みVault内の既存`.md`だけに限定し、`_private`・除外フォルダ・Vault外パスを拒否します。
-
-`PETIT_USE_SONA_CORE=1`では`add_schedule`だけがCoreのSQLite Approval Storeへ切り替わります。他の書き込みToolは従来の確認経路を維持します。
-
-LM Studioが未起動でもサーバーは落ちず、UI上にエラーを表示します。
-
-## Obsidian vault をPETITのMarkdown脳にする
-
-既存のObsidian vaultを使う場合は`.env`などで`PETIT_OBSIDIAN_VAULT_DIRS`を指定します。PETITは`_private`・添付・内部設定を除くMarkdownを`petit_vault`としてChromaに索引化し、`search_memory`から会話記憶・要約・vaultノートを横断検索します。
-
-PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/Daily`と`PETIT/Memory`に置かれます。既存ノートは読み取り・検索対象、自動書き込みは`PETIT/`配下に限定します。
-
-## 開発
-
-- 主軸ブランチは`develop`。機能追加は`feat/<機能名>`。
-- Project Continuity限定テスト:
-
-  ```bash
-  python -m unittest \
-    tests.test_project_continuity \
-    tests.test_project_router \
-    tests.test_project_completion \
-    tests.test_project_resume \
-    tests.test_project_registration \
-    tests.test_project_source_refresh \
-    tests.test_notion_adapter_v2 \
-    tests.test_linkraft_owner_sync \
-    tests.test_github_evidence \
-    tests.test_github_client_evidence \
-    tests.test_github_evidence_routing
-  ```
-
-- Notion会話検索テスト: `python -m unittest tests.test_notion_search -v`
-- Web Push通知テスト: `python -m unittest tests.test_notifications -v`
-- 全Python構文確認: `python -m compileall backend tests`
-- 変更のたびに`PROGRESS.md`へ追記する。
-- ルール詳細は[`CLAUDE.md`](./CLAUDE.md)。
