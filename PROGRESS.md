@@ -99,3 +99,4 @@
 | 2026-07-23 | 17:40 | #63 | Issue #75対応としてNotionタスクのローカルファースト双方向同期を実装。既存Outbox、署名検証Webhook Inbox、URL共有secret、5分差分・起動時・日次全件補修、remote snapshot、フィールド単位三者マージ、論理削除、同期鮮度、設定・専用テスト・CI・設計文書を追加。実Notion Webhook／公開HTTPS／ブラウザE2Eは未確認。 |
 | 2026-07-24 | 13:59 | #64 | Issue #78対応として`get_tasks`を既定Highに変更し、`priority=later`でMid/Medium＋Low、`priority=all`で未設定を含む全優先度を取得できるようにした。重複確認は全優先度を参照し、優先度別・既存状態・Notion同期の回帰テストを更新。ローカル仮DBでSQL動作と変更ファイルの構文を確認、GitHub Actionsと実会話E2Eは未確認。 |
 | 2026-07-25 | 06:34 | #65 | Issue #80対応としてスマホ向け制作伴走モードを実装し、PR #81をmainへ統合。作業トラッキング、10分／20分ごとの前景限定自律声かけ、Highタスク・予定・次の一手、直近3ラリー、2時間セッション分離、途中経過メッセージ、PWAを追加。Mobile work companion／AivisSpeech／Task conversation flow／Core hardening／Model route switcherの全5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eとバックグラウンド通知は未確認。 |
+| 2026-07-25 | 18:07 | #66 | Issue #88対応として、提供画像を64px PNGへ縮小・最適化し、ブラウザfaviconを新しいPETIT惑星ロゴへ更新。HTML参照と画像デコードを確認し、実ブラウザでのキャッシュ更新後表示は未確認。 |

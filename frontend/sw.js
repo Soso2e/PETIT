@@ -1,4 +1,4 @@
-const CACHE_NAME = "petit-shell-v1";
+const CACHE_NAME = "petit-shell-v2";
 const SHELL = [
   "/",
   "/static/style.css",
@@ -10,7 +10,10 @@ const SHELL = [
   "/static/voice.js",
   "/static/companion.js",
   "/static/manifest.webmanifest",
-  "/static/icon.svg"
+  "/static/favicon-64.png",
+  "/static/apple-touch-icon.png",
+  "/static/icon-192.jpg",
+  "/static/icon-512.jpg"
 ];
 
 self.addEventListener("install", (event) => {
