@@ -21,7 +21,6 @@ on:
       - "tests/test_task_write_queue.py"
       - "tests/test_task_phase2_wiring.py"
       - "docs/task_schedule_management_v1.md"
-      - "PROGRESS.md"
       - ".github/workflows/notion-adapter-v2-tests.yml"
 
 concurrency:
