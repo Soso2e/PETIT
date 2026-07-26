@@ -20,6 +20,33 @@ PETIT_TTS_VOLUME_SCALE=1.0
 
 `PETIT_TTS_STYLE_ID`が空の場合は、`GET /speakers`で返る最初のスタイルを使用します。声を固定する場合は、AivisSpeech Engineの`/speakers`レスポンス内にあるスタイルの`id`を設定してください。
 
+## 最小診断
+
+PETITの会話画面やブラウザ再生から切り離して、Engine疎通、話者取得、固定短文合成、WAV検証を順番に確認できます。
+
+```bash
+python scripts/diagnose_aivis_speech.py
+```
+
+既定では`こんにちは、音声テストです。`を合成し、有効なWAVだけを`storage/diagnostics/aivis_speech_test.wav`へ保存します。保存せず疎通だけ確認する場合は次を使います。
+
+```bash
+python scripts/diagnose_aivis_speech.py --no-write
+```
+
+結果はJSONで出力され、`stage`で失敗箇所を区別します。
+
+- `not_configured`: AivisSpeech設定が無効
+- `engine_unreachable`: Engineへ接続できない
+- `speaker_not_found`: 話者・スタイルを解決できない
+- `audio_query_failed`: 音声クエリ作成に失敗
+- `synthesis_failed`: WAV合成に失敗
+- `invalid_audio_response`: RIFF/WAVEヘッダーまたは音声情報が不正
+- `request_timeout`: Engine応答がタイムアウト
+- `complete`: WAV検証と保存まで成功
+
+成功時は話者ID、バイト数、チャンネル数、サンプルレート、フレーム数、長さ、保存先を返します。会話本文そのものや秘密情報は記録しません。
+
 ## PETIT API
 
 ### 状態確認
@@ -80,4 +107,4 @@ PETITをDockerやWSLで動かし、AivisSpeechをWindows側で動かす場合、
 
 ## 未確認
 
-実AivisSpeechモデルを使った先頭再生までの時間、チャンク間の間、長文の体感、PCブラウザとスマートフォンでの割り込み・フォールバックは実機確認が必要です。
+実AivisSpeechモデルを使った最小診断の成功、先頭再生までの時間、チャンク間の間、長文の体感、PCブラウザとスマートフォンでの割り込み・フォールバックは実機確認が必要です。
