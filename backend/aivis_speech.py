@@ -276,8 +276,8 @@ def synthesize(text: str) -> tuple[bytes, int]:
             code="aivis_text_too_long",
         )
 
-    _ensure_circuit_available()
     with _synthesis_lock:
+        _ensure_circuit_available()
         try:
             with httpx.Client(timeout=config.TTS_TIMEOUT) as client:
                 style_id = _resolve_style_id(client)
