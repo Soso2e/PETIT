@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from .. import config
 
 Handler = Callable[..., Any]
+ToolRisk = Literal["safe_read", "low_risk_write", "confirm_write", "destructive"]
 
 
 @dataclass
@@ -21,7 +22,7 @@ class Tool:
     description: str
     parameters: dict[str, Any]
     handler: Handler
-    requires_confirmation: bool = False
+    risk: ToolRisk = "safe_read"
 
 
 _REGISTRY: dict[str, Tool] = {}
@@ -32,9 +33,16 @@ def tool(
     description: str,
     parameters: dict[str, Any],
     *,
+    risk: ToolRisk | None = None,
     requires_confirmation: bool = False,
 ) -> Callable[[Handler], Handler]:
-    """Decorator that registers a function as a callable tool."""
+    """Decorator that registers a function as a callable tool.
+
+    ``requires_confirmation=True`` remains supported for compatibility and maps
+    to ``confirm_write`` unless an explicit ``risk`` is supplied.
+    """
+
+    resolved_risk: ToolRisk = risk or ("confirm_write" if requires_confirmation else "safe_read")
 
     def decorator(func: Handler) -> Handler:
         _REGISTRY[name] = Tool(
@@ -42,7 +50,7 @@ def tool(
             description=description,
             parameters=parameters,
             handler=func,
-            requires_confirmation=requires_confirmation,
+            risk=resolved_risk,
         )
         return func
 
@@ -53,9 +61,13 @@ def registered_names() -> list[str]:
     return sorted(_REGISTRY.keys())
 
 
-def requires_confirmation(name: str) -> bool:
+def tool_risk(name: str) -> ToolRisk:
     tool_obj = _REGISTRY.get(name)
-    return bool(tool_obj and tool_obj.requires_confirmation)
+    return tool_obj.risk if tool_obj else "safe_read"
+
+
+def requires_confirmation(name: str) -> bool:
+    return tool_risk(name) in {"confirm_write", "destructive"}
 
 
 def parse_arguments(name: str, arguments: dict[str, Any] | str | None) -> dict[str, Any]:
@@ -102,13 +114,10 @@ def dispatch(name: str, arguments: dict[str, Any] | str | None) -> str:
         return f"[error] {exc}"
 
     if name == "get_schedule" and config.USE_SONA_CORE:
-        # The legacy handler remains the source of schedule data.  Core only
-        # supplies the execution contract, policy, freshness, and audit path.
         try:
             from .. import sona_core_schedule
         except ImportError:
             return "[error] Sona Agent Core is unavailable; PETIT_USE_SONA_CORE cannot use the legacy path"
-
         return sona_core_schedule.dispatch_get_schedule(arguments)
 
     try:
