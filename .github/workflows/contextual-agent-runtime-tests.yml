@@ -1,0 +1,43 @@
+name: Contextual agent runtime tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/agent.py"
+      - "backend/agent_runtime.py"
+      - "backend/agent_state.py"
+      - "backend/agent_progress.py"
+      - "backend/capability_router.py"
+      - "backend/tools/agent_actions.py"
+      - "backend/tools/__init__.py"
+      - "frontend/app.js"
+      - "tests/test_contextual_agent_runtime.py"
+      - "docs/contextual_agent_runtime.md"
+      - "docs/generic_lists.md"
+      - ".github/workflows/contextual-agent-runtime-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Check frontend syntax
+        run: node --check frontend/app.js
+      - name: Run contextual Agent tests
+        run: python -m unittest tests.test_contextual_agent_runtime -v
+      - name: Run related regression tests
+        run: python -m unittest tests.test_generic_lists tests.test_task_conversation_flow tests.test_task_cancel_status -v

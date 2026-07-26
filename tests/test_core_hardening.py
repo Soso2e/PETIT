@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend import agent, briefing, config, db, main, notion_project_sync, request_context, summarizer
-from backend.lmstudio_client import LMStudioError
 
 
 class RoutingAndMemoryHardeningTests(unittest.TestCase):
@@ -16,14 +15,14 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
 
         def fake_chat(messages, tools=None, temperature=None, model=None, max_tokens=None, route="chat"):
             calls.append({"tools": tools, "model": model, "route": route})
-            return {"role": "assistant", "content": "設計を分析しました"}
+            return {"role": "assistant", "content": "設計を分析しました", "tool_calls": []}
 
         route = {
-            "kind": "agent",
-            "model": "agent-test",
-            "reasons": ["tools_or_reasoning"],
-            "router_source": "test",
-            "router_confidence": 1.0,
+            "type": "agent",
+            "capabilities": [],
+            "goal": "設計を分析する",
+            "source": "test",
+            "confidence": 1.0,
         }
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
@@ -37,9 +36,9 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         self.assertEqual(calls, [{"tools": None, "model": "agent-test", "route": "agent"}])
         self.assertEqual(result["model_route"]["requested_route"], "agent")
         self.assertEqual(result["model_route"]["actual_route"], "agent")
-        self.assertIn("tools_or_reasoning", result["model_route"]["reasons"])
+        self.assertEqual(result["model_route"]["router_source"], "test")
 
-    def test_deterministic_time_and_greeting_skip_ai_router(self) -> None:
+    def test_deterministic_time_and_greeting_skip_capability_router(self) -> None:
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
             patch.object(agent.model_router, "choose") as router,
@@ -66,17 +65,15 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         self.assertEqual(time_result["model_route"]["actual_route"], "deterministic")
         self.assertEqual(greeting_result["model_route"]["kind"], "instant")
 
-    def test_router_suggested_tool_is_executed_with_standard_tool_messages(self) -> None:
+    def test_capability_tool_is_executed_with_compressed_user_context(self) -> None:
         calls: list[dict[str, object]] = []
         dispatched: list[tuple[str, object]] = []
         route = {
-            "kind": "agent",
-            "decision_type": "tool",
-            "model": "agent-test",
-            "reasons": ["ai_router:tool", "天気確認が必要"],
-            "router_source": "ai",
-            "router_confidence": 0.95,
-            "suggested_tools": ["get_weather", "unknown_tool"],
+            "type": "agent",
+            "capabilities": ["calendar"],
+            "goal": "東京の天気から傘が必要か判断する",
+            "source": "llm",
+            "confidence": 0.95,
         }
 
         def fake_chat(messages, tools=None, temperature=None, model=None, max_tokens=None, route="chat"):
@@ -93,87 +90,39 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
                         }
                     ],
                 }
-            return {"role": "assistant", "content": "傘を持っていくのが安全です。"}
+            return {"role": "assistant", "content": "傘を持っていくのが安全です。", "tool_calls": []}
 
         def fake_dispatch(name, arguments):
             dispatched.append((name, arguments))
-            return json.dumps({"ok": True, "forecast": "rain"}, ensure_ascii=False)
+            return json.dumps({"ok": True, "forecast": "rain", "raw": "transport noise"}, ensure_ascii=False)
 
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
             patch.object(agent.model_router, "choose", return_value=route),
             patch.object(config, "CHAT_MODEL", "chat-test"),
             patch.object(config, "AGENT_MODEL", "agent-test"),
-            patch.object(config, "TOOL_RESULT_MODE", "tool"),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
             patch.object(agent.tools, "dispatch", side_effect=fake_dispatch),
         ):
             result = agent.run("傘を持っていくべき？")
 
         self.assertEqual([name for name, _ in dispatched], ["get_weather"])
-        self.assertEqual(result["model_route"]["selected_tools"], ["get_weather"])
-        self.assertEqual(result["model_route"]["tool_result_mode"], "tool")
+        self.assertEqual([item["name"] for item in result["used_tools"]], ["get_weather"])
         second_messages = calls[1]["messages"]
-        self.assertEqual(second_messages[-2]["role"], "assistant")
-        self.assertEqual(second_messages[-2]["tool_calls"][0]["id"], "weather-1")
-        self.assertEqual(second_messages[-1]["role"], "tool")
-        self.assertEqual(second_messages[-1]["tool_call_id"], "weather-1")
-
-    def test_tool_result_auto_falls_back_for_incompatible_template(self) -> None:
-        calls: list[list[dict[str, object]]] = []
-        route = {
-            "kind": "agent",
-            "decision_type": "tool",
-            "model": "agent-test",
-            "reasons": ["ai_router:tool"],
-            "router_source": "ai",
-            "router_confidence": 0.9,
-            "suggested_tools": ["get_weather"],
-        }
-
-        def fake_chat(messages, tools=None, temperature=None, model=None, max_tokens=None, route="chat"):
-            calls.append(messages)
-            if len(calls) == 1:
-                return {
-                    "role": "assistant",
-                    "content": "",
-                    "tool_calls": [
-                        {
-                            "id": "weather-1",
-                            "type": "function",
-                            "function": {"name": "get_weather", "arguments": '{"location":"東京"}'},
-                        }
-                    ],
-                }
-            if len(calls) == 2:
-                raise LMStudioError('Error rendering prompt with jinja template: "No user query found in messages."')
-            return {"role": "assistant", "content": "雨です。"}
-
-        with (
-            patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
-            patch.object(agent.model_router, "choose", return_value=route),
-            patch.object(config, "TOOL_RESULT_MODE", "auto"),
-            patch.object(agent, "chat_completion", side_effect=fake_chat),
-            patch.object(agent.tools, "dispatch", return_value=json.dumps({"ok": True, "forecast": "rain"})),
-        ):
-            result = agent.run("傘いるかな？")
-
-        self.assertEqual(result["reply"], "雨です。")
-        self.assertEqual(result["model_route"]["tool_result_mode"], "user_fallback")
-        self.assertEqual(calls[2][-1]["role"], "user")
-        self.assertIn("Python側で実行した結果", calls[2][-1]["content"])
+        self.assertEqual(second_messages[-1]["role"], "user")
+        self.assertIn("元の依頼", second_messages[-1]["content"])
+        self.assertIn("圧縮結果", second_messages[-1]["content"])
+        self.assertNotIn("transport noise", second_messages[-1]["content"])
 
     def test_multiple_tool_rounds_allow_same_tool_with_different_arguments(self) -> None:
         dispatched: list[dict[str, object]] = []
         call_count = 0
         route = {
-            "kind": "agent",
-            "decision_type": "tool",
-            "model": "agent-test",
-            "reasons": ["ai_router:tool"],
-            "router_source": "ai",
-            "router_confidence": 0.9,
-            "suggested_tools": ["get_schedule"],
+            "type": "agent",
+            "capabilities": ["calendar"],
+            "goal": "直近2日を比較する",
+            "source": "llm",
+            "confidence": 0.9,
         }
 
         def fake_chat(messages, tools=None, temperature=None, model=None, max_tokens=None, route="chat"):
@@ -192,7 +141,7 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
                         }
                     ],
                 }
-            return {"role": "assistant", "content": "2日分を比較しました。"}
+            return {"role": "assistant", "content": "2日分を比較しました。", "tool_calls": []}
 
         def fake_dispatch(name, arguments):
             dispatched.append(dict(arguments))
@@ -201,7 +150,6 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
             patch.object(agent.model_router, "choose", return_value=route),
-            patch.object(config, "TOOL_RESULT_MODE", "tool"),
             patch.object(config, "MAX_TOOL_ITERATIONS", 2),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
             patch.object(agent.tools, "dispatch", side_effect=fake_dispatch),
@@ -211,6 +159,7 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         self.assertEqual([item["date"] for item in dispatched], ["2026-07-22", "2026-07-23"])
         self.assertEqual(call_count, 3)
         self.assertEqual(result["reply"], "2日分を比較しました。")
+        self.assertEqual(result["model_route"]["tool_rounds"], 2)
 
     def test_agent_prompt_allows_complete_analysis(self) -> None:
         self.assertIn("十分な長さ", agent.AGENT_SYSTEM_PROMPT)
@@ -301,7 +250,6 @@ class PersistenceHardeningTests(unittest.TestCase):
 
         rows = main.jobs(limit=10, session_id="s1")["jobs"]
         self.assertEqual([row["id"] for row in rows], [first])
-        # GET is read-only. The row remains available until explicit acknowledgement.
         self.assertEqual([row["id"] for row in main.jobs(limit=10, session_id="s1")["jobs"]], [first])
 
         acknowledged = main.acknowledge_jobs(main.JobAck(job_ids=[first], session_id="s1"))

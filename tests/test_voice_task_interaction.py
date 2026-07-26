@@ -29,27 +29,33 @@ class VoiceTaskInteractionTests(unittest.TestCase):
         chat_prompt = _literal_assignment(module, "CHAT_SYSTEM_PROMPT")
         agent_prompt = _literal_assignment(module, "AGENT_SYSTEM_PROMPT")
         self.assertLess(len(chat_prompt), 120)
-        self.assertLess(len(agent_prompt), 220)
+        self.assertLess(len(agent_prompt), 260)
         self.assertIn("Markdownは使わ", chat_prompt)
         self.assertIn("Markdownは使わ", agent_prompt)
 
-    def test_task_edit_signals_and_read_tool_exclusion_are_present(self) -> None:
-        source, _module_ast = _module("backend/agent.py")
+    def test_task_management_is_exposed_as_one_contextual_capability(self) -> None:
+        source, _module_ast = _module("backend/capability_router.py")
         for marker in (
-            '"update_task"', '"締切を延ば"', '"日付を変"',
-            '"get_task_sync_status"', '"retry_task_sync"',
+            '"lists_and_tasks"',
+            '"get_lists"',
+            '"add_list_item"',
+            '"get_tasks"',
+            '"create_task"',
+            '"update_task"',
+            '"get_task_sync_status"',
+            '"retry_task_sync"',
         ):
             self.assertIn(marker, source)
-        self.assertIn('names = [name for name in names if name != "get_tasks"]', source)
+        self.assertIn("単語一致ではなく", source)
+        self.assertNotIn("_TASK_TOOL_SIGNALS", (ROOT / "backend" / "agent.py").read_text(encoding="utf-8"))
 
-    def test_router_can_suggest_all_task_management_tools(self) -> None:
-        source, module = _module("backend/model_router.py")
-        names = _literal_assignment(module, "_SUGGESTIBLE_TOOLS")
-        self.assertIn("update_task", names)
-        self.assertIn("get_task_sync_status", names)
-        self.assertIn("retry_task_sync", names)
-        self.assertIn("PETITの経路選択器", source)
-        self.assertIn("JSONだけ返し", source)
+    def test_agent_runtime_keeps_confirmation_and_bounded_loop(self) -> None:
+        source = (ROOT / "backend" / "agent_runtime.py").read_text(encoding="utf-8")
+        self.assertIn("config.MAX_TOOL_ITERATIONS", source)
+        self.assertIn("_MAX_TOOL_CALLS = 6", source)
+        self.assertIn("tools.requires_confirmation", source)
+        self.assertIn('"execute_agent_write"', source)
+        self.assertIn("duplicate_tool_call", source)
 
     def test_voice_script_scopes_speech_and_handles_confirmation(self) -> None:
         source = (ROOT / "frontend" / "voice.js").read_text(encoding="utf-8")
@@ -62,7 +68,11 @@ class VoiceTaskInteractionTests(unittest.TestCase):
         self.assertIn("function naturalizeCompletedAction", source)
 
     def test_python_files_parse(self) -> None:
-        for relative in ("backend/agent.py", "backend/model_router.py"):
+        for relative in (
+            "backend/agent.py",
+            "backend/agent_runtime.py",
+            "backend/capability_router.py",
+        ):
             _module(relative)
 
 

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import httpx
 
-from backend import agent, config, lmstudio_client
+from backend import agent, agent_runtime, config, lmstudio_client
 
 
 class CompactChatContextTests(unittest.TestCase):
@@ -26,12 +26,17 @@ class CompactChatContextTests(unittest.TestCase):
         self.assertEqual(recent[0]["role"], "user")
         self.assertTrue(recent[-1]["content"].endswith("a" * 100))
 
-    def test_simple_chat_uses_compact_prompt_and_one_model_call(self) -> None:
-        calls: list[dict[str, object]] = []
+    def test_simple_chat_uses_bounded_context_and_router_reply(self) -> None:
+        captured: list[dict[str, object]] = []
 
-        def fake_chat(messages, tools=None, temperature=None, model=None, max_tokens=None, route="chat"):
-            calls.append({"messages": messages, "tools": tools, "model": model, "route": route})
-            return {"role": "assistant", "content": "楽しんできてね。"}
+        def fake_choose(message, history=None):
+            captured.append({"message": message, "history": history})
+            return {
+                "type": "reply",
+                "reply": "楽しんできてね。",
+                "source": "llm",
+                "confidence": 0.95,
+            }
 
         history = []
         for index in range(5):
@@ -44,37 +49,46 @@ class CompactChatContextTests(unittest.TestCase):
 
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
-            patch.object(config, "CHAT_MODEL", "chat-test"),
-            patch.object(agent, "chat_completion", side_effect=fake_chat),
+            patch.object(agent.model_router, "choose", side_effect=fake_choose),
+            patch.object(agent, "chat_completion") as completion,
         ):
             result = agent.run("今日は池袋に行きます", history=history)
 
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0]["route"], "chat")
-        self.assertIsNone(calls[0]["tools"])
-        messages = calls[0]["messages"]
-        self.assertEqual(messages[0], {"role": "system", "content": agent.CHAT_SYSTEM_PROMPT})
-        self.assertNotIn("書き込み", messages[0]["content"])
-        self.assertLessEqual(len(messages[1:-1]), agent._HISTORY_MAX_MESSAGES)
+        completion.assert_not_called()
+        self.assertEqual(len(captured), 1)
+        routed_history = captured[0]["history"]
+        self.assertLessEqual(len(routed_history), agent._HISTORY_MAX_MESSAGES)
+        self.assertLessEqual(sum(len(item["content"]) for item in routed_history), agent._HISTORY_MAX_CHARS)
         self.assertEqual(result["reply"], "楽しんできてね。")
+        self.assertEqual(result["model_route"]["actual_route"], "chat")
 
     def test_agent_route_keeps_tool_safety_prompt(self) -> None:
         calls: list[dict[str, object]] = []
 
         def fake_chat(messages, tools=None, temperature=None, model=None, max_tokens=None, route="chat"):
             calls.append({"messages": messages, "tools": tools, "model": model, "route": route})
-            return {"role": "assistant", "content": "改善点を整理しました。"}
+            return {"role": "assistant", "content": "改善点を整理しました。", "tool_calls": []}
 
+        route = {
+            "type": "agent",
+            "capabilities": [],
+            "goal": "設計を分析する",
+            "source": "llm",
+            "confidence": 0.9,
+        }
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
+            patch.object(agent.model_router, "choose", return_value=route),
             patch.object(config, "AGENT_MODEL", "agent-test"),
             patch.object(agent, "chat_completion", side_effect=fake_chat),
         ):
             agent.run("この設計を分析して改善して")
 
+        self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["route"], "agent")
-        self.assertEqual(calls[0]["messages"][0]["content"], agent.AGENT_SYSTEM_PROMPT)
-        self.assertIn("実行結果なしに完了したと言わない", agent.AGENT_SYSTEM_PROMPT)
+        self.assertEqual(calls[0]["messages"][0]["content"], agent_runtime._AGENT_SYSTEM_PROMPT)
+        self.assertIn("書き込みはTool callとして提案", agent_runtime._AGENT_SYSTEM_PROMPT)
+        self.assertIn("元の依頼を最後まで保持", agent_runtime._AGENT_SYSTEM_PROMPT)
 
 
 class EmptyModelResponseRecoveryTests(unittest.TestCase):

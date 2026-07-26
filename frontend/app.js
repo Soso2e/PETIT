@@ -14,6 +14,8 @@ const history = [];
 const sessionId = localStorage.getItem("petit_session_id") || crypto.randomUUID();
 localStorage.setItem("petit_session_id", sessionId);
 let modelRoutingSnapshot = null;
+let activeRequestId = null;
+let agentOperationActive = false;
 
 function freshnessLabel(status, label) {
   if (!status || !status.configured) return `${label}: 未使用`;
@@ -105,6 +107,8 @@ function addMessage(role, text, { tools, error, actions, modelRoute } = {}) {
 
 async function decideAction(approvalId, approved, controls) {
   for (const button of controls.querySelectorAll("button")) button.disabled = true;
+  agentOperationActive = approved;
+  if (approved) setTyping(true, "確認された内容を実行してるよ…");
   try {
     const res = await fetch(`/api/actions/${approvalId}`, {
       method: "POST",
@@ -120,20 +124,27 @@ async function decideAction(approvalId, approved, controls) {
     history.push({ role: "assistant", content: data.reply });
   } catch (e) {
     addMessage("assistant", "⚠️ 確認操作に失敗しました: " + e.message, { error: true });
+  } finally {
+    agentOperationActive = false;
+    setTyping(false);
   }
 }
 
-function setTyping(on) {
+function setTyping(on, text = "考え中…") {
   let el = document.getElementById("typing");
   if (on) {
     if (!el) {
       el = document.createElement("div");
       el.id = "typing";
       el.className = "msg msg--assistant";
-      el.innerHTML = '<div class="bubble typing">考え中…</div>';
+      const bubble = document.createElement("div");
+      bubble.className = "bubble typing";
+      el.appendChild(bubble);
       messagesEl.appendChild(el);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
     }
+    const bubble = el.querySelector(".bubble");
+    if (bubble) bubble.textContent = text || "考え中…";
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   } else if (el) {
     el.remove();
   }
@@ -237,10 +248,22 @@ async function acknowledgeJobs(ids) {
 
 async function pollJobs() {
   try {
-    const res = await fetch(`/api/jobs?limit=10&session_id=${encodeURIComponent(sessionId)}`);
+    const res = await fetch(`/api/jobs?limit=20&session_id=${encodeURIComponent(sessionId)}`);
     const data = await res.json();
     const delivered = [];
     for (const job of data.jobs || []) {
+      if (job.type === "agent_progress") {
+        delivered.push(job.id);
+        const belongsToActiveRequest = activeRequestId && job.request_id === activeRequestId;
+        if (!belongsToActiveRequest && !agentOperationActive) continue;
+        try {
+          const progress = JSON.parse(job.result_text || "{}");
+          if (progress.text) setTyping(true, progress.text + "…");
+        } catch (e) {
+          // Invalid progress events are transient and can be discarded safely.
+        }
+        continue;
+      }
       if (job.status === "done") {
         const text = job.result_text || "調べ終わったけど、結果が空でした。";
         addMessage("assistant", "調べ終わったよ。\n" + text);
@@ -283,6 +306,7 @@ async function checkHealth() {
 
 async function sendMessage(text) {
   const requestId = crypto.randomUUID();
+  activeRequestId = requestId;
   addMessage("user", text);
 
   setTyping(true);
@@ -313,6 +337,7 @@ async function sendMessage(text) {
     setTyping(false);
     addMessage("assistant", "⚠️ 通信に失敗しました: " + e.message, { error: true });
   } finally {
+    if (activeRequestId === requestId) activeRequestId = null;
     sendEl.disabled = false;
     inputEl.focus();
   }
@@ -395,5 +420,5 @@ async function initialize() {
 }
 
 setInterval(checkHealth, 60000);
-setInterval(pollJobs, 3000);
+setInterval(pollJobs, 700);
 initialize();
