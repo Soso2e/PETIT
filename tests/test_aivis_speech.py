@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import ast
+import io
+import tempfile
 import unittest
+import wave
 from pathlib import Path
 from unittest.mock import patch
 
 import httpx
 
 from backend import aivis_speech, config
+from scripts import diagnose_aivis_speech
 
 
 class FakeResponse:
@@ -88,6 +92,16 @@ class AivisSpeechTests(unittest.TestCase):
         for item in patches:
             item.start()
         self.addCleanup(lambda: [item.stop() for item in reversed(patches)])
+
+    @staticmethod
+    def _valid_wav_bytes() -> bytes:
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(16000)
+            wav_file.writeframes(b"\x00\x00" * 160)
+        return buffer.getvalue()
 
     def test_synthesize_uses_configured_style_and_adjusts_query(self) -> None:
         client = FakeClient([
@@ -197,6 +211,78 @@ class AivisSpeechTests(unittest.TestCase):
         self.assertEqual(result["error_code"], "aivis_connection_failed")
         self.assertTrue(result["retryable"])
         self.assertIn("offline", result["error"])
+
+    def test_diagnostic_saves_only_valid_wav(self) -> None:
+        audio = self._valid_wav_bytes()
+        health = {
+            "provider": "aivis",
+            "configured": True,
+            "available": True,
+            "base_url": "http://127.0.0.1:10101",
+            "style_id": None,
+            "resolved_style_id": 321,
+            "speaker_count": 1,
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "sample.wav"
+            with (
+                patch.object(diagnose_aivis_speech.aivis_speech, "status", return_value=health),
+                patch.object(diagnose_aivis_speech.aivis_speech, "synthesize", return_value=(audio, 321)),
+            ):
+                report = diagnose_aivis_speech.run_diagnostic(output_path=output)
+
+            self.assertTrue(report["ok"])
+            self.assertEqual(report["stage"], "complete")
+            self.assertEqual(report["resolved_style_id"], 321)
+            self.assertEqual(report["wav"]["sample_rate_hz"], 16000)
+            self.assertEqual(output.read_bytes(), audio)
+
+    def test_diagnostic_classifies_audio_query_failure(self) -> None:
+        health = {
+            "provider": "aivis",
+            "configured": True,
+            "available": True,
+            "base_url": "http://127.0.0.1:10101",
+        }
+        error = aivis_speech.AivisSpeechError(
+            "AivisSpeechの/audio_queryがエラーを返しました（HTTP 503）",
+            code="aivis_http_503",
+            retryable=True,
+            status_code=503,
+        )
+
+        with (
+            patch.object(diagnose_aivis_speech.aivis_speech, "status", return_value=health),
+            patch.object(diagnose_aivis_speech.aivis_speech, "synthesize", side_effect=error),
+        ):
+            report = diagnose_aivis_speech.run_diagnostic(output_path=None)
+
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["stage"], "audio_query_failed")
+        self.assertEqual(report["error_code"], "aivis_http_503")
+        self.assertTrue(report["retryable"])
+        self.assertEqual(report["upstream_status"], 503)
+
+    def test_diagnostic_rejects_invalid_audio_without_writing(self) -> None:
+        health = {
+            "provider": "aivis",
+            "configured": True,
+            "available": True,
+            "base_url": "http://127.0.0.1:10101",
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "invalid.wav"
+            with (
+                patch.object(diagnose_aivis_speech.aivis_speech, "status", return_value=health),
+                patch.object(diagnose_aivis_speech.aivis_speech, "synthesize", return_value=(b"not-wave", 123)),
+            ):
+                report = diagnose_aivis_speech.run_diagnostic(output_path=output)
+
+            self.assertFalse(report["ok"])
+            self.assertEqual(report["stage"], "invalid_audio_response")
+            self.assertFalse(output.exists())
 
     def test_main_declares_tts_routes(self) -> None:
         source = Path("backend/main.py").read_text(encoding="utf-8")
