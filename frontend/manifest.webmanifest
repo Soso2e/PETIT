@@ -1,10 +1,11 @@
 {
+  "id": "/",
   "name": "PETIT — Personal AI Assistant",
   "short_name": "PETIT",
   "description": "生活と制作を見守る自分専用AIアシスタント",
   "lang": "ja",
-  "start_url": "/static/index.html?source=pwa",
-  "scope": "/static/",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0f1115",
@@ -28,7 +29,7 @@
       "name": "PETITに話す",
       "short_name": "話す",
       "description": "PETITを開いて音声入力する",
-      "url": "/static/index.html?mode=voice",
+      "url": "/?mode=voice",
       "icons": [
         {
           "src": "/static/icon-192.jpg",
