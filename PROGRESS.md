@@ -5,7 +5,7 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
-- 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallback、一時的な429／502／503／504の1回再試行、合成直列化、上流エラー詳細診断、モバイル音声アンロックを実装。実AivisSpeechモデルとスマホ／ブラウザE2Eは未確認。
+- 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallback、一時的な429／502／503／504の1回再試行、合成直列化、上流エラー詳細診断、モバイル音声アンロック、文単位チャンク生成・先読み再生・5秒タイムアウト・生成キャンセル、独立診断CLIを実装。実AivisSpeechモデルとPC／スマホブラウザE2Eは未確認。
 - モデル経路: Chat/AgentのURL・モデル・APIキーを独立設定できる。明示ツール・挨拶・時刻はルーター前に決定論処理し、曖昧な自然文だけChatルーターの提案を許可リストと登録済みツールで検証する。Agentは標準`role=tool`を優先し、Jinja非対応時だけuser follow-upへ退避、既定3ツールラウンド後に最終回答できる。実LM Studio 1／2モデル・標準tool／互換fallback・ブラウザE2Eは未確認。
 - モデル切替: WebからChat／Agentを個別にローカルLM Studio・DeepSeek V4 Flash・DeepSeek V4 Proへ切替でき、選択だけをローカル保存する。DeepSeek APIキーはブラウザや保存ファイルへ返さず、Embeddingはローカルのまま。専用テスト5件成功、実DeepSeek／ブラウザE2Eは未確認。
 - 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
@@ -104,3 +104,4 @@
 | 2026-07-26 | 03:31 | #67 | Issue #92対応としてWeb Push通知基盤を実装。Service Worker／Push API／VAPID、購読登録・解除、カテゴリ別opt-in、SQLiteの購読・通知イベント・配信履歴、`NotificationProvider`境界、通知設定UI、テスト通知、秘密鍵Git除外、専用テスト・CI・README／Concept／実iPhone確認文書を追加。ローカル単体テスト5件とJavaScript構文確認成功、GitHub Actionsと実VAPID／HTTPSブラウザ／実iPhone PWA E2Eは未確認。 |
 | 2026-07-26 | 04:10 | #68 | Issue #94対応としてPETIT用語集へのREADMEリンクを追加。既存用語集でタスク・プロジェクト・リスト・記憶・引き継ぎの定義と使い分け例を確認。ドキュメントのみのためコードテストは未実施。 |
 | 2026-07-26 | 04:25 | #69 | Issue #93のPhase 1〜2として音声テキストを文単位チャンクへ分割し、先頭生成後の再生中に次チャンクを先読み、チャンクごとの5秒タイムアウト、残り部分のブラウザTTS fallback、ユーザー入力時の生成・再生キャンセル、簡潔な音声状態表示を追加。JavaScript構文・実AivisSpeech／PC／スマホE2EはGitHub Actionsと実機で未確認。 |
+| 2026-07-26 | 04:49 | #70 | Issue #93 Phase 0として会話画面から独立したAivisSpeech診断CLIを追加。Engine疎通、話者解決、固定短文合成、RIFF/WAVE・音声情報検証、検証済みWAV保存、失敗段階JSON分類、単体テスト3件、CI・文書を追加。GitHub Actionsと実AivisSpeechでの診断実行は未確認。 |
