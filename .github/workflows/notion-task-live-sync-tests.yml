@@ -15,7 +15,6 @@ on:
       - "tests/test_daily_life_index.py"
       - "docs/notion_task_live_sync.md"
       - ".env.example"
-      - "PROGRESS.md"
       - ".github/workflows/notion-task-live-sync-tests.yml"
 
 concurrency:
