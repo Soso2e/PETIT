@@ -9,6 +9,7 @@ on:
       - "frontend/index.html"
       - "frontend/mobile_audio_unlock.js"
       - "frontend/voice.js"
+      - "scripts/diagnose_aivis_speech.py"
       - "tests/test_aivis_speech.py"
       - ".github/workflows/aivis-speech-tests.yml"
       - ".env.example"
@@ -33,7 +34,9 @@ jobs:
           python -m pip install --quiet --upgrade pip
           python -m pip install --quiet httpx
       - name: Compile Python sources
-        run: python -m compileall backend tests
+        run: python -m compileall backend scripts tests
+      - name: Check diagnostic CLI
+        run: python scripts/diagnose_aivis_speech.py --help
       - name: Check voice JavaScript syntax
         run: |
           node --check frontend/mobile_audio_unlock.js
