@@ -100,7 +100,7 @@
 | 2026-07-23 | 17:40 | #63 | Issue #75対応としてNotionタスクのローカルファースト双方向同期を実装。既存Outbox、署名検証Webhook Inbox、URL共有secret、5分差分・起動時・日次全件補修、remote snapshot、フィールド単位三者マージ、論理削除、同期鮮度、設定・専用テスト・CI・設計文書を追加。実Notion Webhook／公開HTTPS／ブラウザE2Eは未確認。 |
 | 2026-07-24 | 13:59 | #64 | Issue #78対応として`get_tasks`を既定Highに変更し、`priority=later`でMid/Medium＋Low、`priority=all`で未設定を含む全優先度を取得できるようにした。重複確認は全優先度を参照し、優先度別・既存状態・Notion同期の回帰テストを更新。ローカル仮DBでSQL動作と変更ファイルの構文を確認、GitHub Actionsと実会話E2Eは未確認。 |
 | 2026-07-25 | 06:34 | #65 | Issue #80対応としてスマホ向け制作伴走モードを実装し、PR #81をmainへ統合。作業トラッキング、10分／20分ごとの前景限定自律声かけ、Highタスク・予定・次の一手、直近3ラリー、2時間セッション分離、途中経過メッセージ、PWAを追加。Mobile work companion／AivisSpeech／Task conversation flow／Core hardening／Model route switcherの全5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eとバックグラウンド通知は未確認。 |
-| 2026-07-25 | 18:07 | #66 | Issue #88対応として、提供画像を64px PNGへ縮小・最適化し、ブラウザfaviconを新しいPETIT惑星ロゴへ更新。HTML参照と画像デコードを確認し、実ブラウザでのキャッシュ更新後表示は未確認。 |
+| 2026-07-25 | 18:07 | #66 | Issue #88対応として、提供画像を64×64へ縮小・最適化し、ブラウザfaviconを新しいPETIT惑星ロゴへ更新。HTML参照と画像デコードを確認し、実ブラウザでのキャッシュ更新後表示は未確認。 |
 | 2026-07-26 | 03:31 | #67 | Issue #92対応としてWeb Push通知基盤を実装。Service Worker／Push API／VAPID、購読登録・解除、カテゴリ別opt-in、SQLiteの購読・通知イベント・配信履歴、`NotificationProvider`境界、通知設定UI、テスト通知、秘密鍵Git除外、専用テスト・CI・README／Concept／実iPhone確認文書を追加。ローカル単体テスト5件とJavaScript構文確認成功、GitHub Actionsと実VAPID／HTTPSブラウザ／実iPhone PWA E2Eは未確認。 |
 | 2026-07-26 | 04:10 | #68 | Issue #94対応としてPETIT用語集へのREADMEリンクを追加。既存用語集でタスク・プロジェクト・リスト・記憶・引き継ぎの定義と使い分け例を確認。ドキュメントのみのためコードテストは未実施。 |
 | 2026-07-26 | 04:25 | #69 | Issue #93のPhase 1〜2として音声テキストを文単位チャンクへ分割し、先頭生成後の再生中に次チャンクを先読み、チャンクごとの5秒タイムアウト、残り部分のブラウザTTS fallback、ユーザー入力時の生成・再生キャンセル、簡潔な音声状態表示を追加。JavaScript構文・実AivisSpeech／PC／スマホE2EはGitHub Actionsと実機で未確認。 |
@@ -112,3 +112,4 @@
 | 2026-07-26 | 07:51 | #75 | PWAアイコン5点の実デコード・寸法、Mobile work companion静的テスト6件、Service Worker JavaScript構文、通知Python構文、差分形式を確認。通知単体テストは環境にFastAPIがなく未実施。 |
 | 2026-07-26 | 07:58 | #76 | 提供された文字ロゴを`frontend/branding/name_logo.png`、惑星ロゴを`icon_logo.png`として原寸保存し、惑星ロゴからfavicon・Apple Touch・PWA通常／maskableアイコンを再生成。Service Workerキャッシュを更新。 |
 | 2026-07-26 | 08:01 | #77 | ブランド原本2点と派生アイコン6点の実デコード・寸法、Mobile work companion静的テスト7件、Service Worker JavaScript構文、通知Python構文、差分形式を確認。 |
+| 2026-07-26 | 23:06 | #78 | Issue #109対応としてREADMEからAivisSpeech初期セットアップへ導線を追加し、Windows導入、音声モデル、Engine、`/docs`・`/speakers`、`.env`、診断CLI、WAV再生、Docker／WSL接続差、stage別切り分け、ブラウザ標準TTSとの無料運用方針を整理。文書変更のみで、実Engine E2Eは未実施。 |
