@@ -14,6 +14,9 @@
   const speechRecognitionSupported = Boolean(SpeechRecognitionApi);
   const browserSpeechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
   const audioPlaybackSupported = typeof Audio !== "undefined" && typeof fetch === "function";
+  const TTS_CHUNK_TARGET_CHARS = 48;
+  const TTS_CHUNK_MAX_CHARS = 72;
+  const TTS_CHUNK_TIMEOUT_MS = 5000;
   const voiceApprovePhrases = new Set([
     "はい", "うん", "お願い", "お願いします", "やって", "やってください",
     "実行", "実行して", "実行してください", "それで", "それでお願い",
@@ -88,6 +91,49 @@
       .trim();
   }
 
+  function splitLongSpeechSegment(segment) {
+    const chunks = [];
+    let rest = segment.trim();
+    while (rest.length > TTS_CHUNK_MAX_CHARS) {
+      const candidates = [
+        rest.lastIndexOf("、", TTS_CHUNK_MAX_CHARS),
+        rest.lastIndexOf("，", TTS_CHUNK_MAX_CHARS),
+        rest.lastIndexOf(",", TTS_CHUNK_MAX_CHARS),
+        rest.lastIndexOf(" ", TTS_CHUNK_MAX_CHARS),
+      ];
+      let breakAt = Math.max(...candidates);
+      if (breakAt < Math.floor(TTS_CHUNK_TARGET_CHARS / 2)) breakAt = TTS_CHUNK_MAX_CHARS;
+      else breakAt += 1;
+      chunks.push(rest.slice(0, breakAt).trim());
+      rest = rest.slice(breakAt).trim();
+    }
+    if (rest) chunks.push(rest);
+    return chunks;
+  }
+
+  function splitSpeechText(text) {
+    const sentenceParts = String(text || "").match(/[^。！？!?\n]+[。！？!?]?/g) || [];
+    const segments = sentenceParts.flatMap((part) => splitLongSpeechSegment(part));
+    const chunks = [];
+    let current = "";
+
+    for (const segment of segments) {
+      if (!segment) continue;
+      if (!current) {
+        current = segment;
+        continue;
+      }
+      if (current.length < TTS_CHUNK_TARGET_CHARS && (current + segment).length <= TTS_CHUNK_MAX_CHARS) {
+        current += segment;
+        continue;
+      }
+      chunks.push(current);
+      current = segment;
+    }
+    if (current) chunks.push(current);
+    return chunks;
+  }
+
   function normalizeVoiceCommand(text) {
     return String(text || "")
       .toLowerCase()
@@ -159,6 +205,12 @@
       || null;
   }
 
+  function createAbortError() {
+    const error = new Error("音声処理を中止しました。");
+    error.name = "AbortError";
+    return error;
+  }
+
   function releaseAudio() {
     if (currentAudio) {
       currentAudio.pause();
@@ -178,9 +230,10 @@
     }
     releaseAudio();
     if (browserSpeechSupported) window.speechSynthesis.cancel();
+    setVoiceState("");
   }
 
-  function speakWithBrowser(text) {
+  function speakWithBrowser(text, { reason = "端末の音声で再生しています…" } = {}) {
     if (!browserSpeechSupported) return false;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "ja-JP";
@@ -188,11 +241,89 @@
     utterance.pitch = 1.0;
     const voice = findJapaneseVoice();
     if (voice) utterance.voice = voice;
-    utterance.onstart = () => setVoiceState("AivisSpeechに接続できないため、ブラウザ音声で再生しています…");
+    utterance.onstart = () => setVoiceState(reason);
     utterance.onend = () => setVoiceState("");
-    utterance.onerror = () => setVoiceState("音声の再生に失敗しました。", { error: true });
+    utterance.onerror = () => setVoiceState("音声を再生できませんでした。", { error: true });
     window.speechSynthesis.speak(utterance);
     return true;
+  }
+
+  async function requestTtsBlob(text, controller) {
+    if (controller.signal.aborted) throw createAbortError();
+
+    const requestController = new AbortController();
+    let timedOut = false;
+    const cancelRequest = () => requestController.abort();
+    controller.signal.addEventListener("abort", cancelRequest, { once: true });
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      requestController.abort();
+    }, TTS_CHUNK_TIMEOUT_MS);
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+        signal: requestController.signal,
+      });
+      if (!response.ok) {
+        let detail = "";
+        try {
+          detail = (await response.json()).error || "";
+        } catch (_error) {
+          detail = "";
+        }
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      return await response.blob();
+    } catch (error) {
+      if (timedOut) {
+        const timeoutError = new Error("音声の準備がタイムアウトしました。");
+        timeoutError.name = "TtsTimeoutError";
+        throw timeoutError;
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+      controller.signal.removeEventListener("abort", cancelRequest);
+    }
+  }
+
+  function startTtsChunk(text, controller) {
+    return requestTtsBlob(text, controller).then(
+      (blob) => ({ blob, error: null }),
+      (error) => ({ blob: null, error }),
+    );
+  }
+
+  async function playAudioBlob(blob, controller) {
+    if (controller.signal.aborted) throw createAbortError();
+    releaseAudio();
+    currentAudioUrl = URL.createObjectURL(blob);
+    const audio = new Audio(currentAudioUrl);
+    currentAudio = audio;
+
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error = null) => {
+        if (settled) return;
+        settled = true;
+        controller.signal.removeEventListener("abort", handleAbort);
+        if (currentAudio === audio) releaseAudio();
+        if (error) reject(error);
+        else resolve();
+      };
+      const handleAbort = () => finish(createAbortError());
+
+      controller.signal.addEventListener("abort", handleAbort, { once: true });
+      audio.onplay = () => {
+        if (currentTtsRequest === controller) setVoiceState("PETITが話しています…");
+      };
+      audio.onended = () => finish();
+      audio.onerror = () => finish(new Error("AivisSpeech音声の再生に失敗しました。"));
+      audio.play().catch((error) => finish(error));
+    });
   }
 
   async function speakText(text, { force = false } = {}) {
@@ -206,49 +337,51 @@
       return;
     }
 
+    const chunks = splitSpeechText(spoken);
+    if (!chunks.length) return;
+
     const controller = new AbortController();
     currentTtsRequest = controller;
-    setVoiceState("AivisSpeechで音声を生成しています…");
+    setVoiceState("音声を準備中…");
+
+    let nextChunkIndex = 0;
+    let pendingChunk = startTtsChunk(chunks[0], controller);
 
     try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: spoken }),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        let detail = "";
-        try {
-          detail = (await response.json()).error || "";
-        } catch (_error) {
-          detail = "";
-        }
-        throw new Error(detail || `HTTP ${response.status}`);
+      while (nextChunkIndex < chunks.length) {
+        const currentIndex = nextChunkIndex;
+        const result = await pendingChunk;
+        if (result.error) throw result.error;
+        if (!result.blob || controller.signal.aborted || currentTtsRequest !== controller) return;
+
+        const followingIndex = currentIndex + 1;
+        pendingChunk = followingIndex < chunks.length
+          ? startTtsChunk(chunks[followingIndex], controller)
+          : null;
+
+        await playAudioBlob(result.blob, controller);
+        nextChunkIndex = followingIndex;
       }
 
-      const blob = await response.blob();
-      if (controller.signal.aborted || currentTtsRequest !== controller) return;
-      currentTtsRequest = null;
-      currentAudioUrl = URL.createObjectURL(blob);
-      currentAudio = new Audio(currentAudioUrl);
-      currentAudio.onplay = () => setVoiceState("PETITが話しています…");
-      currentAudio.onended = () => {
-        releaseAudio();
+      if (currentTtsRequest === controller) {
+        currentTtsRequest = null;
         setVoiceState("");
-      };
-      currentAudio.onerror = () => {
-        releaseAudio();
-        setVoiceState("AivisSpeech音声の再生に失敗しました。", { error: true });
-      };
-      await currentAudio.play();
+      }
     } catch (error) {
-      if (controller.signal.aborted) return;
+      const cancelled = controller.signal.aborted || currentTtsRequest !== controller;
+      if (cancelled) return;
+
+      controller.abort();
       currentTtsRequest = null;
       releaseAudio();
-      if (!speakWithBrowser(spoken)) {
-        const message = error instanceof Error ? error.message : "AivisSpeechへ接続できません。";
-        setVoiceState(`音声を再生できませんでした。${message}`, { error: true });
+      console.warn("AivisSpeech playback failed", error);
+
+      const remainingText = chunks.slice(nextChunkIndex).join("") || spoken;
+      const reason = error instanceof Error && error.name === "TtsTimeoutError"
+        ? "音声の準備に時間がかかったため、端末の音声で再生しています…"
+        : "AivisSpeechを利用できないため、端末の音声で再生しています…";
+      if (!speakWithBrowser(remainingText, { reason })) {
+        setVoiceState("音声を再生できませんでした。", { error: true });
       }
     }
   }
@@ -380,7 +513,7 @@
     localStorage.setItem("petit_voice_reply_enabled", voiceReplyEnabled ? "1" : "0");
     if (!voiceReplyEnabled) stopSpeaking();
     updateVoiceToggle();
-    setVoiceState(voiceReplyEnabled ? "AivisSpeech音声応答を有効にしました。" : "音声応答を無効にしました。");
+    setVoiceState(voiceReplyEnabled ? "音声応答を有効にしました。" : "音声応答を無効にしました。");
   });
 
   micEl.addEventListener("click", toggleListening);
