@@ -339,7 +339,7 @@ def _create_event(category: str, title: str, body: str, url: str) -> tuple[int, 
         "url": url or "/",
         "category": category,
         "tag": f"petit-{category}",
-        "icon": "/static/icon-192.jpg",
+        "icon": "/static/icon-192.png",
         "badge": "/static/favicon-64.png",
     }
     now = db.now_iso()

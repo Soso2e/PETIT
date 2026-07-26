@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import struct
 import unittest
 from pathlib import Path
 
@@ -31,6 +32,28 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertEqual(manifest["start_url"], "/")
         self.assertEqual(manifest["scope"], "/")
         self.assertTrue(manifest["icons"])
+        self.assertEqual(
+            {icon["purpose"] for icon in manifest["icons"]},
+            {"any", "maskable"},
+        )
+
+    def test_pwa_icons_are_valid_png_files_with_declared_sizes(self) -> None:
+        manifest = json.loads((FRONTEND / "manifest.webmanifest").read_text(encoding="utf-8"))
+        for icon in manifest["icons"]:
+            self.assertEqual(icon["type"], "image/png")
+            path = FRONTEND / icon["src"].removeprefix("/static/")
+            data = path.read_bytes()
+            self.assertTrue(data.startswith(b"\x89PNG\r\n\x1a\n"))
+            self.assertEqual(data[-12:], b"\x00\x00\x00\x00IEND\xaeB`\x82")
+            width, height = struct.unpack(">II", data[16:24])
+            declared_size = tuple(int(value) for value in icon["sizes"].split("x"))
+            self.assertEqual((width, height), declared_size)
+
+    def test_brand_logo_sources_are_preserved(self) -> None:
+        for filename in ("name_logo.png", "icon_logo.png"):
+            data = (FRONTEND / "branding" / filename).read_bytes()
+            self.assertTrue(data.startswith(b"\x89PNG\r\n\x1a\n"))
+            self.assertEqual(data[-12:], b"\x00\x00\x00\x00IEND\xaeB`\x82")
 
     def test_session_split_and_internal_prompt_filter_are_present(self) -> None:
         source = (FRONTEND / "session.js").read_text(encoding="utf-8")
