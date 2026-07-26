@@ -2,50 +2,179 @@
 
 PETITはAivisSpeech Engineを使って返答をWAV音声に変換します。AivisSpeechが停止中の場合、対応ブラウザではブラウザ標準TTSへ自動フォールバックします。
 
-## セットアップ
+## 無料運用の方針
 
-1. AivisSpeechをインストールし、使用する音声モデルを追加する。
-2. AivisSpeech EngineまたはAivisSpeechエディタを起動する。
-3. `http://127.0.0.1:10101/docs` が開けることを確認する。
-4. PETITの`.env`へ次を設定する。
+PETITの読み上げに有料APIは必須ではありません。
+
+- **高速・確実さ優先**: ブラウザ標準TTS
+- **日本語の声質優先**: ローカルAivisSpeech
+
+AivisSpeechをまだ導入していない、Engineが停止している、モデル設定が失敗している場合でも、PETITのテキスト会話は継続します。音声応答を有効にしている対応ブラウザでは、標準TTSへ切り替わります。
+
+## 初期セットアップ
+
+### 1. AivisSpeechをインストールする
+
+AivisSpeech公式配布ページから、PETITを動かすPCへAivisSpeechをインストールします。
+
+Windowsでは、インストール後にスタートメニューからAivisSpeechを起動できることを確認します。PETITとAivisSpeechは同じPCで動かすのが最も簡単です。
+
+### 2. 音声モデルを追加する
+
+AivisSpeechを起動し、使用する音声モデルを追加します。モデルが1つも入っていないと、Engineへ接続できても話者を取得できず、音声合成できません。
+
+追加後、AivisSpeech上で短い文章を入力し、アプリ単体で音声を生成できることを先に確認してください。
+
+### 3. AivisSpeech Engineを起動する
+
+AivisSpeech EngineまたはAivisSpeechエディタを起動します。既定の接続先は次です。
+
+```text
+http://127.0.0.1:10101
+```
+
+ブラウザでAPIドキュメントを開きます。
+
+```text
+http://127.0.0.1:10101/docs
+```
+
+開けない場合は、PETITではなくAivisSpeech側の起動・ポート・ファイアウォールを確認します。
+
+### 4. 話者一覧を確認する
+
+PowerShellで実行します。
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:10101/speakers |
+    ConvertTo-Json -Depth 20
+```
+
+話者とスタイルの一覧が返れば、PETITからEngineへ到達できます。声を固定する場合は、使いたいスタイルの`id`を控えます。
+
+### 5. `.env`を設定する
+
+プロジェクトルートの`.env`へ設定します。
 
 ```env
 PETIT_TTS_PROVIDER=aivis
 PETIT_TTS_BASE_URL=http://127.0.0.1:10101
 PETIT_TTS_STYLE_ID=
+PETIT_TTS_TIMEOUT=30
+PETIT_TTS_MAX_CHARS=1000
 PETIT_TTS_SPEED_SCALE=1.0
 PETIT_TTS_INTONATION_SCALE=1.0
 PETIT_TTS_VOLUME_SCALE=1.0
 ```
 
-`PETIT_TTS_STYLE_ID`が空の場合は、`GET /speakers`で返る最初のスタイルを使用します。声を固定する場合は、AivisSpeech Engineの`/speakers`レスポンス内にあるスタイルの`id`を設定してください。
+`PETIT_TTS_STYLE_ID`が空の場合は、`GET /speakers`で返る最初のスタイルを使用します。声を固定する場合は、先ほど確認したスタイルIDを設定します。
 
-## 最小診断
+`.env`を変更したらPETITを再起動します。OS環境変数に同名の設定がある場合は、`.env`よりOS環境変数が優先されます。
 
-PETITの会話画面やブラウザ再生から切り離して、Engine疎通、話者取得、固定短文合成、WAV検証を順番に確認できます。
+### 6. 診断CLIを実行する
 
-```bash
+PETITの会話画面やブラウザ再生から切り離し、Engine疎通、話者取得、固定短文合成、WAV検証を順番に確認します。
+
+```powershell
 python scripts/diagnose_aivis_speech.py
 ```
 
-既定では`こんにちは、音声テストです。`を合成し、有効なWAVだけを`storage/diagnostics/aivis_speech_test.wav`へ保存します。保存せず疎通だけ確認する場合は次を使います。
+成功すると次のように表示されます。
 
-```bash
+```json
+{
+  "ok": true,
+  "stage": "complete"
+}
+```
+
+既定では`こんにちは、音声テストです。`を合成し、有効なWAVだけを次へ保存します。
+
+```text
+storage/diagnostics/aivis_speech_test.wav
+```
+
+保存せず疎通だけ確認する場合は次を使います。
+
+```powershell
 python scripts/diagnose_aivis_speech.py --no-write
 ```
 
+### 7. 保存WAVを再生する
+
+Windows PowerShellで実行します。
+
+```powershell
+Invoke-Item .\storage\diagnostics\aivis_speech_test.wav
+```
+
+日本語音声が再生できれば、次の経路は成功しています。
+
+```text
+PETITのPython処理
+→ AivisSpeech Engine
+→ 音声クエリ
+→ WAV合成
+→ ファイル保存
+```
+
+その後、PETITのブラウザ画面で音声応答を有効にして確認します。
+
+## 診断結果別の確認
+
 結果はJSONで出力され、`stage`で失敗箇所を区別します。
 
-- `not_configured`: AivisSpeech設定が無効
-- `engine_unreachable`: Engineへ接続できない
-- `speaker_not_found`: 話者・スタイルを解決できない
-- `audio_query_failed`: 音声クエリ作成に失敗
-- `synthesis_failed`: WAV合成に失敗
-- `invalid_audio_response`: RIFF/WAVEヘッダーまたは音声情報が不正
-- `request_timeout`: Engine応答がタイムアウト
-- `complete`: WAV検証と保存まで成功
+### `not_configured`
 
-成功時は話者ID、バイト数、チャンネル数、サンプルレート、フレーム数、長さ、保存先を返します。会話本文そのものや秘密情報は記録しません。
+`.env`の次を確認します。
+
+```env
+PETIT_TTS_PROVIDER=aivis
+```
+
+### `engine_unreachable`
+
+Engineが起動していないか、接続先が違います。
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:10101/speakers
+```
+
+これも失敗する場合は、AivisSpeechの起動、ポート、Windowsファイアウォールを確認します。
+
+### `speaker_not_found`
+
+音声モデルが追加されていないか、`PETIT_TTS_STYLE_ID`が実在しません。一度空欄に戻します。
+
+```env
+PETIT_TTS_STYLE_ID=
+```
+
+### `audio_query_failed`
+
+文章から音声クエリを作成する段階で失敗しています。AivisSpeechアプリ単体で同じモデルが発話できるか確認します。
+
+### `synthesis_failed`
+
+音声クエリ作成後のWAV合成で失敗しています。診断JSONの`upstream_status`とAivisSpeech側ログを確認します。
+
+### `invalid_audio_response`
+
+HTTP応答は返っていますが、有効なWAVではありません。接続先が別サービスやエラーページになっていないか確認します。
+
+### `request_timeout`
+
+合成処理が設定時間内に完了していません。一時的な確認として次へ増やせます。
+
+```env
+PETIT_TTS_TIMEOUT=60
+```
+
+ただし日常会話では長く待たせず、ブラウザ標準TTSへ切り替える設計を優先します。
+
+### `complete`
+
+WAV検証と保存まで成功です。保存ファイルを再生し、その後PETIT画面の読み上げを確認します。
 
 ## PETIT API
 
@@ -56,6 +185,13 @@ GET /api/tts/status
 ```
 
 AivisSpeechへの接続可否、設定値、実際に選択されたスタイルIDを返します。失敗時は`error_code`、`retryable`、`upstream_status`も返すため、Engine停止・タイムアウト・上流HTTPエラーを区別できます。
+
+PowerShellでは次を使えます。
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/tts/status |
+    ConvertTo-Json -Depth 10
+```
 
 ### 音声生成
 
@@ -97,6 +233,12 @@ http://PETITのIP:8000/api/tts/status
 
 PETITをDockerやWSLで動かし、AivisSpeechをWindows側で動かす場合、コンテナ／WSL内の`127.0.0.1`はWindowsホストを指しません。`PETIT_TTS_BASE_URL`を`host.docker.internal`またはWindowsホストの到達可能なIPへ変更してください。
 
+例:
+
+```env
+PETIT_TTS_BASE_URL=http://host.docker.internal:10101
+```
+
 ## 調整値
 
 - `PETIT_TTS_SPEED_SCALE`: 話速。0.5〜2.0へ制限
@@ -109,7 +251,7 @@ PETITをDockerやWSLで動かし、AivisSpeechをWindows側で動かす場合、
 
 - 新しいPETIT返答を画面へ表示した後、読み上げを非同期で開始する
 - 読み上げ文を句点・疑問符・改行などで分け、約48文字を目安、最大72文字のチャンクへまとめる
-- 先頭チャンクを先に生成し、再生中に次のチャンクを先読みする
+- 先頭チャンクを先に生成し、再生中に次チャンクを先読みする
 - 各チャンクの準備が5秒を超えた場合はAivisSpeech処理を中止し、残りだけブラウザ標準TTSへフォールバックする
 - 音声状態は`音声を準備中…`、`PETITが話しています…`などの短い表示にする
 - 各返答のスピーカーボタンで再読上げできる
