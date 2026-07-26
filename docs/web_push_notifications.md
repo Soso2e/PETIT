@@ -32,12 +32,12 @@ Issue #92で追加した、PWA向け通知基盤の設定・運用・検証手�
 
 ```env
 PETIT_VAPID_PUBLIC_KEY=<URL-safe Base64のP-256公開鍵>
-PETIT_VAPID_PRIVATE_KEY=/absolute/path/to/private_key.pem
+PETIT_VAPID_PRIVATE_KEY=/absolute/path/to/PETIT/storage/keys/vapid_private.pem
 PETIT_VAPID_SUBJECT=mailto:your-address@example.com
 PETIT_WEB_PUSH_TTL_SECONDS=300
 ```
 
-- 秘密鍵はGitへ追加しない
+- 秘密鍵はGitへ追加せず、Git管理外の`storage/keys/`などへ置く
 - `PETIT_VAPID_SUBJECT`は`mailto:`または公開可能な`https:` URLを使う
 - `PETIT_WEB_PUSH_TTL_SECONDS`は任意。既定値は300秒、最大86400秒
 
@@ -46,15 +46,16 @@ PETIT_WEB_PUSH_TTL_SECONDS=300
 OpenSSLで秘密鍵を作り、ブラウザの`applicationServerKey`用公開鍵をURL-safe Base64へ変換します。
 
 ```bash
-openssl ecparam -name prime256v1 -genkey -noout -out private_key.pem
-openssl ec -in private_key.pem -pubout -outform DER \
+mkdir -p storage/keys
+openssl ecparam -name prime256v1 -genkey -noout -out storage/keys/vapid_private.pem
+openssl ec -in storage/keys/vapid_private.pem -pubout -outform DER \
   | tail -c 65 \
   | base64 \
   | tr -d '=\n' \
   | tr '/+' '_-'
 ```
 
-表示された公開鍵を`PETIT_VAPID_PUBLIC_KEY`へ設定し、秘密鍵ファイルの絶対パスを`PETIT_VAPID_PRIVATE_KEY`へ設定します。
+表示された公開鍵を`PETIT_VAPID_PUBLIC_KEY`へ設定し、`storage/keys/vapid_private.pem`の絶対パスを`PETIT_VAPID_PRIVATE_KEY`へ設定します。Windowsでは`.env.example`のパス例を参照してください。
 
 ## API
 
