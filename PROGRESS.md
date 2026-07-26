@@ -108,3 +108,7 @@
 | 2026-07-26 | 05:06 | #71 | Issue #93の連続失敗対策として、再試行可能なAivisSpeech失敗を数え、2回連続で60秒回路遮断、`status`への残り秒数・失敗分類公開、疎通・合成成功時の自動解除、回帰テスト2件、文書を追加。GitHub Actionsと実Engine復旧E2Eは未確認。 |
 | 2026-07-26 | 07:26 | #72 | チャット入力でIME変換確定中のEnter送信を抑止し、通常Enter送信とShift+Enter改行を維持。JavaScript構文確認と実ブラウザ確認は修正後に実施。 |
 | 2026-07-26 | 07:26 | #73 | IME Enter修正のJavaScript構文、差分、通常Enter／Shift+Enter／IME変換中Enterの条件テストを確認。ローカルサーバー未起動のため実ブラウザE2Eは未確認。 |
+| 2026-07-26 | 07:46 | #74 | Issue #107対応として破損していたPWA用192／512／Apple Touchアイコンを正常なPNGへ再生成し、通常用とmaskable用を分離。manifest・通知・Service Worker参照と画像回帰テストを更新。 |
+| 2026-07-26 | 07:51 | #75 | PWAアイコン5点の実デコード・寸法、Mobile work companion静的テスト6件、Service Worker JavaScript構文、通知Python構文、差分形式を確認。通知単体テストは環境にFastAPIがなく未実施。 |
+| 2026-07-26 | 07:58 | #76 | 提供された文字ロゴを`frontend/branding/name_logo.png`、惑星ロゴを`icon_logo.png`として原寸保存し、惑星ロゴからfavicon・Apple Touch・PWA通常／maskableアイコンを再生成。Service Workerキャッシュを更新。 |
+| 2026-07-26 | 08:01 | #77 | ブランド原本2点と派生アイコン6点の実デコード・寸法、Mobile work companion静的テスト7件、Service Worker JavaScript構文、通知Python構文、差分形式を確認。 |
