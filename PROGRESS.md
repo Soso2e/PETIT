@@ -106,3 +106,5 @@
 | 2026-07-26 | 04:25 | #69 | Issue #93のPhase 1〜2として音声テキストを文単位チャンクへ分割し、先頭生成後の再生中に次チャンクを先読み、チャンクごとの5秒タイムアウト、残り部分のブラウザTTS fallback、ユーザー入力時の生成・再生キャンセル、簡潔な音声状態表示を追加。JavaScript構文・実AivisSpeech／PC／スマホE2EはGitHub Actionsと実機で未確認。 |
 | 2026-07-26 | 04:49 | #70 | Issue #93 Phase 0として会話画面から独立したAivisSpeech診断CLIを追加。Engine疎通、話者解決、固定短文合成、RIFF/WAVE・音声情報検証、検証済みWAV保存、失敗段階JSON分類、単体テスト3件、CI・文書を追加。GitHub Actionsと実AivisSpeechでの診断実行は未確認。 |
 | 2026-07-26 | 05:06 | #71 | Issue #93の連続失敗対策として、再試行可能なAivisSpeech失敗を数え、2回連続で60秒回路遮断、`status`への残り秒数・失敗分類公開、疎通・合成成功時の自動解除、回帰テスト2件、文書を追加。GitHub Actionsと実Engine復旧E2Eは未確認。 |
+| 2026-07-26 | 07:26 | #72 | チャット入力でIME変換確定中のEnter送信を抑止し、通常Enter送信とShift+Enter改行を維持。JavaScript構文確認と実ブラウザ確認は修正後に実施。 |
+| 2026-07-26 | 07:26 | #73 | IME Enter修正のJavaScript構文、差分、通常Enter／Shift+Enter／IME変換中Enterの条件テストを確認。ローカルサーバー未起動のため実ブラウザE2Eは未確認。 |
