@@ -13,6 +13,7 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png" />
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="stylesheet" href="/static/companion.css" />
+  <link rel="stylesheet" href="/static/notifications.css" />
 </head>
 <body>
   <div class="app">
@@ -21,6 +22,7 @@
       <span id="app-version" class="status status--unknown" title="起動中のPETITバージョン">v…</span>
       <span id="status" class="status status--unknown">接続確認中…</span>
       <div class="header-actions">
+        <button id="notification-toggle" type="button" class="notification-toggle" aria-pressed="false" aria-expanded="false">通知 OFF</button>
         <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
       </div>
       <div class="header-meta">
@@ -28,6 +30,19 @@
         <button id="history-toggle" type="button" class="history-toggle" aria-expanded="false" hidden>履歴を見る</button>
       </div>
     </header>
+
+    <section id="notification-panel" class="notification-panel" aria-label="通知設定" hidden>
+      <div class="notification-panel__head">
+        <h2>通知設定</h2>
+      </div>
+      <p id="notification-state" class="notification-panel__state" role="status" aria-live="polite">通知状態を確認中…</p>
+      <div id="notification-categories" class="notification-categories"></div>
+      <div class="notification-panel__actions">
+        <button id="notification-enable" type="button">この端末で有効にする</button>
+        <button id="notification-test" type="button" disabled>テスト通知</button>
+        <button id="notification-disable" type="button" hidden>この端末の通知を解除</button>
+      </div>
+    </section>
 
     <section id="companion-dashboard" class="companion-dashboard" aria-label="制作伴走ダッシュボード">
       <article class="companion-card companion-card--work">
@@ -99,6 +114,7 @@
   <script src="/static/session.js"></script>
   <script src="/static/version.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/notifications.js"></script>
   <script src="/static/action_confirm.js"></script>
   <script src="/static/mobile_audio_unlock.js"></script>
   <script src="/static/voice.js"></script>
