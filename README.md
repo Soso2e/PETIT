@@ -40,6 +40,11 @@ storage/   SQLite などの実行時データ（git 管理外）
 
 4. ブラウザで <http://127.0.0.1:8000> を開く。
 
+5. 音声読み上げを使う場合は [`docs/aivis_speech.md`](docs/aivis_speech.md) の初期セットアップへ進む。
+   - AivisSpeechを使う場合は、Windowsでのインストール → 音声モデル追加 → Engine起動 → `/docs` / `/speakers` → `.env` → 診断CLI → WAV再生の順で確認します。
+   - AivisSpeechが未準備・停止中でもチャットは利用でき、対応ブラウザでは無料のブラウザ標準TTSへフォールバックできます。
+   - 有料TTS APIは前提ではありません。
+
 ## 環境変数（主なもの）
 
 | 変数 | 既定値 | 説明 |
@@ -55,6 +60,10 @@ storage/   SQLite などの実行時データ（git 管理外）
 | `PETIT_SONA_CORE_AUDIT_PATH` | `storage/audit/sona_agent_core.jsonl` | Core Tool実行の監査ログ |
 | `PETIT_SONA_CORE_APPROVAL_TTL_SECONDS` | `600` | Core Approvalの有効期限（秒） |
 | `PETIT_HOST` / `PETIT_PORT` | `127.0.0.1` / `8000` | サーバーの待受 |
+| `PETIT_TTS_PROVIDER` | `aivis` | 読み上げProvider。AivisSpeech未利用時もチャットは動作 |
+| `PETIT_TTS_BASE_URL` | `http://127.0.0.1:10101` | PETITプロセスから見たAivisSpeech Engine接続先 |
+| `PETIT_TTS_STYLE_ID` | 空欄 | 空欄なら`/speakers`の最初のスタイルを自動選択 |
+| `PETIT_TTS_TIMEOUT` | `30` | AivisSpeech Engine応答待ち秒数 |
 | `PETIT_OBSIDIAN_VAULT_DIRS` | なし | RAG検索対象にする既存Obsidian vault。Windowsは`;`区切り |
 | `PETIT_VAULT_SUBDIR` | `PETIT` | PETITがMarkdownを書き込むvault内サブディレクトリ |
 | `PETIT_EMBED_RETRY_SECONDS` | `60` | Embedding停止時の再試行間隔 |
@@ -86,7 +95,8 @@ storage/   SQLite などの実行時データ（git 管理外）
 | `PETIT_VAPID_SUBJECT` | なし | VAPID連絡先。`mailto:`または公開可能な`https:` URL |
 | `PETIT_WEB_PUSH_TTL_SECONDS` | `300` | Push Serviceが通知を保持する秒数 |
 
-Notion Adapter v2、Notion会話検索、Linkraft、GitHub evidence、Web Pushの詳細設定は、
+AivisSpeech、Notion Adapter v2、Notion会話検索、Linkraft、GitHub evidence、Web Pushの詳細設定は、
+[`docs/aivis_speech.md`](docs/aivis_speech.md)、
 [`docs/notion_adapter_v2.md`](docs/notion_adapter_v2.md)、
 [`docs/notion_search.md`](docs/notion_search.md)、
 [`docs/linkraft_owner_sync.md`](docs/linkraft_owner_sync.md)、
@@ -281,6 +291,8 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
 
 - Notion会話検索テスト: `python -m unittest tests.test_notion_search -v`
 - Web Push通知テスト: `python -m unittest tests.test_notifications -v`
-- 全Python構文確認: `python -m compileall backend tests`
+- AivisSpeech診断CLI確認: `python scripts/diagnose_aivis_speech.py --help`
+- AivisSpeechテスト: `python -m unittest tests.test_aivis_speech -v`
+- 全Python構文確認: `python -m compileall backend tests scripts`
 - 変更のたびに`PROGRESS.md`へ追記する。
 - ルール詳細は[`CLAUDE.md`](./CLAUDE.md)。
