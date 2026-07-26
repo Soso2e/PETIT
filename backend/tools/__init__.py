@@ -25,6 +25,20 @@ from . import (
     task_defaults,
 )  # noqa: F401  (import for side-effect registration)
 from .. import web_tools  # noqa: F401  (register web/news/weather tools)
-from .registry import dispatch, openai_tools_schema, parse_arguments, registered_names, requires_confirmation
+from .registry import (
+    dispatch,
+    openai_tools_schema,
+    parse_arguments,
+    registered_names,
+    requires_confirmation,
+    tool_risk,
+)
 
-__all__ = ["dispatch", "openai_tools_schema", "parse_arguments", "registered_names", "requires_confirmation"]
+__all__ = [
+    "dispatch",
+    "openai_tools_schema",
+    "parse_arguments",
+    "registered_names",
+    "requires_confirmation",
+    "tool_risk",
+]
