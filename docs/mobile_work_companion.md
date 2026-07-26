@@ -82,16 +82,18 @@ Web版では、次をすべて満たすときだけ定期チェックを実行�
 
 ## PWA
 
-追加ファイル:
+主なファイル:
 
 - `frontend/manifest.webmanifest`
-- `frontend/sw.js`
+- `frontend/service-worker.js`
 - `frontend/icon.svg`
 
-Service Workerは静的シェルをキャッシュするが、通常はネットワークを優先する。`/api/`はキャッシュしない。
+ルートService Workerは静的シェルのネットワーク優先キャッシュとWeb Push受信をまとめて扱う。`/api/`はキャッシュしない。旧`frontend/sw.js`は既存インストール互換のため残しているが、新しいPWA起動先と通知購読はルートスコープを使う。
+
+Web Pushの設定、通知カテゴリ、API、実iPhone確認は[`web_push_notifications.md`](web_push_notifications.md)を参照する。
 
 ## 制限
 
-iPhoneでWebアプリがバックグラウンドへ移ると、JavaScriptタイマーの正確な継続実行は保証されない。今回の定期声かけは前景動作に限定する。
+iPhoneでWebアプリがバックグラウンドへ移ると、JavaScriptタイマーの正確な継続実行は保証されない。画面内の定期声かけは前景動作に限定する。
 
-バックグラウンド通知、Web Push、SwiftUIネイティブ版は別Issueで扱う。
+Web Push基盤はバックグラウンド受信に使えるが、作業セッションの開始・停止状態は現在ブラウザ`localStorage`だけにあるため、自動の作業セッション通知へ接続するには状態のサーバー保存が別途必要。SwiftUIネイティブ版とAPNs Providerも別工程で扱う。
