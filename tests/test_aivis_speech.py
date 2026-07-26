@@ -73,6 +73,9 @@ class FakeLock:
 
 
 class AivisSpeechTests(unittest.TestCase):
+    def setUp(self) -> None:
+        aivis_speech._record_circuit_success()
+
     def _config_patches(self, **overrides):
         values = {
             "TTS_PROVIDER": "aivis",
@@ -175,6 +178,59 @@ class AivisSpeechTests(unittest.TestCase):
         self.assertIn("model is loading", str(raised.exception))
         self.assertIn("/audio_query", str(raised.exception))
 
+    def test_circuit_opens_after_two_failures_and_skips_next_request(self) -> None:
+        clients = [
+            FakeClient([
+                FakeResponse(json_data={"detail": "engine busy"}, status_code=503),
+                FakeResponse(json_data={"detail": "engine busy"}, status_code=503),
+            ]),
+            FakeClient([
+                FakeResponse(json_data={"detail": "engine busy"}, status_code=503),
+                FakeResponse(json_data={"detail": "engine busy"}, status_code=503),
+            ]),
+        ]
+        self._start_config_patches()
+
+        with (
+            patch.object(aivis_speech.httpx, "Client", side_effect=clients) as client_factory,
+            patch.object(aivis_speech.time, "sleep"),
+        ):
+            for _index in range(2):
+                with self.assertRaises(aivis_speech.AivisSpeechError):
+                    aivis_speech.synthesize("連続失敗")
+            with self.assertRaises(aivis_speech.AivisSpeechError) as blocked:
+                aivis_speech.synthesize("上流へ送らない")
+
+        self.assertEqual(blocked.exception.code, "aivis_circuit_open")
+        self.assertTrue(blocked.exception.retryable)
+        self.assertGreater(blocked.exception.retry_after_seconds or 0, 0)
+        self.assertEqual(client_factory.call_count, 2)
+        state = aivis_speech.status(check_engine=False)
+        self.assertTrue(state["circuit_open"])
+        self.assertEqual(state["consecutive_failures"], 2)
+
+    def test_successful_health_check_closes_open_circuit(self) -> None:
+        failure = aivis_speech.AivisSpeechError(
+            "offline",
+            code="aivis_connection_failed",
+            retryable=True,
+        )
+        aivis_speech._record_circuit_failure(failure)
+        aivis_speech._record_circuit_failure(failure)
+        self.assertTrue(aivis_speech.status(check_engine=False)["circuit_open"])
+
+        client = FakeClient([
+            FakeResponse(json_data=[{"name": "PETIT", "styles": [{"id": 123, "name": "通常"}]}]),
+        ])
+        self._start_config_patches(TTS_STYLE_ID=None)
+
+        with patch.object(aivis_speech.httpx, "Client", return_value=client):
+            result = aivis_speech.status(check_engine=True)
+
+        self.assertTrue(result["available"])
+        self.assertFalse(result["circuit_open"])
+        self.assertEqual(result["consecutive_failures"], 0)
+
     def test_synthesize_serializes_engine_access(self) -> None:
         client = FakeClient([
             FakeResponse(json_data={}),
@@ -211,6 +267,7 @@ class AivisSpeechTests(unittest.TestCase):
         self.assertEqual(result["error_code"], "aivis_connection_failed")
         self.assertTrue(result["retryable"])
         self.assertIn("offline", result["error"])
+        self.assertEqual(result["consecutive_failures"], 1)
 
     def test_diagnostic_saves_only_valid_wav(self) -> None:
         audio = self._valid_wav_bytes()
