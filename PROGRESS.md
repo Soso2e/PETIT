@@ -11,7 +11,8 @@
 - 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
 - 日次生活インデックス: 全`session_id`の会話をAsia/Tokyo基準で1日1回まとめ、空・記号のみ・連続重複だけを除外してローカルLM Studioへ送る。雑談の外出・食事・人・場所・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存し、長期記憶候補は自動昇格しない。専用CIと実ローカルLLM E2Eは未確認。
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
-- 制作伴走Web UI: 作業モード、経過時間、一時停止・終了、10分／20分ごとの前景限定自律声かけ、Highタスク・次の予定・次の一手、直近3ラリー表示、2時間アイドルでのセッション分離、途中経過メッセージ、PWAを実装。5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eとバックグラウンド通知は未確認。
+- 制作伴走Web UI: 作業モード、経過時間、一時停止・終了、10分／20分ごとの前景限定自律声かけ、Highタスク・次の予定・次の一手、直近3ラリー表示、2時間アイドルでのセッション分離、途中経過メッセージ、PWAを実装。5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eは未確認。
+- Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in設定、SQLiteの通知イベント・配信履歴、Web Push Provider境界、設定UI、テスト通知を実装。通知未設定でも既存チャットは動作する。専用単体テスト5件とJavaScript構文確認は成功、実VAPID／HTTPSブラウザ／バックグラウンド受信／通知タップ／実iPhone PWA E2Eは未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
 - Notion会話検索: 明示的なNotion参照をルーターLLM前に決定論的検出し、共有済みページを最大3件検索、プロパティ・本文抜粋・更新日時・URLを取得する。結果ありはAgent 1回、未設定・0件・API失敗はLLMなしで区別する。実Notion／ブラウザE2Eは未確認。
@@ -25,7 +26,7 @@
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
 - 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: Issue #80の実ブラウザ／LM Studio／AivisSpeech／iPhoneホーム画面E2Eを確認し、その後Issue #75の実Notion Webhook／公開HTTPS／ブラウザE2EとIssue #73／#64／#60／#62の実サービスE2Eへ戻る。
+- 次にやること: Issue #92のVAPID設定、HTTPSブラウザ、バックグラウンド受信、通知タップ、解除、実iPhoneホーム画面PWA E2Eを確認する。その後Issue #80の実ブラウザ／LM Studio／AivisSpeech E2E、Issue #75の実Notion Webhook／公開HTTPS／ブラウザE2E、Issue #73／#64／#60／#62の実サービスE2Eへ戻る。
 
 ## 履歴
 
@@ -100,3 +101,4 @@
 | 2026-07-24 | 13:59 | #64 | Issue #78対応として`get_tasks`を既定Highに変更し、`priority=later`でMid/Medium＋Low、`priority=all`で未設定を含む全優先度を取得できるようにした。重複確認は全優先度を参照し、優先度別・既存状態・Notion同期の回帰テストを更新。ローカル仮DBでSQL動作と変更ファイルの構文を確認、GitHub Actionsと実会話E2Eは未確認。 |
 | 2026-07-25 | 06:34 | #65 | Issue #80対応としてスマホ向け制作伴走モードを実装し、PR #81をmainへ統合。作業トラッキング、10分／20分ごとの前景限定自律声かけ、Highタスク・予定・次の一手、直近3ラリー、2時間セッション分離、途中経過メッセージ、PWAを追加。Mobile work companion／AivisSpeech／Task conversation flow／Core hardening／Model route switcherの全5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eとバックグラウンド通知は未確認。 |
 | 2026-07-25 | 18:07 | #66 | Issue #88対応として、提供画像を64px PNGへ縮小・最適化し、ブラウザfaviconを新しいPETIT惑星ロゴへ更新。HTML参照と画像デコードを確認し、実ブラウザでのキャッシュ更新後表示は未確認。 |
+| 2026-07-26 | 03:31 | #67 | Issue #92対応としてWeb Push通知基盤を実装。Service Worker／Push API／VAPID、購読登録・解除、カテゴリ別opt-in、SQLiteの購読・通知イベント・配信履歴、`NotificationProvider`境界、通知設定UI、テスト通知、秘密鍵Git除外、専用テスト・CI・README／Concept／実iPhone確認文書を追加。ローカル単体テスト5件とJavaScript構文確認成功、GitHub Actionsと実VAPID／HTTPSブラウザ／実iPhone PWA E2Eは未確認。 |

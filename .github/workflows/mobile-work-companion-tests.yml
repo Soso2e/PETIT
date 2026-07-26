@@ -8,6 +8,7 @@ on:
       - "frontend/companion.js"
       - "frontend/companion.css"
       - "frontend/manifest.webmanifest"
+      - "frontend/service-worker.js"
       - "frontend/sw.js"
       - "frontend/icon.svg"
       - "tests/test_mobile_work_companion.py"
@@ -33,6 +34,6 @@ jobs:
         run: |
           node --check frontend/session.js
           node --check frontend/companion.js
-          node --check frontend/sw.js
+          node --check frontend/service-worker.js
       - name: Run static regression tests
         run: python -m unittest tests.test_mobile_work_companion -v

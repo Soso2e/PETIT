@@ -5,4 +5,5 @@ pydantic>=2.6
 chromadb>=0.5
 tzdata>=2025.2
 timetree-exporter
+pywebpush>=2.0.0
 sona-agent-core @ git+https://github.com/Soso2e/Sona-Agent-Core.git@0e220a2ec2d1227256495690eefed00beb4e2b5a

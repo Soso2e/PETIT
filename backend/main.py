@@ -20,19 +20,21 @@ import threading
 import time
 from uuid import uuid4
 
-from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, model_routing, notion_task_sync, proactive, request_context, scheduler, tools, vault_indexer, worker
+from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, model_routing, notion_task_sync, notifications, proactive, request_context, scheduler, tools, vault_indexer, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
+app.include_router(notifications.router)
 _artifact_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="petit-artifacts")
 
 
 @app.on_event("startup")
 def _startup() -> None:
     db.init_db()
+    notifications.init_db()
     # Sync existing SQLite data into Chroma in background (best-effort)
     threading.Thread(target=_chroma_sync, daemon=True).start()
     # Autonomous summarizer: fold conversations into memory every N hours
@@ -163,6 +165,7 @@ def health() -> dict[str, Any]:
             "agent_model": agent_health["model"],
         },
         "tts": aivis_speech.status(check_engine=False),
+        "notifications": notifications.notification_status(),
     }
 
 
@@ -480,6 +483,20 @@ def acknowledge_jobs(payload: JobAck) -> dict[str, Any]:
 # Mount assets under /static and serve index.html at the root.
 if config.FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=config.FRONTEND_DIR), name="static")
+
+    @app.get("/service-worker.js", include_in_schema=False)
+    def service_worker() -> Any:
+        service_worker_file = config.FRONTEND_DIR / "service-worker.js"
+        if service_worker_file.exists():
+            return FileResponse(
+                service_worker_file,
+                media_type="application/javascript",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Service-Worker-Allowed": "/",
+                },
+            )
+        return JSONResponse({"detail": "service worker not found"}, status_code=404)
 
     @app.get("/")
     def index() -> Any:

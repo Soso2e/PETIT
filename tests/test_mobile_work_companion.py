@@ -28,8 +28,8 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
     def test_manifest_is_valid_and_standalone(self) -> None:
         manifest = json.loads((FRONTEND / "manifest.webmanifest").read_text(encoding="utf-8"))
         self.assertEqual(manifest["display"], "standalone")
-        self.assertEqual(manifest["start_url"], "/static/index.html?source=pwa")
-        self.assertEqual(manifest["scope"], "/static/")
+        self.assertEqual(manifest["start_url"], "/")
+        self.assertEqual(manifest["scope"], "/")
         self.assertTrue(manifest["icons"])
 
     def test_session_split_and_internal_prompt_filter_are_present(self) -> None:
@@ -47,9 +47,11 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("作業モードを終了したよ", source)
 
     def test_service_worker_never_caches_api_requests(self) -> None:
-        source = (FRONTEND / "sw.js").read_text(encoding="utf-8")
+        source = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
         self.assertIn('url.pathname.startsWith("/api/")', source)
         self.assertIn("fetch(request)", source)
+        self.assertIn('self.addEventListener("push"', source)
+        self.assertIn('self.addEventListener("notificationclick"', source)
 
 
 if __name__ == "__main__":

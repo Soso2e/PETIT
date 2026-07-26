@@ -1,0 +1,41 @@
+name: Web Push notification tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/main.py"
+      - "backend/notifications.py"
+      - "frontend/index.html"
+      - "frontend/notifications.js"
+      - "frontend/service-worker.js"
+      - "frontend/manifest.webmanifest"
+      - "tests/test_notifications.py"
+      - "requirements.txt"
+      - ".github/workflows/web-push-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install notification test dependencies
+        run: python -m pip install --quiet fastapi pydantic pywebpush
+      - name: Compile Python sources
+        run: python -m compileall backend tests
+      - name: Check frontend syntax
+        run: |
+          node --check frontend/notifications.js
+          node --check frontend/service-worker.js
+      - name: Run notification tests
+        run: python -m unittest tests.test_notifications -v
