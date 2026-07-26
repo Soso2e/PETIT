@@ -13,7 +13,6 @@ on:
       - "tests/test_task_conversation_flow.py"
       - "tests/test_task_cancel_status.py"
       - "docs/task_conversation_flow.md"
-      - "PROGRESS.md"
       - ".github/workflows/task-conversation-flow-tests.yml"
 
 concurrency:

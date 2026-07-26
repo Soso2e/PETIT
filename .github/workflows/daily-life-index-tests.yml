@@ -10,7 +10,6 @@ on:
       - "docs/daily_life_index.md"
       - ".env.example"
       - "requirements.txt"
-      - "PROGRESS.md"
       - ".github/workflows/daily-life-index-tests.yml"
 
 concurrency:
