@@ -1,6 +1,7 @@
 # PETIT — Personal AI Assistant (MVP)
 
 設計とデータソースの役割は [ASSISTANT_ARCHITECTURE.md](ASSISTANT_ARCHITECTURE.md) を参照。
+主要な概念の使い分けは [docs/terminology.md](docs/terminology.md) を参照。
 
 会話から意図を読み取り、ツールを使って生活・タスク・予定・記憶を支える、
 自分専用のローカル AI アシスタント。詳しい思想は [`Concept.md`](./Concept.md) を参照。

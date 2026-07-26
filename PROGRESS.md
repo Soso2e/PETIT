@@ -102,3 +102,4 @@
 | 2026-07-25 | 06:34 | #65 | Issue #80対応としてスマホ向け制作伴走モードを実装し、PR #81をmainへ統合。作業トラッキング、10分／20分ごとの前景限定自律声かけ、Highタスク・予定・次の一手、直近3ラリー、2時間セッション分離、途中経過メッセージ、PWAを追加。Mobile work companion／AivisSpeech／Task conversation flow／Core hardening／Model route switcherの全5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eとバックグラウンド通知は未確認。 |
 | 2026-07-25 | 18:07 | #66 | Issue #88対応として、提供画像を64px PNGへ縮小・最適化し、ブラウザfaviconを新しいPETIT惑星ロゴへ更新。HTML参照と画像デコードを確認し、実ブラウザでのキャッシュ更新後表示は未確認。 |
 | 2026-07-26 | 03:31 | #67 | Issue #92対応としてWeb Push通知基盤を実装。Service Worker／Push API／VAPID、購読登録・解除、カテゴリ別opt-in、SQLiteの購読・通知イベント・配信履歴、`NotificationProvider`境界、通知設定UI、テスト通知、秘密鍵Git除外、専用テスト・CI・README／Concept／実iPhone確認文書を追加。ローカル単体テスト5件とJavaScript構文確認成功、GitHub Actionsと実VAPID／HTTPSブラウザ／実iPhone PWA E2Eは未確認。 |
+| 2026-07-26 | 04:10 | #68 | Issue #94対応としてPETIT用語集へのREADMEリンクを追加。既存用語集でタスク・プロジェクト・リスト・記憶・引き継ぎの定義と使い分け例を確認。ドキュメントのみのためコードテストは未実施。 |
