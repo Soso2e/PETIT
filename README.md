@@ -80,12 +80,17 @@ storage/   SQLite などの実行時データ（git 管理外）
 | `PETIT_GITHUB_INITIAL_LOOKBACK_DAYS` | `30` | 初回同期で遡る日数 |
 | `PETIT_GITHUB_MAX_CHECK_COMMITS` | `50` | 1回でcheckを確認するcommit数の上限 |
 | `PETIT_GITHUB_MAX_DEPLOYMENTS` | `20` | 1回でstatusを確認する最近のdeployment数 |
+| `PETIT_VAPID_PUBLIC_KEY` | なし | ブラウザ購読に渡すURL-safe Base64のVAPID公開鍵 |
+| `PETIT_VAPID_PRIVATE_KEY` | なし | Git管理外に置くVAPID秘密鍵PEMの絶対パスまたはエンコード済み秘密鍵 |
+| `PETIT_VAPID_SUBJECT` | なし | VAPID連絡先。`mailto:`または公開可能な`https:` URL |
+| `PETIT_WEB_PUSH_TTL_SECONDS` | `300` | Push Serviceが通知を保持する秒数 |
 
-Notion Adapter v2、Notion会話検索、Linkraft、GitHub evidenceの詳細設定は、
+Notion Adapter v2、Notion会話検索、Linkraft、GitHub evidence、Web Pushの詳細設定は、
 [`docs/notion_adapter_v2.md`](docs/notion_adapter_v2.md)、
 [`docs/notion_search.md`](docs/notion_search.md)、
 [`docs/linkraft_owner_sync.md`](docs/linkraft_owner_sync.md)、
-[`docs/github_evidence.md`](docs/github_evidence.md) を参照してください。
+[`docs/github_evidence.md`](docs/github_evidence.md)、
+[`docs/web_push_notifications.md`](docs/web_push_notifications.md) を参照してください。
 
 ## 現在使える主なツール
 
@@ -219,6 +224,14 @@ ChatとAgentはURL・APIキー・モデルを個別設定できます。Agent停
 
 `/api/health` と各応答の詳細欄では、経路、モデル、ツール、同期鮮度、LLM/Embedding回数、Agentフォールバック、Project Continuityの参照件数、source refreshのattempted/failed/skippedを確認できます。`model_route`にはAIルーターの判断、提案ツール、実際に公開したツール、tool結果の伝達方式も含まれます。
 
+## Web Push通知
+
+Service Worker、Push API、VAPIDを使い、ブラウザを閉じている場合もPETITの通知を受け取れます。購読情報、カテゴリ別設定、通知イベント、端末ごとの配信結果はSQLiteへ保存します。
+
+通知カテゴリはすべて初期OFFです。ヘッダーの通知設定から端末を購読し、必要な種類だけ有効にしてください。通知生成側は`dispatch_notification()`を呼び、配信先は`NotificationProvider`境界へ分離しているため、将来は同じ通知判断ロジックへAPNs Providerを追加できます。
+
+VAPID未設定・依存未導入・通知無効時も既存チャットは動作します。設定、API、実iPhone PWA確認手順は[`docs/web_push_notifications.md`](docs/web_push_notifications.md)を参照してください。
+
 ## Calendar
 
 Google CalendarのCodex/MCP接続はPETITプロセスへ自動共有されません。PETIT側で読むには`PETIT_CALENDAR_ICS_URLS`に非公開iCal URLを設定するか、`PETIT_CALENDAR_ICS_FILES`にエクスポート済み`.ics`を指定します。
@@ -266,6 +279,7 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
   ```
 
 - Notion会話検索テスト: `python -m unittest tests.test_notion_search -v`
+- Web Push通知テスト: `python -m unittest tests.test_notifications -v`
 - 全Python構文確認: `python -m compileall backend tests`
 - 変更のたびに`PROGRESS.md`へ追記する。
 - ルール詳細は[`CLAUDE.md`](./CLAUDE.md)。
