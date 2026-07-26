@@ -8,6 +8,7 @@ env/
 
 # Secrets
 .env
+storage/keys/
 
 # Runtime data
 storage/*.db
