@@ -112,3 +112,4 @@
 | 2026-07-26 | 07:51 | #75 | PWAアイコン5点の実デコード・寸法、Mobile work companion静的テスト6件、Service Worker JavaScript構文、通知Python構文、差分形式を確認。通知単体テストは環境にFastAPIがなく未実施。 |
 | 2026-07-26 | 07:58 | #76 | 提供された文字ロゴを`frontend/branding/name_logo.png`、惑星ロゴを`icon_logo.png`として原寸保存し、惑星ロゴからfavicon・Apple Touch・PWA通常／maskableアイコンを再生成。Service Workerキャッシュを更新。 |
 | 2026-07-26 | 08:01 | #77 | ブランド原本2点と派生アイコン6点の実デコード・寸法、Mobile work companion静的テスト7件、Service Worker JavaScript構文、通知Python構文、差分形式を確認。 |
+| 2026-07-26 | 23:06 | #78 | Issue #109対応としてREADMEからAivisSpeech初期セットアップへ導線を追加し、Windows導入、音声モデル、Engine、`/docs`・`/speakers`、`.env`、診断CLI、WAV再生、Docker／WSL接続差、stage別切り分け、ブラウザ標準TTSとの無料運用方針を整理。文書変更のみで、実Engine E2Eは未実施。 |
