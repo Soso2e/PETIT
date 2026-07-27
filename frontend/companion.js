@@ -28,9 +28,12 @@
     active: false,
     paused: false,
     task: "",
+    workSessionId: null,
     startedAt: null,
     pausedAt: null,
     pausedTotalMs: 0,
+    pauseReason: "",
+    endedAt: null,
     frequency: "10",
     nextCheckAt: null,
     lastCheckAt: null,
@@ -55,6 +58,19 @@
   const saveState = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   const sessionId = () => localStorage.getItem("petit_session_id") || window.PETIT_SESSION?.id || crypto.randomUUID();
   const internalPrefix = () => window.PETIT_SESSION?.internalPrefix || "[PETIT_INTERNAL_EVENT]";
+  const newWorkSessionId = () => (
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `work_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  );
+  const ensureWorkSessionId = () => {
+    if (!state.active) return null;
+    if (!state.workSessionId) {
+      state.workSessionId = newWorkSessionId();
+      saveState();
+    }
+    return state.workSessionId;
+  };
 
   const formatElapsed = (totalMs) => {
     const minutes = Math.max(0, Math.floor(totalMs / 60000));
@@ -260,9 +276,12 @@
       active: true,
       paused: false,
       task,
+      workSessionId: newWorkSessionId(),
       startedAt: Date.now(),
       pausedAt: null,
       pausedTotalMs: 0,
+      pauseReason: "",
+      endedAt: null,
       lastCheckAt: null,
       lastCheckText: "",
     };
@@ -272,23 +291,38 @@
     appendMessage("assistant", `了解！「${task}」やろう。${state.frequency === "quiet" ? "静かに見守るね。" : "様子を見ながら声かけるね。"}`);
   };
 
-  const pauseOrResume = () => {
-    if (!state.active) return;
-    if (state.paused) {
-      const pausedDuration = state.pausedAt ? Date.now() - state.pausedAt : 0;
-      state.pausedTotalMs = Number(state.pausedTotalMs || 0) + pausedDuration;
-      state.paused = false;
-      state.pausedAt = null;
-      scheduleNextCheck();
-      appendMessage("assistant", "おかえり。続きからいこー！");
-    } else {
-      state.paused = true;
-      state.pausedAt = Date.now();
-      state.nextCheckAt = null;
-      appendMessage("assistant", `${formatElapsed(elapsedMs())}進んだね。いったん休憩しよ。`);
-    }
+  const pauseWork = ({ reason = "", reply = true } = {}) => {
+    if (!state.active || state.paused) return false;
+    ensureWorkSessionId();
+    state.paused = true;
+    state.pausedAt = Date.now();
+    state.pauseReason = reason;
+    state.nextCheckAt = null;
     saveState();
     renderWorkState();
+    if (reply) appendMessage("assistant", `${formatElapsed(elapsedMs())}進んだね。いったん休憩しよ。`);
+    return true;
+  };
+
+  const resumeWork = ({ reply = true } = {}) => {
+    if (!state.active || !state.paused) return false;
+    ensureWorkSessionId();
+    const pausedDuration = state.pausedAt ? Date.now() - state.pausedAt : 0;
+    state.pausedTotalMs = Number(state.pausedTotalMs || 0) + pausedDuration;
+    state.paused = false;
+    state.pausedAt = null;
+    state.pauseReason = "";
+    scheduleNextCheck();
+    saveState();
+    renderWorkState();
+    if (reply) appendMessage("assistant", "おかえり。続きからいこー！");
+    return true;
+  };
+
+  const pauseOrResume = () => {
+    if (!state.active) return;
+    if (state.paused) resumeWork();
+    else pauseWork();
   };
 
   const endWork = async () => {
@@ -296,11 +330,90 @@
     const finalElapsed = elapsedMs();
     const task = state.task;
     await askPetit("finish");
-    state = { ...defaultState(), frequency: state.frequency, task };
+    state = { ...defaultState(), frequency: state.frequency, task, endedAt: Date.now() };
     saveState();
     renderWorkState();
     appendMessage("assistant", `作業モードを終了したよ。${formatElapsed(finalElapsed)}おつかれ！`);
     void loadBriefing();
+  };
+
+  const endWorkImmediately = () => {
+    if (!state.active) return null;
+    const finalElapsed = elapsedMs();
+    const task = state.task;
+    const finishedSessionId = ensureWorkSessionId();
+    state = {
+      ...defaultState(),
+      frequency: state.frequency,
+      task,
+      endedAt: Date.now(),
+      lastWorkSessionId: finishedSessionId,
+    };
+    saveState();
+    renderWorkState();
+    void loadBriefing();
+    return finalElapsed;
+  };
+
+  const pauseReasonFor = (text) => {
+    const normalized = String(text || "").trim();
+    const match = normalized.match(/^(.{1,80}?)(?:だから|なので|ので|ため(?:に)?|により)[、,\s]*(?:一旦|いったん|少し|ちょっと)?(?:作業を)?(?:止め|停止|休憩)/);
+    if (!match) return "";
+    return match[1].replace(/^(?:いま|今|作業は|作業を)[、,\s]*/, "").trim();
+  };
+
+  const isPhenomenonReport = (text) => {
+    const normalized = String(text || "").trim();
+    return /(petit|aivis|tts|音声|動画|再生|通信|接続|サーバ|アプリ).{0,30}(途中で)?(?:停止する|停止した|止まる|止まった|切れる|切れた|落ちる|落ちた)/i.test(normalized);
+  };
+
+  const classifySessionCommand = (text) => {
+    const normalized = String(text || "").trim();
+    if (!normalized || isPhenomenonReport(normalized)) return null;
+
+    if (/^(?:再開|作業再開|作業を再開|続き(?:から)?(?:やる|やろう|始める)|戻ろう)(?:[。！!\s]|$)/.test(normalized)) {
+      return { kind: "resume", reason: "" };
+    }
+    if (/(?:今日は|きょうは)?(?:ここまで|この辺で)(?:にする|終わり|終了)?(?:[。！!\s]|$)|^(?:作業を)?(?:終了|終わり|終わる)(?:[。！!\s]|$)/.test(normalized)) {
+      return { kind: "end", reason: "" };
+    }
+    if (/(?:一旦|いったん|少し|ちょっと).*(?:止める|止めよう|停止|休憩)|(?:作業を|作業は).*(?:止める|停止|休憩)|^(?:止める|停止して|休憩する)(?:[。！!\s]|$)/.test(normalized)) {
+      return { kind: "pause", reason: pauseReasonFor(normalized) };
+    }
+    return null;
+  };
+
+  const handleSessionCommand = (command) => {
+    if (!state.active) {
+      appendMessage("assistant", "いま進行中の作業はないよ。作業を始めてから操作してね。");
+      return;
+    }
+
+    ensureWorkSessionId();
+    if (command.kind === "pause") {
+      if (state.paused) {
+        appendMessage("assistant", "いまの作業はすでに一時停止中だよ。");
+        return;
+      }
+      pauseWork({ reason: command.reason, reply: false });
+      appendMessage("assistant", command.reason ? `${command.reason}で一時停止したよ。` : "作業を一時停止したよ。");
+      return;
+    }
+
+    if (command.kind === "resume") {
+      if (!state.paused) {
+        appendMessage("assistant", "いまの作業はすでに進行中だよ。");
+        return;
+      }
+      resumeWork({ reply: false });
+      appendMessage("assistant", "同じ作業を再開したよ。");
+      return;
+    }
+
+    if (command.kind === "end") {
+      const finalElapsed = endWorkImmediately();
+      appendMessage("assistant", `作業を終了したよ。${formatElapsed(finalElapsed)}おつかれ！`);
+    }
   };
 
   const tick = () => {
@@ -316,10 +429,24 @@
     }
   };
 
-  formEl.addEventListener("submit", () => {
+  formEl.addEventListener("submit", (event) => {
     const text = inputEl.value.trim();
     lastInteractionAt = Date.now();
     window.PETIT_SESSION?.markActive?.();
+
+    const command = classifySessionCommand(text);
+    if (command) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      removePendingLead();
+      inputEl.value = "";
+      inputEl.style.height = "auto";
+      appendMessage("user", text);
+      handleSessionCommand(command);
+      inputEl.focus();
+      return;
+    }
+
     const leadText = statusLeadFor(text);
     if (leadText) {
       removePendingLead();
