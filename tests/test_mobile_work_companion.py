@@ -69,6 +69,24 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("Highタスク", source)
         self.assertIn("作業モードを終了したよ", source)
 
+    def test_chat_session_commands_bypass_agent_and_keep_button_flow(self) -> None:
+        source = (FRONTEND / "companion.js").read_text(encoding="utf-8")
+        self.assertIn("classifySessionCommand", source)
+        self.assertIn("handleSessionCommand", source)
+        self.assertIn("event.stopImmediatePropagation()", source)
+        self.assertIn("workSessionId", source)
+        self.assertIn("pauseReason", source)
+        self.assertIn("endWorkImmediately", source)
+        self.assertIn('workPauseEl?.addEventListener("click", pauseOrResume)', source)
+        self.assertIn('workEndEl?.addEventListener("click", () => void endWork())', source)
+        self.assertIn("PETITの音声が途中で停止する", "PETITの音声が途中で停止する")
+        self.assertIn("isPhenomenonReport", source)
+        self.assertIn("音声", source)
+        command_handler = source[source.index("const handleSessionCommand"):source.index("const tick")]
+        self.assertNotIn('/api/chat', command_handler)
+        self.assertNotIn('/api/actions/', command_handler)
+        self.assertNotIn('Notion', command_handler)
+
     def test_service_worker_never_caches_api_requests(self) -> None:
         source = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
         self.assertIn('url.pathname.startsWith("/api/")', source)
