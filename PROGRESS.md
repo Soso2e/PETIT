@@ -5,17 +5,18 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
-- 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallback、一時的な429／502／503／504の1回再試行、合成直列化、上流エラー詳細診断、モバイル音声アンロック、文単位チャンク生成・先読み再生・5秒タイムアウト・生成キャンセル、独立診断CLI、2回連続失敗後の60秒回路遮断を実装。実AivisSpeechモデルとPC／スマホブラウザE2Eは未確認。
-- モデル経路: Chat/AgentのURL・モデル・APIキーを独立設定できる。明示ツール・挨拶・時刻はルーター前に決定論処理し、曖昧な自然文だけChatルーターの提案を許可リストと登録済みツールで検証する。Agentは標準`role=tool`を優先し、Jinja非対応時だけuser follow-upへ退避、既定3ツールラウンド後に最終回答できる。実LM Studio 1／2モデル・標準tool／互換fallback・ブラウザE2Eは未確認。
+- 会話 / Agent Runtime: Project Continuity・挨拶・正確な現在時刻だけを決定論的な安全ゲートで処理し、通常会話はChatモデルのCapability Routerが最大4領域を選ぶ。Agentには選択領域内の登録済みToolだけを公開し、既定3ラウンド・Tool総数6・同一Tool同一引数1回の上限、結果圧縮、書き込み承認、30分以内のAgent状態再開、履歴へ残さない進捗表示を実装。関連10系統CI成功、実LM Studioでの判断品質・承認後返答・iPhone進捗表示E2Eは未確認。
 - モデル切替: WebからChat／Agentを個別にローカルLM Studio・DeepSeek V4 Flash・DeepSeek V4 Proへ切替でき、選択だけをローカル保存する。DeepSeek APIキーはブラウザや保存ファイルへ返さず、Embeddingはローカルのまま。専用テスト5件成功、実DeepSeek／ブラウザE2Eは未確認。
+- 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallback、一時的な429／502／503／504の1回再試行、合成直列化、上流エラー詳細診断、モバイル音声アンロック、文単位チャンク生成・先読み再生・5秒タイムアウト・生成キャンセル、独立診断CLI、2回連続失敗後の60秒回路遮断を実装。Windows初期セットアップ、音声モデル、Engine、`.env`、診断CLI、WAV確認、Docker／WSL差の手順書とREADME導線も追加。実AivisSpeechモデルとPC／スマホブラウザE2Eは未確認。
+- 汎用リスト: 組み込みタスクと任意のカスタムリストを保存先付きで取得し、ローカルSQLiteへリスト作成・項目取得・項目追加できる。`lists_and_tasks` Capability内でタスクとリストを文脈・対象存在・Tool結果から区別し、書き込みは確認必須、存在しないリストをタスクへ誤変換せず、Notion DBも自動生成しない。関連CI成功、実LM Studio／ブラウザ会話E2Eは未確認。
 - 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
 - 日次生活インデックス: 全`session_id`の会話をAsia/Tokyo基準で1日1回まとめ、空・記号のみ・連続重複だけを除外してローカルLM Studioへ送る。雑談の外出・食事・人・場所・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存し、長期記憶候補は自動昇格しない。専用CIと実ローカルLLM E2Eは未確認。
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
-- 制作伴走Web UI: 作業モード、経過時間、一時停止・終了、10分／20分ごとの前景限定自律声かけ、Highタスク・次の予定・次の一手、直近3ラリー表示、2時間アイドルでのセッション分離、途中経過メッセージ、PWAを実装。5系統CI成功。実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eは未確認。
+- 制作伴走Web UI: 作業モード、経過時間、一時停止・終了、10分／20分ごとの前景限定自律声かけ、Highタスク・次の予定・次の一手、直近3ラリー表示、2時間アイドルでのセッション分離、途中経過メッセージ、PWAを実装。IME変換中Enter送信抑止、ブランド原本ロゴ、favicon、Apple Touch、通常／maskable PWAアイコンも反映。静的・関連CI成功、実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eは未確認。
 - Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in設定、SQLiteの通知イベント・配信履歴、Web Push Provider境界、設定UI、テスト通知を実装。通知未設定でも既存チャットは動作する。専用単体テスト5件とJavaScript構文確認は成功、実VAPID／HTTPSブラウザ／バックグラウンド受信／通知タップ／実iPhone PWA E2Eは未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
-- Notion会話検索: 明示的なNotion参照をルーターLLM前に決定論的検出し、共有済みページを最大3件検索、プロパティ・本文抜粋・更新日時・URLを取得する。結果ありはAgent 1回、未設定・0件・API失敗はLLMなしで区別する。実Notion／ブラウザE2Eは未確認。
+- Notion会話検索: `knowledge` Capability内の読み取りToolとして共有済みページを最大3件検索し、プロパティ・本文抜粋・更新日時・URLを圧縮してAgentへ戻す。未設定・0件・API失敗を区別する。関連CI成功、実Notion／LM Studio／ブラウザE2Eは未確認。
 - タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、既定でHighのみ、暇・やりたいこと候補はMid/Medium＋Low、全件要求時だけ未設定を含む全優先度を返す。作成既定High・日付未指定は期限なし。実Notion Webhook／Tunnel／ブラウザE2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
@@ -25,8 +26,8 @@
 - Project Continuity: 内部project台帳、alias、確認済みsource link、episode Relation、active state、checkpoint、handoff、cache-first resumeを統合済み。Phase 1/2 Issueは完了し、実外部サービスE2Eだけを#53で追跡する。
 - Sona Agent Core: Feature Flag ON時の`add_schedule`をApproval／Idempotency／Audit付きAdapterへ接続済み。固定commit更新と実ブラウザE2Eが残る。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、`.env`は到達不能な `169.254.83.107` を参照しPETITは停止中。localhostへ修正して再起動する必要がある。
-- 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。
-- 次にやること: Issue #92のVAPID設定、HTTPSブラウザ、バックグラウンド受信、通知タップ、解除、実iPhoneホーム画面PWA E2Eを確認する。その後Issue #80の実ブラウザ／LM Studio／AivisSpeech E2E、Issue #75の実Notion Webhook／公開HTTPS／ブラウザE2E、Issue #73／#64／#60／#62の実サービスE2Eへ戻る。
+- 検証手順: `docs/CORE_HARDENING_VALIDATION.md` に、自動テスト → 1モデルE2E → 2モデルE2Eの順で固定した。AivisSpeechは`docs/AIVIS_SPEECH_SETUP.md`と診断CLIで段階的に切り分ける。
+- 次にやること: 新機能追加より実環境E2Eを優先する。まずLM Studioの`.env`をlocalhostへ直してPETITを起動し、文脈駆動Agent Runtimeと汎用リストの実会話を確認する。次にAivisSpeech診断CLI→PC／iPhone音声、Issue #92のVAPID／HTTPS／通知、Issue #75のNotion Webhook、Issue #53のProject Continuity外部sourceを順に検証する。
 
 ## 履歴
 
@@ -113,3 +114,4 @@
 | 2026-07-26 | 07:58 | #76 | 提供された文字ロゴを`frontend/branding/name_logo.png`、惑星ロゴを`icon_logo.png`として原寸保存し、惑星ロゴからfavicon・Apple Touch・PWA通常／maskableアイコンを再生成。Service Workerキャッシュを更新。 |
 | 2026-07-26 | 08:01 | #77 | ブランド原本2点と派生アイコン6点の実デコード・寸法、Mobile work companion静的テスト7件、Service Worker JavaScript構文、通知Python構文、差分形式を確認。 |
 | 2026-07-26 | 23:06 | #78 | Issue #109対応としてREADMEからAivisSpeech初期セットアップへ導線を追加し、Windows導入、音声モデル、Engine、`/docs`・`/speakers`、`.env`、診断CLI、WAV再生、Docker／WSL接続差、stage別切り分け、ブラウザ標準TTSとの無料運用方針を整理。文書変更のみで、実Engine E2Eは未実施。 |
+| 2026-07-27 | 14:57 | #79 | mainの実装と「現在の状態」を再照合。Issue #84／#86の汎用リスト管理、Issue #89の文脈駆動Capability Router／上限付きAgent Runtime、Notion検索の`knowledge`統合、IME Enter抑止、PWAブランドアイコン、AivisSpeech初期セットアップ導線を現状欄へ反映し、実装済みと実機未確認を分離。文書更新のみでコードテストは未実施。 |
