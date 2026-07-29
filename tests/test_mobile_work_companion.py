@@ -49,6 +49,41 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
             declared_size = tuple(int(value) for value in icon["sizes"].split("x"))
             self.assertEqual((width, height), declared_size)
 
+    def test_apple_touch_icon_is_valid_180px_png(self) -> None:
+        data = (FRONTEND / "apple-touch-icon.png").read_bytes()
+        self.assertTrue(data.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertEqual(data[-12:], b"\x00\x00\x00\x00IEND\xaeB`\x82")
+        self.assertEqual(struct.unpack(">II", data[16:24]), (180, 180))
+
+    def test_pwa_icon_references_use_current_png_assets(self) -> None:
+        manifest = json.loads((FRONTEND / "manifest.webmanifest").read_text(encoding="utf-8"))
+        manifest_sources = {icon["src"] for icon in manifest["icons"]}
+        self.assertEqual(
+            manifest_sources,
+            {
+                "/static/icon-192.png",
+                "/static/icon-512.png",
+                "/static/icon-maskable-192.png",
+                "/static/icon-maskable-512.png",
+            },
+        )
+        shortcut_sources = {
+            icon["src"]
+            for shortcut in manifest.get("shortcuts", [])
+            for icon in shortcut.get("icons", [])
+        }
+        self.assertEqual(shortcut_sources, {"/static/icon-192.png"})
+
+        service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
+        for source in manifest_sources | shortcut_sources | {"/static/apple-touch-icon.png"}:
+            self.assertIn(source, service_worker)
+        self.assertNotIn("icon-192.jpg", service_worker)
+        self.assertNotIn("icon-512.jpg", service_worker)
+
+        notifications = (ROOT / "backend" / "notifications.py").read_text(encoding="utf-8")
+        self.assertIn('"icon": "/static/icon-192.png"', notifications)
+        self.assertNotIn("icon-192.jpg", notifications)
+
     def test_brand_logo_sources_are_preserved(self) -> None:
         for filename in ("name_logo.png", "icon_logo.png"):
             data = (FRONTEND / "branding" / filename).read_bytes()
