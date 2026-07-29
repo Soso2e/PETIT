@@ -8,11 +8,30 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from .. import config
 
 Handler = Callable[..., Any]
+ToolRisk = Literal["safe_read", "low_risk_write", "confirm_write", "destructive"]
+
+# Existing tools can keep using requires_confirmation while migration happens.
+# These overrides encode the first agreed low-risk set without forcing every
+# decorator to change in one release.
+_DEFAULT_RISKS: dict[str, ToolRisk] = {
+    "create_task": "low_risk_write",
+    "add_task": "low_risk_write",
+    "add_list_item": "low_risk_write",
+    "create_handoff_note": "low_risk_write",
+    "save_memory": "low_risk_write",
+    "ignore_github_repository_candidate": "low_risk_write",
+    "add_schedule": "confirm_write",
+    "update_task": "confirm_write",
+    "complete_task": "confirm_write",
+    "edit_brain_note": "confirm_write",
+    "create_list": "confirm_write",
+    "link_github_repository_candidate": "confirm_write",
+}
 
 
 @dataclass
@@ -21,10 +40,27 @@ class Tool:
     description: str
     parameters: dict[str, Any]
     handler: Handler
-    requires_confirmation: bool = False
+    risk: ToolRisk = "safe_read"
 
 
 _REGISTRY: dict[str, Tool] = {}
+
+
+def _resolve_risk(
+    name: str,
+    *,
+    risk: ToolRisk | None,
+    requires_confirmation: bool,
+) -> ToolRisk:
+    if risk is not None:
+        return risk
+    if name in _DEFAULT_RISKS:
+        return _DEFAULT_RISKS[name]
+    # Backwards compatibility: every legacy confirmation-gated write remains
+    # confirmation-gated unless it is explicitly migrated above.
+    if requires_confirmation:
+        return "confirm_write"
+    return "safe_read"
 
 
 def tool(
@@ -33,8 +69,13 @@ def tool(
     parameters: dict[str, Any],
     *,
     requires_confirmation: bool = False,
+    risk: ToolRisk | None = None,
 ) -> Callable[[Handler], Handler]:
-    """Decorator that registers a function as a callable tool."""
+    """Decorator that registers a function as a callable tool.
+
+    ``risk`` is the preferred policy metadata. ``requires_confirmation`` stays
+    supported for compatibility and maps to ``confirm_write`` by default.
+    """
 
     def decorator(func: Handler) -> Handler:
         _REGISTRY[name] = Tool(
@@ -42,7 +83,11 @@ def tool(
             description=description,
             parameters=parameters,
             handler=func,
-            requires_confirmation=requires_confirmation,
+            risk=_resolve_risk(
+                name,
+                risk=risk,
+                requires_confirmation=requires_confirmation,
+            ),
         )
         return func
 
@@ -53,9 +98,13 @@ def registered_names() -> list[str]:
     return sorted(_REGISTRY.keys())
 
 
-def requires_confirmation(name: str) -> bool:
+def risk_for(name: str) -> ToolRisk:
     tool_obj = _REGISTRY.get(name)
-    return bool(tool_obj and tool_obj.requires_confirmation)
+    return tool_obj.risk if tool_obj else "safe_read"
+
+
+def requires_confirmation(name: str) -> bool:
+    return risk_for(name) in {"confirm_write", "destructive"}
 
 
 def parse_arguments(name: str, arguments: dict[str, Any] | str | None) -> dict[str, Any]:
@@ -108,7 +157,6 @@ def dispatch(name: str, arguments: dict[str, Any] | str | None) -> str:
             from .. import sona_core_schedule
         except ImportError:
             return "[error] Sona Agent Core is unavailable; PETIT_USE_SONA_CORE cannot use the legacy path"
-
         return sona_core_schedule.dispatch_get_schedule(arguments)
 
     try:
