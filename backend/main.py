@@ -226,7 +226,15 @@ def synthesize_speech(payload: TTSRequest) -> Response:
     try:
         audio, style_id = aivis_speech.synthesize(payload.text)
     except aivis_speech.AivisSpeechError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=503)
+        error_payload: dict[str, Any] = {
+            "error": str(exc),
+            "error_code": exc.code,
+            "retryable": exc.retryable,
+            "upstream_status": exc.status_code,
+        }
+        if exc.retry_after_seconds is not None:
+            error_payload["retry_after_seconds"] = exc.retry_after_seconds
+        return JSONResponse(error_payload, status_code=503)
     return Response(
         content=audio,
         media_type="audio/wav",
