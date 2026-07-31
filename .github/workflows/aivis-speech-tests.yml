@@ -11,6 +11,7 @@ on:
       - "frontend/voice.js"
       - "scripts/diagnose_aivis_speech.py"
       - "tests/test_aivis_speech.py"
+      - "tests/test_tts_api_contract.py"
       - ".github/workflows/aivis-speech-tests.yml"
       - ".env.example"
       - "README.md"
@@ -41,4 +42,4 @@ jobs:
           node --check frontend/mobile_audio_unlock.js
           node --check frontend/voice.js
       - name: Run AivisSpeech tests
-        run: python -m unittest tests.test_aivis_speech -v
+        run: python -m unittest tests.test_aivis_speech tests.test_tts_api_contract -v
