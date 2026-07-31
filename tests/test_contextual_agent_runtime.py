@@ -45,7 +45,7 @@ class ContextualAgentRuntimeTests(unittest.TestCase):
             "source": "llm",
         }
 
-    def test_list_item_request_uses_list_tool_and_resumes_after_approval(self) -> None:
+    def test_list_item_request_uses_low_risk_write_without_confirmation(self) -> None:
         created = json.loads(tools.dispatch("create_list", {"name": "科学大キャンプ"}))
         self.assertTrue(created["created"])
 
@@ -63,25 +63,17 @@ class ContextualAgentRuntimeTests(unittest.TestCase):
         ]
         with patch.object(agent_runtime.capability_router, "choose", return_value=self.route(["lists_and_tasks"])):
             with patch.object(agent_runtime, "chat_completion", side_effect=model_results):
-                proposal = agent_runtime.run(
+                result = agent_runtime.run(
                     "科学大キャンプリストに、iPhoneコースガイド見るって追加",
                     history=[],
                 )
-                self.assertEqual(proposal["pending_actions"][0]["name"], "execute_agent_write")
-                wrapper_args = proposal["pending_actions"][0]["arguments"]
-                self.assertEqual(wrapper_args["tool_name"], "add_list_item")
-                self.assertEqual(
-                    wrapper_args["tool_arguments"],
-                    {
-                        "list_name": "科学大キャンプ",
-                        "title": "iPhoneコースガイド見る",
-                    },
-                )
-                self.assertNotEqual(wrapper_args["tool_name"], "create_task")
 
-                approved_reply = tools.dispatch("execute_agent_write", wrapper_args)
-
-        self.assertEqual(approved_reply, "科学大キャンプリストに追加したよ。")
+        self.assertNotIn("pending_actions", result)
+        self.assertEqual(result["reply"], "科学大キャンプリストに追加したよ。")
+        self.assertEqual(
+            [item["name"] for item in result["used_tools"]],
+            ["get_lists", "add_list_item"],
+        )
         items = json.loads(
             tools.dispatch("get_list_items", {"list_name": "科学大キャンプ"})
         )
