@@ -112,12 +112,11 @@ def init_db() -> None:
 
 def _create_event(category: str, title: str, body: str, url: str) -> tuple[int, dict[str, Any]]:
     event_id, payload = _ORIGINAL_CREATE_EVENT(category, title, body, _safe_internal_url(url))
-    payload_url = _safe_internal_url(payload.get("url") or url)
-    target, entity_type, entity_id = _decorate_target(payload_url, event_id)
+    target, entity_type, entity_id = _decorate_target(str(payload.get("url") or url), event_id)
     payload.update(
         {
             "event_id": event_id,
-            "url": payload_url,
+            "url": target,
             "entity_type": entity_type,
             "entity_id": entity_id,
         }
