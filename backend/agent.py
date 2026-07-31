@@ -1,9 +1,8 @@
 """PETIT conversation entrypoint backed by the contextual bounded Agent runtime.
 
 The legacy module remains re-exported for compatibility with existing tests and
-callers. Project continuity, greetings, and exact current-time reads stay
-deterministic; normal conversation, reads, and writes are interpreted from
-context by the LLM runtime.
+callers. Project continuity and exact current-time reads stay deterministic;
+ordinary conversation always reaches the Agent runtime.
 """
 from __future__ import annotations
 
@@ -18,7 +17,7 @@ for _export_name in dir(_legacy):
         globals()[_export_name] = getattr(_legacy, _export_name)
 
 # Tests and older callers patch agent.model_router.choose. Point that compatibility
-# surface at the new Capability Router rather than the retired Tool-name router.
+# surface at the Capability Selector used by the Agent runtime.
 model_router = capability_router
 
 # Legacy route introspection remains available for old tests and extension hooks,
@@ -53,14 +52,12 @@ _TOOL_SIGNALS = tuple(_TOOL_SIGNALS) + tuple(
 _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
 
 CHAT_SYSTEM_PROMPT = (
-    "あなたはPETIT。親しみやすく、柔らかく自然な日本語で直接答える。"
-    "Markdownは使わない。"
+    "あなたはPETITのCapability Selector。最終返答は作らず、Agentへ必要なCapabilityだけを選ぶ。"
 )
 AGENT_SYSTEM_PROMPT = (
-    "あなたはPETIT。まず結論を示し、必要に応じて十分な長さで答える。"
-    "会話文脈から目的を理解し、必要なToolだけを使う。"
-    "Tool結果を踏まえて目的を満たしたか判断し、書き込みは確認なしに実行しない。"
-    "Markdownは使わない。"
+    "あなたはPETIT。親しみやすく自然な日本語で、会話文脈から目的を理解して直接答える。"
+    "必要なToolだけを使い、Tool結果を踏まえて目的を満たしたか判断する。"
+    "書き込みは確認なしに実行しない。Markdownは使わない。"
 )
 SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
 _legacy.CHAT_SYSTEM_PROMPT = CHAT_SYSTEM_PROMPT
@@ -102,7 +99,7 @@ def _github_review_requested(message: str) -> bool:
 
 
 def _related_tool_names(message: str) -> list[str]:
-    """Legacy introspection only; the live route uses Capability Router."""
+    """Legacy introspection only; the live route uses Capability Selector."""
     _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
     return list(_legacy._related_tool_names(message))
 
@@ -121,7 +118,7 @@ def run(
     *,
     allow_defer: bool = True,
 ) -> dict[str, Any]:
-    """Handle one turn through deterministic safety gates then the LLM Agent."""
+    """Handle one turn through narrow safety gates, then Agent by default."""
     del allow_defer
     _sync_legacy_globals()
     recent_history = _legacy._recent_history(history)
@@ -133,10 +130,6 @@ def run(
     )
     if project_turn:
         return project_turn
-
-    instant = _legacy._instant_reply(user_message)
-    if instant:
-        return instant
 
     # Exact current-time reads are stable, local, and do not benefit from an LLM.
     if _legacy._related_tool_names(user_message) == ["get_current_time"]:
