@@ -22,7 +22,7 @@
       <span id="app-version" class="status status--unknown" title="起動中のPETITバージョン">v…</span>
       <span id="status" class="status status--unknown">接続確認中…</span>
       <div class="header-actions">
-        <button id="notification-toggle" type="button" class="notification-toggle" aria-pressed="false" aria-expanded="false">通知 OFF</button>
+        <button id="notification-toggle" type="button" class="notification-toggle" aria-pressed="false" aria-expanded="false">通知</button>
         <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
       </div>
       <div class="header-meta">
@@ -31,17 +31,34 @@
       </div>
     </header>
 
-    <section id="notification-panel" class="notification-panel" aria-label="通知設定" hidden>
+    <section id="notification-panel" class="notification-panel" aria-label="通知センター" hidden>
       <div class="notification-panel__head">
-        <h2>通知設定</h2>
+        <div class="notification-panel__title-row">
+          <h2>通知センター</h2>
+          <span id="notification-unread" class="notification-panel__badge">未読なし</span>
+        </div>
+        <button id="notification-refresh" type="button" class="notification-panel__refresh">更新</button>
       </div>
-      <p id="notification-state" class="notification-panel__state" role="status" aria-live="polite">通知状態を確認中…</p>
-      <div id="notification-categories" class="notification-categories"></div>
-      <div class="notification-panel__actions">
-        <button id="notification-enable" type="button">この端末で有効にする</button>
-        <button id="notification-test" type="button" disabled>テスト通知</button>
-        <button id="notification-disable" type="button" hidden>この端末の通知を解除</button>
+
+      <div class="notification-inbox" aria-live="polite">
+        <div class="notification-filters" role="group" aria-label="通知の表示切り替え">
+          <button type="button" class="notification-filter notification-filter--active" data-notification-state="open">未解決</button>
+          <button type="button" class="notification-filter" data-notification-state="resolved">解決済み</button>
+        </div>
+        <p id="notification-empty" class="notification-empty">通知はまだありません。</p>
+        <div id="notification-list" class="notification-list"></div>
       </div>
+
+      <details class="notification-settings">
+        <summary>Push通知の設定</summary>
+        <p id="notification-state" class="notification-panel__state" role="status" aria-live="polite">通知状態を確認中…</p>
+        <div id="notification-categories" class="notification-categories"></div>
+        <div class="notification-panel__actions">
+          <button id="notification-enable" type="button">この端末で有効にする</button>
+          <button id="notification-test" type="button" disabled>テスト通知</button>
+          <button id="notification-disable" type="button" hidden>この端末の通知を解除</button>
+        </div>
+      </details>
     </section>
 
     <section id="companion-dashboard" class="companion-dashboard" aria-label="制作伴走ダッシュボード">
@@ -111,6 +128,67 @@
       <button id="send" type="submit" class="send">送信</button>
     </form>
   </div>
+
+  <section id="task-panel" class="task-panel" aria-label="タスク詳細" aria-hidden="true" hidden>
+    <div class="task-panel__backdrop" data-task-close></div>
+    <div class="task-panel__sheet">
+      <header class="task-panel__head">
+        <div>
+          <span class="task-panel__eyebrow">タスク詳細</span>
+          <h2 id="task-panel-title">タスク</h2>
+        </div>
+        <button id="task-close" type="button" class="task-panel__close" aria-label="タスク詳細を閉じる">閉じる</button>
+      </header>
+      <form id="task-form" class="task-form">
+        <label>
+          <span>タスク名</span>
+          <input name="title" type="text" required maxlength="240" />
+        </label>
+        <div class="task-form__grid">
+          <label>
+            <span>状態</span>
+            <select name="status">
+              <option value="Yet">Yet</option>
+              <option value="Now">Now</option>
+              <option value="Done">Done</option>
+            </select>
+          </label>
+          <label>
+            <span>期限</span>
+            <input name="due_date" type="date" />
+          </label>
+          <label>
+            <span>優先度</span>
+            <select name="priority">
+              <option value="High">High</option>
+              <option value="Mid">Mid</option>
+              <option value="Low">Low</option>
+            </select>
+          </label>
+          <label>
+            <span>エリア</span>
+            <select name="area">
+              <option value="">未設定</option>
+              <option value="personal">個人</option>
+              <option value="group">グループ</option>
+              <option value="university">大学</option>
+              <option value="work">仕事</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          <span>メモ</span>
+          <textarea name="reason" rows="3" maxlength="1000"></textarea>
+        </label>
+        <p id="task-state" class="task-panel__state" role="status" aria-live="polite"></p>
+        <div class="task-panel__actions">
+          <button id="task-complete" type="button" class="task-panel__complete">完了にする</button>
+          <button type="submit" class="task-panel__save">変更を保存</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
   <script src="/static/session.js"></script>
   <script src="/static/version.js"></script>
   <script src="/static/app.js"></script>

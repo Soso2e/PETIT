@@ -8,11 +8,29 @@
   const testButton = document.getElementById("notification-test");
   const disableButton = document.getElementById("notification-disable");
   const categories = document.getElementById("notification-categories");
-  if (!toggleButton || !panel || !state || !enableButton || !testButton || !disableButton || !categories) return;
+  const refreshButton = document.getElementById("notification-refresh");
+  const unreadBadge = document.getElementById("notification-unread");
+  const eventList = document.getElementById("notification-list");
+  const eventEmpty = document.getElementById("notification-empty");
+  const taskPanel = document.getElementById("task-panel");
+  const taskClose = document.getElementById("task-close");
+  const taskForm = document.getElementById("task-form");
+  const taskState = document.getElementById("task-state");
+  const taskComplete = document.getElementById("task-complete");
+  if (
+    !toggleButton || !panel || !state || !enableButton || !testButton || !disableButton ||
+    !categories || !refreshButton || !unreadBadge || !eventList || !eventEmpty ||
+    !taskPanel || !taskClose || !taskForm || !taskState || !taskComplete
+  ) return;
 
   let serverStatus = null;
   let registration = null;
   let subscription = null;
+  let unreadCount = 0;
+  let eventState = "open";
+  let activeTaskId = null;
+  let activeNotificationId = null;
+  let activeTask = null;
 
   function isSupported() {
     return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -27,10 +45,16 @@
     state.classList.toggle("notification-panel__state--error", error);
   }
 
+  function setTaskState(message, error = false) {
+    taskState.textContent = message;
+    taskState.classList.toggle("task-panel__state--error", error);
+  }
+
   function setBusy(busy) {
     enableButton.disabled = busy;
     testButton.disabled = busy || !subscription;
     disableButton.disabled = busy || !subscription;
+    refreshButton.disabled = busy;
     for (const input of categories.querySelectorAll("input")) input.disabled = busy;
   }
 
@@ -69,56 +93,267 @@
   function renderStatus() {
     const supported = isSupported();
     const subscribed = Boolean(subscription);
-    toggleButton.textContent = subscribed ? "通知 ON" : "通知 OFF";
-    toggleButton.classList.toggle("notification-toggle--on", subscribed);
+    toggleButton.textContent = unreadCount > 0 ? `通知 ${unreadCount}` : (subscribed ? "通知 ON" : "通知");
+    toggleButton.classList.toggle("notification-toggle--on", subscribed || unreadCount > 0);
     toggleButton.setAttribute("aria-pressed", String(subscribed));
+    unreadBadge.textContent = unreadCount > 0 ? `${unreadCount}件未読` : "未読なし";
+    unreadBadge.classList.toggle("notification-panel__badge--active", unreadCount > 0);
     enableButton.hidden = subscribed;
     disableButton.hidden = !subscribed;
     testButton.disabled = !subscribed;
 
     if (!supported) {
-      setState("このブラウザはWeb Pushに対応していません。", true);
-      setBusy(true);
+      setState("このブラウザはWeb Pushに対応していません。通知履歴は利用できます。", true);
+      enableButton.disabled = true;
       return;
     }
 
     const permission = Notification.permission;
     if (!serverStatus?.configured) {
-      setState("サーバー側のVAPID設定が未設定です。", true);
+      setState("通知履歴は利用できます。Push配信にはサーバー側のVAPID設定が必要です。");
       enableButton.disabled = true;
       return;
     }
     if (!serverStatus?.dependency_available) {
-      setState("サーバーにpywebpushがインストールされていません。", true);
+      setState("通知履歴は利用できます。Push配信にはpywebpushが必要です。", true);
       enableButton.disabled = true;
       return;
     }
     if (permission === "denied") {
-      setState("通知がブラウザ設定で拒否されています。設定から許可してください。", true);
+      setState("Push通知がブラウザ設定で拒否されています。通知履歴は利用できます。", true);
       enableButton.disabled = true;
       return;
     }
     if (subscribed) {
-      setState("この端末は通知を受け取れます。必要な種類だけONにしてください。");
+      setState("この端末はPush通知を受け取れます。必要な種類だけONにしてください。");
       return;
     }
     if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !isStandalone()) {
-      setState("iPhoneではPETITをホーム画面に追加してから通知を有効にしてください。");
+      setState("iPhoneでPush通知を使う場合はPETITをホーム画面に追加してください。");
       return;
     }
-    setState("通知はまだ有効になっていません。");
+    setState("Push通知は未設定です。通知履歴はこの画面に残ります。");
+  }
+
+  function formatTimestamp(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat("ja-JP", {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  }
+
+  function renderEvents(events) {
+    eventList.replaceChildren();
+    eventEmpty.hidden = events.length > 0;
+    for (const item of events) {
+      const article = document.createElement("article");
+      article.className = "notification-item";
+      article.classList.toggle("notification-item--unread", !item.read);
+
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "notification-item__open";
+      const heading = document.createElement("strong");
+      heading.textContent = item.title;
+      const body = document.createElement("span");
+      body.textContent = item.body;
+      const meta = document.createElement("small");
+      meta.textContent = `${formatTimestamp(item.created_at)}${item.delivery_status ? ` · ${item.delivery_status}` : ""}`;
+      open.append(heading, body, meta);
+      open.addEventListener("click", () => openEvent(item));
+
+      const resolve = document.createElement("button");
+      resolve.type = "button";
+      resolve.className = "notification-item__resolve";
+      resolve.textContent = item.resolved ? "未解決に戻す" : "解決";
+      resolve.addEventListener("click", async () => {
+        resolve.disabled = true;
+        try {
+          await patchEvent(item.id, { resolved: !item.resolved });
+          await loadEvents();
+        } catch (error) {
+          setState(`通知を解決済みにできませんでした: ${error.message}`, true);
+        }
+      });
+
+      article.append(open, resolve);
+      eventList.appendChild(article);
+    }
+  }
+
+  async function loadEvents() {
+    const data = await fetchJson(`/api/notifications/events?state=${encodeURIComponent(eventState)}&limit=50`);
+    unreadCount = Number(data.unread_count || 0);
+    renderEvents(data.events || []);
+    renderStatus();
+  }
+
+  async function patchEvent(eventId, changes) {
+    return fetchJson(`/api/notifications/events/${encodeURIComponent(eventId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changes),
+    });
+  }
+
+  async function openEvent(item) {
+    if (!item.read) {
+      await patchEvent(item.id, { read: true }).catch(() => undefined);
+    }
+    if (item.entity_type === "task" && /^\d+$/.test(String(item.entity_id || ""))) {
+      await openTask(Number(item.entity_id), item.id);
+      await loadEvents();
+      return;
+    }
+    if (item.action_url && item.action_url !== "/" && item.action_url !== window.location.pathname) {
+      window.location.href = item.action_url;
+      return;
+    }
+    await loadEvents();
+  }
+
+  function setField(name, value) {
+    const field = taskForm.elements.namedItem(name);
+    if (!field) return;
+    field.value = value == null ? "" : String(value);
+  }
+
+  function ensureSelectValue(name, value) {
+    const field = taskForm.elements.namedItem(name);
+    if (!(field instanceof HTMLSelectElement) || !value) return;
+    if (![...field.options].some((option) => option.value === value)) {
+      field.add(new Option(value, value));
+    }
+    field.value = value;
+  }
+
+  function renderTask(task) {
+    activeTask = task;
+    document.getElementById("task-panel-title").textContent = task.title || "タスク詳細";
+    setField("title", task.title);
+    ensureSelectValue("status", task.status);
+    setField("due_date", task.due_date ? String(task.due_date).slice(0, 10) : "");
+    ensureSelectValue("priority", task.priority || "Mid");
+    ensureSelectValue("area", task.area || "");
+    setField("reason", task.reason || "");
+    const source = task.source === "notion" ? "Notion" : "ローカル";
+    const sync = task.sync_status || "synced";
+    setTaskState(`${source} · 同期状態: ${sync}${task.sync_error ? ` · ${task.sync_error}` : ""}`, sync === "failed" || sync === "conflict");
+    taskComplete.disabled = task.status === "Done";
+  }
+
+  async function openTask(taskId, notificationId = null) {
+    activeTaskId = Number(taskId);
+    activeNotificationId = notificationId == null ? null : Number(notificationId);
+    taskPanel.hidden = false;
+    taskPanel.setAttribute("aria-hidden", "false");
+    setTaskState("タスクを取得中…");
+    try {
+      const data = await fetchJson(`/api/notifications/tasks/${encodeURIComponent(activeTaskId)}`);
+      renderTask(data.task);
+      const url = new URL(window.location.href);
+      url.searchParams.set("task", String(activeTaskId));
+      if (activeNotificationId != null) url.searchParams.set("notification", String(activeNotificationId));
+      history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    } catch (error) {
+      setTaskState(`タスクを開けませんでした: ${error.message}`, true);
+    }
+  }
+
+  function closeTask() {
+    activeTaskId = null;
+    activeNotificationId = null;
+    activeTask = null;
+    taskPanel.hidden = true;
+    taskPanel.setAttribute("aria-hidden", "true");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("task");
+    url.searchParams.delete("notification");
+    history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function taskPayload() {
+    const data = new FormData(taskForm);
+    const payload = {
+      title: String(data.get("title") || "").trim(),
+      status: String(data.get("status") || "").trim(),
+      priority: String(data.get("priority") || "").trim(),
+      reason: String(data.get("reason") || "").trim(),
+      notification_id: activeNotificationId,
+      resolve_notification: true,
+    };
+    const area = String(data.get("area") || "").trim();
+    if (area) payload.area = area;
+    const dueDate = String(data.get("due_date") || "").trim();
+    if (dueDate || !activeTask?.due_date) payload.due_date = dueDate;
+    return payload;
+  }
+
+  async function saveTask(event) {
+    event.preventDefault();
+    if (activeTaskId == null) return;
+    const submit = taskForm.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    setTaskState("更新中…");
+    try {
+      const result = await fetchJson(`/api/notifications/tasks/${encodeURIComponent(activeTaskId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(taskPayload()),
+      });
+      renderTask(result.task || activeTask);
+      activeNotificationId = null;
+      setTaskState(`更新しました。同期状態: ${result.sync_status || result.task?.sync_status || "synced"}`);
+      await loadEvents();
+    } catch (error) {
+      setTaskState(`更新できませんでした: ${error.message}`, true);
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  async function completeTask() {
+    if (activeTaskId == null) return;
+    taskComplete.disabled = true;
+    setTaskState("完了にしています…");
+    try {
+      const result = await fetchJson(`/api/notifications/tasks/${encodeURIComponent(activeTaskId)}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notification_id: activeNotificationId,
+          resolve_notification: true,
+        }),
+      });
+      renderTask(result.task || activeTask);
+      activeNotificationId = null;
+      setTaskState(`完了にしました。同期状態: ${result.sync_status || result.task?.sync_status || "synced"}`);
+      await loadEvents();
+    } catch (error) {
+      taskComplete.disabled = false;
+      setTaskState(`完了にできませんでした: ${error.message}`, true);
+    }
   }
 
   async function loadStatus() {
-    if (!isSupported()) {
-      renderStatus();
-      return;
+    if (isSupported()) {
+      try {
+        registration = await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
+        await navigator.serviceWorker.ready;
+        subscription = await registration.pushManager.getSubscription();
+      } catch (error) {
+        registration = null;
+        subscription = null;
+      }
     }
-    registration = await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
-    await navigator.serviceWorker.ready;
-    subscription = await registration.pushManager.getSubscription();
     serverStatus = await fetchJson("/api/notifications/status");
     renderCategories(serverStatus);
+    await loadEvents();
     renderStatus();
   }
 
@@ -137,9 +372,9 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
       });
-      setState("通知を有効にしました。テスト通知で確認できます。");
+      setState("Push通知を有効にしました。テスト通知で確認できます。");
     } catch (error) {
-      setState(`通知を有効にできませんでした: ${error.message}`, true);
+      setState(`Push通知を有効にできませんでした: ${error.message}`, true);
     } finally {
       setBusy(false);
       renderStatus();
@@ -158,9 +393,9 @@
       });
       await subscription.unsubscribe();
       subscription = null;
-      setState("この端末の通知を解除しました。");
+      setState("この端末のPush通知を解除しました。通知履歴は残ります。");
     } catch (error) {
-      setState(`通知を解除できませんでした: ${error.message}`, true);
+      setState(`Push通知を解除できませんでした: ${error.message}`, true);
     } finally {
       setBusy(false);
       renderStatus();
@@ -180,7 +415,7 @@
         body: JSON.stringify({ preferences }),
       });
       serverStatus.preferences = data.preferences;
-      setState("通知する種類を保存しました。");
+      setState("Push通知する種類を保存しました。");
     } catch (error) {
       setState(`通知設定を保存できませんでした: ${error.message}`, true);
     } finally {
@@ -198,8 +433,10 @@
         body: JSON.stringify({}),
       });
       setState(`テスト通知を${result.sent}件送信しました。`);
+      await loadEvents();
     } catch (error) {
       setState(`テスト通知に失敗しました: ${error.message}`, true);
+      await loadEvents().catch(() => undefined);
     } finally {
       setBusy(false);
       renderStatus();
@@ -209,12 +446,38 @@
   toggleButton.addEventListener("click", () => {
     panel.hidden = !panel.hidden;
     toggleButton.setAttribute("aria-expanded", String(!panel.hidden));
+    if (!panel.hidden) loadEvents().catch((error) => setState(error.message, true));
   });
   enableButton.addEventListener("click", enableNotifications);
   disableButton.addEventListener("click", disableNotifications);
   testButton.addEventListener("click", sendTestNotification);
+  refreshButton.addEventListener("click", () => loadEvents().catch((error) => setState(error.message, true)));
+  for (const button of panel.querySelectorAll("[data-notification-state]")) {
+    button.addEventListener("click", () => {
+      eventState = button.dataset.notificationState || "open";
+      for (const item of panel.querySelectorAll("[data-notification-state]")) {
+        item.classList.toggle("notification-filter--active", item === button);
+      }
+      loadEvents().catch((error) => setState(error.message, true));
+    });
+  }
+  taskClose.addEventListener("click", closeTask);
+  taskPanel.querySelector("[data-task-close]")?.addEventListener("click", closeTask);
+  taskForm.addEventListener("submit", saveTask);
+  taskComplete.addEventListener("click", completeTask);
 
-  loadStatus().catch((error) => {
+  loadStatus().then(async () => {
+    const params = new URLSearchParams(window.location.search);
+    const notificationId = params.get("notification");
+    if (notificationId && /^\d+$/.test(notificationId)) {
+      await patchEvent(Number(notificationId), { read: true }).catch(() => undefined);
+    }
+    const taskId = params.get("task");
+    if (taskId && /^\d+$/.test(taskId)) {
+      await openTask(Number(taskId), notificationId && /^\d+$/.test(notificationId) ? Number(notificationId) : null);
+    }
+    await loadEvents();
+  }).catch((error) => {
     setState(`通知状態を取得できませんでした: ${error.message}`, true);
     renderStatus();
   });
