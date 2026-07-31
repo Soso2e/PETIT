@@ -1,4 +1,4 @@
-"""LLM-based capability routing for PETIT's bounded Agent runtime."""
+"""Capability selection for PETIT's agent-first bounded runtime."""
 from __future__ import annotations
 
 import json
@@ -74,14 +74,13 @@ _GROUP_DESCRIPTIONS = {
     "projects": "PETIT内部プロジェクトと外部ソースの継続管理",
 }
 
-_ROUTER_SYSTEM_PROMPT = """あなたはPETITのCapability Routerです。会話文脈からユーザーの目的を判断し、JSONだけを返してください。
+_ROUTER_SYSTEM_PROMPT = """あなたはPETITのCapability Selectorです。会話文脈から、Agentへ公開するCapabilityだけを選び、JSONだけを返してください。
 単語一致ではなく、直前の会話・対象・操作・質問か書き込みかを考えてください。
 
-通常会話だけで答えられる場合:
-{"type":"reply","reply":"短い自然な返答","confidence":0.0}
+返却形式:
+{"capabilities":["group"],"goal":"Agentが達成すべき目的","confidence":0.0}
 
-情報取得、確認、変更、複数段階の作業が必要な場合:
-{"type":"agent","capabilities":["group"],"goal":"達成すべき目的","confidence":0.0}
+通常の雑談やTool不要の会話ではcapabilitiesを空配列にしてください。最終返答は必ずAgentが生成するため、返答本文は作らないでください。
 
 利用可能なCapability:
 %s
@@ -91,7 +90,8 @@ _ROUTER_SYSTEM_PROMPT = """あなたはPETITのCapability Routerです。会話�
 - Tool名や引数は返さない。
 - 「〜について」のような話題提示だけで、作成や追加を推測しない。
 - 書き込み意図は、追加・作成・変更・完了などが文脈上明確な場合だけ扱う。
-- 不明瞭でも勝手な書き込みを選ばず、agentで会話や読み取りを許可する。
+- 不明瞭でも勝手な書き込みを選ばず、必要な読み取りCapabilityだけを選ぶ。
+- Toolが不要なら空配列にする。
 - Markdownは禁止。""" % "\n".join(
     f"- {name}: {_GROUP_DESCRIPTIONS[name]}" for name in CAPABILITY_GROUPS
 )
@@ -140,7 +140,7 @@ def tool_names_for(capabilities: list[str]) -> list[str]:
 
 
 def choose(user_message: str, history: list[dict[str, str]] | None = None) -> dict[str, Any]:
-    """Select a normal reply or bounded capability groups from conversation context."""
+    """Select bounded capability groups while keeping final generation on Agent."""
     text = str(user_message or "").strip()
     messages: list[dict[str, str]] = [{"role": "system", "content": _ROUTER_SYSTEM_PROMPT}]
     for item in (history or [])[-6:]:
@@ -172,23 +172,11 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             "source": "fallback",
         }
 
-    route_type = str(parsed.get("type") or "").strip().casefold()
-    confidence = _confidence(parsed.get("confidence"))
-    if route_type == "reply":
-        reply = str(parsed.get("reply") or "").strip()
-        if reply:
-            return {
-                "type": "reply",
-                "reply": reply,
-                "confidence": confidence,
-                "source": "llm",
-            }
-
     capabilities = validate_capabilities(parsed.get("capabilities"))
     return {
         "type": "agent",
         "capabilities": capabilities,
         "goal": str(parsed.get("goal") or text).strip()[:500],
-        "confidence": confidence,
-        "source": "llm" if route_type == "agent" else "fallback",
+        "confidence": _confidence(parsed.get("confidence")),
+        "source": "llm",
     }

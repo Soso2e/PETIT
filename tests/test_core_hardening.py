@@ -38,10 +38,17 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         self.assertEqual(result["model_route"]["actual_route"], "agent")
         self.assertEqual(result["model_route"]["router_source"], "test")
 
-    def test_deterministic_time_and_greeting_skip_capability_router(self) -> None:
+    def test_time_stays_deterministic_and_greeting_uses_agent(self) -> None:
+        route = {
+            "type": "agent",
+            "capabilities": [],
+            "goal": "自然に挨拶へ返答する",
+            "source": "test",
+            "confidence": 1.0,
+        }
         with (
             patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
-            patch.object(agent.model_router, "choose") as router,
+            patch.object(agent.model_router, "choose", return_value=route) as router,
             patch.object(
                 agent.tools,
                 "dispatch",
@@ -56,14 +63,20 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
                     ensure_ascii=False,
                 ),
             ),
+            patch.object(
+                agent,
+                "chat_completion",
+                return_value={"role": "assistant", "content": "やっほー。今日はどうする？", "tool_calls": []},
+            ),
         ):
             time_result = agent.run("今何時？")
             greeting_result = agent.run("やっほー")
 
-        router.assert_not_called()
+        router.assert_called_once_with("やっほー", [])
         self.assertIn("10:30", time_result["reply"])
         self.assertEqual(time_result["model_route"]["actual_route"], "deterministic")
-        self.assertEqual(greeting_result["model_route"]["kind"], "instant")
+        self.assertEqual(greeting_result["model_route"]["actual_route"], "agent")
+        self.assertIn("やっほー", greeting_result["reply"])
 
     def test_capability_tool_is_executed_with_compressed_user_context(self) -> None:
         calls: list[dict[str, object]] = []
