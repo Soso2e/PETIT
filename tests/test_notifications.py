@@ -90,8 +90,11 @@ class NotificationTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "sent")
         self.assertEqual(result["sent"], 1)
-        self.assertEqual(provider.payloads[0]["payload"]["category"], "work_session")
-        self.assertEqual(provider.payloads[0]["payload"]["url"], "/?mode=work")
+        payload = provider.payloads[0]["payload"]
+        self.assertEqual(payload["category"], "work_session")
+        self.assertEqual(payload["event_id"], result["event_id"])
+        self.assertIn("mode=work", payload["url"])
+        self.assertIn(f"notification={result['event_id']}", payload["url"])
 
     def test_permanent_delivery_error_disables_stale_subscription(self) -> None:
         notifications.update_preferences({"github_ci_failure": True})
