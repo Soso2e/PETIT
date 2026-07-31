@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import config, db, notifications
+from backend import config, db, notification_center, notifications
 
 
 class FakeProvider:
@@ -113,6 +113,33 @@ class NotificationTests(unittest.TestCase):
         self.assertEqual(result["failed"], 1)
         self.assertEqual(result["disabled"], 1)
         self.assertEqual(notifications.active_subscriptions(), [])
+
+    def test_notification_center_tracks_task_deep_link_and_state(self) -> None:
+        result = notifications.dispatch_notification(
+            category="high_task",
+            title="期限が近いタスク",
+            body="確認してください。",
+            url="/?task=42",
+        )
+        listing = notification_center.list_events(state="open")
+        self.assertEqual(listing["unread_count"], 1)
+        event = listing["events"][0]
+        self.assertEqual(event["entity_type"], "task")
+        self.assertEqual(event["entity_id"], "42")
+        self.assertIn(f"notification={result['event_id']}", event["action_url"])
+
+        read = notification_center.update_event_state(result["event_id"], read=True)
+        self.assertTrue(read["read"])
+        resolved = notification_center.update_event_state(result["event_id"], resolved=True)
+        self.assertTrue(resolved["resolved"])
+        self.assertEqual(notification_center.list_events(state="open")["events"], [])
+
+    def test_notification_schema_migration_is_idempotent(self) -> None:
+        notifications.init_db()
+        notifications.init_db()
+        with db.get_connection() as conn:
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(notification_events)")}
+        self.assertTrue({"read_at", "resolved_at", "entity_type", "entity_id", "action_url"} <= columns)
 
 
 if __name__ == "__main__":
