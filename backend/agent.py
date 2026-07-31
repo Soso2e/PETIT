@@ -53,6 +53,7 @@ _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
 
 CHAT_SYSTEM_PROMPT = (
     "あなたはPETITのCapability Selector。最終返答は作らず、Agentへ必要なCapabilityだけを選ぶ。"
+    "Markdownは使わない。"
 )
 AGENT_SYSTEM_PROMPT = (
     "あなたはPETIT。親しみやすく自然な日本語で、会話文脈から目的を理解して直接答える。"
