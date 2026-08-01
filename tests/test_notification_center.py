@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import config, db, notification_center, notifications
+from backend import config, db, notification_center, notifications, task_list_api
 
 
 class NotificationCenterTests(unittest.TestCase):
@@ -41,6 +42,28 @@ class NotificationCenterTests(unittest.TestCase):
         with db.get_connection() as conn:
             columns = {row["name"] for row in conn.execute("PRAGMA table_info(notification_events)")}
         self.assertTrue({"read_at", "resolved_at", "entity_type", "entity_id", "action_url"} <= columns)
+
+    def test_ui_task_list_separates_high_and_low_and_excludes_mid_done(self) -> None:
+        with db.get_connection() as conn:
+            conn.executemany(
+                "INSERT INTO tasks_cache(title, status, due_date, priority, updated_at) VALUES (?, ?, ?, ?, ?)",
+                [
+                    ("重要", "Yet", None, "High", db.now_iso()),
+                    ("あとで", "Yet", "2099-01-01", "Low", db.now_iso()),
+                    ("中間", "Yet", None, "Mid", db.now_iso()),
+                    ("完了済み", "Done", None, "High", db.now_iso()),
+                ],
+            )
+
+        high_response = task_list_api.list_ui_tasks(priority="high")
+        low_response = task_list_api.list_ui_tasks(priority="low")
+        invalid_response = task_list_api.list_ui_tasks(priority="mid")
+        high = json.loads(high_response.body)
+        low = json.loads(low_response.body)
+
+        self.assertEqual([task["title"] for task in high["tasks"]], ["重要"])
+        self.assertEqual([task["title"] for task in low["tasks"]], ["あとで"])
+        self.assertEqual(invalid_response.status_code, 400)
 
 
 if __name__ == "__main__":
