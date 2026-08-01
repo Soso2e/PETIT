@@ -45,6 +45,76 @@ storage/   SQLite などの実行時データ（git 管理外）
    - AivisSpeechが未準備・停止中でもチャットは利用でき、対応ブラウザでは無料のブラウザ標準TTSへフォールバックできます。
    - 有料TTS APIは前提ではありません。
 
+## TailscaleでTailnet内へ公開する
+
+PCとアクセスする端末を同じTailnetへ接続すると、PETITを次のようなHTTPS URLで開けます。
+
+```text
+https://PC名.tailnet名.ts.net
+```
+
+これは同じTailnet内だけの公開です。インターネット全体へ公開するTailscale Funnelは使用しません。
+
+### 1. PETITを起動する
+
+PowerShellでPETITのルートへ移動し、ローカルホストで起動します。
+
+```powershell
+cd "C:\PETITを置いている場所\PETIT"
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+
+先にPC上で動作を確認します。
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/health
+```
+
+ブラウザでも <http://127.0.0.1:8000> を開きます。
+
+### 2. Tailscale Serveで公開する
+
+別の管理者権限PowerShellを開きます。
+
+```powershell
+tailscale status
+tailscale serve --bg http://127.0.0.1:8000
+tailscale serve status
+```
+
+成功すると、次のようなURLが表示されます。
+
+```text
+https://PC名.tailnet名.ts.net
+```
+
+`--bg`を付けるとPowerShellを閉じてもServe設定が維持されます。ただし、PC再起動後も利用するにはPETITのFastAPI自体を再度起動する必要があります。
+
+### 3. iPhoneなどから開く
+
+1. PCと同じTailnetのTailscaleアカウントでログインする
+2. TailscaleをONにする
+3. Safariなどで表示されたHTTPS URLを開く
+
+公開状態を確認する場合:
+
+```powershell
+tailscale serve status
+```
+
+公開を停止する場合:
+
+```powershell
+tailscale serve off
+```
+
+設定を完全にリセットする場合:
+
+```powershell
+tailscale serve reset
+```
+
 ## 環境変数（主なもの）
 
 | 変数 | 既定値 | 説明 |
