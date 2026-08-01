@@ -13,7 +13,7 @@
 - 日次生活インデックス: 全`session_id`の会話をAsia/Tokyo基準で1日1回まとめ、空・記号のみ・連続重複だけを除外してローカルLM Studioへ送る。雑談の外出・食事・人・場所・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存し、長期記憶候補は自動昇格しない。専用CIと実ローカルLLM E2Eは未確認。
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
 - 制作伴走Web UI: 作業モード、経過時間、一時停止・終了、10分／20分ごとの前景限定自律声かけ、Highタスク・次の予定・次の一手、直近3ラリー表示、2時間アイドルでのセッション分離、途中経過メッセージ、PWAを実装。作業状態をサーバーSQLiteにも保存し、20分ごとの継続確認、`まだ続けてる`／チャット返答、さらに20分無応答時の自動停止、40分超の旧localStorage状態停止を追加。関連24テストと構文確認は成功、実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eは未確認。
-- Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in設定、SQLiteの通知イベント・配信履歴、Web Push Provider境界、設定UI、テスト通知を実装。端末でPushを明示的に有効化すると作業セッション通知もONにし、後から個別OFFにできる。Push失敗時も作業停止判定は継続する。関連24テストとJavaScript構文確認は成功、実VAPID／HTTPSブラウザ／バックグラウンド受信／通知タップ／実iPhone PWA E2Eは未確認。
+- Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in設定、SQLiteの通知イベント・配信履歴、Web Push Provider境界、設定UI、テスト通知を実装。ローカルVAPID鍵と`pywebpush`を設定し、稼働中APIで`configured=true`／依存利用可能を確認。端末でPushを明示的に有効化すると作業セッション通知もONにし、後から個別OFFにできる。Push失敗時も作業停止判定は継続する。実HTTPSブラウザの許可表示／購読／バックグラウンド受信／通知タップ／実iPhone PWA E2Eは未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
 - Notion会話検索: `knowledge` Capability内の読み取りToolとして共有済みページを最大3件検索し、プロパティ・本文抜粋・更新日時・URLを圧縮してAgentへ戻す。未設定・0件・API失敗を区別する。関連CI成功、実Notion／LM Studio／ブラウザE2Eは未確認。
@@ -116,3 +116,4 @@
 | 2026-07-26 | 23:06 | #78 | Issue #109対応としてREADMEからAivisSpeech初期セットアップへ導線を追加し、Windows導入、音声モデル、Engine、`/docs`・`/speakers`、`.env`、診断CLI、WAV再生、Docker／WSL接続差、stage別切り分け、ブラウザ標準TTSとの無料運用方針を整理。文書変更のみで、実Engine E2Eは未実施。 |
 | 2026-07-27 | 14:57 | #79 | mainの実装と「現在の状態」を再照合。Issue #84／#86の汎用リスト管理、Issue #89の文脈駆動Capability Router／上限付きAgent Runtime、Notion検索の`knowledge`統合、IME Enter抑止、PWAブランドアイコン、AivisSpeech初期セットアップ導線を現状欄へ反映し、実装済みと実機未確認を分離。文書更新のみでコードテストは未実施。 |
 | 2026-08-01 | 04:39 | #80 | Issue #122対応として作業セッションをSQLiteへ保存し、20分ごとのPush継続確認、返答から20分延長、無応答時の自動停止、旧localStorage状態の停止、`まだ続けてる`UI、Push許可時の作業通知ONを実装。関連24テスト・Python／JavaScript構文・diff確認成功。全300テストは既存DeepSeek／Notion環境依存を含む28失敗・8エラーのため未通過、実VAPID／スマホE2Eは未確認。 |
+| 2026-08-01 | 11:22 | #81 | PWAで通知許可が出ない原因を、起動環境の`pywebpush`不足・VAPID未設定・旧reload子プロセス残存と特定。依存導入、Git管理外のローカルVAPID設定、PETIT再起動後に通知状態APIの`configured=true`／依存利用可能を確認。通知・PWA関連20テスト、JavaScript構文、秘密鍵のignore、diff形式は成功。実HTTPS端末での許可表示・購読・受信は未確認。 |
