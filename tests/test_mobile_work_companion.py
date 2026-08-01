@@ -15,6 +15,7 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         html = (FRONTEND / "index.html").read_text(encoding="utf-8")
         self.assertLess(html.index('/static/session.js'), html.index('/static/app.js'))
         self.assertLess(html.index('/static/voice.js'), html.index('/static/companion.js'))
+        self.assertLess(html.index('/static/companion.js'), html.index('/static/shell.js'))
         for element_id in (
             "work-task",
             "work-toggle",
@@ -26,6 +27,36 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
             "dashboard-schedule",
         ):
             self.assertIn(f'id="{element_id}"', html)
+
+    def test_app_shell_has_four_distinct_views_and_mobile_navigation(self) -> None:
+        html = (FRONTEND / "index.html").read_text(encoding="utf-8")
+        for view in ("today", "chat", "notifications", "settings"):
+            self.assertIn(f'data-app-view="{view}"', html)
+            self.assertIn(f'data-app-nav="{view}"', html)
+        self.assertIn('class="app-shell"', html)
+        self.assertIn('class="app-sidebar"', html)
+        self.assertIn('id="notification-panel"', html)
+        self.assertIn('id="chat-form"', html)
+
+        css = (FRONTEND / "style.css").read_text(encoding="utf-8")
+        self.assertIn("grid-template-columns: var(--sidebar-width) minmax(0, 1fr)", css)
+        self.assertIn("@media (max-width: 680px)", css)
+        self.assertIn("position: fixed", css)
+        self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", css)
+
+    def test_shell_navigation_supports_prompts_and_notification_deep_links(self) -> None:
+        source = (FRONTEND / "shell.js").read_text(encoding="utf-8")
+        self.assertIn("petit_active_view", source)
+        self.assertIn("data-chat-prompt", source)
+        self.assertIn('params.has("task") || params.has("notification")', source)
+        self.assertIn('document.dispatchEvent(new CustomEvent("petit:viewchange"', source)
+        self.assertIn("window.PETITShell", source)
+
+        service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
+        self.assertIn('const CACHE_NAME = "petit-shell-v6"', service_worker)
+        self.assertIn('"/static/shell.js"', service_worker)
+        self.assertIn('"/static/branding/icon_logo.png"', service_worker)
+        self.assertIn('"/static/branding/name_logo.png"', service_worker)
 
     def test_manifest_is_valid_and_standalone(self) -> None:
         manifest = json.loads((FRONTEND / "manifest.webmanifest").read_text(encoding="utf-8"))
