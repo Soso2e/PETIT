@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
+BACKEND = ROOT / "backend"
 
 
 class UniverseUiTests(unittest.TestCase):
@@ -16,6 +17,7 @@ class UniverseUiTests(unittest.TestCase):
     def test_universe_assets_and_legacy_ui_exist(self) -> None:
         for name in ("universe.html", "universe.css", "universe-actions.css", "universe-app.js", "legacy.html"):
             self.assertTrue((FRONTEND / name).is_file(), name)
+        self.assertTrue((BACKEND / "task_list_api.py").is_file())
 
     def test_universe_has_required_views(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
@@ -42,6 +44,8 @@ class UniverseUiTests(unittest.TestCase):
     def test_universe_uses_existing_backend_contracts(self) -> None:
         script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
         self.assertIn('requestJson("/api/briefing"', script)
+        self.assertIn('/api/notifications/tasks?priority=high', script)
+        self.assertIn('/api/notifications/tasks?priority=low', script)
         self.assertIn('requestJson("/api/chat"', script)
         self.assertIn('requestJson("/api/health"', script)
         self.assertIn("/api/actions/", script)
