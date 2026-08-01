@@ -408,11 +408,11 @@
     else renderDetailEmpty();
   };
 
-  const normalizeBriefingTasks = (data) => {
-    const tasks = Array.isArray(data?.tasks) ? data.tasks : [];
-    return tasks.map((task, index) => ({
+  const normalizeTaskRows = (tasks) => {
+    const rows = Array.isArray(tasks) ? tasks : [];
+    return rows.map((task, index) => ({
       ...task,
-      id: task.id || task.external_id || `briefing-${index}`,
+      id: task.id || task.external_id || `task-${index}`,
       sync_status: task.sync_status || "synced",
     }));
   };
@@ -421,9 +421,19 @@
     const refresh = byId("refresh-universe");
     if (refresh) refresh.disabled = true;
     try {
-      const data = await requestJson("/api/briefing");
-      state.briefing = data;
-      state.tasks = normalizeBriefingTasks(data);
+      const briefing = await requestJson("/api/briefing");
+      state.briefing = briefing;
+      let tasks = normalizeTaskRows(briefing.tasks);
+      try {
+        const [highData, lowData] = await Promise.all([
+          requestJson("/api/notifications/tasks?priority=high&limit=200"),
+          requestJson("/api/notifications/tasks?priority=low&limit=200"),
+        ]);
+        tasks = normalizeTaskRows([...(highData.tasks || []), ...(lowData.tasks || [])]);
+      } catch (taskListError) {
+        console.warn("PETIT Universe task list fallback", taskListError);
+      }
+      state.tasks = tasks;
       if (state.selectedTaskId && !selectedTask()) state.selectedTaskId = null;
       if (!state.selectedTaskId && highTasks().length) state.selectedTaskId = taskKey(highTasks()[0], state.tasks.indexOf(highTasks()[0]));
       renderAll();
