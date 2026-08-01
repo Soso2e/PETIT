@@ -23,10 +23,7 @@
     <header class="universe-topbar">
       <a class="brand" href="/" aria-label="PETIT Universe">
         <img src="/static/branding/icon_logo.png" alt="" />
-        <span>
-          <strong>PETIT</strong>
-          <small>UNIVERSE</small>
-        </span>
+        <span><strong>PETIT</strong><small>UNIVERSE</small></span>
       </a>
       <nav class="view-tabs" aria-label="ビュー切り替え">
         <button class="view-tab is-active" data-view="focus">Focus</button>
@@ -35,7 +32,7 @@
         <button class="view-tab" data-view="chat">Chat</button>
       </nav>
       <div class="topbar-actions">
-        <span id="sync-pill" class="sync-pill">同期確認中</span>
+        <span id="sync-pill" class="sync-pill" hidden>同期確認中</span>
         <a class="legacy-link" href="/static/legacy.html">旧UI</a>
       </div>
     </header>
@@ -43,16 +40,17 @@
     <main class="universe-main">
       <section class="view is-active" data-view-panel="focus">
         <div class="focus-layout">
-          <section class="orbit-card" aria-label="Focus Orbit">
+          <section class="orbit-card" aria-label="重要タスクのFocus Orbit">
             <div class="orbit-card__header">
               <div>
-                <span class="eyebrow">FOCUS ORBIT</span>
-                <h1 id="focus-title">いまのObjective</h1>
+                <span class="eyebrow">IMPORTANT NOW</span>
+                <h1 id="focus-title">今日のFocus</h1>
+                <p class="section-copy">いま見るのは、未完了の重要タスクだけ。</p>
               </div>
               <button id="refresh-universe" class="icon-button" type="button" aria-label="タスクを更新">↻</button>
             </div>
 
-            <div id="orbit" class="orbit" role="list" aria-label="タスクの軌道">
+            <div id="orbit" class="orbit" role="list" aria-label="重要タスクの軌道">
               <div class="orbit__ring orbit__ring--one"></div>
               <div class="orbit__ring orbit__ring--two"></div>
               <div class="orbit__ring orbit__ring--three"></div>
@@ -64,10 +62,7 @@
             </div>
 
             <div class="focus-footer">
-              <div>
-                <span class="eyebrow">ACTIVE TASK</span>
-                <strong id="active-task-label">まだ実行中のタスクはありません</strong>
-              </div>
+              <div><span class="eyebrow">ACTIVE TASK</span><strong id="active-task-label">まだ実行中のタスクはありません</strong></div>
               <span id="active-elapsed">0分</span>
             </div>
           </section>
@@ -75,8 +70,8 @@
           <aside id="detail-panel" class="detail-panel" aria-label="タスク詳細">
             <div class="detail-panel__empty">
               <span class="eyebrow">TASK DETAIL</span>
-              <h2>星を選択</h2>
-              <p>タスクを選ぶと、状態・優先度・期限・同期状態を確認できます。</p>
+              <h2>タスクを選択</h2>
+              <p>星または一覧のタスクを選ぶと、完了・分類変更・作業開始ができます。</p>
             </div>
           </aside>
         </div>
@@ -85,32 +80,32 @@
       <section class="view" data-view-panel="universe" hidden>
         <div class="section-head">
           <div>
-            <span class="eyebrow">CONSTELLATION</span>
+            <span class="eyebrow">IMPORTANT PROJECTS</span>
             <h1>Project Universe</h1>
-            <p>AreaごとにProjectを眺め、今戻るべき星座を選びます。</p>
+            <p>重要タスクが残っているProjectだけを表示します。</p>
           </div>
         </div>
         <div id="constellation-grid" class="constellation-grid"></div>
       </section>
 
       <section class="view" data-view-panel="tasks" hidden>
-        <div class="section-head">
+        <div class="section-head task-section-head">
           <div>
             <span class="eyebrow">TASKS</span>
-            <h1>すべてのAction</h1>
-            <p>宇宙で眺め、一覧で確実に編集するための実務ビューです。</p>
+            <h1 id="task-view-title">重要なタスク</h1>
+            <p id="task-view-copy">今やる必要があるHighタスクだけを表示します。</p>
           </div>
-          <div class="task-filters" role="group" aria-label="タスク絞り込み">
-            <button class="filter-chip is-active" data-filter="active">Active</button>
-            <button class="filter-chip" data-filter="high">High</button>
-            <button class="filter-chip" data-filter="all">All</button>
+          <div class="task-filter-wrap">
+            <span id="task-view-count" class="task-count">0件</span>
+            <div class="task-filters" role="group" aria-label="タスク表示切り替え">
+              <button class="filter-chip is-active" data-filter="high">重要</button>
+              <button class="filter-chip" data-filter="low">あとで</button>
+            </div>
           </div>
         </div>
         <div class="task-table-wrap">
           <table class="task-table">
-            <thead>
-              <tr><th>名前</th><th>状態</th><th>優先度</th><th>期限</th><th>Project</th><th>同期</th></tr>
-            </thead>
+            <thead><tr><th>完了</th><th>名前</th><th>期限</th><th>Project</th><th>同期</th></tr></thead>
             <tbody id="task-table-body"></tbody>
           </table>
         </div>
@@ -120,14 +115,11 @@
         <div class="chat-layout">
           <section class="chat-panel">
             <div class="section-head section-head--compact">
-              <div>
-                <span class="eyebrow">PETIT CHAT</span>
-                <h1>宇宙と会話する</h1>
-              </div>
+              <div><span class="eyebrow">PETIT CHAT</span><h1>宇宙と会話する</h1></div>
               <span id="chat-status" class="chat-status">接続確認中</span>
             </div>
             <div id="messages" class="messages" aria-live="polite">
-              <div class="message message--assistant">今の星座を見ながら話そう。やることを言うと、Focusへつなげるよ。</div>
+              <div class="message message--assistant">いま必要なことを一緒に整理しよう。</div>
             </div>
             <form id="chat-form" class="chat-composer">
               <textarea id="chat-input" rows="1" placeholder="PETITに話しかける"></textarea>
@@ -137,25 +129,35 @@
           <aside class="chat-context">
             <span class="eyebrow">CURRENT CONTEXT</span>
             <h2 id="chat-context-title">Focus未選択</h2>
-            <p id="chat-context-copy">星を選ぶと、現在のタスクを意識しながら会話できます。</p>
+            <p id="chat-context-copy">タスクを選ぶと、その内容を意識しながら相談できます。</p>
           </aside>
         </div>
       </section>
     </main>
   </div>
 
+  <div id="task-feedback" class="task-feedback" role="status" aria-live="polite" hidden>
+    <span data-feedback-copy></span>
+    <button type="button" data-feedback-action hidden></button>
+  </div>
+
   <template id="detail-template">
     <div class="detail-panel__content">
       <span class="eyebrow">TASK DETAIL</span>
       <h2 data-detail="title"></h2>
-      <div class="detail-grid">
+      <div class="detail-grid detail-grid--simple">
         <div><span>状態</span><strong data-detail="status"></strong></div>
-        <div><span>優先度</span><strong data-detail="priority"></strong></div>
+        <div><span>分類</span><strong data-detail="bucket"></strong></div>
         <div><span>期限</span><strong data-detail="due"></strong></div>
-        <div><span>同期</span><strong data-detail="sync"></strong></div>
+        <div><span>Project</span><strong data-detail="project"></strong></div>
       </div>
       <p data-detail="reason" class="detail-reason"></p>
-      <div class="detail-actions">
+      <p data-detail="sync" class="detail-sync"></p>
+      <div class="detail-actions detail-actions--primary">
+        <button type="button" data-action="complete">完了にする</button>
+        <button type="button" data-action="bucket">あとでに移す</button>
+      </div>
+      <div class="detail-actions detail-actions--secondary">
         <button type="button" data-action="activate">作業開始</button>
         <button type="button" data-action="chat">PETITに相談</button>
       </div>
