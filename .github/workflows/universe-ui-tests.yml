@@ -1,0 +1,30 @@
+name: Universe UI tests
+
+on:
+  pull_request:
+    paths:
+      - "frontend/index.html"
+      - "frontend/legacy.html"
+      - "frontend/universe.html"
+      - "frontend/universe.css"
+      - "frontend/universe.js"
+      - "tests/test_universe_ui.py"
+      - "docs/universe_focus_orbit.md"
+      - ".github/workflows/universe-ui-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check JavaScript syntax
+        run: node --check frontend/universe.js
+      - name: Run Universe UI tests
+        run: python -m unittest tests.test_universe_ui -v
