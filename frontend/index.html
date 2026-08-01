@@ -50,10 +50,15 @@
           <span id="view-eyebrow" class="app-topbar__eyebrow">TODAY</span>
           <h1 id="view-title">今日</h1>
         </div>
-        <div class="header-actions">
-          <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
+        <div class="work-actions">
+          <button id="work-toggle" type="button" class="work-button">作業開始</button>
+          <button id="work-continue" type="button" class="work-button" hidden>まだ続けてる</button>
+          <button id="work-pause" type="button" class="work-secondary" hidden>一時停止</button>
+          <button id="work-check-now" type="button" class="work-secondary" hidden>今声かけて</button>
+          <button id="work-end" type="button" class="work-secondary" hidden>終了</button>
         </div>
-      </header>
+        <p class="dashboard-line">20分ごとに続行を確認し、20分返事がなければ時間を止めます。</p>
+      </article>
 
       <main class="view-stack">
         <section id="view-today" class="app-view app-view--today" data-app-view="today" aria-label="今日">

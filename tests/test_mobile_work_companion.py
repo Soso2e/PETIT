@@ -19,6 +19,7 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         for element_id in (
             "work-task",
             "work-toggle",
+            "work-continue",
             "work-frequency",
             "work-elapsed",
             "history-toggle",
@@ -134,6 +135,9 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("10 * 60 * 1000", source)
         self.assertIn("Highタスク", source)
         self.assertIn("作業モードを終了したよ", source)
+        self.assertIn('/api/work-sessions', source)
+        self.assertIn('state.awaitingResponse', source)
+        self.assertIn('maximumLegacyMs', source)
 
     def test_chat_session_commands_bypass_agent_and_keep_button_flow(self) -> None:
         source = (FRONTEND / "companion.js").read_text(encoding="utf-8")
@@ -159,6 +163,11 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("fetch(request)", source)
         self.assertIn('self.addEventListener("push"', source)
         self.assertIn('self.addEventListener("notificationclick"', source)
+
+    def test_enabling_push_enables_work_session_check_ins(self) -> None:
+        source = (FRONTEND / "notifications.js").read_text(encoding="utf-8")
+        self.assertIn('input[data-category="work_session"]', source)
+        self.assertIn("Push通知と作業セッションの声かけを有効にしました", source)
 
 
 if __name__ == "__main__":

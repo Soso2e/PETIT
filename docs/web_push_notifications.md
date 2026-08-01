@@ -18,7 +18,7 @@ Issue #92で追加した、PWA向け通知基盤の設定・運用・検証手�
 
 ## 通知カテゴリ
 
-すべて初期状態ではOFFです。通知設定UIで個別に有効化します。
+すべて初期状態ではOFFです。通知設定UIで個別に有効化します。端末でPush通知を初めて有効にしたときだけ、無限計測を防ぐ`work_session`も同時にONにします。後から個別にOFFへ戻せます。
 
 - `work_session` — 作業セッションの声かけ
 - `schedule_reminder` — 予定前リマインド
@@ -134,6 +134,7 @@ Content-Type: application/json
 - `notification_preferences` — カテゴリ別ON/OFF
 - `notification_events` — 生成した通知イベント
 - `notification_deliveries` — 端末ごとの送信結果
+- `work_sessions` — 20分ごとの継続確認、返答待ち、自動停止状態
 
 Push Serviceが404または410を返した購読は、恒久的に無効な購読として自動停止します。
 
@@ -152,7 +153,7 @@ Web PushはSecure Contextが必要です。
 3. PETITを起動する
 4. ヘッダーの`通知 OFF`を開く
 5. `この端末で有効にする`を押して許可する
-6. 必要な通知カテゴリだけONにする
+6. 作業セッションの声かけがONになったことを確認し、ほかの必要なカテゴリもONにする
 7. `テスト通知`を押す
 8. PETITのタブを閉じた状態でも通知が届くことを確認する
 9. 通知を押してPETITが開くことを確認する
@@ -179,5 +180,5 @@ iPhone/iPadでは、Web Pushはホーム画面へ追加したWebアプリで確�
 
 - VAPID未設定でもFastAPIと既存チャットは起動する
 - `pywebpush`未導入時も既存チャットは動き、通知UIだけが未設定を表示する
-- カテゴリは初期OFFなので、購読登録だけで自動通知は始まらない
+- カテゴリは初期OFF。通知設定UIから新しく購読した端末では、無限計測防止のため`work_session`だけ同時にONになる
 - APNs実装は今回の対象外

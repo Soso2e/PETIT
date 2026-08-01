@@ -11,6 +11,7 @@
   const sessionLabelEl = byId("session-label");
   const workTaskEl = byId("work-task");
   const workToggleEl = byId("work-toggle");
+  const workContinueEl = byId("work-continue");
   const workPauseEl = byId("work-pause");
   const workEndEl = byId("work-end");
   const workCheckNowEl = byId("work-check-now");
@@ -38,6 +39,7 @@
     nextCheckAt: null,
     lastCheckAt: null,
     lastCheckText: "",
+    awaitingResponse: false,
   });
 
   const loadState = () => {
@@ -54,6 +56,24 @@
   let pendingLead = null;
   let proactiveInFlight = false;
   let lastInteractionAt = Date.now();
+  let lastServerPollAt = 0;
+
+  const workSessionRequest = async (path, method = "POST", body = null) => {
+    const response = await fetch(`/api/work-sessions${path}`, {
+      method,
+      cache: "no-store",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`);
+    return data.session;
+  };
+
+  const syncSessionAction = (action) => {
+    if (!state.workSessionId) return Promise.resolve(null);
+    return workSessionRequest(`/${encodeURIComponent(state.workSessionId)}/${action}`).catch(() => null);
+  };
 
   const saveState = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   const sessionId = () => localStorage.getItem("petit_session_id") || window.PETIT_SESSION?.id || crypto.randomUUID();
@@ -255,6 +275,7 @@
     if (workFrequencyEl) workFrequencyEl.value = state.frequency || "10";
     if (workToggleEl) workToggleEl.textContent = active ? "作業中" : "作業開始";
     if (workToggleEl) workToggleEl.classList.toggle("is-active", active);
+    if (workContinueEl) workContinueEl.hidden = !active || !state.awaitingResponse;
     if (workPauseEl) {
       workPauseEl.hidden = !active;
       workPauseEl.textContent = paused ? "再開" : "一時停止";
@@ -287,6 +308,7 @@
     };
     scheduleNextCheck();
     saveState();
+    void workSessionRequest("/start", "POST", { session_id: state.workSessionId, task }).catch(() => undefined);
     renderWorkState();
     appendMessage("assistant", `了解！「${task}」やろう。${state.frequency === "quiet" ? "静かに見守るね。" : "様子を見ながら声かけるね。"}`);
   };
@@ -299,6 +321,7 @@
     state.pauseReason = reason;
     state.nextCheckAt = null;
     saveState();
+    void syncSessionAction("pause");
     renderWorkState();
     if (reply) appendMessage("assistant", `${formatElapsed(elapsedMs())}進んだね。いったん休憩しよ。`);
     return true;
@@ -314,6 +337,7 @@
     state.pauseReason = "";
     scheduleNextCheck();
     saveState();
+    void syncSessionAction("resume");
     renderWorkState();
     if (reply) appendMessage("assistant", "おかえり。続きからいこー！");
     return true;
@@ -329,9 +353,11 @@
     if (!state.active) return;
     const finalElapsed = elapsedMs();
     const task = state.task;
+    const sessionIdToEnd = state.workSessionId;
     await askPetit("finish");
     state = { ...defaultState(), frequency: state.frequency, task, endedAt: Date.now() };
     saveState();
+    if (sessionIdToEnd) void workSessionRequest(`/${encodeURIComponent(sessionIdToEnd)}/end`).catch(() => undefined);
     renderWorkState();
     appendMessage("assistant", `作業モードを終了したよ。${formatElapsed(finalElapsed)}おつかれ！`);
     void loadBriefing();
@@ -350,6 +376,7 @@
       lastWorkSessionId: finishedSessionId,
     };
     saveState();
+    if (finishedSessionId) void workSessionRequest(`/${encodeURIComponent(finishedSessionId)}/end`).catch(() => undefined);
     renderWorkState();
     void loadBriefing();
     return finalElapsed;
@@ -427,12 +454,37 @@
     if (Date.now() >= next && document.visibilityState === "visible") {
       void askPetit("check");
     }
+    if (Date.now() - lastServerPollAt >= 15000 && state.workSessionId) {
+      lastServerPollAt = Date.now();
+      void workSessionRequest(`/${encodeURIComponent(state.workSessionId)}`, "GET").then((session) => {
+        if (!state.active || session.session_id !== state.workSessionId) return;
+        state.awaitingResponse = Boolean(session.awaiting_response_since);
+        if (session.status === "auto_stopped") {
+          const finalElapsed = endWorkImmediately();
+          appendMessage("assistant", `返事がなかったので作業時間を${formatElapsed(finalElapsed)}で止めたよ。続けるときはもう一度開始してね。`);
+          return;
+        }
+        saveState();
+        renderWorkState();
+      }).catch(() => {
+        const maximumLegacyMs = 2 * 20 * 60 * 1000;
+        if (state.active && elapsedMs() > maximumLegacyMs) {
+          const finalElapsed = endWorkImmediately();
+          appendMessage("assistant", `以前の作業状態が残っていたので、${formatElapsed(finalElapsed)}で時間を止めたよ。`);
+        }
+      });
+    }
   };
 
   formEl.addEventListener("submit", (event) => {
     const text = inputEl.value.trim();
     lastInteractionAt = Date.now();
     window.PETIT_SESSION?.markActive?.();
+    if (text && state.active && state.workSessionId) {
+      state.awaitingResponse = false;
+      saveState();
+      void syncSessionAction("respond");
+    }
 
     const command = classifySessionCommand(text);
     if (command) {
@@ -484,6 +536,13 @@
   dashboardRefreshEl?.addEventListener("click", () => void loadBriefing());
   workToggleEl?.addEventListener("click", () => {
     if (!state.active) startWork();
+  });
+  workContinueEl?.addEventListener("click", () => {
+    state.awaitingResponse = false;
+    scheduleNextCheck();
+    renderWorkState();
+    void syncSessionAction("respond");
+    appendMessage("assistant", "了解、続行だね。20分後にまた様子を聞くよ。");
   });
   workPauseEl?.addEventListener("click", pauseOrResume);
   workEndEl?.addEventListener("click", () => void endWork());
