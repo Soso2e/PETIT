@@ -334,6 +334,12 @@
   .notification-item { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .notification-item__resolve { width: max-content; margin: 0 0 10px 12px; }
   .notification-categories { grid-template-columns: 1fr; }
+  .notification-filter,
+  .notification-panel__refresh,
+  .notification-item__resolve,
+  .notification-panel__actions button { min-height: 44px; }
+  .notification-panel__actions { display: grid; grid-template-columns: 1fr; }
+  .notification-panel__actions button { width: 100%; }
 
   .task-panel__sheet {
     top: auto;

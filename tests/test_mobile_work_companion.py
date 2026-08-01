@@ -3,11 +3,24 @@ from __future__ import annotations
 import json
 import struct
 import unittest
+from collections import Counter
+from html.parser import HTMLParser
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
+
+
+class IdCollector(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.ids: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        for name, value in attrs:
+            if name == "id" and value:
+                self.ids.append(value)
 
 
 class MobileWorkCompanionStaticTests(unittest.TestCase):
@@ -44,6 +57,15 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("position: fixed", css)
         self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", css)
 
+    def test_app_shell_html_has_unique_ids_and_closed_topbar(self) -> None:
+        html = (FRONTEND / "index.html").read_text(encoding="utf-8")
+        parser = IdCollector()
+        parser.feed(html)
+        duplicates = [element_id for element_id, count in Counter(parser.ids).items() if count > 1]
+
+        self.assertEqual(duplicates, [])
+        self.assertLess(html.index("</header>"), html.index('<main class="view-stack">'))
+
     def test_shell_navigation_supports_prompts_and_notification_deep_links(self) -> None:
         source = (FRONTEND / "shell.js").read_text(encoding="utf-8")
         self.assertIn("petit_active_view", source)
@@ -53,7 +75,7 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("window.PETITShell", source)
 
         service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('const CACHE_NAME = "petit-shell-v6"', service_worker)
+        self.assertIn('const CACHE_NAME = "petit-shell-v7"', service_worker)
         self.assertIn('"/static/shell.js"', service_worker)
         self.assertIn('"/static/branding/icon_logo.png"', service_worker)
         self.assertIn('"/static/branding/name_logo.png"', service_worker)

@@ -108,6 +108,12 @@
   margin-top: 17px;
 }
 
+.work-note {
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
 .work-button,
 .work-secondary {
   min-height: 40px;
@@ -201,11 +207,17 @@
 
 @media (max-width: 680px) {
   .companion-dashboard { gap: 10px; }
-  .companion-card { border-radius: 19px; padding: 17px; }
-  .companion-card--work { padding: 19px 17px; }
-  .work-main-row { align-items: stretch; flex-direction: column; }
+  .companion-card { border-radius: 19px; padding: 16px; }
+  .companion-card--work { padding: 18px 16px; }
+  .companion-card__head { margin-bottom: 13px; }
+  .work-task { min-height: 48px; font-size: 16px; }
+  .work-main-row { align-items: center; }
   .work-elapsed { min-width: 0; }
   .work-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .work-button,
-  .work-secondary { width: 100%; }
+  .work-secondary { width: 100%; min-height: 46px; font-size: 12px; }
+  .work-frequency { min-height: 44px; font-size: 16px; }
+  .dashboard-line { font-size: 13px; }
+  .dashboard-line--primary { font-size: 14px; }
+  .dashboard-list { font-size: 13px; }
 }
