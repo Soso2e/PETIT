@@ -37,7 +37,7 @@
 
 | 日付 | 時間 | 回数 | 変更内容 |
 |------|------|------|----------|
-| 2026-06-25 | 08:47 | #1 | MVP 実装: FastAPI バックエンド（agent ループ + LM Studio クライアント + SQLite）、ツール（save/search_memory, get/add_task, get_schedule）、ブラウザ用チャット UI、CLAUDE.md / README / .gitignore を追加。`develop` ブランチを作成。 |
+| 2026-06-25 | 08:47 | #1 | MVP 実装: FastAPI バックエンド（agent ループ + LM Studio クライアント + SQLite）、ツール（save/search_memory, get/add_task, get_schedule）、ブラウザ用チャット UI、CLAUDE.md / README.md / .gitignore を追加。`develop` ブランチを作成。 |
 | 2026-06-25 | 09:05 | #2 | Notion 連携実装: notion_client.py（REST APIクライアント・ページパース・ページネーション対応）、tools/notion.py（sync_notion_tasks ツール + upsert）、get_tasks が Notion 設定時に自動同期、/api/health に Notion 設定状況を追加、.env.example 作成。`feat/notion` ブランチ。 |
 | 2026-06-25 | 13:20 | #3 | RAG検索実装: chroma_client.py（ChromaDB永続化 + LM Studio embeddings カスタム関数 + graceful fallback）、search_memory がセマンティック検索→キーワード自動フォールバック、save_memory と会話ターンを Chroma に自動索引化、起動時に既存SQLiteデータをバックグラウンド同期、/api/health に RAG ステータス追加。`feat/rag` ブランチ。 |
 | 2026-06-25 | 17:50 | #4 | Progress Log を1ファイルに整理: 詳細ログ `progress.md` を削除し、進捗記録を `PROGRESS.md`（表形式）に一本化。CLAUDE.md の Progress Log ルールとディレクトリ構成を更新。 |
@@ -123,3 +123,4 @@
 | 2026-08-01 | 11:47 | #82 | 実装済み・未確認: Issue #129として完了報告の会話フローを再設計し、「LiTデザインは完了した！」をLLMなしで未完了の「LiTのデザイン実装」へ一意解決、複数候補の短期選択状態、完了済み／0件分岐、Project完了確認の優先維持、対象つき確認UI、承認後の自然な返答を追加。関連28テスト、Python／JavaScript構文、diff形式、一時DBの`/api/chat`縦切り（LLM 0回）成功。実ブラウザ操作・実Notion同期は未確認。 |
 | 2026-08-01 | 12:26 | #83 | 実装済み・未確認: 実会話で「今進んでいるプロジェクトの状況をまとめて」に作業予告だけを返しTool未実行で終了する症状を確認。Agent Runtimeへ作業予告の最終回答を1回だけ同一ターン内のTool実行へ戻すガードを追加し、再失敗時は未実行を明示。`projects` Capabilityの未登録Tool名を実在Toolへ修正し、保存済みcheckpointを読む`get_project_status`を追加。関連43テスト、Python／JavaScript構文、diff形式、稼働中APIのTool登録を確認。外部API課金を避けるため実DeepSeek会話E2Eは未実施。既存`test_confirmed_stale_source_is_disclosed` 1件は今回未変更箇所で単独失敗。 |
 | 2026-08-01 | 12:53 | #84 | 実装済み・未確認: Issue #129の実会話「キャンプの予習も終わったわ」が`project_completion_missing_project`へ強制フォールバックする原因を、Task完了パターンの助詞`も`・語尾`わ`未対応と広すぎるProject完了ゲートに特定。自然文をタスク候補へ解決し、対象名あり・アクティブProjectなしの報告はProject名不足へ強制しないよう修正。関連20テストとPython構文確認成功。周辺60テストは既知の`test_confirmed_stale_source_is_disclosed` 1件のみ今回未変更箇所で失敗。実ブラウザ操作・実Notion同期は未確認。 |
+| 2026-08-01 | 17:13 | #85 | 実装済み・未確認: Issue #131の追加要件としてUniverse UIをHigh中心へ整理し、Focus／Project Universeは未完了Highのみ、TasksはHigh「重要」とLow「あとで」を完全分離、Midを非表示化。一覧・詳細からの直接完了、完了直後の元に戻す、High↔Low切替、同期正常時の表示簡略化、旧UI設定から新UIへ戻る導線、High／Low全件取得APIと回帰テストを追加。JavaScript構文の事前確認成功、実ブラウザ／実Notion／iPhone E2EとGitHub Actionsは未確認。 |
