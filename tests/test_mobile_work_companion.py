@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
+LEGACY_HTML = FRONTEND / "legacy.html"
 
 
 class IdCollector(HTMLParser):
@@ -25,7 +26,7 @@ class IdCollector(HTMLParser):
 
 class MobileWorkCompanionStaticTests(unittest.TestCase):
     def test_index_loads_session_before_chat_and_companion_after_voice(self) -> None:
-        html = (FRONTEND / "index.html").read_text(encoding="utf-8")
+        html = LEGACY_HTML.read_text(encoding="utf-8")
         self.assertLess(html.index('/static/session.js'), html.index('/static/app.js'))
         self.assertLess(html.index('/static/voice.js'), html.index('/static/companion.js'))
         self.assertLess(html.index('/static/companion.js'), html.index('/static/shell.js'))
@@ -42,7 +43,7 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
             self.assertIn(f'id="{element_id}"', html)
 
     def test_app_shell_has_four_distinct_views_and_mobile_navigation(self) -> None:
-        html = (FRONTEND / "index.html").read_text(encoding="utf-8")
+        html = LEGACY_HTML.read_text(encoding="utf-8")
         for view in ("today", "chat", "notifications", "settings"):
             self.assertIn(f'data-app-view="{view}"', html)
             self.assertIn(f'data-app-nav="{view}"', html)
@@ -58,7 +59,7 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("grid-template-columns: repeat(4, minmax(0, 1fr))", css)
 
     def test_app_shell_html_has_unique_ids_and_closed_topbar(self) -> None:
-        html = (FRONTEND / "index.html").read_text(encoding="utf-8")
+        html = LEGACY_HTML.read_text(encoding="utf-8")
         parser = IdCollector()
         parser.feed(html)
         duplicates = [element_id for element_id, count in Counter(parser.ids).items() if count > 1]

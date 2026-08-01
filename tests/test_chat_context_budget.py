@@ -92,6 +92,25 @@ class CompactChatContextTests(unittest.TestCase):
 
 
 class EmptyModelResponseRecoveryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.endpoint_patch = patch.object(
+            lmstudio_client,
+            "endpoint",
+            side_effect=lambda route: {
+                "configured": True,
+                "provider": "lm_studio",
+                "label": "LM Studio",
+                "base_url": "http://localhost:1234/v1",
+                "api_key": "lm-studio",
+                "model": "local-model",
+                "profile": "local",
+            },
+        )
+        self.endpoint_patch.start()
+
+    def tearDown(self) -> None:
+        self.endpoint_patch.stop()
+
     @staticmethod
     def _response(content: str, *, finish_reason: str = "stop") -> httpx.Response:
         return httpx.Response(

@@ -1,8 +1,14 @@
 "use strict";
 
 const CACHE_NAME = "petit-shell-v7";
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v1`;
 const SHELL = [
   "/",
+  "/static/universe.html",
+  "/static/universe.css",
+  "/static/universe-actions.css",
+  "/static/universe-app.js",
+  "/static/legacy.html",
   "/static/style.css",
   "/static/companion.css",
   "/static/notifications.css",
@@ -27,13 +33,13 @@ const SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)).catch(() => undefined));
+  event.waitUntil(caches.open(ACTIVE_CACHE_NAME).then((cache) => cache.addAll(SHELL)).catch(() => undefined));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== ACTIVE_CACHE_NAME).map((key) => caches.delete(key))))
   );
   self.clients.claim();
 });
@@ -48,7 +54,7 @@ self.addEventListener("fetch", (event) => {
     fetch(request)
       .then((response) => {
         const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
+        caches.open(ACTIVE_CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
         return response;
       })
       .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))

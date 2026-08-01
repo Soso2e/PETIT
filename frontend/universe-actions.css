@@ -1,0 +1,42 @@
+.chat-actions {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(157, 180, 255, 0.16);
+}
+
+.chat-actions small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.chat-actions button {
+  border: 1px solid rgba(157, 180, 255, 0.28);
+  border-radius: 12px;
+  padding: 8px 11px;
+  color: var(--text);
+  background: rgba(157, 180, 255, 0.14);
+  cursor: pointer;
+}
+
+.chat-actions button:last-child {
+  background: transparent;
+}
+
+.chat-actions button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+  .chat-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chat-actions small {
+    grid-column: 1 / -1;
+  }
+}

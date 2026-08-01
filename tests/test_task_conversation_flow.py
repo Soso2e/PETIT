@@ -125,7 +125,7 @@ class TaskConversationFlowTests(unittest.TestCase):
     def test_frontend_accepts_shitehoshii_as_pending_action_approval(self) -> None:
         root = Path(__file__).resolve().parents[1]
         script = (root / "frontend" / "action_confirm.js").read_text(encoding="utf-8")
-        html = (root / "frontend" / "index.html").read_text(encoding="utf-8")
+        html = (root / "frontend" / "legacy.html").read_text(encoding="utf-8")
 
         self.assertIn('"してほしい"', script)
         self.assertIn('event.stopImmediatePropagation()', script)
