@@ -43,6 +43,19 @@ class TaskCompletionConversationTests(unittest.TestCase):
         self.assertEqual(action["arguments"]["task_id"], task_id)
         self.assertEqual(action["arguments"]["title_query"], "LiTのデザイン実装")
 
+    def test_additive_particle_and_casual_ending_resolve_named_task(self) -> None:
+        task_id = self.add_task("キャンプの予習")
+
+        with patch("backend.agent.chat_completion", side_effect=AssertionError("LLM must not run")):
+            result = agent.run("キャンプの予習も終わったわ")
+
+        self.assertEqual(result["model_route"]["kind"], "task_completion_preview")
+        self.assertIn("キャンプの予習", result["reply"])
+        action = result["pending_actions"][0]
+        self.assertEqual(action["name"], "complete_task")
+        self.assertEqual(action["arguments"]["task_id"], task_id)
+        self.assertEqual(action["arguments"]["title_query"], "キャンプの予習")
+
     def test_ambiguous_candidates_are_listed_once_and_followup_number_selects(self) -> None:
         first_id = self.add_task("LiTデザイン実装")
         self.add_task("LiTデザイン確認")

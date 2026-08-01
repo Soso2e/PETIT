@@ -151,6 +151,16 @@ class ProjectCompletionTests(unittest.TestCase):
         self.assertIn("どのプロジェクト", result["reply"])
         self.assertFalse(result.get("pending_actions"))
 
+    def test_named_completion_without_active_project_is_not_forced_into_project_fallback(self) -> None:
+        project_continuity.set_active_project(config.PETIT_OWNER_ID, None)
+
+        result = project_completion.try_handle_completion_turn(
+            "キャンプの予習も終わったわ",
+            user_id=config.PETIT_OWNER_ID,
+        )
+
+        self.assertIsNone(result)
+
     def test_task_completion_command_stays_on_existing_tool_path(self) -> None:
         result = project_completion.try_handle_completion_turn(
             "このタスクを完了にして",

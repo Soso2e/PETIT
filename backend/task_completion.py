@@ -18,9 +18,9 @@ from . import config, db
 _DRAFT_TTL_MINUTES = 30
 _NAMED_COMPLETION_PATTERNS = (
     re.compile(
-        r"^(?P<title>.+?)(?:は|が|を)?(?:もう)?"
+        r"^(?P<title>.+?)(?:は|が|を|も)?(?:もう)?"
         r"(?:完了した|完了したよ|完了|終わった|終えた|できた)"
-        r"(?:よ|ね|ぞ|！|!|。|\.)*$",
+        r"(?:よ|ね|ぞ|わ|！|!|。|\.)*$",
         re.IGNORECASE,
     ),
     re.compile(
