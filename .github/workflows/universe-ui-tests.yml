@@ -7,7 +7,8 @@ on:
       - "frontend/legacy.html"
       - "frontend/universe.html"
       - "frontend/universe.css"
-      - "frontend/universe.js"
+      - "frontend/universe-actions.css"
+      - "frontend/universe-app.js"
       - "tests/test_universe_ui.py"
       - "docs/universe_focus_orbit.md"
       - ".github/workflows/universe-ui-tests.yml"
@@ -25,6 +26,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Check JavaScript syntax
-        run: node --check frontend/universe.js
+        run: node --check frontend/universe-app.js
       - name: Run Universe UI tests
         run: python -m unittest tests.test_universe_ui -v
