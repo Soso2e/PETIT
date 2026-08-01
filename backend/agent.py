@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import agent_legacy as _legacy
-from . import agent_runtime, capability_router, config, project_router
+from . import agent_runtime, capability_router, config, project_router, task_completion_intent
 
 # Re-export the historical module surface while the runtime migration stabilizes.
 for _export_name in dir(_legacy):
@@ -124,6 +124,14 @@ def run(
     del allow_defer
     _sync_legacy_globals()
     recent_history = _legacy._recent_history(history)
+
+    # A named task completion is resolved from SQLite exactly once before the
+    # broader Project Continuity route. This prevents an ordinary task report
+    # from being mistaken for a project checkpoint and avoids repeated LLM
+    # get_tasks calls when one candidate is already available locally.
+    task_completion_turn = task_completion_intent.try_handle(user_message)
+    if task_completion_turn:
+        return task_completion_turn
 
     project_turn = project_router.try_handle_project_turn(
         user_message,
