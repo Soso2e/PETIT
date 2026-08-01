@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v5";
+const CACHE_NAME = "petit-shell-v6";
 const SHELL = [
   "/",
   "/static/style.css",
@@ -14,6 +14,7 @@ const SHELL = [
   "/static/mobile_audio_unlock.js",
   "/static/voice.js",
   "/static/companion.js",
+  "/static/shell.js",
   "/static/manifest.webmanifest",
   "/static/favicon-64.png",
   "/static/apple-touch-icon.png",
@@ -21,6 +22,8 @@ const SHELL = [
   "/static/icon-512.png",
   "/static/icon-maskable-192.png",
   "/static/icon-maskable-512.png",
+  "/static/branding/icon_logo.png",
+  "/static/branding/name_logo.png",
 ];
 
 self.addEventListener("install", (event) => {
