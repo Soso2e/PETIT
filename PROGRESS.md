@@ -19,7 +19,7 @@
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
 - Notion会話検索: `knowledge` Capability内の読み取りToolとして共有済みページを最大3件検索し、プロパティ・本文抜粋・更新日時・URLを圧縮してAgentへ戻す。未設定・0件・API失敗を区別する。関連CI成功、実Notion／LM Studio／ブラウザE2Eは未確認。
-- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、既定でHighのみ、暇・やりたいこと候補はMid/Medium＋Low、全件要求時だけ未設定を含む全優先度を返す。作成既定High・日付未指定は期限なし。実Notion Webhook／Tunnel／ブラウザE2Eは未確認。
+- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、既定でHighのみ、暇・やりたいこと候補はMid/Medium＋Low、全件要求時だけ未設定を含む全優先度を返す。作成既定High・日付未指定は期限なし。名前つき完了報告はProject完了やAgentより先にSQLiteで一意／複数／完了済み／0件へ決定論的に解決し、一意候補だけ確認付き`complete_task`へ進める。関連28テストと一時DBのAPI縦切りは成功、実ブラウザの確認操作と実Notion同期E2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
 - GitHub Daily Review: access可能な全repositoryを横断し、前回cursor以降のcommit／PR／checkと`PROGRESS.md`を朝ブリーフィング・明示会話でレビューする。CIは成功済み。実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。
@@ -120,3 +120,4 @@
 | 2026-08-01 | 04:39 | #80 | Issue #122対応として作業セッションをSQLiteへ保存し、20分ごとのPush継続確認、返答から20分延長、無応答時の自動停止、旧localStorage状態の停止、`まだ続けてる`UI、Push許可時の作業通知ONを実装。関連24テスト・Python／JavaScript構文・diff確認成功。全300テストは既存DeepSeek／Notion環境依存を含む28失敗・8エラーのため未通過、実VAPID／スマホE2Eは未確認。 |
 | 2026-08-01 | 10:46 | #81 | 動作確認済み: Issue #126対応として壊れていたtopbar閉じタグと作業操作の重複IDを修正し、390px向けの縦積み、44px以上の主要操作、16px入力、下部ナビ、通知・設定を調整。390×844のブラウザで今日／チャット／通知／設定の横スクロールなしを確認し、関連20テスト・JavaScript構文・diff確認成功。実iPhone PWAは未確認。既存`test_mobile_companion_acceptance`の古いvisibilitychange期待1件は未解決。 |
 | 2026-08-01 | 11:22 | #81 | PWAで通知許可が出ない原因を、起動環境の`pywebpush`不足・VAPID未設定・旧reload子プロセス残存と特定。依存導入、Git管理外のローカルVAPID設定、PETIT再起動後に通知状態APIの`configured=true`／依存利用可能を確認。通知・PWA関連20テスト、JavaScript構文、秘密鍵のignore、diff形式は成功。実HTTPS端末での許可表示・購読・受信は未確認。 |
+| 2026-08-01 | 11:47 | #82 | 実装済み・未確認: Issue #129として完了報告の会話フローを再設計し、「LiTデザインは完了した！」をLLMなしで未完了の「LiTのデザイン実装」へ一意解決、複数候補の短期選択状態、完了済み／0件分岐、Project完了確認の優先維持、対象つき確認UI、承認後の自然な返答を追加。関連28テスト、Python／JavaScript構文、diff形式、一時DBの`/api/chat`縦切り（LLM 0回）成功。実ブラウザ操作・実Notion同期は未確認。 |

@@ -285,7 +285,27 @@ def try_handle_project_turn(
         )
         if registration:
             return registration
-        from . import project_completion
+        from . import project_completion, task_completion
+
+        # An already-open project completion clarification owns its follow-up.
+        # Without this guard, a reply such as "実装だけ終わった" could be
+        # mistaken for a newly named task completion.
+        if project_completion.get_completion_draft(user_id):
+            completion = project_completion.try_handle_completion_turn(
+                user_message,
+                user_id=user_id,
+                recent_history=recent_history,
+            )
+            if completion:
+                return completion
+
+        task_completion_turn = task_completion.try_handle_task_completion_turn(
+            user_message,
+            user_id=user_id,
+            recent_history=recent_history,
+        )
+        if task_completion_turn:
+            return task_completion_turn
 
         completion = project_completion.try_handle_completion_turn(
             user_message,
