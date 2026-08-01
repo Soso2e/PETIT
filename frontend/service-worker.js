@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v6";
+const CACHE_NAME = "petit-shell-v7";
 const SHELL = [
   "/",
   "/static/style.css",

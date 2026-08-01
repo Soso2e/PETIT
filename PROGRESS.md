@@ -12,7 +12,7 @@
 - 会話記憶: 短期履歴、エピソード、長期記憶を分離。エピソード要約はAgent endpointを使い、朝ブリーフィングとproactive openerはエピソードを優先し旧summariesを移行用fallbackにした。実LM Studioでの確定・再起動後検索は未確認。
 - 日次生活インデックス: 全`session_id`の会話をAsia/Tokyo基準で1日1回まとめ、空・記号のみ・連続重複だけを除外してローカルLM Studioへ送る。雑談の外出・食事・人・場所・感情・制作等をSQLite／Memory／Chroma／Markdownへ保存し、長期記憶候補は自動昇格しない。専用CIと実ローカルLLM E2Eは未確認。
 - セッション: SQLite会話をsession_idで取得し、ブラウザ再読み込み時に直近履歴を復元する。バックグラウンドjobはrequest/sessionへ紐付け、GETは読み取り専用、表示後のPOST ackで配信済みにする。実ブラウザ複数タブ／複数端末E2Eは未確認。
-- 制作伴走Web UI: 作業モード、経過時間、一時停止・終了、10分／20分ごとの前景限定自律声かけ、Highタスク・次の予定・次の一手、直近3ラリー表示、2時間アイドルでのセッション分離、途中経過メッセージ、PWAを実装。作業状態をサーバーSQLiteにも保存し、20分ごとの継続確認、`まだ続けてる`／チャット返答、さらに20分無応答時の自動停止、40分超の旧localStorage状態停止を追加。関連24テストと構文確認は成功、実ブラウザ／実LM Studio／実AivisSpeech／iPhoneホーム画面E2Eは未確認。
+- 制作伴走Web UI: 作業モード、経過時間、一時停止・終了、10分／20分ごとの前景限定自律声かけ、Highタスク・次の予定・次の一手、直近3ラリー表示、2時間アイドルでのセッション分離、途中経過メッセージ、PWAを実装。作業状態をサーバーSQLiteにも保存し、20分ごとの継続確認、`まだ続けてる`／チャット返答、さらに20分無応答時の自動停止、40分超の旧localStorage状態停止を追加。スマホ向け画面崩れ・重複IDを修正し、縦積み、44px以上の主要操作、16px入力、下部ナビを390×844のブラウザで4画面確認済み。関連20テストと構文確認は成功、実iPhoneホーム画面／AivisSpeech／Push E2Eは未確認。
 - Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in設定、SQLiteの通知イベント・配信履歴、Web Push Provider境界、設定UI、テスト通知を実装。端末でPushを明示的に有効化すると作業セッション通知もONにし、後から個別OFFにできる。Push失敗時も作業停止判定は継続する。関連24テストとJavaScript構文確認は成功、実VAPID／HTTPSブラウザ／バックグラウンド受信／通知タップ／実iPhone PWA E2Eは未確認。
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
@@ -116,3 +116,4 @@
 | 2026-07-26 | 23:06 | #78 | Issue #109対応としてREADMEからAivisSpeech初期セットアップへ導線を追加し、Windows導入、音声モデル、Engine、`/docs`・`/speakers`、`.env`、診断CLI、WAV再生、Docker／WSL接続差、stage別切り分け、ブラウザ標準TTSとの無料運用方針を整理。文書変更のみで、実Engine E2Eは未実施。 |
 | 2026-07-27 | 14:57 | #79 | mainの実装と「現在の状態」を再照合。Issue #84／#86の汎用リスト管理、Issue #89の文脈駆動Capability Router／上限付きAgent Runtime、Notion検索の`knowledge`統合、IME Enter抑止、PWAブランドアイコン、AivisSpeech初期セットアップ導線を現状欄へ反映し、実装済みと実機未確認を分離。文書更新のみでコードテストは未実施。 |
 | 2026-08-01 | 04:39 | #80 | Issue #122対応として作業セッションをSQLiteへ保存し、20分ごとのPush継続確認、返答から20分延長、無応答時の自動停止、旧localStorage状態の停止、`まだ続けてる`UI、Push許可時の作業通知ONを実装。関連24テスト・Python／JavaScript構文・diff確認成功。全300テストは既存DeepSeek／Notion環境依存を含む28失敗・8エラーのため未通過、実VAPID／スマホE2Eは未確認。 |
+| 2026-08-01 | 10:46 | #81 | 動作確認済み: Issue #126対応として壊れていたtopbar閉じタグと作業操作の重複IDを修正し、390px向けの縦積み、44px以上の主要操作、16px入力、下部ナビ、通知・設定を調整。390×844のブラウザで今日／チャット／通知／設定の横スクロールなしを確認し、関連20テスト・JavaScript構文・diff確認成功。実iPhone PWAは未確認。既存`test_mobile_companion_acceptance`の古いvisibilitychange期待1件は未解決。 |
