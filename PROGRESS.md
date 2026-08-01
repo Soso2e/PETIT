@@ -5,7 +5,7 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
-- 会話 / Agent Runtime: Project Continuity・挨拶・正確な現在時刻だけを決定論的な安全ゲートで処理し、通常会話はChatモデルのCapability Routerが最大4領域を選ぶ。Agentには選択領域内の登録済みToolだけを公開し、既定3ラウンド・Tool総数6・同一Tool同一引数1回の上限、結果圧縮、書き込み承認、30分以内のAgent状態再開、履歴へ残さない進捗表示を実装。関連10系統CI成功、実LM Studioでの判断品質・承認後返答・iPhone進捗表示E2Eは未確認。
+- 会話 / Agent Runtime: Project Continuity・挨拶・正確な現在時刻だけを決定論的な安全ゲートで処理し、通常会話はChatモデルのCapability Routerが最大4領域を選ぶ。Agentには選択領域内の登録済みToolだけを公開し、既定3ラウンド・Tool総数6・同一Tool同一引数1回の上限、結果圧縮、書き込み承認、30分以内のAgent状態再開、履歴へ残さない進捗表示を実装。Toolが必要な依頼への「確認します／調べます」だけの最終回答を再実行へ戻すガードと、保存済みプロジェクト状況を読む`get_project_status`を追加。関連43テストと稼働中APIへのTool登録は確認済み、実DeepSeek会話での結果返答・承認後返答・iPhone進捗表示E2Eは未確認。
 - モデル切替: WebからChat／Agentを個別にローカルLM Studio・DeepSeek V4 Flash・DeepSeek V4 Proへ切替でき、選択だけをローカル保存する。DeepSeek APIキーはブラウザや保存ファイルへ返さず、Embeddingはローカルのまま。専用テスト5件成功、実DeepSeek／ブラウザE2Eは未確認。
 - 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallback、一時的な429／502／503／504の1回再試行、合成直列化、上流エラー詳細診断、モバイル音声アンロック、文単位チャンク生成・先読み再生・5秒タイムアウト・生成キャンセル、独立診断CLI、2回連続失敗後の60秒回路遮断を実装。Windows初期セットアップ、音声モデル、Engine、`.env`、診断CLI、WAV確認、Docker／WSL差の手順書とREADME導線も追加。実AivisSpeechモデルとPC／スマホブラウザE2Eは未確認。
 - 汎用リスト: 組み込みタスクと任意のカスタムリストを保存先付きで取得し、ローカルSQLiteへリスト作成・項目取得・項目追加できる。`lists_and_tasks` Capability内でタスクとリストを文脈・対象存在・Tool結果から区別し、書き込みは確認必須、存在しないリストをタスクへ誤変換せず、Notion DBも自動生成しない。関連CI成功、実LM Studio／ブラウザ会話E2Eは未確認。
@@ -121,3 +121,4 @@
 | 2026-08-01 | 10:46 | #81 | 動作確認済み: Issue #126対応として壊れていたtopbar閉じタグと作業操作の重複IDを修正し、390px向けの縦積み、44px以上の主要操作、16px入力、下部ナビ、通知・設定を調整。390×844のブラウザで今日／チャット／通知／設定の横スクロールなしを確認し、関連20テスト・JavaScript構文・diff確認成功。実iPhone PWAは未確認。既存`test_mobile_companion_acceptance`の古いvisibilitychange期待1件は未解決。 |
 | 2026-08-01 | 11:22 | #81 | PWAで通知許可が出ない原因を、起動環境の`pywebpush`不足・VAPID未設定・旧reload子プロセス残存と特定。依存導入、Git管理外のローカルVAPID設定、PETIT再起動後に通知状態APIの`configured=true`／依存利用可能を確認。通知・PWA関連20テスト、JavaScript構文、秘密鍵のignore、diff形式は成功。実HTTPS端末での許可表示・購読・受信は未確認。 |
 | 2026-08-01 | 11:47 | #82 | 実装済み・未確認: Issue #129として完了報告の会話フローを再設計し、「LiTデザインは完了した！」をLLMなしで未完了の「LiTのデザイン実装」へ一意解決、複数候補の短期選択状態、完了済み／0件分岐、Project完了確認の優先維持、対象つき確認UI、承認後の自然な返答を追加。関連28テスト、Python／JavaScript構文、diff形式、一時DBの`/api/chat`縦切り（LLM 0回）成功。実ブラウザ操作・実Notion同期は未確認。 |
+| 2026-08-01 | 12:26 | #83 | 実装済み・未確認: 実会話で「今進んでいるプロジェクトの状況をまとめて」に作業予告だけを返しTool未実行で終了する症状を確認。Agent Runtimeへ作業予告の最終回答を1回だけ同一ターン内のTool実行へ戻すガードを追加し、再失敗時は未実行を明示。`projects` Capabilityの未登録Tool名を実在Toolへ修正し、保存済みcheckpointを読む`get_project_status`を追加。関連43テスト、Python／JavaScript構文、diff形式、稼働中APIのTool登録を確認。外部API課金を避けるため実DeepSeek会話E2Eは未実施。既存`test_confirmed_stale_source_is_disclosed` 1件は今回未変更箇所で単独失敗。 |

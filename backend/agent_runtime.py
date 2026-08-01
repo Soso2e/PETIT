@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from . import agent_progress, agent_state, capability_router, config, request_context, tools
@@ -11,6 +12,15 @@ _MAX_TOOL_CALLS = 6
 _MAX_RESULT_CHARS = 5000
 _MAX_HISTORY_MESSAGES = 8
 _MAX_HISTORY_CHARS = 3200
+
+_DEFERRED_ACTION_END = re.compile(
+    r"(?:"
+    r"(?:確認|調査|検索|参照|取得|同期|照会|特定|更新|反映|整理|集計|要約)(?:し|して)"
+    r"(?:ます|みます|みる|みるね|おきます|くる|いきます|行きます)"
+    r"|(?:調べ|探し|見)(?:ます|てみます|てみる|てみるね|てくる)"
+    r"|まとめ(?:ます|てみます|てみる|てみるね)"
+    r")[。．.!！]*\s*$"
+)
 
 _AGENT_SYSTEM_PROMPT = """あなたはPETIT。ユーザーの生活・制作・開発を支える実務的な相棒です。
 直近の会話と元の依頼を読み、必要なToolを選び、結果を受け取ったら目的を満たしたか判断してください。
@@ -23,6 +33,8 @@ _AGENT_SYSTEM_PROMPT = """あなたはPETIT。ユーザーの生活・制作・�
 - 書き込みはTool callとして提案する。実行と承認はランタイムが管理する。
 - 「〜について」のような話題提示だけで、作成・追加・変更を推測しない。
 - 対象が曖昧なら勝手に別概念へ変換せず、必要な確認を短く返す。
+- 読み取りや調査を頼まれたら、このターン内でToolを実行して結果まで返す。
+- 「確認します」「調べます」「参照します」「更新します」などの作業予告だけを最終回答にしない。
 - 最終回答は自然な日本語。Markdownは使わない。
 """
 
@@ -180,6 +192,17 @@ def _answer(message: dict[str, Any], messages: list[dict[str, Any]]) -> str:
     return ""
 
 
+def _is_deferred_action_reply(reply: str) -> bool:
+    """Detect a short promise to act later that does not complete this turn."""
+    text = " ".join(str(reply or "").split())
+    if not text or len(text) > 240:
+        return False
+    last_sentence = re.split(r"[。．.!！]", text)[-2 if text[-1:] in "。．.!！" else -1]
+    if re.search(r"(?:必要|希望)(?:なら|であれば)|(?:よけれ|欲しけれ)ば", last_sentence):
+        return False
+    return bool(_DEFERRED_ACTION_END.search(text))
+
+
 def _confirmation_text(name: str, arguments: dict[str, Any]) -> str:
     label = _CONFIRMATION_LABELS.get(name, name)
     visible = {
@@ -265,6 +288,8 @@ def _execute_loop(
     selected_schemas = _selected_schemas(selected_names)
     allowed = set(selected_names)
     had_failure = False
+    deferred_retry_used = False
+    deferred_failure = False
 
     while True:
         message = chat_completion(
@@ -278,6 +303,28 @@ def _execute_loop(
             reply = _answer(message, messages)
             if not reply:
                 reply = "うまく答えを確定できなかったよ。対象やしてほしいことを少し具体的に教えて。"
+            if capabilities and _is_deferred_action_reply(reply):
+                if not deferred_retry_used:
+                    deferred_retry_used = True
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "その返答は作業予告で、元の依頼を完了していません。"
+                                "利用可能なToolをこのターン内で実行し、結果まで返してください。"
+                                "Toolで実行できない場合は、できない理由と現在分かる範囲を今答えてください。"
+                                "『確認します』『調べます』『参照します』『更新します』だけで終わらないでください。"
+                            ),
+                        }
+                    )
+                    continue
+                reply = (
+                    "必要な確認をこのターン内で実行できなかったよ。"
+                    "実行していないのに『調べます』とは返さず、できなかったことを明示するね。"
+                )
+                had_failure = True
+                deferred_failure = True
             agent_progress.emit("finalizing", "返答をまとめてるよ")
             return {
                 "reply": reply,
@@ -290,6 +337,7 @@ def _execute_loop(
                     router_confidence=router_confidence,
                     tool_rounds=tool_rounds,
                     total_tool_calls=total_tool_calls,
+                    fallback_reason="deferred_action_without_execution" if deferred_failure else None,
                 ),
             }
 
