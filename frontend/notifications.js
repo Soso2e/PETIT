@@ -372,7 +372,21 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
       });
-      setState("Push通知を有効にしました。テスト通知で確認できます。");
+      const workSessionPreference = categories.querySelector('input[data-category="work_session"]');
+      if (workSessionPreference && !workSessionPreference.checked) {
+        workSessionPreference.checked = true;
+        const preferences = {};
+        for (const input of categories.querySelectorAll("input[data-category]")) {
+          preferences[input.dataset.category] = input.checked;
+        }
+        const data = await fetchJson("/api/notifications/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ preferences }),
+        });
+        serverStatus.preferences = data.preferences;
+      }
+      setState("Push通知と作業セッションの声かけを有効にしました。テスト通知で確認できます。");
     } catch (error) {
       setState(`Push通知を有効にできませんでした: ${error.message}`, true);
     } finally {
