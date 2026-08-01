@@ -13,6 +13,15 @@
 
   if (!views.size || !navButtons.length || !title || !eyebrow) return;
 
+  // app.js historically names its conversation array `history`. Give the older
+  // notification UI a browser-history-compatible method until that global is renamed.
+  if (Array.isArray(history) && typeof history.replaceState !== "function") {
+    Object.defineProperty(history, "replaceState", {
+      configurable: true,
+      value: window.history.replaceState.bind(window.history),
+    });
+  }
+
   const metadata = {
     today: { title: "今日", eyebrow: "TODAY" },
     chat: { title: "チャット", eyebrow: "ASSISTANT" },
