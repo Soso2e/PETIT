@@ -62,13 +62,23 @@ function addMessage(role, text, { tools, error, actions, modelRoute } = {}) {
         preview.append(term, detail);
       }
       controls.appendChild(preview);
+    } else if (actions[0].name === "complete_task") {
+      const args = actions[0].arguments || {};
+      const preview = document.createElement("dl");
+      preview.className = "action-preview";
+      const term = document.createElement("dt");
+      const detail = document.createElement("dd");
+      term.textContent = "完了にするタスク";
+      detail.textContent = args.title_query || `ID: ${args.task_id}`;
+      preview.append(term, detail);
+      controls.appendChild(preview);
     }
     const approve = document.createElement("button");
     approve.type = "button";
-    approve.textContent = "実行する";
+    approve.textContent = actions[0].name === "complete_task" ? "完了にする" : "実行する";
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = "キャンセル";
+    cancel.textContent = actions[0].name === "complete_task" ? "やめる" : "キャンセル";
     controls.append(approve, cancel);
     bubble.appendChild(controls);
     approve.addEventListener("click", () => decideAction(actions[0].approval_id, true, controls));

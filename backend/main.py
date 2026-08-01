@@ -389,7 +389,7 @@ def decide_action(approval_id: str, decision: ActionDecision) -> ChatResponse:
     if _tool_result_failed(result):
         return ChatResponse(reply="", error=f"書き込みに失敗しました。{_short_tool_result(result)}")
     return ChatResponse(
-        reply=f"確認された内容を実行しました。\n{_short_tool_result(result)}",
+        reply=_confirmed_action_reply(action["name"], result),
         used_tools=[{"name": action["name"], "arguments": action["arguments"]}],
     )
 
@@ -409,6 +409,19 @@ def _tool_result_failed(result: str) -> bool:
 
 def _short_tool_result(result: str) -> str:
     return result if len(result) <= 600 else result[:600] + "…"
+
+
+def _confirmed_action_reply(action_name: str, result: str) -> str:
+    if action_name == "complete_task":
+        try:
+            data = json.loads(result)
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict) and data.get("completed"):
+            task = data.get("task") if isinstance(data.get("task"), dict) else {}
+            title = str(task.get("title") or "タスク")
+            return f"「{title}」を完了にしたよ。おつかれさま！"
+    return f"確認された内容を実行しました。\n{_short_tool_result(result)}"
 
 
 def _persist_chat_artifacts(conv_id: int, message: str, reply: str, used_tools: str | None) -> None:

@@ -5,7 +5,7 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
-- 会話 / Agent Runtime: Project Continuity・挨拶・正確な現在時刻だけを決定論的な安全ゲートで処理し、通常会話はChatモデルのCapability Routerが最大4領域を選ぶ。Agentには選択領域内の登録済みToolだけを公開し、既定3ラウンド・Tool総数6・同一Tool同一引数1回の上限、結果圧縮、書き込み承認、30分以内のAgent状態再開、履歴へ残さない進捗表示を実装。関連10系統CI成功、実LM Studioでの判断品質・承認後返答・iPhone進捗表示E2Eは未確認。
+- 会話 / Agent Runtime: Project Continuity・挨拶・正確な現在時刻だけを決定論的な安全ゲートで処理し、通常会話はChatモデルのCapability Routerが最大4領域を選ぶ。Agentには選択領域内の登録済みToolだけを公開し、既定3ラウンド・Tool総数6・同一Tool同一引数1回の上限、結果圧縮、書き込み承認、30分以内のAgent状態再開、履歴へ残さない進捗表示を実装。Toolが必要な依頼への「確認します／調べます」だけの最終回答を再実行へ戻すガードと、保存済みプロジェクト状況を読む`get_project_status`を追加。関連43テストと稼働中APIへのTool登録は確認済み、実DeepSeek会話での結果返答・承認後返答・iPhone進捗表示E2Eは未確認。
 - モデル切替: WebからChat／Agentを個別にローカルLM Studio・DeepSeek V4 Flash・DeepSeek V4 Proへ切替でき、選択だけをローカル保存する。DeepSeek APIキーはブラウザや保存ファイルへ返さず、Embeddingはローカルのまま。専用テスト5件成功、実DeepSeek／ブラウザE2Eは未確認。
 - 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallback、一時的な429／502／503／504の1回再試行、合成直列化、上流エラー詳細診断、モバイル音声アンロック、文単位チャンク生成・先読み再生・5秒タイムアウト・生成キャンセル、独立診断CLI、2回連続失敗後の60秒回路遮断を実装。Windows初期セットアップ、音声モデル、Engine、`.env`、診断CLI、WAV確認、Docker／WSL差の手順書とREADME導線も追加。実AivisSpeechモデルとPC／スマホブラウザE2Eは未確認。
 - 汎用リスト: 組み込みタスクと任意のカスタムリストを保存先付きで取得し、ローカルSQLiteへリスト作成・項目取得・項目追加できる。`lists_and_tasks` Capability内でタスクとリストを文脈・対象存在・Tool結果から区別し、書き込みは確認必須、存在しないリストをタスクへ誤変換せず、Notion DBも自動生成しない。関連CI成功、実LM Studio／ブラウザ会話E2Eは未確認。
@@ -19,7 +19,7 @@
 - SQLite: WAL、busy_timeout、会話session index、job delivery index、保存artifact用単一executorを追加。同時書き込みの実負荷試験は未実施。
 - Notion Adapter v2: Project Relation、担当者、親子タスク、ブロックRelation、source更新時刻、候補確認、部分失敗を保持。成功したsource同期では取得されなくなったProject／Task cacheを削除し、loader失敗時は以前のcacheを維持する。実Notion v2 E2Eは未確認。
 - Notion会話検索: `knowledge` Capability内の読み取りToolとして共有済みページを最大3件検索し、プロパティ・本文抜粋・更新日時・URLを圧縮してAgentへ戻す。未設定・0件・API失敗を区別する。関連CI成功、実Notion／LM Studio／ブラウザE2Eは未確認。
-- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、既定でHighのみ、暇・やりたいこと候補はMid/Medium＋Low、全件要求時だけ未設定を含む全優先度を返す。作成既定High・日付未指定は期限なし。実Notion Webhook／Tunnel／ブラウザE2Eは未確認。
+- タスク管理: Notionを人間向け外部正本、SQLiteをPETITの即時統合ビューとして扱う。PETIT→Notionは既存Outbox、Notion→PETITは署名検証Webhook Inbox、5分差分同期、日次全件補修で同期し、フィールド単位三者マージと論理削除でpending/failed/conflictを保護する。通常の`get_tasks`はSQLiteだけを読み、既定でHighのみ、暇・やりたいこと候補はMid/Medium＋Low、全件要求時だけ未設定を含む全優先度を返す。作成既定High・日付未指定は期限なし。名前つき完了報告はProject完了やAgentより先にSQLiteで一意／複数／完了済み／0件へ決定論的に解決し、一意候補だけ確認付き`complete_task`へ進める。関連28テストと一時DBのAPI縦切りは成功、実ブラウザの確認操作と実Notion同期E2Eは未確認。
 - Linkraft Adapter: owner-only読み取りAPI、差分cursor、task/activity/support/knowledge cache、候補確認、stale fallbackを実装済み。実公開URL・token・owner user id E2Eは未確認。
 - GitHub evidence Adapter: confirmation-firstでcommit／PR／check／deploymentを分離cacheし、確認済みrepositoryだけresume直前に同期する。private repository tokenの実E2Eは未確認。
 - GitHub Daily Review: access可能な全repositoryを横断し、前回cursor以降のcommit／PR／checkと`PROGRESS.md`を朝ブリーフィング・明示会話でレビューする。CIは成功済み。実Fine-grained PAT／LM Studio／ブラウザE2Eは未確認。
@@ -120,3 +120,6 @@
 | 2026-08-01 | 04:39 | #80 | Issue #122対応として作業セッションをSQLiteへ保存し、20分ごとのPush継続確認、返答から20分延長、無応答時の自動停止、旧localStorage状態の停止、`まだ続けてる`UI、Push許可時の作業通知ONを実装。関連24テスト・Python／JavaScript構文・diff確認成功。全300テストは既存DeepSeek／Notion環境依存を含む28失敗・8エラーのため未通過、実VAPID／スマホE2Eは未確認。 |
 | 2026-08-01 | 10:46 | #81 | 動作確認済み: Issue #126対応として壊れていたtopbar閉じタグと作業操作の重複IDを修正し、390px向けの縦積み、44px以上の主要操作、16px入力、下部ナビ、通知・設定を調整。390×844のブラウザで今日／チャット／通知／設定の横スクロールなしを確認し、関連20テスト・JavaScript構文・diff確認成功。実iPhone PWAは未確認。既存`test_mobile_companion_acceptance`の古いvisibilitychange期待1件は未解決。 |
 | 2026-08-01 | 11:22 | #81 | PWAで通知許可が出ない原因を、起動環境の`pywebpush`不足・VAPID未設定・旧reload子プロセス残存と特定。依存導入、Git管理外のローカルVAPID設定、PETIT再起動後に通知状態APIの`configured=true`／依存利用可能を確認。通知・PWA関連20テスト、JavaScript構文、秘密鍵のignore、diff形式は成功。実HTTPS端末での許可表示・購読・受信は未確認。 |
+| 2026-08-01 | 11:47 | #82 | 実装済み・未確認: Issue #129として完了報告の会話フローを再設計し、「LiTデザインは完了した！」をLLMなしで未完了の「LiTのデザイン実装」へ一意解決、複数候補の短期選択状態、完了済み／0件分岐、Project完了確認の優先維持、対象つき確認UI、承認後の自然な返答を追加。関連28テスト、Python／JavaScript構文、diff形式、一時DBの`/api/chat`縦切り（LLM 0回）成功。実ブラウザ操作・実Notion同期は未確認。 |
+| 2026-08-01 | 12:26 | #83 | 実装済み・未確認: 実会話で「今進んでいるプロジェクトの状況をまとめて」に作業予告だけを返しTool未実行で終了する症状を確認。Agent Runtimeへ作業予告の最終回答を1回だけ同一ターン内のTool実行へ戻すガードを追加し、再失敗時は未実行を明示。`projects` Capabilityの未登録Tool名を実在Toolへ修正し、保存済みcheckpointを読む`get_project_status`を追加。関連43テスト、Python／JavaScript構文、diff形式、稼働中APIのTool登録を確認。外部API課金を避けるため実DeepSeek会話E2Eは未実施。既存`test_confirmed_stale_source_is_disclosed` 1件は今回未変更箇所で単独失敗。 |
+| 2026-08-01 | 12:53 | #84 | 実装済み・未確認: Issue #129の実会話「キャンプの予習も終わったわ」が`project_completion_missing_project`へ強制フォールバックする原因を、Task完了パターンの助詞`も`・語尾`わ`未対応と広すぎるProject完了ゲートに特定。自然文をタスク候補へ解決し、対象名あり・アクティブProjectなしの報告はProject名不足へ強制しないよう修正。関連20テストとPython構文確認成功。周辺60テストは既知の`test_confirmed_stale_source_is_disclosed` 1件のみ今回未変更箇所で失敗。実ブラウザ操作・実Notion同期は未確認。 |

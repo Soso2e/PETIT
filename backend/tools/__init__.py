@@ -18,6 +18,7 @@ from . import (
     notion_search,
     project_completion,
     project_registration,
+    project_status,
     schedule,
     tasks,
     tasks_phase2,

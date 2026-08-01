@@ -39,6 +39,12 @@ class CapabilitySelectorTests(unittest.TestCase):
         self.assertEqual(result["capabilities"], ["lists_and_tasks", "calendar"])
         self.assertEqual(result["goal"], "今日のタスクと予定を確認する")
 
+    def test_projects_capability_exposes_registered_status_tool(self) -> None:
+        names = capability_router.tool_names_for(["projects"])
+
+        self.assertIn("get_project_status", names)
+        self.assertIn("get_tasks", names)
+
 
 class AgentEntrypointTests(unittest.TestCase):
     def test_greeting_reaches_agent_runtime_instead_of_legacy_instant_reply(self) -> None:

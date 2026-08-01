@@ -56,11 +56,15 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "create_handoff_note",
     ),
     "projects": (
-        "get_notion_projects",
-        "sync_notion_projects",
-        "register_project",
-        "complete_project",
         "get_project_status",
+        "get_tasks",
+        "get_notion_project_candidates",
+        "get_linkraft_project_candidates",
+        "get_brain_note_candidates",
+        "get_github_repository_candidates",
+        "sync_notion_tasks",
+        "sync_linkraft_projects",
+        "sync_github_evidence",
     ),
 }
 

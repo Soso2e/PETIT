@@ -138,6 +138,26 @@ def _is_completion_start(message: str) -> bool:
     return bool(_COMPLETION_START.search(text) or _DETAILED_PROGRESS.search(text))
 
 
+def _has_named_completion_subject(message: str) -> bool:
+    """Return whether a completion report names work before the completion phrase."""
+    text = " ".join(str(message or "").strip().split())
+    matches = [
+        match
+        for pattern in (_COMPLETION_START, _DETAILED_PROGRESS)
+        if (match := pattern.search(text))
+    ]
+    if not matches:
+        return False
+    first = min(matches, key=lambda match: match.start())
+    subject = text[:first.start()].strip(" \t\r\n、,。.!！?？『』「」\"'")
+    subject = re.sub(r"(?:は|が|を|も)$", "", subject).strip()
+    generic_subjects = {
+        "", "一旦", "とりあえず", "やっと", "これで", "もう",
+        "全部", "すべて", "今日", "作業", "この作業",
+    }
+    return subject not in generic_subjects
+
+
 def _summary_hint(message: str, project_name: str, history: list[dict[str, str]] | None) -> str:
     stripped = _COMPLETION_START.sub("", message).strip(" 、。！!")
     stripped = re.sub(r"^(?:一旦|とりあえず|やっと|これで)\s*", "", stripped).strip()
@@ -415,6 +435,8 @@ def try_handle_completion_turn(
             return None
         active = project_continuity.get_active_project(user_id)
         if not active:
+            if _has_named_completion_subject(user_message):
+                return None
             return {
                 "reply": "お疲れさま。どのプロジェクトの作業が終わったか、名前を教えて。",
                 "used_tools": [],
