@@ -7,5 +7,7 @@ except ModuleNotFoundError:
     pass
 else:
     from . import notification_center as _notification_center
+    from . import task_list_api as _task_list_api
 
     _notification_center.install()
+    _task_list_api.install()
