@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from typing import Any
 
-from . import config, daily_index, db, github_daily_review, notion_task_sync, task_sync_queue, web_sources
+from . import config, daily_index, db, github_daily_review, notion_task_sync, task_sync_queue, web_sources, work_sessions
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class JobWorker:
         self.interval_seconds = interval_seconds
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._next_work_check_at = 0.0
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -35,6 +37,7 @@ class JobWorker:
             notion_task_sync.request_startup_sync()
         github_daily_review.ensure_schema()
         daily_index.ensure_schema()
+        work_sessions.ensure_schema()
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="petit-job-worker", daemon=True)
         self._thread.start()
@@ -53,6 +56,9 @@ class JobWorker:
     def _run(self) -> None:
         while not self._stop.is_set():
             try:
+                if time.monotonic() >= self._next_work_check_at:
+                    work_sessions.run_due_checks()
+                    self._next_work_check_at = time.monotonic() + 15.0
                 job = db.claim_next_job()
                 if job is not None:
                     _process_job(job)
