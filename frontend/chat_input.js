@@ -29,11 +29,23 @@
     resize();
   };
 
+  const loadSharedModule = (src, marker) => {
+    if (document.querySelector(`script[data-petit-module="${marker}"]`)) return;
+    const script = document.createElement("script");
+    script.src = src;
+    script.defer = true;
+    script.dataset.petitModule = marker;
+    document.head.appendChild(script);
+  };
+
   const discover = () => {
     setup({
       form: document.getElementById("chat-form"),
       input: document.getElementById("input") || document.getElementById("chat-input"),
     });
+    if (document.querySelector(".universe-shell")) {
+      loadSharedModule("/static/app_shell.js", "app-shell");
+    }
   };
 
   window.PetitChatInput = { setup, discover };

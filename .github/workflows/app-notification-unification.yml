@@ -1,0 +1,38 @@
+name: App notification unification tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/reminders.py"
+      - "backend/tools/reminders.py"
+      - "frontend/session.js"
+      - "frontend/universe-app.js"
+      - "frontend/universe.html"
+      - "tests/test_app_notification_unification.py"
+      - ".github/workflows/app-notification-unification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/reminders.py"
+      - "backend/tools/reminders.py"
+      - "frontend/session.js"
+      - "frontend/universe-app.js"
+      - "frontend/universe.html"
+      - "tests/test_app_notification_unification.py"
+
+concurrency:
+  group: app-notification-unification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile
+        run: python -m py_compile backend/tools/reminders.py tests/test_app_notification_unification.py
+      - name: Run tests
+        run: python -m unittest tests.test_app_notification_unification -v

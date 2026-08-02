@@ -10,7 +10,11 @@ from .registry import tool
 @tool(
     name="create_reminder",
     description=(
-        "指定日時または指定分後に、PETITから通知する単発リマインダーを作成する。"
+        "PETIT内部へ単発リマインダーを作成する。カレンダー予定は作成しない。"
+        "『リマインドして』『知らせて』の明示依頼だけでなく、"
+        "『20:30になったら帰ろうかな』『22時には寝ようかな』のように、"
+        "未来の時刻と行動が同時に示された発話もこのToolを優先する。"
+        "時刻だけで予定時間帯・参加者・終了時刻が示されていない場合はadd_scheduleを使わない。"
         "『30分後にカフェへ行く時間だと知らせて』ではdelay_minutes=30を使う。"
         "『2026年8月5日14時に提出を知らせて』ではtrigger_atをISO日時で指定する。"
         "trigger_atとdelay_minutesは同時に指定しない。"
@@ -18,7 +22,7 @@ from .registry import tool
     parameters={
         "type": "object",
         "properties": {
-            "title": {"type": "string", "description": "一覧と通知に表示する短いタイトル"},
+            "title": {"type": "string", "description": "一覧と通知に表示する短い行動名。例: 帰宅、就寝、提出"},
             "trigger_at": {
                 "type": "string",
                 "description": "通知日時。ISO 8601。時差なしの場合はPETIT_TIMEZONE（既定Asia/Tokyo）として扱う。",
