@@ -17,7 +17,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "get_tasks",
         "create_task",
         "update_task",
-        "classify_task_project",
+        "set_task_parent",
         "complete_task",
         "get_task_sync_status",
         "retry_task_sync",
@@ -70,7 +70,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
 }
 
 _GROUP_DESCRIPTIONS = {
-    "lists_and_tasks": "タスク、Notionタスク、任意リスト、その項目の取得・追加・変更",
+    "lists_and_tasks": "タスク、Notionタスク、親子関係、任意リスト、その項目の取得・追加・変更",
     "calendar": "時刻、天気、予定、カレンダーの取得・追加・同期",
     "knowledge": "BRAIN、Notion、記憶の検索と確認付き編集",
     "github": "GitHubのリポジトリ、差分、PR、開発状況",
