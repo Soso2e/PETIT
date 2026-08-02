@@ -13,7 +13,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import config, db, notifications, task_hierarchy
-from .tools import tasks as task_tools
 
 _INSTALLED = False
 _OPEN_STATUS_SQL = "lower(status) NOT IN ('done', 'canceled', 'cancelled', 'chancel', '完了')"
@@ -146,6 +145,26 @@ def patch_task_parent(task_id: int, payload: TaskParentUpdate) -> JSONResponse:
     return JSONResponse(result, status_code=200 if result.get("updated") else 400)
 
 
+def _create_task_record(
+    *,
+    title: str,
+    due_date: str | None,
+    priority: str,
+    area: str | None,
+    reason: str | None,
+) -> dict[str, Any]:
+    """Load the full task Tool package only when a child creation is executed."""
+    from .tools import tasks as task_tools  # noqa: PLC0415
+
+    return task_tools.create_task(
+        title=title,
+        due_date=due_date,
+        priority=priority,
+        area=area,
+        reason=reason,
+    )
+
+
 def create_child_task(parent_task_id: int, payload: ChildTaskCreate) -> JSONResponse:
     """Create one task and attach it to the selected Life-root task."""
     parent = task_hierarchy._find_task(task_id=parent_task_id)
@@ -167,7 +186,7 @@ def create_child_task(parent_task_id: int, payload: ChildTaskCreate) -> JSONResp
     if normalized_priority is None:
         return JSONResponse({"error": "priorityはHigh、Mid、Lowのいずれかです。"}, status_code=400)
 
-    created = task_tools.create_task(
+    created = _create_task_record(
         title=str(values["title"]).strip(),
         due_date=values.get("due_date"),
         priority=normalized_priority,
