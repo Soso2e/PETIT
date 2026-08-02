@@ -39,12 +39,13 @@
 
     <form id="chat-form" class="composer">
       <button id="mic" type="button" class="mic" aria-label="音声入力を開始" title="押して話す">🎤</button>
-      <textarea id="input" class="input" rows="1" placeholder="メッセージを入力（Enterで送信 / Shift+Enterで改行）"></textarea>
+      <textarea id="input" class="input" rows="1" placeholder="メッセージを入力（Enterで改行 / Ctrl・Cmd+Enterで送信）"></textarea>
       <button id="send" type="submit" class="send">送信</button>
     </form>
   </div>
   <script src="/static/version.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/chat_keyboard.js"></script>
   <script src="/static/action_confirm.js"></script>
   <script src="/static/mobile_audio_unlock.js"></script>
   <script src="/static/voice.js"></script>
