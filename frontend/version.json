@@ -1,6 +1,6 @@
 {
   "name": "PETIT",
-  "version": "0.2.0",
-  "release": "ai-router",
-  "includes": ["PR #44 lightweight AI routing"]
+  "version": "0.5.1",
+  "release": "task-universe-navigation",
+  "includes": ["two-step task focus", "explicit parent apply", "mobile Life spacing"]
 }

@@ -20,6 +20,7 @@
     tasks: [],
     selectedProject: localStorage.getItem(STORAGE.selectedProject) || "",
     selectedTaskId: null,
+    overviewSelectionId: null,
     activeTaskId: localStorage.getItem(STORAGE.activeTask),
     workSessionId: localStorage.getItem(STORAGE.workSession),
     workSession: null,
@@ -30,6 +31,10 @@
     workSessionBusy: false,
     autoStopReported: false,
   };
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let orbitFrame = null;
+  let orbitClock = 0;
+  let orbitLastFrame = 0;
   localStorage.setItem("petit_session_id", state.sessionId);
 
   const byId = (id) => document.getElementById(id);
@@ -70,6 +75,7 @@
   const isHigh = (task) => priorityOf(task) === "high";
   const isLow = (task) => priorityOf(task) === "low";
   const isMid = (task) => ["mid", "medium"].includes(priorityOf(task));
+  const isRootTask = (task) => task?.hierarchy_role === "root" || !task?.parent_task_id;
   const taskKey = (task, index = 0) => String(task.id || task.external_id || task.url || `task-${index}`);
   const taskProject = (task) => String(task.project_title || task.project_name || "未分類").trim() || "未分類";
   const taskNumericId = (task) => /^\d+$/.test(String(task.id || "")) ? Number(task.id) : null;
@@ -91,7 +97,14 @@
       const active = panel.dataset.viewPanel === name;
       panel.hidden = !active;
       panel.classList.toggle("is-active", active);
+      panel.classList.remove("is-entering");
+      if (active && panel.dataset.motionSeen !== "true" && !reducedMotion.matches) {
+        panel.dataset.motionSeen = "true";
+        panel.classList.add("is-entering");
+        panel.addEventListener("animationend", () => panel.classList.remove("is-entering"), { once: true });
+      }
     });
+    if (!["universe", "tasks"].includes(name)) state.overviewSelectionId = null;
     if (name === "chat") chatInputEl?.focus();
   };
 
@@ -152,7 +165,7 @@
 
   const projectNames = () => projectGroups().map((group) => group.project);
   const projectTasks = (project = state.selectedProject) => openTasks().filter((task) => taskProject(task) === project);
-  const focusTasks = () => projectTasks().filter(isHigh);
+  const focusTasks = () => sortedTasks(projectTasks().filter((task) => !isRootTask(task)));
 
   const activeTask = () => state.tasks.find((task, index) => taskKey(task, index) === state.activeTaskId) || null;
   const selectedTask = () => state.tasks.find((task, index) => taskKey(task, index) === state.selectedTaskId) || null;
@@ -164,12 +177,14 @@
       localStorage.removeItem(STORAGE.selectedProject);
       return;
     }
-    const active = activeTask();
-    if (active && names.includes(taskProject(active))) {
-      state.selectedProject = taskProject(active);
-    } else if (!names.includes(state.selectedProject)) {
-      const firstWithHigh = projectGroups().find((group) => group.tasks.some(isHigh));
-      state.selectedProject = firstWithHigh?.project || names[0];
+    if (!names.includes(state.selectedProject)) {
+      const active = activeTask();
+      if (active && names.includes(taskProject(active))) {
+        state.selectedProject = taskProject(active);
+      } else {
+        const firstWithHigh = projectGroups().find((group) => group.tasks.some(isHigh));
+        state.selectedProject = firstWithHigh?.project || names[0];
+      }
     }
     localStorage.setItem(STORAGE.selectedProject, state.selectedProject);
   };
@@ -194,14 +209,59 @@
     selectProject(names[nextIndex]);
   };
 
-  const orbitPosition = (index, total, task) => {
-    const status = normalizeStatus(task.status).toLowerCase();
-    const ring = status === "doing" || status === "now" ? 0.28 : 0.4;
-    const angle = (-Math.PI / 2) + (Math.PI * 2 * index / Math.max(total, 1));
+  const orbitPosition = (index, total, elapsedSeconds = 0) => {
+    const capacity = 8;
+    const ringIndex = Math.floor(index / capacity);
+    const ringStart = ringIndex * capacity;
+    const ringTotal = Math.min(capacity, Math.max(1, total - ringStart));
+    const slotIndex = index - ringStart;
+    const radiusX = Math.min(43, 25 + (ringIndex * 10));
+    const radiusY = Math.min(35, 20 + (ringIndex * 8));
+    const duration = 74 + (ringIndex * 18);
+    const direction = ringIndex % 2 === 0 ? 1 : -1;
+    const angle = (-Math.PI / 2)
+      + (Math.PI * 2 * slotIndex / ringTotal)
+      + (direction * elapsedSeconds * Math.PI * 2 / duration);
     return {
-      left: `${50 + Math.cos(angle) * ring * 100}%`,
-      top: `${50 + Math.sin(angle) * ring * 68}%`,
+      left: `${50 + Math.cos(angle) * radiusX}%`,
+      top: `${50 + Math.sin(angle) * radiusY}%`,
+      ring: ringIndex + 1,
     };
+  };
+
+  const stopOrbitMotion = () => {
+    if (orbitFrame != null) window.cancelAnimationFrame(orbitFrame);
+    orbitFrame = null;
+    orbitLastFrame = 0;
+  };
+
+  const startOrbitMotion = () => {
+    if (reducedMotion.matches || !nodesEl?.children.length) {
+      stopOrbitMotion();
+      return;
+    }
+    if (orbitFrame != null) return;
+    const tick = (timestamp) => {
+      const focusPanelHidden = Boolean(nodesEl.closest("[data-view-panel]")?.hidden);
+      const paused = document.hidden
+        || focusPanelHidden;
+      if (!orbitLastFrame) orbitLastFrame = timestamp;
+      const delta = Math.min(50, Math.max(0, timestamp - orbitLastFrame));
+      orbitLastFrame = timestamp;
+      if (!paused) orbitClock += delta / 1000;
+      const nodes = Array.from(nodesEl.querySelectorAll(".space-node[data-orbit-index]"));
+      nodes.forEach((node) => {
+        const position = orbitPosition(
+          Number(node.dataset.orbitIndex || 0),
+          Number(node.dataset.orbitTotal || nodes.length),
+          orbitClock,
+        );
+        node.style.left = position.left;
+        node.style.top = position.top;
+      });
+      orbitFrame = window.requestAnimationFrame(tick);
+    };
+    orbitFrame = window.requestAnimationFrame(tick);
   };
 
   const showFeedback = (message, actionLabel = "", action = null) => {
@@ -362,6 +422,23 @@
     byId("chat-context-copy").textContent = `Life › ${taskProject(task)} › ${text(task.title, "タスク")}`;
   };
 
+  const selectOverviewTask = (task, index = 0) => {
+    const key = taskKey(task, index);
+    const openFocus = state.overviewSelectionId === key;
+    selectTask(task, index);
+    if (openFocus) {
+      state.overviewSelectionId = null;
+      renderConstellations();
+      renderTaskTable();
+      switchView("focus");
+      return;
+    }
+    state.overviewSelectionId = key;
+    renderConstellations();
+    renderTaskTable();
+    showFeedback(`「${text(task.title, "タスク")}」を選択しました。もう一度押すとFocusへ移ります。`);
+  };
+
   const renderProjectControls = () => {
     const names = projectNames();
     if (focusProjectNameEl) focusProjectNameEl.textContent = state.selectedProject || "Projectなし";
@@ -382,40 +459,55 @@
   };
 
   const renderOrbit = () => {
-    nodesEl.replaceChildren();
-    const visible = focusTasks().slice(0, 10);
+    const visible = focusTasks();
+    const visibleKeys = new Set(visible.map((task) => taskKey(task, state.tasks.indexOf(task))));
+    const existingNodes = new Map(
+      Array.from(nodesEl.querySelectorAll(":scope > .space-node[data-task-id]"))
+        .map((node) => [node.dataset.taskId, node]),
+    );
+    existingNodes.forEach((node, key) => {
+      if (!visibleKeys.has(key)) node.remove();
+    });
     focusEmptyEl.hidden = visible.length > 0;
     visible.forEach((task, index) => {
       const key = taskKey(task, state.tasks.indexOf(task));
       const status = normalizeStatus(task.status).toLowerCase();
       const sync = syncClass(task);
-      const button = document.createElement("button");
-      button.type = "button";
+      let button = existingNodes.get(key);
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.dataset.taskId = key;
+        const label = document.createElement("span");
+        label.className = "space-node__label";
+        button.appendChild(label);
+        nodesEl.appendChild(button);
+      }
       button.className = [
         "space-node",
-        "space-node--high",
+        `space-node--${isHigh(task) ? "high" : (isLow(task) ? "low" : "mid")}`,
         ["waiting", "blocked"].includes(status) ? "space-node--waiting" : "",
         key === state.activeTaskId && state.workSession ? "space-node--active" : "",
         key === state.selectedTaskId ? "is-selected" : "",
         sync === "failed" ? "space-node--failed" : sync === "conflict" ? "space-node--conflict" : "",
       ].filter(Boolean).join(" ");
-      const position = orbitPosition(index, visible.length, task);
+      const position = orbitPosition(index, visible.length, orbitClock);
       button.style.left = position.left;
       button.style.top = position.top;
-      button.dataset.taskId = key;
+      button.dataset.orbitIndex = String(index);
+      button.dataset.orbitTotal = String(visible.length);
+      button.dataset.orbitRing = String(position.ring);
       button.setAttribute("role", "listitem");
       button.setAttribute("aria-label", `${text(task.title, "タスク")}を選択`);
-      const label = document.createElement("span");
-      label.className = "space-node__label";
+      const label = button.querySelector(".space-node__label");
       label.textContent = text(task.title, "名称未設定");
-      button.appendChild(label);
-      button.addEventListener("click", () => selectTask(task, state.tasks.indexOf(task)));
-      nodesEl.appendChild(button);
+      button.onclick = () => selectTask(task, state.tasks.indexOf(task));
     });
 
     const project = state.selectedProject || "Projectなし";
     objectiveNodeEl.querySelector(".space-node__label").textContent = project;
     focusTitleEl.textContent = project;
+    startOrbitMotion();
   };
 
   const taskMutation = async (task, operation) => {
@@ -479,10 +571,12 @@
   }).catch((error) => showFeedback(`分類を変更できませんでした: ${error.message}`));
 
   const renderDetailEmpty = () => {
+    delete detailPanelEl.dataset.taskId;
     detailPanelEl.innerHTML = '<div class="detail-panel__empty"><span class="eyebrow">TASK DETAIL</span><h2>タスクを選択</h2><p>星または一覧のタスクを選ぶと詳細を確認できます。時間計測は「作業開始」を押したときだけ始まります。</p></div>';
   };
 
   const renderDetail = (task, index = 0) => {
+    detailPanelEl.dataset.taskId = taskKey(task, index);
     detailPanelEl.replaceChildren();
     const fragment = detailTemplate.content.cloneNode(true);
     fragment.querySelector('[data-detail="title"]').textContent = text(task.title, "名称未設定");
@@ -535,8 +629,8 @@
     const rows = sortedTasks(filteredTasks());
     byId("task-view-title").textContent = state.filter === "low" ? "あとでやりたいこと" : "重要なタスク";
     byId("task-view-copy").textContent = state.filter === "low"
-      ? "Lowだけを分離して表示します。重要タスクとは混ざりません。"
-      : "今やる必要があるHighタスクだけを表示します。";
+      ? "Lowだけを分離して表示。1回押して選択、もう1回でFocusへ移ります。"
+      : "Highだけを表示。1回押して選択、もう1回でFocusへ移ります。";
     byId("task-view-count").textContent = `${rows.length}件`;
 
     if (!rows.length) {
@@ -577,8 +671,16 @@
       syncCell.appendChild(syncLabel);
       row.appendChild(syncCell);
       row.addEventListener("click", () => {
-        selectTask(task, state.tasks.indexOf(task));
-        switchView("focus");
+        selectOverviewTask(task, state.tasks.indexOf(task));
+      });
+      row.tabIndex = 0;
+      const selected = state.overviewSelectionId === taskKey(task, state.tasks.indexOf(task));
+      row.classList.toggle("is-selected", selected);
+      row.setAttribute("aria-selected", String(selected));
+      row.addEventListener("keydown", (event) => {
+        if (!["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
+        selectOverviewTask(task, state.tasks.indexOf(task));
       });
       taskTableBodyEl.appendChild(row);
     });
@@ -588,6 +690,10 @@
     const row = document.createElement("button");
     row.type = "button";
     row.className = `universe-task universe-task--${isHigh(task) ? "high" : (isLow(task) ? "low" : "mid")}`;
+    row.dataset.taskId = taskKey(task, state.tasks.indexOf(task));
+    const selected = state.overviewSelectionId === row.dataset.taskId;
+    row.classList.toggle("is-selected", selected);
+    row.setAttribute("aria-pressed", String(selected));
     const title = document.createElement("span");
     title.className = "universe-task__title";
     title.textContent = text(task.title, "名称未設定");
@@ -597,8 +703,7 @@
     row.append(title, meta);
     row.addEventListener("click", (event) => {
       event.stopPropagation();
-      selectTask(task, state.tasks.indexOf(task));
-      switchView("focus");
+      selectOverviewTask(task, state.tasks.indexOf(task));
     });
     return row;
   };
@@ -618,6 +723,9 @@
     groups.forEach((group) => {
       const card = document.createElement("article");
       card.className = "constellation-card constellation-card--list";
+      const rootTask = group.tasks.find(isRootTask) || group.tasks[0];
+      if (rootTask) card.dataset.rootTaskId = taskKey(rootTask, state.tasks.indexOf(rootTask));
+      card.dataset.area = String(group.area || "unsorted").toLowerCase();
       if (group.project === state.selectedProject) card.classList.add("is-selected");
 
       const header = document.createElement("button");
@@ -638,7 +746,14 @@
       const lowCount = group.tasks.filter(isLow).length;
       counts.textContent = `High ${highCount} / Mid ${midCount} / Low ${lowCount}`;
       header.append(headingWrap, counts);
-      header.addEventListener("click", () => selectProject(group.project));
+      const rootKey = rootTask ? taskKey(rootTask, state.tasks.indexOf(rootTask)) : "";
+      const rootSelected = Boolean(rootKey && state.overviewSelectionId === rootKey);
+      header.classList.toggle("is-selected", rootSelected);
+      header.setAttribute("aria-pressed", String(rootSelected));
+      header.addEventListener("click", () => {
+        if (rootTask) selectOverviewTask(rootTask, state.tasks.indexOf(rootTask));
+        else selectProject(group.project, { openFocus: false });
+      });
 
       const taskList = document.createElement("div");
       taskList.className = "universe-task-list";
@@ -706,7 +821,7 @@
     }));
   };
 
-  const loadUniverse = async () => {
+  const loadUniverse = async ({ focusTaskId = "", openFocus = false } = {}) => {
     const refresh = byId("refresh-universe");
     if (refresh) refresh.disabled = true;
     try {
@@ -729,17 +844,27 @@
         }
       }
       state.tasks = tasks;
+      document.dispatchEvent(new CustomEvent("petit:tasks-updated", { detail: { tasks: [...state.tasks] } }));
       if (state.selectedTaskId && !selectedTask()) state.selectedTaskId = null;
       if (state.activeTaskId && !activeTask()) {
         state.activeTaskId = null;
         localStorage.removeItem(STORAGE.activeTask);
       }
       ensureSelectedProject();
+      const requestedTask = focusTaskId
+        ? state.tasks.find((task, index) => taskKey(task, index) === String(focusTaskId))
+        : null;
+      if (requestedTask) {
+        state.selectedProject = taskProject(requestedTask);
+        state.selectedTaskId = taskKey(requestedTask, state.tasks.indexOf(requestedTask));
+        localStorage.setItem(STORAGE.selectedProject, state.selectedProject);
+      }
       if (!state.selectedTaskId) {
         const first = focusTasks()[0] || projectTasks()[0] || null;
         if (first) state.selectedTaskId = taskKey(first, state.tasks.indexOf(first));
       }
       renderAll();
+      if (requestedTask && openFocus) switchView("focus");
     } catch (error) {
       focusTitleEl.textContent = "タスクを読み込めませんでした";
       objectiveNodeEl.querySelector(".space-node__label").textContent = "再読み込みしてね";
@@ -750,6 +875,26 @@
     } finally {
       if (refresh) refresh.disabled = false;
     }
+  };
+
+  const focusTaskById = async (id, { refresh = false } = {}) => {
+    const key = String(id || "");
+    if (!key) return false;
+    if (refresh) {
+      await loadUniverse({ focusTaskId: key, openFocus: true });
+      return Boolean(selectedTask());
+    }
+    const task = state.tasks.find((candidate, index) => taskKey(candidate, index) === key);
+    if (!task) return false;
+    selectTask(task, state.tasks.indexOf(task));
+    switchView("focus");
+    return true;
+  };
+
+  window.PetitUniverse = {
+    focusTask: (id) => focusTaskById(id),
+    refreshAndFocusTask: (id) => focusTaskById(id, { refresh: true }),
+    tasks: () => [...state.tasks],
   };
 
   const appendMessage = (role, message, actions = []) => {

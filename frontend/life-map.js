@@ -24,7 +24,7 @@
     core = document.createElement("div");
     core.className = "life-map__core";
     core.setAttribute("aria-hidden", "true");
-    core.innerHTML = '<span class="eyebrow">YOUR LIFE</span><strong>LIFE</strong><small>星を選んでFocusへ</small>';
+    core.innerHTML = '<span class="eyebrow">YOUR LIFE</span><strong>LIFE</strong><small>1回選択 · 2回目Focus</small>';
     map.prepend(core);
     return core;
   };
@@ -59,8 +59,8 @@
 
   const mobileLayout = (count) => {
     if (count === 1) return [{ x: 50, y: 31, scale: 1.04 }];
-    const startY = 25;
-    const endY = 91;
+    const startY = 18;
+    const endY = 94;
     const step = (endY - startY) / Math.max(1, count - 1);
     return Array.from({ length: count }, (_, index) => ({
       x: index % 2 === 0 ? 29 : 71,
@@ -70,7 +70,7 @@
   };
 
   const layoutFor = (count) => mobileQuery.matches ? mobileLayout(count) : desktopLayout(count);
-  const corePosition = () => mobileQuery.matches ? { x: 50, y: 9 } : { x: 50, y: 50 };
+  const corePosition = () => mobileQuery.matches ? { x: 50, y: 7 } : { x: 50, y: 50 };
 
   const addConnection = (svg, from, to, active = false, secondary = false) => {
     const line = createSvgElement("line", {
@@ -103,7 +103,7 @@
       task.style.transform = `translate(-50%, -50%) rotate(${angle}deg) translateX(${radius}px) rotate(${-angle}deg)`;
       if (taskIndex >= 6) task.classList.add("life-task-star--overflow");
       const title = task.querySelector(".universe-task__title")?.textContent?.trim();
-      if (title) task.setAttribute("aria-label", `${title}をFocusで開く`);
+      if (title) task.setAttribute("aria-label", `${title}を選択。選択中ならFocusへ移る`);
     });
   };
 
@@ -177,7 +177,7 @@
       if (!cards.length) return;
 
       const mapHeight = mobileQuery.matches
-        ? Math.max(780, 250 + (cards.length * 150))
+        ? Math.max(820, 220 + (cards.length * 118))
         : (cards.length > 8 ? 840 : 720);
       map.style.minHeight = `${mapHeight}px`;
       map.style.setProperty("--life-project-count", String(cards.length));
@@ -193,6 +193,7 @@
         const position = positions[index];
         const selected = card.classList.contains("is-selected");
         card.classList.add("life-star-system");
+        card.dataset.planetVariant = String(index % 4);
         card.style.setProperty("--life-x", `${position.x}%`);
         card.style.setProperty("--life-y", `${position.y}%`);
         card.style.setProperty("--life-scale", String(position.scale));
@@ -201,8 +202,8 @@
         const header = card.querySelector(".constellation-card__header");
         const projectName = card.querySelector(".constellation-card__heading strong")?.textContent?.trim();
         if (header && projectName) {
-          header.setAttribute("aria-label", `${projectName}へフォーカス`);
-          header.title = `${projectName}を開く`;
+          header.setAttribute("aria-label", `${projectName}を選択。選択中ならFocusへ移る`);
+          header.title = `${projectName}を選択。もう一度でFocus`;
         }
 
         decorateTaskStars(card, index);

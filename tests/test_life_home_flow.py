@@ -29,7 +29,8 @@ class LifeHomeFlowAssetTests(unittest.TestCase):
         self.assertIn('/static/task-flow.css', shell)
         self.assertIn('/parent`', script)
         self.assertIn('/children`', script)
-        self.assertIn("await focusRoot(destination", script)
+        self.assertIn("await refreshAndFocusTask(taskId(task))", script)
+        self.assertIn("window.PetitUniverse.refreshAndFocusTask", script)
         self.assertIn("この親Taskに小タスクを追加", script)
 
     def test_today_dashboard_has_actions_and_metrics(self) -> None:

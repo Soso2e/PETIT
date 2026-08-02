@@ -1,16 +1,26 @@
 "use strict";
 
 const CACHE_NAME = "petit-shell-v9";
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v2`;
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v4`;
 const SHELL = [
   "/",
   "/static/universe.html",
   "/static/universe.css",
   "/static/universe-actions.css",
   "/static/universe-next.css",
+  "/static/life-map.css",
+  "/static/life-transition.css",
+  "/static/task-flow.css",
+  "/static/today.css",
   "/static/reminders.css",
   "/static/universe-app.js",
   "/static/universe-next.js",
+  "/static/life-map.js",
+  "/static/task-flow.js",
+  "/static/today.js",
+  "/static/app_shell.js",
+  "/static/chat_input.js",
+  "/static/petit-version.js",
   "/static/reminders.js",
   "/static/legacy.html",
   "/static/style.css",

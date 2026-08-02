@@ -48,6 +48,8 @@ Life
 
 ### Life
 
+- Taskは1回目のクリックで選択し、同じTaskの2回目のクリックでFocusへ移る
+- 選択中Taskはハイライトし、次のクリックの結果を文言と`aria-pressed`で示す
 - Life直下Taskをカードとして一覧表示する
 - 子Taskを持つTaskは親カードとして表示する
 - 子Taskは親カードの内側へインデントして表示する
@@ -94,7 +96,7 @@ has_children
 
 ## 親子変更
 
-Task詳細の親Taskセレクトから次を行う。
+Task詳細の親Taskセレクトで候補を選び、「親Taskを変更」を押した時だけ次を行う。候補の選択だけではAPIへ送信しない。
 
 ```text
 PATCH /api/notifications/tasks/{task_id}/parent

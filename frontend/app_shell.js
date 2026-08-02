@@ -1,6 +1,7 @@
 // Shared PETIT application shell for Universe UI.
 (() => {
   const HOME_VIEW = "universe";
+  const ASSET_VERSION = "0.5.1";
   const PRIMARY_VIEWS = ["universe", "focus", "tasks", "chat"];
   const MORE_VIEWS = [
     { view: "today", label: "Today" },
@@ -16,7 +17,7 @@
     if (document.querySelector(`link[data-petit-module="${marker}"]`)) return;
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = href;
+    link.href = `${href}?v=${ASSET_VERSION}`;
     link.dataset.petitModule = marker;
     document.head.appendChild(link);
   };
@@ -24,7 +25,7 @@
   const loadScript = (src, marker) => {
     if (document.querySelector(`script[data-petit-module="${marker}"]`)) return;
     const script = document.createElement("script");
-    script.src = src;
+    script.src = `${src}?v=${ASSET_VERSION}`;
     script.async = false;
     script.dataset.petitModule = marker;
     document.head.appendChild(script);

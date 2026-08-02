@@ -107,17 +107,41 @@ p { color: var(--muted); line-height: 1.7; }
 .orbit { position: relative; flex: 1; min-height: 560px; margin: 4px 20px 0; overflow: hidden; perspective: 1000px; }
 .orbit::after { content: ""; position: absolute; inset: 28% 30%; background: radial-gradient(circle, rgba(157,180,255,.14), transparent 66%); filter: blur(25px); }
 .orbit__ring { position: absolute; left: 50%; top: 50%; border: 1px solid rgba(157,180,255,.12); border-radius: 50%; transform: translate(-50%, -50%) rotateX(64deg); }
+.orbit__ring::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e7edff;
+  box-shadow: 0 0 14px #9db4ff, 0 0 30px rgba(157,180,255,.7);
+  transform: translate(-50%, -50%);
+}
 .orbit__ring--one { width: 36%; height: 36%; }
 .orbit__ring--two { width: 62%; height: 62%; }
 .orbit__ring--three { width: 88%; height: 88%; }
-.space-node { position: absolute; z-index: 4; width: 120px; min-height: 120px; padding: 18px; border: 1px solid rgba(205,218,255,.24); border-radius: 50%; background: radial-gradient(circle at 32% 25%, rgba(255,255,255,.22), rgba(95,113,190,.18) 38%, rgba(15,20,42,.94) 72%); box-shadow: 0 0 24px rgba(120,148,255,.18), inset 0 0 24px rgba(255,255,255,.05); transform: translate(-50%, -50%); cursor: pointer; transition: transform .25s ease, box-shadow .25s ease, opacity .25s ease; }
+.space-node { position: absolute; z-index: 4; width: 112px; min-height: 112px; padding: 18px; overflow: hidden; border: 1px solid rgba(205,218,255,.24); border-radius: 50%; background: radial-gradient(circle at 32% 25%, rgba(255,255,255,.22), rgba(95,113,190,.18) 38%, rgba(15,20,42,.94) 72%); box-shadow: 0 0 24px rgba(120,148,255,.18), inset 0 0 24px rgba(255,255,255,.05); transform: translate(-50%, -50%); cursor: pointer; transition: transform .3s cubic-bezier(.2,.82,.2,1), box-shadow .34s ease, opacity .3s ease; will-change: left, top, transform; }
+.space-node::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background:
+    repeating-linear-gradient(165deg, transparent 0 11px, rgba(255,255,255,.055) 12px 14px, transparent 15px 22px),
+    radial-gradient(circle at 62% 66%, rgba(255,255,255,.08), transparent 44%);
+  opacity: .8;
+  pointer-events: none;
+}
 .space-node:hover, .space-node.is-selected { transform: translate(-50%, -50%) scale(1.08); box-shadow: 0 0 44px rgba(157,180,255,.45), inset 0 0 28px rgba(255,255,255,.08); }
 .space-node--objective { left: 50%; top: 50%; width: 168px; min-height: 168px; z-index: 6; background: radial-gradient(circle at 35% 28%, #f5f7ff, #8fa8ff 14%, #304283 44%, #0b1027 75%); box-shadow: 0 0 70px rgba(122,151,255,.5), 0 0 140px rgba(76,98,203,.24); }
 .space-node--active { animation: activePulse 2.8s ease-in-out infinite; border-color: rgba(255,255,255,.72); }
 .space-node--waiting { opacity: .52; filter: saturate(.5); }
 .space-node--failed, .space-node--conflict { border-color: rgba(255,127,157,.85); box-shadow: 0 0 34px rgba(255,127,157,.24); }
 .space-node--high { width: 134px; min-height: 134px; }
-.space-node--low { width: 96px; min-height: 96px; opacity: .72; }
+.space-node--mid { width: 110px; min-height: 110px; border-color: rgba(255, 201, 120, .42); background: radial-gradient(circle at 32% 25%, rgba(255,255,255,.25), rgba(170,112,61,.22) 38%, rgba(38,22,22,.96) 74%); }
+.space-node--low { width: 88px; min-height: 88px; opacity: .72; background: radial-gradient(circle at 32% 25%, rgba(255,255,255,.2), rgba(78,139,122,.17) 38%, rgba(11,31,31,.96) 74%); }
 .space-node__label { position: relative; z-index: 2; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; font-size: 13px; line-height: 1.45; font-weight: 650; text-align: center; text-shadow: 0 2px 12px rgba(0,0,0,.65); }
 @keyframes activePulse {
   0%, 100% { box-shadow: 0 0 34px rgba(200,214,255,.4), 0 0 70px rgba(111,140,255,.28); }
@@ -196,6 +220,8 @@ p { color: var(--muted); line-height: 1.7; }
   .space-node { width: 94px; min-height: 94px; padding: 12px; }
   .space-node--objective { width: 142px; min-height: 142px; }
   .space-node--high { width: 108px; min-height: 108px; }
+  .space-node--mid { width: 94px; min-height: 94px; }
+  .space-node--low { width: 78px; min-height: 78px; }
   .space-node__label { font-size: 11px; }
   .orbit__ring--one { width: 46%; height: 46%; }
   .orbit__ring--two { width: 72%; height: 72%; }

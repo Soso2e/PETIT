@@ -23,7 +23,8 @@ class LifeMapAssetTests(unittest.TestCase):
         self.assertIn('querySelectorAll(":scope > .universe-task")', source)
         self.assertIn("MutationObserver", source)
         self.assertIn("life-map__connection", source)
-        self.assertIn("へフォーカス", source)
+        self.assertIn("選択中ならFocusへ移る", source)
+        self.assertIn("cards.length * 118", source)
 
     def test_life_map_has_mobile_and_reduced_motion_styles(self):
         source = (FRONTEND / "life-map.css").read_text(encoding="utf-8")

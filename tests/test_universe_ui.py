@@ -102,6 +102,25 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('localStorage.removeItem("petit_universe_active_started_at")', script)
         self.assertNotIn('localStorage.setItem("petit_universe_active_started_at"', script)
 
+    def test_overview_requires_select_then_focus(self) -> None:
+        script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        self.assertIn("overviewSelectionId", script)
+        self.assertIn("const selectOverviewTask", script)
+        self.assertIn("state.overviewSelectionId === key", script)
+        self.assertIn("もう一度押すとFocus", script)
+        self.assertIn("1回押して選択", html)
+        self.assertIn('setAttribute("aria-pressed"', script)
+
+    def test_parent_assignment_requires_explicit_apply(self) -> None:
+        html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        flow = (FRONTEND / "task-flow.js").read_text(encoding="utf-8")
+        self.assertIn('data-action="parent-apply"', html)
+        self.assertIn("const handleParentSelection", flow)
+        self.assertIn("const handleParentApply", flow)
+        self.assertIn("void changeParent(task, select, applyButton)", flow)
+        self.assertIn("まだ保存されていません", flow)
+
     def test_task_controls_and_undo_are_present(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
         script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
@@ -114,7 +133,8 @@ class UniverseUiTests(unittest.TestCase):
 
     def test_parent_assignment_is_available_in_ui_and_chat(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
-        script = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
+        script = (FRONTEND / "task-flow.js").read_text(encoding="utf-8")
+        decorator = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
         tool = (BACKEND / "tools" / "task_hierarchy.py").read_text(encoding="utf-8")
         service = (BACKEND / "task_hierarchy.py").read_text(encoding="utf-8")
         tools_init = (BACKEND / "tools" / "__init__.py").read_text(encoding="utf-8")
@@ -123,12 +143,30 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('/parent', script)
         self.assertIn('move_to_life: true', script)
         self.assertIn('parent_task_id: Number', script)
+        self.assertNotIn('/parent`', decorator)
         self.assertIn('name="set_task_parent"', tool)
         self.assertIn("requires_confirmation=True", tool)
         self.assertIn("parent_external_ids", service)
         self.assertIn("task_hierarchy", tools_init)
         self.assertIn('"set_task_parent"', capability)
         self.assertNotIn("classify_task_project", capability)
+
+    def test_parent_assignment_uses_the_task_shown_in_detail_panel(self) -> None:
+        app = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        flow = (FRONTEND / "task-flow.js").read_text(encoding="utf-8")
+        decorator = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
+        self.assertIn("detailPanelEl.dataset.taskId = taskKey(task, index)", app)
+        self.assertIn("delete detailPanelEl.dataset.taskId", app)
+        for script in (flow, decorator):
+            displayed = script.index("const displayedId =")
+            remembered = script.index("const remembered =", displayed)
+            self.assertLess(displayed, remembered)
+
+    def test_focus_orbit_uses_all_child_priorities_and_shared_refresh(self) -> None:
+        script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        self.assertIn("filter((task) => !isRootTask(task))", script)
+        self.assertIn("refreshAndFocusTask", script)
+        self.assertIn('dataset.orbitIndex', script)
 
     def test_focus_zoom_and_motion_controls_exist(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
@@ -142,6 +180,19 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn("@keyframes nodeArrival", css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", css)
         self.assertIn("hierarchy-root-duplicate", css)
+
+    def test_focus_motion_reuses_nodes_and_does_not_restart_on_selection(self) -> None:
+        script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        css = (FRONTEND / "universe-next.css").read_text(encoding="utf-8")
+        self.assertIn("const existingNodes = new Map", script)
+        self.assertIn("if (!button)", script)
+        self.assertNotIn("nodesEl.replaceChildren()", script)
+        self.assertIn("if (orbitFrame != null) return", script)
+        self.assertNotIn('nodesEl.matches(":hover")', script)
+        self.assertNotIn('nodesEl.matches(":focus-within")', script)
+        self.assertIn('panel.dataset.motionSeen !== "true"', script)
+        self.assertIn('.view.is-entering', css)
+        self.assertNotIn('.view.is-active {\n  animation: viewArrival', css)
 
     def test_legacy_settings_can_return_to_new_ui(self) -> None:
         shell = (FRONTEND / "shell.js").read_text(encoding="utf-8")

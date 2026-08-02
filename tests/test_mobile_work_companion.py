@@ -76,7 +76,7 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("window.PETITShell", source)
 
         service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('const CACHE_NAME = "petit-shell-v8"', service_worker)
+        self.assertIn('const CACHE_NAME = "petit-shell-v9"', service_worker)
         self.assertIn('"/static/shell.js"', service_worker)
         self.assertIn('"/static/branding/icon_logo.png"', service_worker)
         self.assertIn('"/static/branding/name_logo.png"', service_worker)
@@ -95,8 +95,12 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
     def test_pwa_icons_are_valid_png_files_with_declared_sizes(self) -> None:
         manifest = json.loads((FRONTEND / "manifest.webmanifest").read_text(encoding="utf-8"))
         for icon in manifest["icons"]:
+            if icon["type"] == "image/svg+xml":
+                self.assertEqual(icon["sizes"], "any")
+                self.assertTrue((FRONTEND / icon["src"].split("?", 1)[0].removeprefix("/static/")).is_file())
+                continue
             self.assertEqual(icon["type"], "image/png")
-            path = FRONTEND / icon["src"].removeprefix("/static/")
+            path = FRONTEND / icon["src"].split("?", 1)[0].removeprefix("/static/")
             data = path.read_bytes()
             self.assertTrue(data.startswith(b"\x89PNG\r\n\x1a\n"))
             self.assertEqual(data[-12:], b"\x00\x00\x00\x00IEND\xaeB`\x82")
@@ -116,10 +120,11 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertEqual(
             manifest_sources,
             {
-                "/static/icon-192.png",
-                "/static/icon-512.png",
-                "/static/icon-maskable-192.png",
-                "/static/icon-maskable-512.png",
+                "/static/icon-desktop.svg?v=2",
+                "/static/icon-192.png?v=2",
+                "/static/icon-512.png?v=2",
+                "/static/icon-maskable-192.png?v=2",
+                "/static/icon-maskable-512.png?v=2",
             },
         )
         shortcut_sources = {
@@ -127,11 +132,11 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
             for shortcut in manifest.get("shortcuts", [])
             for icon in shortcut.get("icons", [])
         }
-        self.assertEqual(shortcut_sources, {"/static/icon-192.png"})
+        self.assertEqual(shortcut_sources, {"/static/icon-192.png?v=2"})
 
         service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
         for source in manifest_sources | shortcut_sources | {"/static/apple-touch-icon.png"}:
-            self.assertIn(source, service_worker)
+            self.assertIn(source.split("?", 1)[0], service_worker)
         self.assertNotIn("icon-192.jpg", service_worker)
         self.assertNotIn("icon-512.jpg", service_worker)
 
