@@ -62,7 +62,7 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn("const openTasks", script)
         self.assertIn("projectTasks().filter(isHigh)", script)
         self.assertIn("group.tasks.forEach", script)
-        self.assertIn("universe-task--low", script)
+        self.assertIn('isLow(task) ? "low"', script)
 
     def test_universe_uses_existing_backend_contracts(self) -> None:
         script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
