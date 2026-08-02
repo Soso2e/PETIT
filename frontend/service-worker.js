@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v8";
+const CACHE_NAME = "petit-shell-v7";
 const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v2`;
 const SHELL = [
   "/",
