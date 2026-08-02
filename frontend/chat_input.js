@@ -29,6 +29,15 @@
     resize();
   };
 
+  const loadStylesheet = (href, marker) => {
+    if (document.querySelector(`link[data-petit-style="${marker}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.dataset.petitStyle = marker;
+    document.head.appendChild(link);
+  };
+
   const loadSharedModule = (src, marker) => {
     if (document.querySelector(`script[data-petit-module="${marker}"]`)) return;
     const script = document.createElement("script");
@@ -44,7 +53,9 @@
       input: document.getElementById("input") || document.getElementById("chat-input"),
     });
     if (document.querySelector(".universe-shell")) {
+      loadStylesheet("/static/petit-ui-system.css?v=0.7.0", "unified-ui-system");
       loadSharedModule("/static/app_shell.js?v=0.5.1", "app-shell");
+      loadSharedModule("/static/petit-ui-system.js?v=0.7.0", "unified-ui-system");
     }
   };
 
