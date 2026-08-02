@@ -507,6 +507,7 @@ if config.FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=config.FRONTEND_DIR), name="static")
 
     @app.get("/service-worker.js", include_in_schema=False)
+    @app.get("/sw.js", include_in_schema=False)
     def service_worker() -> Any:
         service_worker_file = config.FRONTEND_DIR / "service-worker.js"
         if service_worker_file.exists():

@@ -358,20 +358,49 @@
   }
 
   async function enableNotifications() {
+    // CRITICAL: Request permission at the absolute top of user gesture handler
+    // to prevent mobile Safari/Chrome from discarding user activation
+    let permissionPromise = null;
+    if ("Notification" in window && Notification.permission === "default") {
+      try {
+        permissionPromise = Notification.requestPermission();
+      } catch (err) {
+        // Fallback for older callback-based requestPermission
+        permissionPromise = new Promise((resolve) => Notification.requestPermission(resolve));
+      }
+    }
+
     setBusy(true);
     try {
+      if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !isStandalone()) {
+        throw new Error("iOSでPush通知を受信するには、Safariの共有メニューから『ホーム画面に追加』して起動してください。");
+      }
       if (!serverStatus?.configured) throw new Error("VAPID設定が未設定です");
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") throw new Error("通知が許可されませんでした");
+
+      let permission = Notification.permission;
+      if (permissionPromise) {
+        permission = await permissionPromise;
+      }
+      if (permission !== "granted") {
+        throw new Error("通知許可が提示されないか、拒否されました。端末の設定画面で通知を許可してください。");
+      }
+
+      if (!registration) {
+        registration = await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
+        await navigator.serviceWorker.ready;
+      }
+
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(serverStatus.public_key),
       });
+
       await fetchJson("/api/notifications/subscriptions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
       });
+
       const workSessionPreference = categories.querySelector('input[data-category="work_session"]');
       if (workSessionPreference && !workSessionPreference.checked) {
         workSessionPreference.checked = true;
