@@ -136,7 +136,7 @@
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (reducedMotionQuery.matches) {
+    if (!target.classList.contains("is-selected") || reducedMotionQuery.matches) {
       replayClick(target);
       return;
     }
