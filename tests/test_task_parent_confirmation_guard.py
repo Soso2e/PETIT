@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from backend import tools
+from backend import agent_runtime, tools
 from backend.tools import task_hierarchy as task_hierarchy_tool
 
 
@@ -18,6 +18,16 @@ class TaskParentConfirmationGuardTests(unittest.TestCase):
                     "parent_task_id": 135,
                 },
             )
+
+    def test_confirm_write_keeps_digit_string_id_compatibility(self) -> None:
+        parsed = tools.parse_arguments(
+            "update_task",
+            {
+                "task_id": "136",
+                "title": "ROOMIES/歩くアニメーションを追加",
+            },
+        )
+        self.assertEqual(parsed["task_id"], "136")
 
     def test_set_task_parent_accepts_compatibility_ids_and_title(self) -> None:
         parsed = tools.parse_arguments(
@@ -40,6 +50,23 @@ class TaskParentConfirmationGuardTests(unittest.TestCase):
         self.assertIn("親子変更にはset_task_parentを使う", schemas["update_task"]["description"])
         self.assertIn("update_taskではなく必ずこのToolを使う", schemas["set_task_parent"]["description"])
         self.assertIn("確認はRuntimeが一度だけ表示する", schemas["set_task_parent"]["description"])
+
+    def test_runtime_detects_manual_write_confirmation(self) -> None:
+        self.assertTrue(agent_runtime._is_manual_write_confirmation("この内容で実行しますか？"))
+        self.assertTrue(agent_runtime._is_manual_write_confirmation("この内容で更新してもいいですか？"))
+        self.assertFalse(agent_runtime._is_manual_write_confirmation("どのタスクを変更しますか？"))
+
+    def test_set_task_parent_has_readable_runtime_confirmation(self) -> None:
+        confirmation = agent_runtime._confirmation_text(
+            "set_task_parent",
+            {
+                "task_id": 136,
+                "parent_task_id": 135,
+                "title": "ROOMIES/歩くアニメーションを追加",
+            },
+        )
+        self.assertIn("操作: タスクの親子関係を変更", confirmation)
+        self.assertEqual(confirmation.count("この内容で実行しますか？"), 1)
 
     def test_parent_and_title_change_share_one_confirmed_tool(self) -> None:
         child = {"id": 136, "title": "歩くアニメーションを追加", "source": "local"}
