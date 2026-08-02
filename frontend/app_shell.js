@@ -11,6 +11,29 @@
     if (target) target.click();
   };
 
+  const loadStylesheet = (href, marker) => {
+    if (document.querySelector(`link[data-petit-module="${marker}"]`)) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.dataset.petitModule = marker;
+    document.head.appendChild(link);
+  };
+
+  const loadScript = (src, marker) => {
+    if (document.querySelector(`script[data-petit-module="${marker}"]`)) return;
+    const script = document.createElement("script");
+    script.src = src;
+    script.dataset.petitModule = marker;
+    document.head.appendChild(script);
+  };
+
+  const installLifeMap = () => {
+    if (!document.querySelector('[data-view-panel="universe"]')) return;
+    loadStylesheet("/static/life-map.css", "life-map-style");
+    loadScript("/static/life-map.js", "life-map-script");
+  };
+
   const createMoreMenu = (nav) => {
     if (document.getElementById("petit-more-menu")) return;
 
@@ -142,6 +165,7 @@
     });
 
     installStyles();
+    installLifeMap();
     createMoreMenu(nav);
 
     const requested = new URLSearchParams(window.location.search).get("view");
