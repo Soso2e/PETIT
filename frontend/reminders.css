@@ -194,12 +194,8 @@
   font-size: 1.1rem;
 }
 
-/*
- * Universe's fifth navigation tab made the 981–1180px desktop range too tight.
- * This file loads last, so keep the shared laptop-width safety overrides here
- * until the Universe stylesheets are consolidated.
- */
-@media (max-width: 1180px) and (min-width: 641px) {
+/* The compact desktop layout must never catch phone landscape widths. */
+@media (min-width: 981px) and (max-width: 1180px) {
   .universe-topbar {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -233,7 +229,60 @@
   }
 }
 
+/* Five tabs should stay inside the viewport on phones and tablets. */
+@media (max-width: 980px) {
+  .view-tabs {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    justify-self: stretch;
+    overflow: visible;
+  }
+
+  .view-tab {
+    min-width: 0;
+    padding-inline: 8px;
+    overflow: hidden;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 640px) {
+  .universe-topbar {
+    padding-bottom: 10px;
+  }
+
+  .topbar-actions {
+    min-width: 0;
+  }
+
+  .view-tabs {
+    gap: 2px;
+    padding: 4px;
+  }
+
+  .view-tab {
+    padding: 8px 2px;
+    font-size: 10.5px;
+  }
+
+  .orbit-card__header {
+    padding: 18px 16px 0;
+  }
+
+  .section-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .chat-panel,
+  .chat-context,
+  .detail-panel {
+    padding: 18px;
+  }
+
   .reminder-section-head {
     align-items: stretch;
   }
