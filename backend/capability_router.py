@@ -28,6 +28,9 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "get_schedule",
         "add_schedule",
         "sync_calendar",
+        "create_reminder",
+        "get_reminders",
+        "manage_reminder",
         "get_weather",
     ),
     "knowledge": (
@@ -71,7 +74,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
 
 _GROUP_DESCRIPTIONS = {
     "lists_and_tasks": "タスク、Notionタスク、親子関係、任意リスト、その項目の取得・追加・変更",
-    "calendar": "時刻、天気、予定、カレンダーの取得・追加・同期",
+    "calendar": "時刻、天気、予定、リマインダー、カレンダーの取得・追加・変更・同期",
     "knowledge": "BRAIN、Notion、記憶の検索と確認付き編集",
     "github": "GitHubのリポジトリ、差分、PR、開発状況",
     "web": "ニュースや外部調査",
