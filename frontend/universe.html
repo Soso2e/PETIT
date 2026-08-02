@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/static/universe.css" />
   <link rel="stylesheet" href="/static/universe-actions.css" />
   <link rel="stylesheet" href="/static/universe-next.css" />
+  <link rel="stylesheet" href="/static/reminders.css" />
 </head>
 <body>
   <div class="space" aria-hidden="true">
@@ -30,6 +31,7 @@
         <button class="view-tab is-active" data-view="focus">Focus</button>
         <button class="view-tab" data-view="universe">Life</button>
         <button class="view-tab" data-view="tasks">Tasks</button>
+        <button class="view-tab" data-view="reminders">Remind</button>
         <button class="view-tab" data-view="chat">Chat</button>
       </nav>
       <div class="topbar-actions">
@@ -142,6 +144,29 @@
         </div>
       </section>
 
+      <section class="view" data-view-panel="reminders" hidden>
+        <div class="section-head reminder-section-head">
+          <div>
+            <span class="eyebrow">REMINDERS</span>
+            <h1>忘れないための約束</h1>
+            <p>Chatで登録したリマインダーを確認し、完了・延期・取消できます。</p>
+          </div>
+          <div class="reminder-toolbar">
+            <div class="reminder-filters" role="group" aria-label="リマインダー表示切り替え">
+              <button class="reminder-filter is-active" type="button" data-reminder-filter="upcoming">未完了</button>
+              <button class="reminder-filter" type="button" data-reminder-filter="history">履歴</button>
+              <button class="reminder-filter" type="button" data-reminder-filter="all">すべて</button>
+            </div>
+            <button id="refresh-reminders" class="reminder-refresh" type="button">更新</button>
+          </div>
+        </div>
+        <div class="reminder-summary-line">
+          <span id="reminder-count">0件</span>
+          <span id="reminder-status" class="reminder-status" aria-live="polite">読み込み中</span>
+        </div>
+        <div id="reminder-list" class="reminder-list" aria-live="polite"></div>
+      </section>
+
       <section class="view" data-view-panel="chat" hidden>
         <div class="chat-layout">
           <section class="chat-panel">
@@ -202,5 +227,6 @@
 
   <script src="/static/universe-app.js"></script>
   <script src="/static/universe-next.js"></script>
+  <script src="/static/reminders.js"></script>
 </body>
 </html>
