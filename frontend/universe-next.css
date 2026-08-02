@@ -1,4 +1,4 @@
-/* Spatial motion and Project classification layer for PETIT Universe. */
+/* Spatial motion and Life-first task hierarchy for PETIT Universe. */
 :root {
   --universe-zoom: 1;
   --orbit-parallax-x: 0px;
@@ -99,6 +99,7 @@
   transform: translate(-50%, -50%) scale(.55);
 }
 .orbit[data-zoom-level="near"] .space-node__label { -webkit-line-clamp: 4; font-size: 13px; }
+.hierarchy-root-duplicate { display: none !important; }
 
 html[data-universe-motion="ready"] .task-nodes .space-node {
   animation: nodeArrival .52s cubic-bezier(.18,.9,.28,1.16) backwards;
@@ -111,7 +112,7 @@ html[data-universe-motion="ready"] .view.is-active {
   animation: viewArrival .34s cubic-bezier(.2,.82,.2,1) backwards;
 }
 
-.detail-project-field {
+.detail-parent-field {
   display: grid;
   gap: 8px;
   margin: 0 0 18px;
@@ -120,8 +121,8 @@ html[data-universe-motion="ready"] .view.is-active {
   border-radius: 16px;
   background: rgba(255,255,255,.035);
 }
-.detail-project-field > span { color: var(--muted); font-size: 11px; }
-.detail-project-field select {
+.detail-parent-field > span { color: var(--muted); font-size: 11px; }
+.detail-parent-field select {
   width: 100%;
   min-height: 44px;
   padding: 0 12px;
@@ -131,8 +132,39 @@ html[data-universe-motion="ready"] .view.is-active {
   background: rgba(8, 12, 29, .94);
   outline: none;
 }
-.detail-project-field select:focus { border-color: rgba(157,180,255,.7); box-shadow: 0 0 0 3px rgba(157,180,255,.12); }
-.detail-project-field small { color: var(--muted); line-height: 1.55; }
+.detail-parent-field select:focus { border-color: rgba(157,180,255,.7); box-shadow: 0 0 0 3px rgba(157,180,255,.12); }
+.detail-parent-field small { color: var(--muted); line-height: 1.55; }
+
+.constellation-card--parent { border-color: rgba(157, 180, 255, .3); }
+.constellation-card--parent::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 15% 10%, rgba(157,180,255,.13), transparent 38%);
+}
+.constellation-card--single { min-height: 150px; }
+.universe-task--root-copy { display: none !important; }
+.universe-task--child {
+  position: relative;
+  margin-left: 18px;
+}
+.universe-task--child::before {
+  content: "";
+  position: absolute;
+  left: -13px;
+  top: 50%;
+  width: 8px;
+  height: 1px;
+  background: rgba(157,180,255,.35);
+}
+.task-row--child .task-table__title { padding-left: 30px; position: relative; }
+.task-row--child .task-table__title::before {
+  content: "↳";
+  position: absolute;
+  left: 12px;
+  color: var(--accent);
+}
 
 @keyframes nebulaBreathe {
   from { transform: scale(.92) translate3d(-2%, 1%, 0); opacity: .18; }
@@ -167,7 +199,7 @@ html[data-universe-motion="ready"] .view.is-active {
     visibility: hidden;
     pointer-events: none;
   }
-  .detail-project-field select { font-size: 16px; }
+  .detail-parent-field select { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
