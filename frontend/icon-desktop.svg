@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">PETIT</title>
+  <desc id="desc">惑星の輪をまとったPETITロボット</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="72%">
+      <stop offset="0" stop-color="#172044"/>
+      <stop offset="0.62" stop-color="#090d22"/>
+      <stop offset="1" stop-color="#03050d"/>
+    </radialGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fbff"/>
+      <stop offset="1" stop-color="#a9c6ff"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#79f5ff"/>
+      <stop offset="0.55" stop-color="#7e8cff"/>
+      <stop offset="1" stop-color="#d48cff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="92" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="138" fill="#0d1535" stroke="#34447e" stroke-width="6"/>
+  <ellipse cx="256" cy="270" rx="188" ry="70" fill="none" stroke="url(#ring)" stroke-width="22" transform="rotate(-14 256 270)" filter="url(#glow)"/>
+  <path d="M174 198c0-31 25-56 56-56h52c31 0 56 25 56 56v92c0 42-34 76-76 76h-12c-42 0-76-34-76-76z" fill="url(#face)" stroke="#d7e6ff" stroke-width="8"/>
+  <rect x="201" y="205" width="110" height="81" rx="36" fill="#101936"/>
+  <circle cx="229" cy="245" r="11" fill="#74f2ff" filter="url(#glow)"/>
+  <circle cx="283" cy="245" r="11" fill="#74f2ff" filter="url(#glow)"/>
+  <path d="M233 318c14 10 32 10 46 0" fill="none" stroke="#657bb8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M256 142v-24" stroke="#d7e6ff" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="256" cy="104" r="15" fill="#91f8ff" filter="url(#glow)"/>
+  <circle cx="382" cy="176" r="13" fill="#ffd685"/>
+  <circle cx="131" cy="331" r="8" fill="#d39cff"/>
+</svg>

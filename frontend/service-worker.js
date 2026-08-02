@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v8";
+const CACHE_NAME = "petit-shell-v9";
 const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v2`;
 const SHELL = [
   "/",
@@ -28,6 +28,7 @@ const SHELL = [
   "/static/manifest.webmanifest",
   "/static/favicon-64.png",
   "/static/apple-touch-icon.png",
+  "/static/icon-desktop.svg",
   "/static/icon-192.png",
   "/static/icon-512.png",
   "/static/icon-maskable-192.png",
