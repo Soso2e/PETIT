@@ -23,9 +23,11 @@ class ReminderUiTests(unittest.TestCase):
     def test_reminder_ui_uses_safe_dom_and_backend_contract(self) -> None:
         script = (FRONTEND / "reminders.js").read_text(encoding="utf-8")
         self.assertIn("/api/notifications/reminders", script)
-        self.assertIn('/snooze', script)
-        self.assertIn('/complete', script)
-        self.assertIn('/cancel', script)
+        self.assertIn('${encodeURIComponent(reminder.id)}/${action}', script)
+        self.assertIn('action === "snooze"', script)
+        self.assertIn('actionButton("完了", "complete"', script)
+        self.assertIn('actionButton("10分後", "snooze"', script)
+        self.assertIn('actionButton("取消", "cancel"', script)
         self.assertIn("textContent", script)
         self.assertNotIn("innerHTML", script)
 
