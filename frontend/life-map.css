@@ -1,0 +1,330 @@
+/* Life overview: connected projects and tasks as one navigable constellation. */
+.constellation-grid.life-cosmos-map {
+  position: relative;
+  display: block;
+  min-height: 720px;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid rgba(157, 180, 255, .16);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(105, 131, 255, .16), transparent 22%),
+    radial-gradient(circle at 20% 15%, rgba(127, 227, 193, .07), transparent 30%),
+    radial-gradient(circle at 78% 75%, rgba(166, 102, 255, .08), transparent 32%),
+    linear-gradient(155deg, rgba(10, 14, 32, .88), rgba(4, 7, 18, .76));
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(24px);
+}
+
+.constellation-grid.life-cosmos-map::before,
+.constellation-grid.life-cosmos-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.constellation-grid.life-cosmos-map::before {
+  z-index: 0;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(255,255,255,.75) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 64% 28%, rgba(157,180,255,.68) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 36% 72%, rgba(127,227,193,.55) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 86% 82%, rgba(255,255,255,.5) 0 1px, transparent 1.5px);
+  background-size: 118px 118px, 176px 176px, 224px 224px, 286px 286px;
+  opacity: .52;
+  animation: lifeStarField 7s ease-in-out infinite alternate;
+}
+.constellation-grid.life-cosmos-map::after {
+  z-index: 0;
+  inset: 12% 18%;
+  border: 1px solid rgba(157, 180, 255, .06);
+  border-radius: 50%;
+  transform: rotate(-9deg);
+  box-shadow:
+    0 0 80px rgba(74, 103, 221, .08),
+    inset 0 0 80px rgba(74, 103, 221, .04);
+}
+
+.life-map__lines {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.life-map__connection {
+  stroke: rgba(157, 180, 255, .23);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-dasharray: 1.5 2.4;
+  filter: drop-shadow(0 0 4px rgba(157, 180, 255, .25));
+  animation: lifeSignal 10s linear infinite;
+}
+.life-map__connection.is-secondary {
+  stroke: rgba(127, 227, 193, .09);
+  stroke-width: .75;
+  stroke-dasharray: .7 3.8;
+}
+.life-map__connection.is-active {
+  stroke: rgba(225, 233, 255, .74);
+  stroke-width: 2;
+  stroke-dasharray: 3 1.6;
+  filter: drop-shadow(0 0 8px rgba(157, 180, 255, .75));
+}
+
+.life-map__core {
+  position: absolute;
+  left: var(--life-x, 50%);
+  top: var(--life-y, 50%);
+  z-index: 3;
+  display: grid;
+  place-content: center;
+  width: 154px;
+  height: 154px;
+  padding: 18px;
+  border: 1px solid rgba(223, 231, 255, .34);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 27%, rgba(255,255,255,.95), rgba(187,205,255,.82) 6%, rgba(87,112,215,.74) 23%, rgba(26,37,88,.92) 58%, rgba(7,11,29,.98) 76%);
+  box-shadow:
+    0 0 46px rgba(132, 158, 255, .42),
+    0 0 110px rgba(84, 104, 209, .24),
+    inset 0 0 28px rgba(255,255,255,.08);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: lifeCorePulse 4.8s ease-in-out infinite;
+}
+.life-map__core strong {
+  margin: 6px 0;
+  font-size: 26px;
+  letter-spacing: .2em;
+  text-indent: .2em;
+}
+.life-map__core small { color: rgba(231, 236, 255, .66); font-size: 10px; }
+
+.constellation-card.life-star-system {
+  position: absolute;
+  left: var(--life-x);
+  top: var(--life-y);
+  z-index: 4;
+  width: 166px;
+  min-height: 166px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  transform: translate(-50%, -50%) scale(var(--life-scale, 1));
+  animation: lifeNodeArrival .56s cubic-bezier(.18, .9, .28, 1.15) backwards;
+  animation-delay: var(--life-delay, 0ms);
+}
+.constellation-card.life-star-system::before,
+.constellation-card.life-star-system::after { display: none; }
+
+.life-star-system .constellation-card__header {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  width: 166px;
+  height: 166px;
+  padding: 22px 16px;
+  overflow: hidden;
+  border: 1px solid rgba(190, 206, 255, .25);
+  border-radius: 50%;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 31% 24%, rgba(255,255,255,.22), rgba(132,154,255,.18) 17%, rgba(39,52,111,.84) 52%, rgba(10,15,37,.98) 78%);
+  box-shadow:
+    0 0 28px rgba(118, 145, 255, .2),
+    inset 0 0 30px rgba(255,255,255,.04);
+  cursor: pointer;
+  text-align: center;
+  transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
+}
+.life-star-system .constellation-card__header:hover,
+.life-star-system .constellation-card__header:focus-visible {
+  outline: none;
+  border-color: rgba(220, 229, 255, .72);
+  box-shadow:
+    0 0 48px rgba(157, 180, 255, .5),
+    0 0 100px rgba(93, 119, 232, .2),
+    inset 0 0 34px rgba(255,255,255,.08);
+  transform: scale(1.08);
+}
+.life-star-system.is-selected .constellation-card__header {
+  border-color: rgba(235, 240, 255, .82);
+  box-shadow:
+    0 0 52px rgba(196, 211, 255, .62),
+    0 0 110px rgba(111, 140, 255, .34),
+    inset 0 0 36px rgba(255,255,255,.1);
+  animation: selectedLifeStar 2.8s ease-in-out infinite;
+}
+.life-star-system .constellation-card__heading {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+}
+.life-star-system .constellation-card__heading .eyebrow {
+  max-width: 128px;
+  overflow: hidden;
+  color: rgba(205, 217, 255, .66);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.life-star-system .constellation-card__heading strong {
+  display: -webkit-box;
+  max-width: 132px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font-size: 15px;
+  line-height: 1.35;
+  letter-spacing: -.02em;
+}
+.life-star-system .constellation-card__counts {
+  margin-top: 10px;
+  color: rgba(222, 229, 255, .65);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.life-star-system .universe-task-list {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.life-star-system .universe-task.life-task-star {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  align-content: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(180, 198, 255, .35);
+  border-radius: 999px;
+  color: var(--text);
+  background: radial-gradient(circle at 34% 28%, #f7f9ff 0 3%, #91aaff 12%, #28396f 56%, #0a1029 80%);
+  box-shadow: 0 0 16px rgba(136, 163, 255, .34);
+  opacity: .9;
+  pointer-events: auto;
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--task-angle))
+    translateX(var(--task-radius))
+    rotate(calc(-1 * var(--task-angle)));
+  transition: width .22s ease, transform .22s ease, box-shadow .22s ease, background .22s ease;
+  animation: lifeTaskArrival .42s ease backwards;
+  animation-delay: var(--task-delay, 0ms);
+}
+.life-star-system .universe-task.life-task-star:hover,
+.life-star-system .universe-task.life-task-star:focus-visible {
+  z-index: 8;
+  width: 156px;
+  padding: 7px 11px;
+  outline: none;
+  background: rgba(17, 25, 55, .97);
+  box-shadow: 0 0 28px rgba(157, 180, 255, .55);
+}
+.life-star-system .life-task-star .universe-task__title,
+.life-star-system .life-task-star .universe-task__meta {
+  display: none;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.life-star-system .life-task-star:hover .universe-task__title,
+.life-star-system .life-task-star:focus-visible .universe-task__title {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+}
+.life-star-system .life-task-star:hover .universe-task__meta,
+.life-star-system .life-task-star:focus-visible .universe-task__meta {
+  display: block;
+  color: var(--muted);
+  font-size: 8px;
+}
+.life-star-system .life-task-star--overflow { display: none; }
+.life-star-system .universe-task--high { border-color: rgba(224, 231, 255, .74); box-shadow: 0 0 20px rgba(183, 202, 255, .5); }
+.life-star-system .universe-task--mid { opacity: .72; }
+.life-star-system .universe-task--low { opacity: .45; filter: saturate(.62); }
+
+@keyframes lifeStarField { from { opacity: .34; } to { opacity: .68; } }
+@keyframes lifeSignal { to { stroke-dashoffset: -24; } }
+@keyframes lifeCorePulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(.97); }
+  50% { transform: translate(-50%, -50%) scale(1.035); }
+}
+@keyframes lifeNodeArrival {
+  from { opacity: 0; filter: blur(6px); transform: translate(-50%, -50%) scale(.58); }
+  to { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(var(--life-scale, 1)); }
+}
+@keyframes lifeTaskArrival {
+  from { opacity: 0; }
+  to { opacity: .9; }
+}
+@keyframes selectedLifeStar {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@media (max-width: 900px) {
+  .constellation-grid.life-cosmos-map { min-height: 780px; }
+  .constellation-card.life-star-system { width: 148px; min-height: 148px; }
+  .life-star-system .constellation-card__header { width: 148px; height: 148px; }
+  .life-star-system .universe-task.life-task-star { --task-radius: 86px !important; }
+}
+
+@media (max-width: 640px) {
+  .universe-section-head { display: grid; }
+  .constellation-grid.life-cosmos-map {
+    min-height: 980px;
+    overflow: hidden;
+    border-radius: 24px;
+  }
+  .constellation-grid.life-cosmos-map::after { inset: 6% 16%; border-radius: 46%; }
+  .life-map__core { width: 124px; height: 124px; }
+  .life-map__core strong { font-size: 20px; }
+  .life-map__core small { display: none; }
+  .constellation-card.life-star-system { width: 136px; min-height: 136px; }
+  .life-star-system .constellation-card__header { width: 136px; height: 136px; padding: 17px 13px; }
+  .life-star-system .constellation-card__heading strong { max-width: 110px; font-size: 13px; }
+  .life-star-system .constellation-card__counts { font-size: 8px; }
+  .life-star-system .universe-task.life-task-star {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    --task-radius: 76px !important;
+  }
+  .life-star-system .universe-task.life-task-star:nth-child(n+4) { display: none; }
+  .life-star-system .universe-task.life-task-star:hover,
+  .life-star-system .universe-task.life-task-star:focus-visible { width: 132px; }
+  .life-map__connection.is-secondary { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .constellation-grid.life-cosmos-map::before,
+  .life-map__connection,
+  .life-map__core,
+  .constellation-card.life-star-system,
+  .life-star-system .constellation-card__header,
+  .life-star-system .universe-task.life-task-star {
+    animation: none !important;
+    transition-duration: .01ms !important;
+  }
+}
