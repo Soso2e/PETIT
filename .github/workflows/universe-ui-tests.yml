@@ -3,6 +3,8 @@ name: Universe UI tests
 on:
   pull_request:
     paths:
+      - "backend/task_list_api.py"
+      - "backend/work_sessions.py"
       - "frontend/index.html"
       - "frontend/legacy.html"
       - "frontend/universe.html"
@@ -25,7 +27,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Check JavaScript syntax
-        run: node --check frontend/universe-app.js
+      - name: Check syntax
+        run: |
+          python -m py_compile backend/task_list_api.py tests/test_universe_ui.py
+          node --check frontend/universe-app.js
       - name: Run Universe UI tests
         run: python -m unittest tests.test_universe_ui -v
