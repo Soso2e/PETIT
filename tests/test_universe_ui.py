@@ -28,6 +28,7 @@ class UniverseUiTests(unittest.TestCase):
         ):
             self.assertTrue((FRONTEND / name).is_file(), name)
         self.assertTrue((BACKEND / "task_list_api.py").is_file())
+        self.assertTrue((BACKEND / "task_hierarchy.py").is_file())
         self.assertTrue((BACKEND / "tools" / "task_hierarchy.py").is_file())
         self.assertFalse((BACKEND / "tools" / "task_projects.py").exists())
 
@@ -115,6 +116,7 @@ class UniverseUiTests(unittest.TestCase):
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
         script = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
         tool = (BACKEND / "tools" / "task_hierarchy.py").read_text(encoding="utf-8")
+        service = (BACKEND / "task_hierarchy.py").read_text(encoding="utf-8")
         tools_init = (BACKEND / "tools" / "__init__.py").read_text(encoding="utf-8")
         capability = (BACKEND / "capability_router.py").read_text(encoding="utf-8")
         self.assertIn('data-action="parent"', html)
@@ -123,6 +125,7 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('parent_task_id: Number', script)
         self.assertIn('name="set_task_parent"', tool)
         self.assertIn("requires_confirmation=True", tool)
+        self.assertIn("parent_external_ids", service)
         self.assertIn("task_hierarchy", tools_init)
         self.assertIn('"set_task_parent"', capability)
         self.assertNotIn("classify_task_project", capability)
@@ -278,7 +281,7 @@ class UniverseTaskListApiTests(unittest.TestCase):
     def test_parent_endpoint_routes_to_hierarchy_service(self) -> None:
         from backend import task_list_api
 
-        with patch("backend.tools.task_hierarchy.set_task_parent", return_value={"updated": True}) as setter:
+        with patch.object(task_list_api.task_hierarchy, "set_task_parent", return_value={"updated": True}) as setter:
             response = task_list_api.patch_task_parent(
                 2,
                 task_list_api.TaskParentUpdate(parent_task_id=1),
