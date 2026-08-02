@@ -1,100 +1,109 @@
-# PETIT Universe — Focus Orbit
+# PETIT Universe — Life / Project / Task
 
 ## 目的
 
-PETITのタスク画面を、一覧中心のUIから「頭の中の宇宙」を操作する空間UIへ刷新する。
-
-宇宙表現は装飾ではなく、既存のタスク構造と状態を理解しやすくするために使う。
-
-## 概念対応
-
-| PETIT | Universe UI |
-|---|---|
-| 生活全体 | 宇宙 |
-| Area | 宇宙領域 |
-| Project | 星座 |
-| Objective | 中心星 |
-| Action | 周囲の星 |
-| active task | 強く発光する星 |
-| Waiting / blocked | 暗く停止した星 |
-| Done | 通常表示から外し、将来は残光として表示 |
-| pending | 同期中 |
-| synced | 同期済み |
-| failed / conflict | 警告状態の星 |
-
-## 今回のVertical Slice
-
-最初から本格3Dや全Task CRUDを実装せず、既存APIで体験を確認する。
+PETITのタスクを、単なる一覧ではなく次の階層として理解できるようにする。
 
 ```text
-/api/briefing
-  ↓ SQLite由来のTask
-Focus / Universe / Tasks
-
-/api/chat
-  ↓
-Chatビュー
+Life
+└─ Project（1つのUniverse）
+   └─ Task
 ```
+
+例:
+
+```text
+Life
+└─ Roomies
+   └─ 歩きモーションを作る
+```
+
+LifeはNotionからSQLiteへ同期された未完了タスク全体、Projectは継続的な取り組み、Taskは実際に行う作業を表す。
+
+## ビューの役割
 
 ### Focus
 
-- 現在のProjectを中心星として表示する
-- 最大10件の未完了Actionを軌道へ配置する
-- Highは大きく、Lowは小さく表示する
-- Doing / Nowは内側の軌道へ寄せる
-- Waiting / blockedは暗くする
-- active taskは発光させる
-- タスク選択時は詳細パネルを表示する
+- 選択中Projectを中央に置く
+- そのProjectの未完了Highタスクだけを軌道へ表示する
+- Projectセレクトと前後ボタンでFocus内からProjectを移動できる
+- `Life › Project`のパンくずから全体へ戻れる
+- タスクの選択と作業開始を分離する
 
 ### Universe
 
-- Projectごとに簡易星座カードを表示する
-- Active Action件数を星の数として表す
-- 選択するとFocusへ戻る
+- Life配下のProjectを縦に一覧表示する
+- Project内の未完了High / Mid / Lowタスクを優先度順に表示する
+- ProjectまたはTaskを選択すると、そのProjectのFocusへ移動する
+- Lowは一覧には含めるが、Focusには出さない
 
 ### Tasks
 
-- Active / High / Allで絞り込む
-- 名前、状態、優先度、期限、Project、同期状態を一覧表示する
-- 行を選ぶとFocusと詳細へ戻る
+- High「重要」とLow「あとで」を混ぜずに表示する
+- 完了、元に戻す、High↔Low変更を行う
 
 ### Chat
 
-- 既存`/api/chat`を使う
-- 選択中Actionを相談文へ取り込める
-- 会話後に`/api/briefing`を再取得する
+- 選択中Taskを文脈としてPETITへ相談する
+- 作業継続確認中にチャットへ返答した場合も、作業継続として扱う
 
-## active task
+## 作業セッション
 
-初期段階では次をlocalStorageへ保存する。
+タスクを選択しただけでは計測しない。詳細の「作業開始」を押した時だけ、既存の`/api/work-sessions`へ作業セッションを作る。
 
 ```text
-petit_universe_active_task_id
-petit_universe_active_started_at
+選択中
+  ↓ 作業開始
+計測中
+  ↓ 20分
+継続確認
+  ├─ 返答あり → 次の20分へ
+  └─ 20分無応答 → 自動停止
 ```
 
-これはUI体験の検証用であり、将来はProject Continuityまたは作業セッションのサーバー状態へ統合する。
+新UIは次の操作を提供する。
 
-## 旧UI
+- 作業開始
+- まだ続ける
+- 一時停止
+- 再開
+- 終了
 
-新UIは`/`から開く。
+セッションIDとactive task IDだけをlocalStorageへ保存し、開始時刻・一時停止時間・自動停止判定はSQLite上のサーバー状態を正とする。旧クライアント専用の`petit_universe_active_started_at`は使用しない。
 
-既存の通知、設定、制作伴走UIは`/static/legacy.html`へ退避し、新UIから戻れるようにする。
+## API
+
+```text
+GET  /api/notifications/tasks?priority=all&limit=500
+POST /api/work-sessions/start
+GET  /api/work-sessions/{session_id}
+POST /api/work-sessions/{session_id}/respond
+POST /api/work-sessions/{session_id}/pause
+POST /api/work-sessions/{session_id}/resume
+POST /api/work-sessions/{session_id}/end
+```
+
+`priority=all`はLife Universe専用で、未完了High / Mid / Medium / Low / 未設定を取得する。FocusとTasksは引き続きHigh／Lowの明示的な導線を使う。
 
 ## 非目標
 
+- Objective / Actionの正式スキーマ移行
+- 親Task Relationの可視化
 - Three.jsや外部3Dライブラリ
-- 物理シミュレーション
-- ドラッグによるRelation変更
-- Objective / Actionスキーマmigration
-- Task CRUD APIの新設
-- 数百ノードの常時描画
+- ドラッグによるProject変更
+- Done履歴の残光表示
 
-## 次の段階
+現段階では既存のProject Relationを使い、`Life > Project > Task`の体験を先に確認する。
 
-1. 実ブラウザとiPhoneで操作性を確認する
-2. `/api/work-graph`を追加する
-3. active taskをサーバーへ保存する
-4. Objective / Action / blocked_byを正式データから描画する
-5. 詳細パネルから既存Task更新経路へ接続する
-6. Done履歴を残光として表示する
+## 実機確認
+
+- タスクを選ぶだけでは時間が増えない
+- 作業開始後だけ時間が増える
+- 再読み込み後も作業状態が復元される
+- 20分後に継続確認が表示される
+- 継続操作で次の20分へ進む
+- 無応答時に自動停止する
+- Focus内でProjectを前後移動できる
+- UniverseからProject／Taskを選んでFocusへ移動できる
+- UniverseにMid／Lowを含む全未完了タスクがProject別に並ぶ
+- iPhone PWAでProjectセレクトと作業操作が押せる

@@ -10,7 +10,10 @@
 
 .chat-actions small { color: var(--muted); line-height: 1.5; }
 .chat-actions button,
-.task-feedback button {
+.task-feedback button,
+.work-session-controls button,
+.constellation-card__header,
+.universe-task {
   border: 1px solid rgba(157, 180, 255, 0.28);
   border-radius: 12px;
   padding: 8px 11px;
@@ -95,12 +98,199 @@
 .task-feedback span { line-height: 1.5; }
 .task-feedback button { white-space: nowrap; }
 
+/* Life > Project > Task hierarchy */
+.focus-header { align-items: center; }
+.focus-heading { min-width: 0; }
+.focus-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 0 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.focus-breadcrumb button {
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+.focus-breadcrumb strong {
+  overflow: hidden;
+  color: var(--accent-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.focus-project-switcher {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.focus-project-switcher label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.focus-project-switcher select {
+  min-width: 190px;
+  max-width: 300px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 10px 34px 10px 12px;
+  color: var(--text);
+  background: rgba(255, 255, 255, .055);
+}
+.focus-project-switcher button:disabled { cursor: default; opacity: .35; }
+.focus-empty {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  top: calc(50% + 115px);
+  margin: 0;
+  transform: translateX(-50%);
+  font-size: 13px;
+  text-align: center;
+}
+
+.active-copy {
+  min-width: 0;
+}
+.active-copy strong,
+.active-copy small { display: block; }
+.active-copy small {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.work-session-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.work-session-controls button {
+  white-space: nowrap;
+  background: transparent;
+}
+.work-session-controls button:first-of-type {
+  border-color: rgba(127, 227, 193, .44);
+  background: rgba(127, 227, 193, .13);
+}
+.work-session-controls button:disabled { cursor: wait; opacity: .5; }
+#active-elapsed { min-width: 62px; text-align: right; }
+
+/* Universe is the list view of the complete Life hierarchy. */
+.universe-section-head { align-items: flex-end; }
+.universe-summary {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, .035);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.constellation-grid--list {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.constellation-card--list {
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.constellation-card--list::after { display: none; }
+.constellation-card--list.is-selected {
+  border-color: rgba(157, 180, 255, .48);
+  box-shadow: 0 0 0 1px rgba(157, 180, 255, .12), var(--shadow);
+}
+.constellation-card__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 0;
+  border-radius: 0;
+  padding: 20px 22px;
+  text-align: left;
+  background: rgba(255, 255, 255, .025);
+}
+.constellation-card__header:hover { background: rgba(157, 180, 255, .09); }
+.constellation-card__heading { min-width: 0; }
+.constellation-card__heading strong {
+  display: block;
+  margin-top: 7px;
+  overflow: hidden;
+  font-size: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.constellation-card__counts {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.universe-task-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+.universe-task {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-color: rgba(255, 255, 255, .07);
+  padding: 11px 12px;
+  text-align: left;
+  background: rgba(255, 255, 255, .025);
+}
+.universe-task:hover { background: rgba(157, 180, 255, .1); }
+.universe-task__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.universe-task__meta {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.universe-task--high { border-left: 3px solid var(--accent); }
+.universe-task--mid { border-left: 3px solid var(--warning); }
+.universe-task--low { border-left: 3px solid rgba(165, 172, 199, .45); opacity: .72; }
+
+@media (max-width: 980px) {
+  .focus-header { align-items: flex-start; flex-direction: column; }
+  .focus-project-switcher { width: 100%; }
+  .focus-project-switcher label { flex: 1; }
+  .focus-project-switcher select { width: 100%; max-width: none; }
+  .universe-task-list { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 640px) {
   .chat-actions { grid-template-columns: 1fr 1fr; }
   .chat-actions small { grid-column: 1 / -1; }
-  .task-section-head { align-items: stretch; }
+  .task-section-head,
+  .universe-section-head { align-items: stretch; }
   .task-filter-wrap { justify-content: space-between; }
   .detail-actions--primary,
   .detail-actions--secondary { grid-template-columns: 1fr; }
   .task-feedback { left: 14px; right: 14px; bottom: max(14px, calc(env(safe-area-inset-bottom) + 10px)); transform: none; }
+  .focus-project-switcher { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .focus-footer { align-items: flex-start; flex-direction: column; }
+  .work-session-controls { width: 100%; justify-content: flex-start; }
+  #active-elapsed { margin-right: auto; text-align: left; }
+  .universe-summary { width: fit-content; white-space: normal; }
+  .constellation-card__header { align-items: flex-start; flex-direction: column; }
+  .constellation-card__counts { white-space: normal; }
+  .universe-task { grid-template-columns: 1fr; gap: 4px; }
 }
