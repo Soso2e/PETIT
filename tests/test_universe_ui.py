@@ -181,6 +181,19 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn("@media (prefers-reduced-motion: reduce)", css)
         self.assertIn("hierarchy-root-duplicate", css)
 
+    def test_focus_motion_reuses_nodes_and_does_not_restart_on_selection(self) -> None:
+        script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        css = (FRONTEND / "universe-next.css").read_text(encoding="utf-8")
+        self.assertIn("const existingNodes = new Map", script)
+        self.assertIn("if (!button)", script)
+        self.assertNotIn("nodesEl.replaceChildren()", script)
+        self.assertIn("if (orbitFrame != null) return", script)
+        self.assertNotIn('nodesEl.matches(":hover")', script)
+        self.assertNotIn('nodesEl.matches(":focus-within")', script)
+        self.assertIn('panel.dataset.motionSeen !== "true"', script)
+        self.assertIn('.view.is-entering', css)
+        self.assertNotIn('.view.is-active {\n  animation: viewArrival', css)
+
     def test_legacy_settings_can_return_to_new_ui(self) -> None:
         shell = (FRONTEND / "shell.js").read_text(encoding="utf-8")
         self.assertIn("installNewUiReturn", shell)

@@ -97,6 +97,12 @@
       const active = panel.dataset.viewPanel === name;
       panel.hidden = !active;
       panel.classList.toggle("is-active", active);
+      panel.classList.remove("is-entering");
+      if (active && panel.dataset.motionSeen !== "true" && !reducedMotion.matches) {
+        panel.dataset.motionSeen = "true";
+        panel.classList.add("is-entering");
+        panel.addEventListener("animationend", () => panel.classList.remove("is-entering"), { once: true });
+      }
     });
     if (!["universe", "tasks"].includes(name)) state.overviewSelectionId = null;
     if (name === "chat") chatInputEl?.focus();
@@ -230,14 +236,15 @@
   };
 
   const startOrbitMotion = () => {
-    stopOrbitMotion();
-    if (reducedMotion.matches || !nodesEl?.children.length) return;
+    if (reducedMotion.matches || !nodesEl?.children.length) {
+      stopOrbitMotion();
+      return;
+    }
+    if (orbitFrame != null) return;
     const tick = (timestamp) => {
       const focusPanelHidden = Boolean(nodesEl.closest("[data-view-panel]")?.hidden);
       const paused = document.hidden
-        || focusPanelHidden
-        || nodesEl.matches(":hover")
-        || nodesEl.matches(":focus-within");
+        || focusPanelHidden;
       if (!orbitLastFrame) orbitLastFrame = timestamp;
       const delta = Math.min(50, Math.max(0, timestamp - orbitLastFrame));
       orbitLastFrame = timestamp;
@@ -452,16 +459,30 @@
   };
 
   const renderOrbit = () => {
-    stopOrbitMotion();
-    nodesEl.replaceChildren();
     const visible = focusTasks();
+    const visibleKeys = new Set(visible.map((task) => taskKey(task, state.tasks.indexOf(task))));
+    const existingNodes = new Map(
+      Array.from(nodesEl.querySelectorAll(":scope > .space-node[data-task-id]"))
+        .map((node) => [node.dataset.taskId, node]),
+    );
+    existingNodes.forEach((node, key) => {
+      if (!visibleKeys.has(key)) node.remove();
+    });
     focusEmptyEl.hidden = visible.length > 0;
     visible.forEach((task, index) => {
       const key = taskKey(task, state.tasks.indexOf(task));
       const status = normalizeStatus(task.status).toLowerCase();
       const sync = syncClass(task);
-      const button = document.createElement("button");
-      button.type = "button";
+      let button = existingNodes.get(key);
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.dataset.taskId = key;
+        const label = document.createElement("span");
+        label.className = "space-node__label";
+        button.appendChild(label);
+        nodesEl.appendChild(button);
+      }
       button.className = [
         "space-node",
         `space-node--${isHigh(task) ? "high" : (isLow(task) ? "low" : "mid")}`,
@@ -473,18 +494,14 @@
       const position = orbitPosition(index, visible.length, orbitClock);
       button.style.left = position.left;
       button.style.top = position.top;
-      button.dataset.taskId = key;
       button.dataset.orbitIndex = String(index);
       button.dataset.orbitTotal = String(visible.length);
       button.dataset.orbitRing = String(position.ring);
       button.setAttribute("role", "listitem");
       button.setAttribute("aria-label", `${text(task.title, "タスク")}を選択`);
-      const label = document.createElement("span");
-      label.className = "space-node__label";
+      const label = button.querySelector(".space-node__label");
       label.textContent = text(task.title, "名称未設定");
-      button.appendChild(label);
-      button.addEventListener("click", () => selectTask(task, state.tasks.indexOf(task)));
-      nodesEl.appendChild(button);
+      button.onclick = () => selectTask(task, state.tasks.indexOf(task));
     });
 
     const project = state.selectedProject || "Projectなし";

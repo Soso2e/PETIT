@@ -101,7 +101,7 @@ html[data-universe-motion="ready"] .task-nodes .space-node {
 html[data-universe-motion="ready"] .space-node.is-selected {
   animation: selectedSignal 2.2s ease-in-out infinite;
 }
-html[data-universe-motion="ready"] .view.is-active {
+html[data-universe-motion="ready"] .view.is-entering {
   animation: viewArrival .34s cubic-bezier(.2,.82,.2,1) backwards;
 }
 
@@ -196,7 +196,7 @@ html[data-universe-motion="ready"] .view.is-active {
   .orbit__ring,
   .task-nodes .space-node,
   .space-node.is-selected,
-  .view.is-active {
+  .view.is-entering {
     animation: none !important;
   }
   .task-nodes,
