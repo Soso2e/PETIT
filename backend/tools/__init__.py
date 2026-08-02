@@ -28,7 +28,17 @@ from . import (
     task_defaults,
 )  # noqa: F401  (import for side-effect registration)
 from .. import web_tools  # noqa: F401  (register web/news/weather tools)
+from . import registry
 from .registry import dispatch, openai_tools_schema, parse_arguments, registered_names, requires_confirmation, risk_for
+
+registry.append_description(
+    "update_task",
+    (
+        "タスクの親子関係は変更しない。parent_idやparent_task_idを渡さず、"
+        "親子変更にはset_task_parentを使う。明示的な書き込み依頼では自然文で事前確認せずToolをcallし、"
+        "確認はRuntimeに一度だけ表示させる。"
+    ),
+)
 
 __all__ = [
     "dispatch",
