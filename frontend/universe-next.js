@@ -312,7 +312,7 @@
 
   const observe = (element) => {
     if (!element) return;
-    new MutationObserver(() => queueMicrotask(decorateAll)).observe(element, { childList: true, subtree: true });
+    new MutationObserver(() => queueMicrotask(decorateAll)).observe(element, { childList: true });
   };
 
   document.addEventListener("click", rememberTaskFromClick, true);
