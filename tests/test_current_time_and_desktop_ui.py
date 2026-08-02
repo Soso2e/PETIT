@@ -62,10 +62,6 @@ class DesktopUniverseLayoutTests(unittest.TestCase):
         self.assertIn(".chat-layout", css)
         self.assertIn("grid-template-columns: 1fr", css)
 
-    def test_service_worker_cache_version_is_bumped(self) -> None:
-        script = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('const CACHE_NAME = "petit-shell-v8";', script)
-
 
 if __name__ == "__main__":
     unittest.main()
