@@ -11,6 +11,7 @@
   <link rel="manifest" href="/static/manifest.webmanifest" />
   <link rel="stylesheet" href="/static/universe.css" />
   <link rel="stylesheet" href="/static/universe-actions.css" />
+  <link rel="stylesheet" href="/static/universe-next.css" />
 </head>
 <body>
   <div class="space" aria-hidden="true">
@@ -27,7 +28,7 @@
       </a>
       <nav class="view-tabs" aria-label="ビュー切り替え">
         <button class="view-tab is-active" data-view="focus">Focus</button>
-        <button class="view-tab" data-view="universe">Universe</button>
+        <button class="view-tab" data-view="universe">Life</button>
         <button class="view-tab" data-view="tasks">Tasks</button>
         <button class="view-tab" data-view="chat">Chat</button>
       </nav>
@@ -40,39 +41,45 @@
     <main class="universe-main">
       <section class="view is-active" data-view-panel="focus">
         <div class="focus-layout">
-          <section class="orbit-card" aria-label="Lifeから選択Projectへ入るFocus Orbit">
+          <section class="orbit-card" aria-label="Life直下の親タスクと子タスクを表示するFocus Orbit">
             <div class="orbit-card__header focus-header">
               <div class="focus-heading">
-                <span class="eyebrow">LIFE / PROJECT / TASK</span>
+                <span class="eyebrow">LIFE / TASK / CHILD</span>
                 <div id="focus-breadcrumb" class="focus-breadcrumb" aria-label="現在の階層">
                   <button type="button" data-life-root>Life</button>
                   <span>›</span>
-                  <strong id="focus-project-name">Project</strong>
+                  <strong id="focus-project-name">親Task</strong>
                 </div>
                 <h1 id="focus-title">今日のFocus</h1>
-                <p class="section-copy">LifeからProjectを選び、その中の重要タスクだけに集中します。</p>
+                <p class="section-copy">Life直下の親タスクを中心に、その子タスクへ集中します。</p>
               </div>
-              <div class="focus-project-switcher" aria-label="Focus Project切り替え">
-                <button id="focus-project-prev" class="icon-button" type="button" aria-label="前のProject">‹</button>
+              <div class="focus-project-switcher" aria-label="親タスク切り替え">
+                <button id="focus-project-prev" class="icon-button" type="button" aria-label="前の親タスク">‹</button>
                 <label>
-                  <span>Project</span>
-                  <select id="focus-project-select" aria-label="Projectを選択"></select>
+                  <span>親Task</span>
+                  <select id="focus-project-select" aria-label="親タスクを選択"></select>
                 </label>
-                <button id="focus-project-next" class="icon-button" type="button" aria-label="次のProject">›</button>
+                <button id="focus-project-next" class="icon-button" type="button" aria-label="次の親タスク">›</button>
                 <button id="refresh-universe" class="icon-button" type="button" aria-label="タスクを更新">↻</button>
+              </div>
+              <div class="focus-zoom-controls" role="group" aria-label="Focus Orbitの拡大縮小">
+                <button id="focus-zoom-out" type="button" aria-label="縮小">−</button>
+                <span id="focus-zoom-label" aria-live="polite">100%</span>
+                <button id="focus-zoom-in" type="button" aria-label="拡大">＋</button>
+                <button id="focus-zoom-reset" type="button">Reset</button>
               </div>
             </div>
 
-            <div id="orbit" class="orbit" role="list" aria-label="選択Projectの重要タスク">
+            <div id="orbit" class="orbit" role="list" aria-label="選択中の親タスクと子タスク" data-zoom-level="normal">
               <div class="orbit__ring orbit__ring--one"></div>
               <div class="orbit__ring orbit__ring--two"></div>
               <div class="orbit__ring orbit__ring--three"></div>
-              <button id="objective-node" class="space-node space-node--objective" type="button" aria-label="Project一覧へ戻る">
+              <button id="objective-node" class="space-node space-node--objective" type="button" aria-label="Life一覧へ戻る">
                 <span class="space-node__glow"></span>
                 <span class="space-node__label">読み込み中…</span>
               </button>
               <div id="task-nodes" class="task-nodes"></div>
-              <p id="focus-empty" class="focus-empty" hidden>このProjectに未完了Highタスクはありません。</p>
+              <p id="focus-empty" class="focus-empty" hidden>この親タスクに未完了Highの子タスクはありません。</p>
             </div>
 
             <div class="focus-footer">
@@ -103,9 +110,9 @@
       <section class="view" data-view-panel="universe" hidden>
         <div class="section-head universe-section-head">
           <div>
-            <span class="eyebrow">LIFE UNIVERSE</span>
-            <h1>Life → Project → Task</h1>
-            <p>Notion由来の未完了タスク全体をLifeとして、Projectごとに一覧表示します。</p>
+            <span class="eyebrow">LIFE</span>
+            <h1>Life → Task → Child Task</h1>
+            <p>すべてのタスクはLife直下にあり、必要なタスクだけが親となって子タスクを持ちます。</p>
           </div>
           <div id="universe-summary" class="universe-summary" aria-live="polite">読み込み中…</div>
         </div>
@@ -129,7 +136,7 @@
         </div>
         <div class="task-table-wrap">
           <table class="task-table">
-            <thead><tr><th>完了</th><th>名前</th><th>期限</th><th>Project</th><th>同期</th></tr></thead>
+            <thead><tr><th>完了</th><th>名前</th><th>期限</th><th>親Task</th><th>同期</th></tr></thead>
             <tbody id="task-table-body"></tbody>
           </table>
         </div>
@@ -173,8 +180,13 @@
         <div><span>状態</span><strong data-detail="status"></strong></div>
         <div><span>分類</span><strong data-detail="bucket"></strong></div>
         <div><span>期限</span><strong data-detail="due"></strong></div>
-        <div><span>Project</span><strong data-detail="project"></strong></div>
+        <div><span>親Task</span><strong data-detail="project"></strong></div>
       </div>
+      <label class="detail-parent-field">
+        <span>親子関係</span>
+        <select data-action="parent" aria-label="Taskの親を選択"></select>
+        <small data-parent-help>親タスクを読み込んでいます。</small>
+      </label>
       <p data-detail="reason" class="detail-reason"></p>
       <p data-detail="sync" class="detail-sync"></p>
       <div class="detail-actions detail-actions--primary">
@@ -189,5 +201,6 @@
   </template>
 
   <script src="/static/universe-app.js"></script>
+  <script src="/static/universe-next.js"></script>
 </body>
 </html>

@@ -1,0 +1,329 @@
+// PETIT Universe enhancements: Life-first task hierarchy, zoom, and spatial motion.
+(() => {
+  const ZOOM = { min: 0.82, max: 1.22, step: 0.1, storage: "petit_universe_zoom" };
+  const state = {
+    tasks: [],
+    selectedTaskId: null,
+    zoom: Number(localStorage.getItem(ZOOM.storage)) || 1,
+    pinching: false,
+    pinchDistance: 0,
+    pinchZoom: 1,
+  };
+
+  const byId = (id) => document.getElementById(id);
+  const orbit = byId("orbit");
+  const detailPanel = byId("detail-panel");
+  const taskNodes = byId("task-nodes");
+  const constellationGrid = byId("constellation-grid");
+  const taskTableBody = byId("task-table-body");
+  const zoomLabel = byId("focus-zoom-label");
+
+  const text = (value) => String(value ?? "").trim();
+  const taskId = (task) => String(task?.id || task?.external_id || "");
+  const rootTitle = (task) => text(task?.root_title || task?.project_title || task?.title);
+  const isRoot = (task) => task?.hierarchy_role === "root" || !task?.parent_task_id;
+
+  const requestJson = async (url, options = {}) => {
+    const response = await fetch(url, { cache: "no-store", ...options });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  };
+
+  const showFeedback = (message) => {
+    const feedback = byId("task-feedback");
+    const copy = feedback?.querySelector("[data-feedback-copy]");
+    const action = feedback?.querySelector("[data-feedback-action]");
+    if (!feedback || !copy) return;
+    copy.textContent = message;
+    if (action) action.hidden = true;
+    feedback.hidden = false;
+    window.setTimeout(() => { feedback.hidden = true; }, 4400);
+  };
+
+  const loadCatalog = async () => {
+    try {
+      const data = await requestJson("/api/notifications/tasks?priority=all&limit=500");
+      state.tasks = data.tasks || [];
+      decorateAll();
+    } catch (error) {
+      console.warn("PETIT task hierarchy load failed", error);
+    }
+  };
+
+  const findTask = ({ id = "", title = "", root = "", due = "" } = {}) => {
+    if (id) {
+      const exact = state.tasks.find((task) => taskId(task) === String(id));
+      if (exact) return exact;
+    }
+    const matches = state.tasks.filter((task) => {
+      if (title && text(task.title) !== title) return false;
+      if (root && rootTitle(task) !== root) return false;
+      if (due && text(task.due_date) !== due) return false;
+      return true;
+    });
+    return matches.length === 1 ? matches[0] : matches[0] || null;
+  };
+
+  const rememberTaskFromClick = (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    const node = target.closest(".space-node[data-task-id]");
+    if (node) {
+      state.selectedTaskId = node.dataset.taskId || null;
+      return;
+    }
+
+    const tableRow = target.closest("#task-table-body tr");
+    if (tableRow) {
+      const cells = tableRow.querySelectorAll("td");
+      const task = findTask({
+        title: text(tableRow.querySelector(".task-table__title")?.textContent),
+        due: text(tableRow.querySelector(".task-table__due")?.textContent).replace("—", ""),
+        root: text(cells[3]?.dataset.rootTitle || ""),
+      });
+      state.selectedTaskId = task ? taskId(task) : null;
+      return;
+    }
+
+    const universeTask = target.closest(".universe-task");
+    if (universeTask) {
+      const task = findTask({
+        title: text(universeTask.querySelector(".universe-task__title")?.textContent),
+        root: text(universeTask.closest(".constellation-card")?.querySelector(".constellation-card__heading strong")?.textContent),
+      });
+      state.selectedTaskId = task ? taskId(task) : null;
+    }
+  };
+
+  const currentDetailTask = () => {
+    const remembered = findTask({ id: state.selectedTaskId || "" });
+    if (remembered) return remembered;
+    const title = text(detailPanel?.querySelector('[data-detail="title"]')?.textContent);
+    return findTask({ title });
+  };
+
+  const parentCandidates = (task) => state.tasks.filter((candidate) => {
+    if (!isRoot(candidate)) return false;
+    if (taskId(candidate) === taskId(task)) return false;
+    if (task.source === "notion" && (!candidate.external_id || candidate.source !== "notion")) return false;
+    return true;
+  });
+
+  const assignParent = async (task, select, help) => {
+    const selected = select.value;
+    const movingToLife = selected === "";
+    const parent = movingToLife ? null : state.tasks.find((item) => taskId(item) === selected);
+    if (!movingToLife && !parent) return;
+    if (movingToLife && isRoot(task)) return;
+    if (parent && String(task.parent_task_id || "") === taskId(parent)) return;
+
+    select.disabled = true;
+    help.textContent = movingToLife ? "Life直下へ戻しています…" : `「${parent.title}」の子タスクにしています…`;
+    try {
+      await requestJson(`/api/notifications/tasks/${encodeURIComponent(taskId(task))}/parent`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(movingToLife ? { move_to_life: true } : { parent_task_id: Number(parent.id) }),
+      });
+      state.selectedTaskId = taskId(task);
+      showFeedback(
+        movingToLife
+          ? `「${text(task.title) || "タスク"}」をLife直下へ戻しました。`
+          : `「${text(task.title) || "タスク"}」を「${parent.title}」の子タスクにしました。`,
+      );
+      await loadCatalog();
+      byId("refresh-universe")?.click();
+    } catch (error) {
+      help.textContent = error.message;
+      showFeedback(`親子関係を変更できませんでした: ${error.message}`);
+      select.disabled = false;
+      select.value = String(task.parent_task_id || "");
+    }
+  };
+
+  const decorateDetail = () => {
+    const select = detailPanel?.querySelector('[data-action="parent"]');
+    const help = detailPanel?.querySelector("[data-parent-help]");
+    if (!(select instanceof HTMLSelectElement) || !help || select.dataset.ready === "1") return;
+    const task = currentDetailTask();
+    if (!task) return;
+
+    state.selectedTaskId = taskId(task);
+    const parentLabel = detailPanel.querySelector('[data-detail="project"]');
+    if (parentLabel) parentLabel.textContent = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
+
+    select.replaceChildren();
+    const life = document.createElement("option");
+    life.value = "";
+    life.textContent = "Life直下";
+    select.appendChild(life);
+
+    parentCandidates(task).forEach((candidate) => {
+      const option = document.createElement("option");
+      option.value = taskId(candidate);
+      option.textContent = candidate.title;
+      select.appendChild(option);
+    });
+    select.value = String(task.parent_task_id || "");
+
+    const lockedParent = Boolean(task.has_children);
+    select.disabled = lockedParent;
+    help.textContent = lockedParent
+      ? "このタスクは子タスクを持つ親です。親子階層は2段までに制限しています。"
+      : task.source === "notion"
+        ? "Life直下のNotionタスクを親にできます。変更はSQLiteへ即時反映し、Notionへ同期します。"
+        : "Life直下に置くか、別のLife直下タスクの子にできます。";
+    select.dataset.ready = "1";
+    select.addEventListener("click", (event) => event.stopPropagation());
+    select.addEventListener("change", () => assignParent(task, select, help));
+  };
+
+  const decorateNodes = () => {
+    const selectedRoot = text(byId("focus-project-name")?.textContent);
+    let visibleChildren = 0;
+    taskNodes?.querySelectorAll(".space-node").forEach((node, index) => {
+      const task = findTask({ id: node.dataset.taskId || "" });
+      node.style.setProperty("--node-index", String(index));
+      if (task && isRoot(task) && rootTitle(task) === selectedRoot) {
+        node.classList.add("hierarchy-root-duplicate");
+        node.setAttribute("aria-hidden", "true");
+      } else {
+        node.classList.remove("hierarchy-root-duplicate");
+        node.removeAttribute("aria-hidden");
+        visibleChildren += 1;
+      }
+    });
+    const empty = byId("focus-empty");
+    if (empty) empty.hidden = visibleChildren > 0;
+  };
+
+  const decorateLife = () => {
+    constellationGrid?.querySelectorAll(".constellation-card").forEach((card) => {
+      const heading = text(card.querySelector(".constellation-card__heading strong")?.textContent);
+      const root = state.tasks.find((task) => isRoot(task) && text(task.title) === heading);
+      if (!root) return;
+      card.classList.toggle("constellation-card--parent", Boolean(root.has_children));
+      card.classList.toggle("constellation-card--single", !root.has_children);
+
+      const eyebrow = card.querySelector(".eyebrow");
+      if (eyebrow) eyebrow.textContent = root.has_children ? "LIFE DIRECT · PARENT TASK" : "LIFE DIRECT · TASK";
+
+      const children = state.tasks.filter((task) => Number(task.parent_task_id) === Number(root.id));
+      const counts = card.querySelector(".constellation-card__counts");
+      if (counts) counts.textContent = root.has_children ? `${children.length} Child Task` : "単独Task";
+
+      card.querySelectorAll(".universe-task").forEach((row) => {
+        const title = text(row.querySelector(".universe-task__title")?.textContent);
+        const task = state.tasks.find((item) => rootTitle(item) === heading && text(item.title) === title);
+        if (!task) return;
+        row.classList.toggle("universe-task--root-copy", isRoot(task));
+        row.classList.toggle("universe-task--child", !isRoot(task));
+      });
+    });
+
+    const groups = new Set(state.tasks.filter(isRoot).map((task) => taskId(task))).size;
+    const children = state.tasks.filter((task) => !isRoot(task)).length;
+    const summary = byId("universe-summary");
+    if (summary) summary.textContent = `Life · ${groups} Task · ${children} Child`;
+  };
+
+  const decorateTaskTable = () => {
+    taskTableBody?.querySelectorAll("tr").forEach((row) => {
+      const cells = row.querySelectorAll("td");
+      if (cells.length < 4) return;
+      const title = text(row.querySelector(".task-table__title")?.textContent);
+      const due = text(row.querySelector(".task-table__due")?.textContent).replace("—", "");
+      const task = findTask({ title, due });
+      if (!task) return;
+      cells[3].textContent = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
+      cells[3].dataset.rootTitle = rootTitle(task);
+      row.classList.toggle("task-row--child", !isRoot(task));
+    });
+  };
+
+  const decorateAll = () => {
+    decorateDetail();
+    decorateNodes();
+    decorateLife();
+    decorateTaskTable();
+  };
+
+  const zoomLevel = () => (state.zoom < 0.94 ? "far" : (state.zoom > 1.08 ? "near" : "normal"));
+
+  const applyZoom = (value, { persist = true } = {}) => {
+    state.zoom = Math.min(ZOOM.max, Math.max(ZOOM.min, Number(value) || 1));
+    orbit?.style.setProperty("--universe-zoom", state.zoom.toFixed(2));
+    if (orbit) orbit.dataset.zoomLevel = zoomLevel();
+    if (zoomLabel) zoomLabel.textContent = `${Math.round(state.zoom * 100)}%`;
+    byId("focus-zoom-out")?.toggleAttribute("disabled", state.zoom <= ZOOM.min + 0.001);
+    byId("focus-zoom-in")?.toggleAttribute("disabled", state.zoom >= ZOOM.max - 0.001);
+    if (persist) localStorage.setItem(ZOOM.storage, String(state.zoom));
+  };
+
+  const pinchDistance = (touches) => {
+    if (touches.length < 2) return 0;
+    return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+  };
+
+  const installZoom = () => {
+    byId("focus-zoom-out")?.addEventListener("click", () => applyZoom(state.zoom - ZOOM.step));
+    byId("focus-zoom-in")?.addEventListener("click", () => applyZoom(state.zoom + ZOOM.step));
+    byId("focus-zoom-reset")?.addEventListener("click", () => applyZoom(1));
+    if (!orbit) return;
+
+    orbit.addEventListener("touchstart", (event) => {
+      if (event.touches.length !== 2) return;
+      state.pinching = true;
+      state.pinchDistance = pinchDistance(event.touches);
+      state.pinchZoom = state.zoom;
+    }, { passive: true });
+    orbit.addEventListener("touchmove", (event) => {
+      if (!state.pinching || event.touches.length !== 2) return;
+      const distance = pinchDistance(event.touches);
+      if (!distance || !state.pinchDistance) return;
+      event.preventDefault();
+      applyZoom(state.pinchZoom * (distance / state.pinchDistance), { persist: false });
+    }, { passive: false });
+    orbit.addEventListener("touchend", () => {
+      if (!state.pinching) return;
+      state.pinching = false;
+      localStorage.setItem(ZOOM.storage, String(state.zoom));
+    }, { passive: true });
+  };
+
+  const installParallax = () => {
+    const card = document.querySelector(".orbit-card");
+    if (!card || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    card.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "touch") return;
+      const rect = card.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+      const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+      card.style.setProperty("--orbit-parallax-x", `${x * 10}px`);
+      card.style.setProperty("--orbit-parallax-y", `${y * 8}px`);
+    });
+    card.addEventListener("pointerleave", () => {
+      card.style.setProperty("--orbit-parallax-x", "0px");
+      card.style.setProperty("--orbit-parallax-y", "0px");
+    });
+  };
+
+  const observe = (element) => {
+    if (!element) return;
+    new MutationObserver(() => queueMicrotask(decorateAll)).observe(element, { childList: true });
+  };
+
+  document.addEventListener("click", rememberTaskFromClick, true);
+  observe(detailPanel);
+  observe(taskNodes);
+  observe(constellationGrid);
+  observe(taskTableBody);
+
+  document.documentElement.dataset.universeMotion = "ready";
+  applyZoom(state.zoom, { persist: false });
+  installZoom();
+  installParallax();
+  void loadCatalog();
+})();

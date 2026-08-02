@@ -22,6 +22,7 @@ from . import (
     schedule,
     tasks,
     tasks_phase2,
+    task_hierarchy,
     task_reads,
     task_defaults,
 )  # noqa: F401  (import for side-effect registration)
