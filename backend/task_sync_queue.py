@@ -320,9 +320,22 @@ def _update_remote_task(page_id: str, payload: dict[str, Any]) -> dict[str, Any]
     )
     if not props:
         raise NotionError("更新するNotionプロパティがありません。")
-    return notion_client.parse_task_page(
-        notion_client._patch(f"/pages/{page_id}", {"properties": props}, timeout=20)
-    )
+    try:
+        return notion_client.parse_task_page(
+            notion_client._patch(f"/pages/{page_id}", {"properties": props}, timeout=20)
+        )
+    except NotionError as exc:
+        err_msg = str(exc)
+        if "is not a property that exists" in err_msg:
+            for key in list(props.keys()):
+                if key in err_msg and key != config.NOTION_PROP_TITLE:
+                    props.pop(key, None)
+            if not props:
+                return notion_client.get_task_page(page_id)
+            return notion_client.parse_task_page(
+                notion_client._patch(f"/pages/{page_id}", {"properties": props}, timeout=20)
+            )
+        raise
 
 
 def _execute(operation: dict[str, Any]) -> None:
@@ -332,7 +345,27 @@ def _execute(operation: dict[str, Any]) -> None:
     payload = _loads(operation.get("payload_json"))
 
     if operation["operation"] == "create":
+        existing_external_id = str(task.get("external_id") or "").strip()
+        if existing_external_id:
+            # Notionへの作成は成功済み（external_idが保存されている）。
+            # _apply_remote_result の途中で失敗した可能性があるため、
+            # Notionから最新状態を取得して再度ローカルに反映する。
+            remote = notion_client.get_task_page(existing_external_id)
+            _apply_remote_result(operation, remote)
+            return
         remote = create_task_page(**payload)
+        # Notionページ作成成功後、_apply_remote_result 呼び出し前に
+        # external_id を tasks_cache へ即時保存する。
+        # これにより、_apply_remote_result が失敗して再試行が発生しても
+        # Notion上で重複ページが作成されることを防ぐ。
+        created_external_id = str(remote.get("external_id") or "").strip()
+        if created_external_id:
+            now = db.now_iso()
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE tasks_cache SET external_id=?, updated_at=? WHERE id=? AND (external_id IS NULL OR external_id='')",
+                    (created_external_id, now, int(operation["task_id"])),
+                )
         _apply_remote_result(operation, remote)
         return
     if operation["operation"] != "update":
