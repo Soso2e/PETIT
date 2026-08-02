@@ -1,6 +1,6 @@
 {
   "name": "PETIT",
-  "version": "0.2.0",
-  "release": "ai-router",
-  "includes": ["PR #44 lightweight AI routing"]
+  "version": "0.5.0",
+  "release": "task-universe-navigation",
+  "includes": ["Focus child-task orbit", "idempotent parent movement", "CSS planet visuals"]
 }

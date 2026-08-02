@@ -30,6 +30,10 @@
     workSessionBusy: false,
     autoStopReported: false,
   };
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let orbitFrame = null;
+  let orbitClock = 0;
+  let orbitLastFrame = 0;
   localStorage.setItem("petit_session_id", state.sessionId);
 
   const byId = (id) => document.getElementById(id);
@@ -70,6 +74,7 @@
   const isHigh = (task) => priorityOf(task) === "high";
   const isLow = (task) => priorityOf(task) === "low";
   const isMid = (task) => ["mid", "medium"].includes(priorityOf(task));
+  const isRootTask = (task) => task?.hierarchy_role === "root" || !task?.parent_task_id;
   const taskKey = (task, index = 0) => String(task.id || task.external_id || task.url || `task-${index}`);
   const taskProject = (task) => String(task.project_title || task.project_name || "未分類").trim() || "未分類";
   const taskNumericId = (task) => /^\d+$/.test(String(task.id || "")) ? Number(task.id) : null;
@@ -152,7 +157,7 @@
 
   const projectNames = () => projectGroups().map((group) => group.project);
   const projectTasks = (project = state.selectedProject) => openTasks().filter((task) => taskProject(task) === project);
-  const focusTasks = () => projectTasks().filter(isHigh);
+  const focusTasks = () => sortedTasks(projectTasks().filter((task) => !isRootTask(task)));
 
   const activeTask = () => state.tasks.find((task, index) => taskKey(task, index) === state.activeTaskId) || null;
   const selectedTask = () => state.tasks.find((task, index) => taskKey(task, index) === state.selectedTaskId) || null;
@@ -164,12 +169,14 @@
       localStorage.removeItem(STORAGE.selectedProject);
       return;
     }
-    const active = activeTask();
-    if (active && names.includes(taskProject(active))) {
-      state.selectedProject = taskProject(active);
-    } else if (!names.includes(state.selectedProject)) {
-      const firstWithHigh = projectGroups().find((group) => group.tasks.some(isHigh));
-      state.selectedProject = firstWithHigh?.project || names[0];
+    if (!names.includes(state.selectedProject)) {
+      const active = activeTask();
+      if (active && names.includes(taskProject(active))) {
+        state.selectedProject = taskProject(active);
+      } else {
+        const firstWithHigh = projectGroups().find((group) => group.tasks.some(isHigh));
+        state.selectedProject = firstWithHigh?.project || names[0];
+      }
     }
     localStorage.setItem(STORAGE.selectedProject, state.selectedProject);
   };
@@ -194,14 +201,58 @@
     selectProject(names[nextIndex]);
   };
 
-  const orbitPosition = (index, total, task) => {
-    const status = normalizeStatus(task.status).toLowerCase();
-    const ring = status === "doing" || status === "now" ? 0.28 : 0.4;
-    const angle = (-Math.PI / 2) + (Math.PI * 2 * index / Math.max(total, 1));
+  const orbitPosition = (index, total, elapsedSeconds = 0) => {
+    const capacity = 8;
+    const ringIndex = Math.floor(index / capacity);
+    const ringStart = ringIndex * capacity;
+    const ringTotal = Math.min(capacity, Math.max(1, total - ringStart));
+    const slotIndex = index - ringStart;
+    const radiusX = Math.min(43, 25 + (ringIndex * 10));
+    const radiusY = Math.min(35, 20 + (ringIndex * 8));
+    const duration = 74 + (ringIndex * 18);
+    const direction = ringIndex % 2 === 0 ? 1 : -1;
+    const angle = (-Math.PI / 2)
+      + (Math.PI * 2 * slotIndex / ringTotal)
+      + (direction * elapsedSeconds * Math.PI * 2 / duration);
     return {
-      left: `${50 + Math.cos(angle) * ring * 100}%`,
-      top: `${50 + Math.sin(angle) * ring * 68}%`,
+      left: `${50 + Math.cos(angle) * radiusX}%`,
+      top: `${50 + Math.sin(angle) * radiusY}%`,
+      ring: ringIndex + 1,
     };
+  };
+
+  const stopOrbitMotion = () => {
+    if (orbitFrame != null) window.cancelAnimationFrame(orbitFrame);
+    orbitFrame = null;
+    orbitLastFrame = 0;
+  };
+
+  const startOrbitMotion = () => {
+    stopOrbitMotion();
+    if (reducedMotion.matches || !nodesEl?.children.length) return;
+    const tick = (timestamp) => {
+      const focusPanelHidden = Boolean(nodesEl.closest("[data-view-panel]")?.hidden);
+      const paused = document.hidden
+        || focusPanelHidden
+        || nodesEl.matches(":hover")
+        || nodesEl.matches(":focus-within");
+      if (!orbitLastFrame) orbitLastFrame = timestamp;
+      const delta = Math.min(50, Math.max(0, timestamp - orbitLastFrame));
+      orbitLastFrame = timestamp;
+      if (!paused) orbitClock += delta / 1000;
+      const nodes = Array.from(nodesEl.querySelectorAll(".space-node[data-orbit-index]"));
+      nodes.forEach((node) => {
+        const position = orbitPosition(
+          Number(node.dataset.orbitIndex || 0),
+          Number(node.dataset.orbitTotal || nodes.length),
+          orbitClock,
+        );
+        node.style.left = position.left;
+        node.style.top = position.top;
+      });
+      orbitFrame = window.requestAnimationFrame(tick);
+    };
+    orbitFrame = window.requestAnimationFrame(tick);
   };
 
   const showFeedback = (message, actionLabel = "", action = null) => {
@@ -382,8 +433,9 @@
   };
 
   const renderOrbit = () => {
+    stopOrbitMotion();
     nodesEl.replaceChildren();
-    const visible = focusTasks().slice(0, 10);
+    const visible = focusTasks();
     focusEmptyEl.hidden = visible.length > 0;
     visible.forEach((task, index) => {
       const key = taskKey(task, state.tasks.indexOf(task));
@@ -393,16 +445,19 @@
       button.type = "button";
       button.className = [
         "space-node",
-        "space-node--high",
+        `space-node--${isHigh(task) ? "high" : (isLow(task) ? "low" : "mid")}`,
         ["waiting", "blocked"].includes(status) ? "space-node--waiting" : "",
         key === state.activeTaskId && state.workSession ? "space-node--active" : "",
         key === state.selectedTaskId ? "is-selected" : "",
         sync === "failed" ? "space-node--failed" : sync === "conflict" ? "space-node--conflict" : "",
       ].filter(Boolean).join(" ");
-      const position = orbitPosition(index, visible.length, task);
+      const position = orbitPosition(index, visible.length, orbitClock);
       button.style.left = position.left;
       button.style.top = position.top;
       button.dataset.taskId = key;
+      button.dataset.orbitIndex = String(index);
+      button.dataset.orbitTotal = String(visible.length);
+      button.dataset.orbitRing = String(position.ring);
       button.setAttribute("role", "listitem");
       button.setAttribute("aria-label", `${text(task.title, "タスク")}を選択`);
       const label = document.createElement("span");
@@ -416,6 +471,7 @@
     const project = state.selectedProject || "Projectなし";
     objectiveNodeEl.querySelector(".space-node__label").textContent = project;
     focusTitleEl.textContent = project;
+    startOrbitMotion();
   };
 
   const taskMutation = async (task, operation) => {
@@ -588,6 +644,7 @@
     const row = document.createElement("button");
     row.type = "button";
     row.className = `universe-task universe-task--${isHigh(task) ? "high" : (isLow(task) ? "low" : "mid")}`;
+    row.dataset.taskId = taskKey(task, state.tasks.indexOf(task));
     const title = document.createElement("span");
     title.className = "universe-task__title";
     title.textContent = text(task.title, "名称未設定");
@@ -618,6 +675,9 @@
     groups.forEach((group) => {
       const card = document.createElement("article");
       card.className = "constellation-card constellation-card--list";
+      const rootTask = group.tasks.find(isRootTask) || group.tasks[0];
+      if (rootTask) card.dataset.rootTaskId = taskKey(rootTask, state.tasks.indexOf(rootTask));
+      card.dataset.area = String(group.area || "unsorted").toLowerCase();
       if (group.project === state.selectedProject) card.classList.add("is-selected");
 
       const header = document.createElement("button");
@@ -706,7 +766,7 @@
     }));
   };
 
-  const loadUniverse = async () => {
+  const loadUniverse = async ({ focusTaskId = "", openFocus = false } = {}) => {
     const refresh = byId("refresh-universe");
     if (refresh) refresh.disabled = true;
     try {
@@ -729,17 +789,27 @@
         }
       }
       state.tasks = tasks;
+      document.dispatchEvent(new CustomEvent("petit:tasks-updated", { detail: { tasks: [...state.tasks] } }));
       if (state.selectedTaskId && !selectedTask()) state.selectedTaskId = null;
       if (state.activeTaskId && !activeTask()) {
         state.activeTaskId = null;
         localStorage.removeItem(STORAGE.activeTask);
       }
       ensureSelectedProject();
+      const requestedTask = focusTaskId
+        ? state.tasks.find((task, index) => taskKey(task, index) === String(focusTaskId))
+        : null;
+      if (requestedTask) {
+        state.selectedProject = taskProject(requestedTask);
+        state.selectedTaskId = taskKey(requestedTask, state.tasks.indexOf(requestedTask));
+        localStorage.setItem(STORAGE.selectedProject, state.selectedProject);
+      }
       if (!state.selectedTaskId) {
         const first = focusTasks()[0] || projectTasks()[0] || null;
         if (first) state.selectedTaskId = taskKey(first, state.tasks.indexOf(first));
       }
       renderAll();
+      if (requestedTask && openFocus) switchView("focus");
     } catch (error) {
       focusTitleEl.textContent = "タスクを読み込めませんでした";
       objectiveNodeEl.querySelector(".space-node__label").textContent = "再読み込みしてね";
@@ -750,6 +820,26 @@
     } finally {
       if (refresh) refresh.disabled = false;
     }
+  };
+
+  const focusTaskById = async (id, { refresh = false } = {}) => {
+    const key = String(id || "");
+    if (!key) return false;
+    if (refresh) {
+      await loadUniverse({ focusTaskId: key, openFocus: true });
+      return Boolean(selectedTask());
+    }
+    const task = state.tasks.find((candidate, index) => taskKey(candidate, index) === key);
+    if (!task) return false;
+    selectTask(task, state.tasks.indexOf(task));
+    switchView("focus");
+    return true;
+  };
+
+  window.PetitUniverse = {
+    focusTask: (id) => focusTaskById(id),
+    refreshAndFocusTask: (id) => focusTaskById(id, { refresh: true }),
+    tasks: () => [...state.tasks],
   };
 
   const appendMessage = (role, message, actions = []) => {

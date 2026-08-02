@@ -9,9 +9,9 @@
   <title>PETIT Universe</title>
   <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon-64.png" />
   <link rel="manifest" href="/static/manifest.webmanifest" />
-  <link rel="stylesheet" href="/static/universe.css" />
-  <link rel="stylesheet" href="/static/universe-actions.css" />
-  <link rel="stylesheet" href="/static/universe-next.css" />
+  <link rel="stylesheet" href="/static/universe.css?v=0.5.0" />
+  <link rel="stylesheet" href="/static/universe-actions.css?v=0.5.0" />
+  <link rel="stylesheet" href="/static/universe-next.css?v=0.5.0" />
   <link rel="stylesheet" href="/static/reminders.css" />
 </head>
 <body>
@@ -114,7 +114,7 @@
                 <span class="space-node__label">読み込み中…</span>
               </button>
               <div id="task-nodes" class="task-nodes"></div>
-              <p id="focus-empty" class="focus-empty" hidden>この親タスクに未完了Highの子タスクはありません。</p>
+              <p id="focus-empty" class="focus-empty" hidden>この親タスクに未完了の子タスクはありません。</p>
             </div>
 
             <div class="focus-footer">
@@ -174,10 +174,10 @@
 
   <template id="detail-template"><div class="detail-panel__content"><span class="eyebrow">TASK DETAIL</span><h2 data-detail="title"></h2><div class="detail-grid detail-grid--simple"><div><span>状態</span><strong data-detail="status"></strong></div><div><span>分類</span><strong data-detail="bucket"></strong></div><div><span>期限</span><strong data-detail="due"></strong></div><div><span>親Task</span><strong data-detail="project"></strong></div></div><label class="detail-parent-field"><span>親子関係</span><select data-action="parent" aria-label="Taskの親を選択"></select><small data-parent-help>親タスクを読み込んでいます。</small></label><p data-detail="reason" class="detail-reason"></p><p data-detail="sync" class="detail-sync"></p><div class="detail-actions detail-actions--primary"><button type="button" data-action="complete">完了にする</button><button type="button" data-action="bucket">あとでに移す</button></div><div class="detail-actions detail-actions--secondary"><button type="button" data-action="activate">作業開始</button><button type="button" data-action="chat">PETITに相談</button></div></div></template>
 
-  <script src="/static/petit-version.js"></script>
-  <script src="/static/chat_input.js"></script>
-  <script src="/static/universe-app.js"></script>
-  <script src="/static/universe-next.js"></script>
+  <script src="/static/petit-version.js?v=0.5.0"></script>
+  <script src="/static/chat_input.js?v=0.5.0"></script>
+  <script src="/static/universe-app.js?v=0.5.0"></script>
+  <script src="/static/universe-next.js?v=0.5.0"></script>
   <script src="/static/today.js"></script>
   <script src="/static/reminders.js"></script>
 </body>

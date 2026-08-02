@@ -34,6 +34,12 @@
     if (state.loading) return;
     state.loading = true;
     try {
+      const sharedTasks = window.PetitUniverse?.tasks?.() || [];
+      if (sharedTasks.length) {
+        state.tasks = sharedTasks;
+        decorateDetail();
+        return;
+      }
       const data = await requestJson("/api/notifications/tasks?priority=all&limit=500");
       state.tasks = Array.isArray(data.tasks) ? data.tasks : [];
       decorateDetail();
@@ -67,7 +73,7 @@
     }
     const universeTask = target.closest(".universe-task");
     if (universeTask) {
-      const task = findTask({
+      const task = findTask({ id: universeTask.dataset.taskId || "" }) || findTask({
         title: text(universeTask.querySelector(".universe-task__title")?.textContent),
         root: text(universeTask.closest(".constellation-card")?.querySelector(".constellation-card__heading strong")?.textContent),
       });
@@ -98,30 +104,16 @@
     document.querySelector(`[data-view="${view}"]`)?.click();
   };
 
-  const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-
-  const focusRoot = async (title, selectedChildId = "") => {
-    activateView("focus");
-    byId("refresh-universe")?.click();
-    for (let attempt = 0; attempt < 30; attempt += 1) {
-      const select = byId("focus-project-select");
-      const option = Array.from(select?.options || []).find((item) => item.value === title);
-      if (select && option) {
-        select.value = title;
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-        if (!selectedChildId) return;
-        for (let childAttempt = 0; childAttempt < 20; childAttempt += 1) {
-          const node = document.querySelector(`#task-nodes [data-task-id="${CSS.escape(String(selectedChildId))}"]`);
-          if (node instanceof HTMLElement) {
-            node.click();
-            return;
-          }
-          await wait(70);
-        }
-        return;
-      }
-      await wait(80);
+  const refreshAndFocusTask = async (id) => {
+    if (window.PetitUniverse?.refreshAndFocusTask) {
+      const focused = await window.PetitUniverse.refreshAndFocusTask(id);
+      state.tasks = window.PetitUniverse.tasks?.() || state.tasks;
+      state.selectedTaskId = String(id || "") || null;
+      return focused;
     }
+    await loadCatalog();
+    activateView("focus");
+    return false;
   };
 
   const changeParent = async (task, select) => {
@@ -143,12 +135,11 @@
           ? { move_to_life: true }
           : { parent_task_id: Number(parent.id) }),
       });
-      await loadCatalog();
       const destination = data.parent?.title || text(task.title);
       showFeedback(moveToLife
         ? `「${text(task.title)}」をLife直下へ戻し、そのTaskへ移動しました。`
         : `「${text(task.title)}」を「${destination}」の子タスクにし、親Taskへ移動しました。`);
-      await focusRoot(destination, moveToLife ? "" : taskId(task));
+      await refreshAndFocusTask(taskId(task));
     } catch (error) {
       if (help) help.textContent = error.message;
       showFeedback(`親子関係を変更できませんでした: ${error.message}`);
@@ -218,9 +209,8 @@
       if (input) input.value = "";
       const childId = taskId(data.task);
       state.selectedTaskId = childId || state.selectedTaskId;
-      await loadCatalog();
       showFeedback(`「${title}」を「${text(task.title)}」の小タスクとして追加しました。`);
-      await focusRoot(text(task.title), childId);
+      await refreshAndFocusTask(childId);
     } catch (error) {
       if (status) status.textContent = error.message;
       showFeedback(`小タスクを追加できませんでした: ${error.message}`);
@@ -254,6 +244,12 @@
   const initialize = () => {
     document.addEventListener("click", rememberTaskFromClick, true);
     document.addEventListener("change", handleParentChange, true);
+    document.addEventListener("petit:tasks-updated", (event) => {
+      const tasks = event.detail?.tasks;
+      if (!Array.isArray(tasks)) return;
+      state.tasks = tasks;
+      queueMicrotask(decorateDetail);
+    });
     const detailPanel = byId("detail-panel");
     if (detailPanel) {
       new MutationObserver(() => queueMicrotask(decorateDetail)).observe(detailPanel, {

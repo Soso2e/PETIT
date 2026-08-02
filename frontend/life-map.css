@@ -106,6 +106,10 @@
 .life-map__core small { color: rgba(231, 236, 255, .66); font-size: 10px; }
 
 .constellation-card.life-star-system {
+  --planet-light: rgba(203, 216, 255, .32);
+  --planet-mid: rgba(91, 116, 220, .74);
+  --planet-dark: rgba(11, 17, 48, .98);
+  --planet-ring: rgba(183, 201, 255, .32);
   position: absolute;
   left: var(--life-x);
   top: var(--life-y);
@@ -122,8 +126,65 @@
   animation: lifeNodeArrival .56s cubic-bezier(.18, .9, .28, 1.15) backwards;
   animation-delay: var(--life-delay, 0ms);
 }
+.constellation-card.life-star-system[data-area="personal"] {
+  --planet-light: rgba(226, 198, 255, .34);
+  --planet-mid: rgba(126, 82, 198, .78);
+  --planet-dark: rgba(27, 12, 53, .98);
+  --planet-ring: rgba(224, 192, 255, .38);
+}
+.constellation-card.life-star-system[data-area="work"] {
+  --planet-light: rgba(177, 240, 255, .36);
+  --planet-mid: rgba(43, 140, 190, .76);
+  --planet-dark: rgba(5, 31, 53, .98);
+  --planet-ring: rgba(151, 230, 255, .38);
+}
+.constellation-card.life-star-system[data-area="university"] {
+  --planet-light: rgba(255, 231, 174, .38);
+  --planet-mid: rgba(191, 117, 55, .78);
+  --planet-dark: rgba(57, 26, 8, .98);
+  --planet-ring: rgba(255, 218, 155, .4);
+}
+.constellation-card.life-star-system[data-area="group"] {
+  --planet-light: rgba(179, 255, 226, .34);
+  --planet-mid: rgba(43, 157, 126, .76);
+  --planet-dark: rgba(5, 43, 37, .98);
+  --planet-ring: rgba(151, 255, 223, .38);
+}
+.constellation-card.life-star-system[data-planet-variant="1"] {
+  --planet-light: rgba(175, 246, 255, .32);
+  --planet-mid: rgba(55, 132, 184, .76);
+  --planet-dark: rgba(5, 27, 55, .98);
+  --planet-ring: rgba(164, 231, 255, .38);
+}
+.constellation-card.life-star-system[data-planet-variant="2"] {
+  --planet-light: rgba(255, 210, 168, .34);
+  --planet-mid: rgba(176, 88, 102, .76);
+  --planet-dark: rgba(48, 12, 30, .98);
+  --planet-ring: rgba(255, 194, 182, .38);
+}
+.constellation-card.life-star-system[data-planet-variant="3"] {
+  --planet-light: rgba(181, 255, 216, .32);
+  --planet-mid: rgba(52, 139, 112, .76);
+  --planet-dark: rgba(6, 39, 37, .98);
+  --planet-ring: rgba(164, 255, 220, .36);
+}
 .constellation-card.life-star-system::before,
 .constellation-card.life-star-system::after { display: none; }
+.constellation-card.life-star-system.constellation-card--parent::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: block;
+  width: 132%;
+  height: 36%;
+  border: 1px solid var(--planet-ring);
+  border-radius: 50%;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--planet-ring) 65%, transparent);
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-15deg);
+}
 
 .life-star-system .constellation-card__header {
   position: relative;
@@ -134,12 +195,13 @@
   width: 166px;
   height: 166px;
   padding: 22px 16px;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid rgba(190, 206, 255, .25);
   border-radius: 50%;
   color: var(--text);
   background:
-    radial-gradient(circle at 31% 24%, rgba(255,255,255,.22), rgba(132,154,255,.18) 17%, rgba(39,52,111,.84) 52%, rgba(10,15,37,.98) 78%);
+    radial-gradient(circle at 30% 23%, rgba(255,255,255,.72) 0 2%, var(--planet-light) 8%, transparent 25%),
+    radial-gradient(ellipse at 38% 35%, var(--planet-light), var(--planet-mid) 43%, var(--planet-dark) 78%);
   box-shadow:
     0 0 28px rgba(118, 145, 255, .2),
     inset 0 0 30px rgba(255,255,255,.04);
@@ -147,6 +209,20 @@
   text-align: center;
   transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
 }
+.life-star-system .constellation-card__header::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  z-index: 0;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(ellipse at 70% 68%, rgba(255,255,255,.08) 0 2px, transparent 3px 14px),
+    linear-gradient(112deg, transparent 22%, rgba(255,255,255,.08) 43%, transparent 58%);
+  opacity: .7;
+  pointer-events: none;
+  transform: rotate(-12deg);
+}
+.life-star-system .constellation-card__header > * { position: relative; z-index: 2; }
 .life-star-system .constellation-card__header:hover,
 .life-star-system .constellation-card__header:focus-visible {
   outline: none;
@@ -216,7 +292,9 @@
   border: 1px solid rgba(180, 198, 255, .35);
   border-radius: 999px;
   color: var(--text);
-  background: radial-gradient(circle at 34% 28%, #f7f9ff 0 3%, #91aaff 12%, #28396f 56%, #0a1029 80%);
+  background:
+    radial-gradient(circle at 32% 25%, #fff 0 3%, rgba(206,220,255,.96) 6%, transparent 19%),
+    radial-gradient(circle at 50% 55%, #7895ee 0, #293d82 52%, #070c22 82%);
   box-shadow: 0 0 16px rgba(136, 163, 255, .34);
   opacity: .9;
   pointer-events: auto;
@@ -228,6 +306,14 @@
   transition: width .22s ease, transform .22s ease, box-shadow .22s ease, background .22s ease;
   animation: lifeTaskArrival .42s ease backwards;
   animation-delay: var(--task-delay, 0ms);
+}
+.life-star-system .universe-task.life-task-star::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.15), transparent 66%);
+  pointer-events: none;
 }
 .life-star-system .universe-task.life-task-star:hover,
 .life-star-system .universe-task.life-task-star:focus-visible {

@@ -30,19 +30,14 @@
     return data;
   };
 
-  const showFeedback = (message) => {
-    const feedback = byId("task-feedback");
-    const copy = feedback?.querySelector("[data-feedback-copy]");
-    const action = feedback?.querySelector("[data-feedback-action]");
-    if (!feedback || !copy) return;
-    copy.textContent = message;
-    if (action) action.hidden = true;
-    feedback.hidden = false;
-    window.setTimeout(() => { feedback.hidden = true; }, 4400);
-  };
-
   const loadCatalog = async () => {
     try {
+      const sharedTasks = window.PetitUniverse?.tasks?.() || [];
+      if (sharedTasks.length) {
+        state.tasks = sharedTasks;
+        decorateAll();
+        return;
+      }
       const data = await requestJson("/api/notifications/tasks?priority=all&limit=500");
       state.tasks = data.tasks || [];
       decorateAll();
@@ -89,7 +84,7 @@
 
     const universeTask = target.closest(".universe-task");
     if (universeTask) {
-      const task = findTask({
+      const task = findTask({ id: universeTask.dataset.taskId || "" }) || findTask({
         title: text(universeTask.querySelector(".universe-task__title")?.textContent),
         root: text(universeTask.closest(".constellation-card")?.querySelector(".constellation-card__heading strong")?.textContent),
       });
@@ -110,38 +105,6 @@
     if (task.source === "notion" && (!candidate.external_id || candidate.source !== "notion")) return false;
     return true;
   });
-
-  const assignParent = async (task, select, help) => {
-    const selected = select.value;
-    const movingToLife = selected === "";
-    const parent = movingToLife ? null : state.tasks.find((item) => taskId(item) === selected);
-    if (!movingToLife && !parent) return;
-    if (movingToLife && isRoot(task)) return;
-    if (parent && String(task.parent_task_id || "") === taskId(parent)) return;
-
-    select.disabled = true;
-    help.textContent = movingToLife ? "Life直下へ戻しています…" : `「${parent.title}」の子タスクにしています…`;
-    try {
-      await requestJson(`/api/notifications/tasks/${encodeURIComponent(taskId(task))}/parent`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(movingToLife ? { move_to_life: true } : { parent_task_id: Number(parent.id) }),
-      });
-      state.selectedTaskId = taskId(task);
-      showFeedback(
-        movingToLife
-          ? `「${text(task.title) || "タスク"}」をLife直下へ戻しました。`
-          : `「${text(task.title) || "タスク"}」を「${parent.title}」の子タスクにしました。`,
-      );
-      await loadCatalog();
-      byId("refresh-universe")?.click();
-    } catch (error) {
-      help.textContent = error.message;
-      showFeedback(`親子関係を変更できませんでした: ${error.message}`);
-      select.disabled = false;
-      select.value = String(task.parent_task_id || "");
-    }
-  };
 
   const decorateDetail = () => {
     const select = detailPanel?.querySelector('[data-action="parent"]');
@@ -177,7 +140,6 @@
         : "Life直下に置くか、別のLife直下タスクの子にできます。";
     select.dataset.ready = "1";
     select.addEventListener("click", (event) => event.stopPropagation());
-    select.addEventListener("change", () => assignParent(task, select, help));
   };
 
   const decorateNodes = () => {
@@ -316,6 +278,12 @@
   };
 
   document.addEventListener("click", rememberTaskFromClick, true);
+  document.addEventListener("petit:tasks-updated", (event) => {
+    const tasks = event.detail?.tasks;
+    if (!Array.isArray(tasks)) return;
+    state.tasks = tasks;
+    queueMicrotask(decorateAll);
+  });
   observe(detailPanel);
   observe(taskNodes);
   observe(constellationGrid);

@@ -68,6 +68,11 @@ def _effective_parent_id(conn: Any, task: dict[str, Any]) -> int | None:
     return int(value) if value is not None else None
 
 
+def _current_parent_id(task: dict[str, Any]) -> int | None:
+    with db.get_connection() as conn:
+        return _effective_parent_id(conn, task)
+
+
 def _task_has_children(conn: Any, task: dict[str, Any]) -> bool:
     task_id = int(task["id"])
     external_id = str(task.get("external_id") or "").strip()
@@ -155,11 +160,33 @@ def set_task_parent(
         parent = _resolve_parent(parent_task_id, parent_title_query)
         if parent is None:
             return {"updated": False, "error": "親タスクを1件に絞れませんでした。"}
+        if _current_parent_id(child) == int(parent["id"]):
+            return {
+                "updated": True,
+                "changed": False,
+                "source": child.get("source") or "local",
+                "queued": False,
+                "sync_status": child.get("sync_status") or "synced",
+                "task": child,
+                "parent": {"id": parent["id"], "title": parent["title"]},
+                "message": f'タスクはすでに「{parent["title"]}」の子タスクです。',
+            }
         error = _validate_parent(child, parent)
         if error:
             return {"updated": False, "error": error}
         if child.get("source") == "notion":
             parent_external_ids = [str(parent["external_id"])]
+    elif _current_parent_id(child) is None:
+        return {
+            "updated": True,
+            "changed": False,
+            "source": child.get("source") or "local",
+            "queued": False,
+            "sync_status": child.get("sync_status") or "synced",
+            "task": child,
+            "parent": None,
+            "message": "タスクはすでにLife直下にあります。",
+        }
 
     now = db.now_iso()
     with db.get_connection() as conn:

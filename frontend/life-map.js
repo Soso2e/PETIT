@@ -193,6 +193,7 @@
         const position = positions[index];
         const selected = card.classList.contains("is-selected");
         card.classList.add("life-star-system");
+        card.dataset.planetVariant = String(index % 4);
         card.style.setProperty("--life-x", `${position.x}%`);
         card.style.setProperty("--life-y", `${position.y}%`);
         card.style.setProperty("--life-scale", String(position.scale));

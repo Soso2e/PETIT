@@ -114,7 +114,8 @@ class UniverseUiTests(unittest.TestCase):
 
     def test_parent_assignment_is_available_in_ui_and_chat(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
-        script = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
+        script = (FRONTEND / "task-flow.js").read_text(encoding="utf-8")
+        decorator = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
         tool = (BACKEND / "tools" / "task_hierarchy.py").read_text(encoding="utf-8")
         service = (BACKEND / "task_hierarchy.py").read_text(encoding="utf-8")
         tools_init = (BACKEND / "tools" / "__init__.py").read_text(encoding="utf-8")
@@ -123,12 +124,19 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('/parent', script)
         self.assertIn('move_to_life: true', script)
         self.assertIn('parent_task_id: Number', script)
+        self.assertNotIn('/parent`', decorator)
         self.assertIn('name="set_task_parent"', tool)
         self.assertIn("requires_confirmation=True", tool)
         self.assertIn("parent_external_ids", service)
         self.assertIn("task_hierarchy", tools_init)
         self.assertIn('"set_task_parent"', capability)
         self.assertNotIn("classify_task_project", capability)
+
+    def test_focus_orbit_uses_all_child_priorities_and_shared_refresh(self) -> None:
+        script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        self.assertIn("filter((task) => !isRootTask(task))", script)
+        self.assertIn("refreshAndFocusTask", script)
+        self.assertIn('dataset.orbitIndex', script)
 
     def test_focus_zoom_and_motion_controls_exist(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
