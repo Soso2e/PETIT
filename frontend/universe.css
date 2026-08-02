@@ -394,9 +394,26 @@ h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .space::before, .space::after, .space__nebula, .space-node--active, .view.is-entering {
+  .space::before, .space::after, .space__nebula, .space-node--active, .view.is-entering, .constellation-card.is-selected, .universe-task.is-selected {
     animation: none !important;
     transition: none !important;
   }
 }
+
+/* 1st Selection Glow & Pulse Animation (Smooth & Zero DOM Reload) */
+.constellation-card.is-selected,
+.universe-task.is-selected,
+.constellation-card__header.is-selected {
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 24px var(--cyan-glow), inset 0 0 12px rgba(0, 242, 255, 0.15) !important;
+  transform: translateY(-2px) scale(1.015);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+  animation: selectGlowPulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes selectGlowPulse {
+  0% { box-shadow: 0 0 16px var(--cyan-glow), inset 0 0 8px rgba(0, 242, 255, 0.1); }
+  100% { box-shadow: 0 0 30px rgba(0, 242, 255, 0.55), inset 0 0 18px rgba(0, 242, 255, 0.25); }
+}
+
 

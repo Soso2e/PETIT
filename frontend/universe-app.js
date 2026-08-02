@@ -422,6 +422,22 @@
     byId("chat-context-copy").textContent = `Life › ${taskProject(task)} › ${text(task.title, "タスク")}`;
   };
 
+  const updateOverviewSelectionUI = (selectedKey) => {
+    if (!constellationGridEl) return;
+    constellationGridEl.querySelectorAll(".is-selected").forEach((el) => {
+      if (el.dataset.taskId !== selectedKey && el.dataset.rootTaskId !== selectedKey) {
+        el.classList.remove("is-selected");
+        if (el.hasAttribute("aria-pressed")) el.setAttribute("aria-pressed", "false");
+      }
+    });
+    if (selectedKey) {
+      constellationGridEl.querySelectorAll(`[data-task-id="${CSS.escape(selectedKey)}"], [data-root-task-id="${CSS.escape(selectedKey)}"]`).forEach((el) => {
+        el.classList.add("is-selected");
+        if (el.hasAttribute("aria-pressed")) el.setAttribute("aria-pressed", "true");
+      });
+    }
+  };
+
   const selectOverviewTask = (task, index = 0) => {
     const key = taskKey(task, index);
     const openFocus = state.overviewSelectionId === key;
@@ -434,8 +450,7 @@
       return;
     }
     state.overviewSelectionId = key;
-    renderConstellations();
-    renderTaskTable();
+    updateOverviewSelectionUI(key);
     showFeedback(`「${text(task.title, "タスク")}」を選択しました。もう一度押すとFocusへ移ります。`);
   };
 
