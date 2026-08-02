@@ -9,6 +9,7 @@ on:
       - "tests/test_chat_context_budget.py"
       - "tests/test_schedule_date_parsing.py"
       - "tests/test_notion_search.py"
+      - "tests/test_task_completion_intent.py"
       - ".github/workflows/core-hardening.yml"
   workflow_dispatch:
 
@@ -35,7 +36,7 @@ jobs:
           python -m pip install --quiet fastapi uvicorn httpx pydantic chromadb timetree-exporter
 
       - name: Compile Python sources
-        run: python -m compileall backend tests/test_core_hardening.py tests/test_chat_context_budget.py tests/test_schedule_date_parsing.py tests/test_notion_search.py
+        run: python -m compileall backend tests/test_core_hardening.py tests/test_chat_context_budget.py tests/test_schedule_date_parsing.py tests/test_notion_search.py tests/test_task_completion_intent.py
 
       - name: Check frontend syntax
         run: node --check frontend/app.js
@@ -65,3 +66,6 @@ jobs:
 
       - name: Run Notion conversational search tests
         run: python -m unittest tests.test_notion_search -v
+
+      - name: Run task completion intent tests
+        run: python -m unittest tests.test_task_completion_intent -v
