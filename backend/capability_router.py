@@ -5,7 +5,7 @@ import json
 import re
 from typing import Any
 
-from . import config, tools
+from . import config, time_context, tools
 from .lmstudio_client import LMStudioError, chat_completion
 
 CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
@@ -150,7 +150,9 @@ def tool_names_for(capabilities: list[str]) -> list[str]:
 def choose(user_message: str, history: list[dict[str, str]] | None = None) -> dict[str, Any]:
     """Select bounded capability groups while keeping final generation on Agent."""
     text = str(user_message or "").strip()
-    messages: list[dict[str, str]] = [{"role": "system", "content": _ROUTER_SYSTEM_PROMPT}]
+    messages: list[dict[str, str]] = [
+        {"role": "system", "content": time_context.with_current_context(_ROUTER_SYSTEM_PROMPT)}
+    ]
     for item in (history or [])[-6:]:
         role = item.get("role")
         content = str(item.get("content") or "").strip()
