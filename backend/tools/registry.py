@@ -124,7 +124,13 @@ def _matches_type(value: Any, expected: str) -> bool:
     if expected == "string":
         return isinstance(value, str)
     if expected == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
+        return (
+            isinstance(value, int)
+            and not isinstance(value, bool)
+        ) or (
+            isinstance(value, str)
+            and value.strip().isdigit()
+        )
     if expected == "number":
         return isinstance(value, (int, float)) and not isinstance(value, bool)
     if expected == "boolean":
