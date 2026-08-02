@@ -34,9 +34,10 @@ class AppNotificationUnificationTests(unittest.TestCase):
         self.assertIn('/static/chat_input.js', html)
         self.assertNotIn('/static/chat_keyboard.js', html)
 
-    def test_universe_app_shell_has_five_primary_navigation_items(self):
+    def test_universe_app_shell_has_life_first_primary_navigation(self):
         source = (ROOT / "frontend" / "app_shell.js").read_text(encoding="utf-8")
-        self.assertIn('const PRIMARY_VIEWS = ["today", "focus", "tasks", "chat"]', source)
+        self.assertIn('const PRIMARY_VIEWS = ["universe", "focus", "tasks", "chat"]', source)
+        self.assertIn('{ view: "today", label: "Today" }', source)
         self.assertIn('moreButton.textContent = "More"', source)
         self.assertIn('Calendar（read-only）', source)
         self.assertIn('Reminders', source)

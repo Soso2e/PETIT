@@ -1,4 +1,17 @@
 /* Parent-task operations that stay inside the task detail panel. */
+.detail-parent-field__controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+.detail-parent-field__controls button {
+  min-height: 44px;
+  border: 1px solid rgba(157,180,255,.42);
+  border-radius: 12px;
+  padding: 0 16px;
+  color: #f5f7ff;
+  background: rgba(99, 124, 226, .24);
+  cursor: pointer;
+}
+.detail-parent-field__controls button:disabled { opacity: .42; cursor: default; }
+.detail-parent-field__controls button[data-busy="true"] { cursor: wait; }
+
 .detail-child-create {
   display: grid;
   gap: 12px;
@@ -50,6 +63,8 @@
 .detail-child-create__status { min-height: 1.4em; color: var(--muted); font-size: 11px; line-height: 1.45; }
 
 @media (max-width: 640px) {
+  .detail-parent-field__controls { grid-template-columns: 1fr; }
+  .detail-parent-field__controls button { min-height: 44px; }
   .detail-child-create__head { display: grid; }
   .detail-child-create__head small { text-align: left; }
   .detail-child-create__fields { grid-template-columns: 1fr; }

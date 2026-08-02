@@ -102,6 +102,25 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('localStorage.removeItem("petit_universe_active_started_at")', script)
         self.assertNotIn('localStorage.setItem("petit_universe_active_started_at"', script)
 
+    def test_overview_requires_select_then_focus(self) -> None:
+        script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        self.assertIn("overviewSelectionId", script)
+        self.assertIn("const selectOverviewTask", script)
+        self.assertIn("state.overviewSelectionId === key", script)
+        self.assertIn("もう一度押すとFocus", script)
+        self.assertIn("1回押して選択", html)
+        self.assertIn('setAttribute("aria-pressed"', script)
+
+    def test_parent_assignment_requires_explicit_apply(self) -> None:
+        html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        flow = (FRONTEND / "task-flow.js").read_text(encoding="utf-8")
+        self.assertIn('data-action="parent-apply"', html)
+        self.assertIn("const handleParentSelection", flow)
+        self.assertIn("const handleParentApply", flow)
+        self.assertIn("void changeParent(task, select, applyButton)", flow)
+        self.assertIn("まだ保存されていません", flow)
+
     def test_task_controls_and_undo_are_present(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
         script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")

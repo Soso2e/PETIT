@@ -114,8 +114,9 @@
 
   const decorateDetail = () => {
     const select = detailPanel?.querySelector('[data-action="parent"]');
+    const applyButton = detailPanel?.querySelector('[data-action="parent-apply"]');
     const help = detailPanel?.querySelector("[data-parent-help]");
-    if (!(select instanceof HTMLSelectElement) || !help || select.dataset.ready === "1") return;
+    if (!(select instanceof HTMLSelectElement) || !(applyButton instanceof HTMLButtonElement) || !help || select.dataset.ready === "1") return;
     const task = currentDetailTask();
     if (!task) return;
 
@@ -136,14 +137,16 @@
       select.appendChild(option);
     });
     select.value = String(task.parent_task_id || "");
+    select.dataset.originalValue = select.value;
+    applyButton.disabled = true;
 
     const lockedParent = Boolean(task.has_children);
     select.disabled = lockedParent;
     help.textContent = lockedParent
       ? "このタスクは子タスクを持つ親です。親子階層は2段までに制限しています。"
       : task.source === "notion"
-        ? "Life直下のNotionタスクを親にできます。変更はSQLiteへ即時反映し、Notionへ同期します。"
-        : "Life直下に置くか、別のLife直下タスクの子にできます。";
+        ? "Life直下のNotionタスクを選び、「親Taskを変更」で保存します。"
+        : "Life直下または別の親Taskを選び、明示的に保存します。";
     select.dataset.ready = "1";
     select.addEventListener("click", (event) => event.stopPropagation());
   };

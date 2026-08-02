@@ -20,6 +20,7 @@
     tasks: [],
     selectedProject: localStorage.getItem(STORAGE.selectedProject) || "",
     selectedTaskId: null,
+    overviewSelectionId: null,
     activeTaskId: localStorage.getItem(STORAGE.activeTask),
     workSessionId: localStorage.getItem(STORAGE.workSession),
     workSession: null,
@@ -97,6 +98,7 @@
       panel.hidden = !active;
       panel.classList.toggle("is-active", active);
     });
+    if (!["universe", "tasks"].includes(name)) state.overviewSelectionId = null;
     if (name === "chat") chatInputEl?.focus();
   };
 
@@ -413,6 +415,23 @@
     byId("chat-context-copy").textContent = `Life › ${taskProject(task)} › ${text(task.title, "タスク")}`;
   };
 
+  const selectOverviewTask = (task, index = 0) => {
+    const key = taskKey(task, index);
+    const openFocus = state.overviewSelectionId === key;
+    selectTask(task, index);
+    if (openFocus) {
+      state.overviewSelectionId = null;
+      renderConstellations();
+      renderTaskTable();
+      switchView("focus");
+      return;
+    }
+    state.overviewSelectionId = key;
+    renderConstellations();
+    renderTaskTable();
+    showFeedback(`「${text(task.title, "タスク")}」を選択しました。もう一度押すとFocusへ移ります。`);
+  };
+
   const renderProjectControls = () => {
     const names = projectNames();
     if (focusProjectNameEl) focusProjectNameEl.textContent = state.selectedProject || "Projectなし";
@@ -593,8 +612,8 @@
     const rows = sortedTasks(filteredTasks());
     byId("task-view-title").textContent = state.filter === "low" ? "あとでやりたいこと" : "重要なタスク";
     byId("task-view-copy").textContent = state.filter === "low"
-      ? "Lowだけを分離して表示します。重要タスクとは混ざりません。"
-      : "今やる必要があるHighタスクだけを表示します。";
+      ? "Lowだけを分離して表示。1回押して選択、もう1回でFocusへ移ります。"
+      : "Highだけを表示。1回押して選択、もう1回でFocusへ移ります。";
     byId("task-view-count").textContent = `${rows.length}件`;
 
     if (!rows.length) {
@@ -635,8 +654,16 @@
       syncCell.appendChild(syncLabel);
       row.appendChild(syncCell);
       row.addEventListener("click", () => {
-        selectTask(task, state.tasks.indexOf(task));
-        switchView("focus");
+        selectOverviewTask(task, state.tasks.indexOf(task));
+      });
+      row.tabIndex = 0;
+      const selected = state.overviewSelectionId === taskKey(task, state.tasks.indexOf(task));
+      row.classList.toggle("is-selected", selected);
+      row.setAttribute("aria-selected", String(selected));
+      row.addEventListener("keydown", (event) => {
+        if (!["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
+        selectOverviewTask(task, state.tasks.indexOf(task));
       });
       taskTableBodyEl.appendChild(row);
     });
@@ -647,6 +674,9 @@
     row.type = "button";
     row.className = `universe-task universe-task--${isHigh(task) ? "high" : (isLow(task) ? "low" : "mid")}`;
     row.dataset.taskId = taskKey(task, state.tasks.indexOf(task));
+    const selected = state.overviewSelectionId === row.dataset.taskId;
+    row.classList.toggle("is-selected", selected);
+    row.setAttribute("aria-pressed", String(selected));
     const title = document.createElement("span");
     title.className = "universe-task__title";
     title.textContent = text(task.title, "名称未設定");
@@ -656,8 +686,7 @@
     row.append(title, meta);
     row.addEventListener("click", (event) => {
       event.stopPropagation();
-      selectTask(task, state.tasks.indexOf(task));
-      switchView("focus");
+      selectOverviewTask(task, state.tasks.indexOf(task));
     });
     return row;
   };
@@ -700,7 +729,14 @@
       const lowCount = group.tasks.filter(isLow).length;
       counts.textContent = `High ${highCount} / Mid ${midCount} / Low ${lowCount}`;
       header.append(headingWrap, counts);
-      header.addEventListener("click", () => selectProject(group.project));
+      const rootKey = rootTask ? taskKey(rootTask, state.tasks.indexOf(rootTask)) : "";
+      const rootSelected = Boolean(rootKey && state.overviewSelectionId === rootKey);
+      header.classList.toggle("is-selected", rootSelected);
+      header.setAttribute("aria-pressed", String(rootSelected));
+      header.addEventListener("click", () => {
+        if (rootTask) selectOverviewTask(rootTask, state.tasks.indexOf(rootTask));
+        else selectProject(group.project, { openFocus: false });
+      });
 
       const taskList = document.createElement("div");
       taskList.className = "universe-task-list";

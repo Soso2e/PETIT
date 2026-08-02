@@ -241,6 +241,9 @@
     inset 0 0 36px rgba(255,255,255,.1);
   animation: selectedLifeStar 2.8s ease-in-out infinite;
 }
+.life-star-system .constellation-card__header.is-selected {
+  box-shadow: 0 0 0 3px rgba(224, 231, 255, .86), 0 0 46px rgba(126, 154, 255, .62), inset 0 0 34px rgba(255,255,255,.12);
+}
 .life-star-system .constellation-card__heading {
   display: grid;
   justify-items: center;
@@ -378,7 +381,7 @@
 @media (max-width: 640px) {
   .universe-section-head { display: grid; }
   .constellation-grid.life-cosmos-map {
-    min-height: 980px;
+    min-height: 820px;
     overflow: hidden;
     border-radius: 24px;
   }

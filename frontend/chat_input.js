@@ -44,7 +44,7 @@
       input: document.getElementById("input") || document.getElementById("chat-input"),
     });
     if (document.querySelector(".universe-shell")) {
-      loadSharedModule("/static/app_shell.js?v=0.5.0", "app-shell");
+      loadSharedModule("/static/app_shell.js?v=0.5.1", "app-shell");
     }
   };
 

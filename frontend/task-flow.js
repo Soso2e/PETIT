@@ -122,14 +122,22 @@
     return false;
   };
 
-  const changeParent = async (task, select) => {
+  const changeParent = async (task, select, applyButton) => {
     const help = select.closest(".detail-parent-field")?.querySelector("[data-parent-help]");
     const parentId = text(select.value);
     const moveToLife = !parentId;
     const parent = moveToLife ? null : findTask({ id: parentId });
     if (!moveToLife && !parent) return;
+    if (parentId === text(task.parent_task_id)) {
+      applyButton.disabled = true;
+      if (help) help.textContent = "現在の親Taskから変更はありません。";
+      return;
+    }
 
     select.disabled = true;
+    applyButton.disabled = true;
+    applyButton.dataset.busy = "true";
+    applyButton.textContent = "適用中…";
     if (help) help.textContent = moveToLife
       ? "Life直下へ戻しています…"
       : `「${parent.title}」へ移動しています…`;
@@ -151,19 +159,49 @@
       showFeedback(`親子関係を変更できませんでした: ${error.message}`);
       select.disabled = false;
       select.value = String(task.parent_task_id || "");
+    } finally {
+      applyButton.dataset.busy = "false";
+      applyButton.textContent = "親Taskを変更";
+      if (document.contains(applyButton)) {
+        select.disabled = Boolean(task.has_children);
+        applyButton.disabled = true;
+      }
     }
   };
 
-  const handleParentChange = (event) => {
+  const handleParentSelection = (event) => {
     const select = event.target instanceof Element
       ? event.target.closest('[data-action="parent"]')
       : null;
     if (!(select instanceof HTMLSelectElement)) return;
     const task = currentDetailTask();
     if (!task) return;
+    event.stopImmediatePropagation();
+    const field = select.closest(".detail-parent-field");
+    const applyButton = field?.querySelector('[data-action="parent-apply"]');
+    const help = field?.querySelector("[data-parent-help]");
+    if (!(applyButton instanceof HTMLButtonElement)) return;
+    const changed = text(select.value) !== text(task.parent_task_id);
+    applyButton.disabled = !changed;
+    if (help) {
+      const parent = findTask({ id: text(select.value) });
+      help.textContent = changed
+        ? (parent ? `「${text(parent.title)}」の子タスクに変更します。まだ保存されていません。` : "Life直下へ戻します。まだ保存されていません。")
+        : "現在の親Taskから変更はありません。";
+    }
+  };
+
+  const handleParentApply = (event) => {
+    const applyButton = event.target instanceof Element
+      ? event.target.closest('[data-action="parent-apply"]')
+      : null;
+    if (!(applyButton instanceof HTMLButtonElement) || applyButton.disabled) return;
+    const select = applyButton.closest(".detail-parent-field")?.querySelector('[data-action="parent"]');
+    const task = currentDetailTask();
+    if (!(select instanceof HTMLSelectElement) || !task) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    void changeParent(task, select);
+    void changeParent(task, select, applyButton);
   };
 
   const createChildComposer = (task) => {
@@ -249,7 +287,8 @@
 
   const initialize = () => {
     document.addEventListener("click", rememberTaskFromClick, true);
-    document.addEventListener("change", handleParentChange, true);
+    document.addEventListener("click", handleParentApply, true);
+    document.addEventListener("change", handleParentSelection, true);
     document.addEventListener("petit:tasks-updated", (event) => {
       const tasks = event.detail?.tasks;
       if (!Array.isArray(tasks)) return;

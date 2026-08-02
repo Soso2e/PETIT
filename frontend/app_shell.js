@@ -1,7 +1,7 @@
 // Shared PETIT application shell for Universe UI.
 (() => {
   const HOME_VIEW = "universe";
-  const ASSET_VERSION = "0.5.0";
+  const ASSET_VERSION = "0.5.1";
   const PRIMARY_VIEWS = ["universe", "focus", "tasks", "chat"];
   const MORE_VIEWS = [
     { view: "today", label: "Today" },

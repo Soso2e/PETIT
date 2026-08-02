@@ -254,6 +254,10 @@
   background: rgba(255, 255, 255, .025);
 }
 .universe-task:hover { background: rgba(157, 180, 255, .1); }
+.universe-task.is-selected {
+  background: rgba(157, 180, 255, .2);
+  box-shadow: 0 0 0 2px rgba(157, 180, 255, .72), 0 0 28px rgba(112, 139, 255, .25);
+}
 .universe-task__title {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -267,6 +271,8 @@
 .universe-task--high { border-left: 3px solid var(--accent); }
 .universe-task--mid { border-left: 3px solid var(--warning); }
 .universe-task--low { border-left: 3px solid rgba(165, 172, 199, .45); opacity: .72; }
+.task-table tbody tr.is-selected { background: rgba(157, 180, 255, .16); box-shadow: inset 3px 0 0 var(--accent); }
+.task-table tbody tr:focus-visible { outline: 2px solid rgba(157, 180, 255, .78); outline-offset: -2px; }
 
 @media (max-width: 980px) {
   .focus-header { align-items: flex-start; flex-direction: column; }

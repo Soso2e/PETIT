@@ -1,7 +1,7 @@
 "use strict";
 
 const CACHE_NAME = "petit-shell-v9";
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v3`;
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v4`;
 const SHELL = [
   "/",
   "/static/universe.html",
