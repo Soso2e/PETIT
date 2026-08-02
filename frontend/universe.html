@@ -40,30 +40,53 @@
     <main class="universe-main">
       <section class="view is-active" data-view-panel="focus">
         <div class="focus-layout">
-          <section class="orbit-card" aria-label="重要タスクのFocus Orbit">
-            <div class="orbit-card__header">
-              <div>
-                <span class="eyebrow">IMPORTANT NOW</span>
+          <section class="orbit-card" aria-label="Lifeから選択Projectへ入るFocus Orbit">
+            <div class="orbit-card__header focus-header">
+              <div class="focus-heading">
+                <span class="eyebrow">LIFE / PROJECT / TASK</span>
+                <div id="focus-breadcrumb" class="focus-breadcrumb" aria-label="現在の階層">
+                  <button type="button" data-life-root>Life</button>
+                  <span>›</span>
+                  <strong id="focus-project-name">Project</strong>
+                </div>
                 <h1 id="focus-title">今日のFocus</h1>
-                <p class="section-copy">いま見るのは、未完了の重要タスクだけ。</p>
+                <p class="section-copy">LifeからProjectを選び、その中の重要タスクだけに集中します。</p>
               </div>
-              <button id="refresh-universe" class="icon-button" type="button" aria-label="タスクを更新">↻</button>
+              <div class="focus-project-switcher" aria-label="Focus Project切り替え">
+                <button id="focus-project-prev" class="icon-button" type="button" aria-label="前のProject">‹</button>
+                <label>
+                  <span>Project</span>
+                  <select id="focus-project-select" aria-label="Projectを選択"></select>
+                </label>
+                <button id="focus-project-next" class="icon-button" type="button" aria-label="次のProject">›</button>
+                <button id="refresh-universe" class="icon-button" type="button" aria-label="タスクを更新">↻</button>
+              </div>
             </div>
 
-            <div id="orbit" class="orbit" role="list" aria-label="重要タスクの軌道">
+            <div id="orbit" class="orbit" role="list" aria-label="選択Projectの重要タスク">
               <div class="orbit__ring orbit__ring--one"></div>
               <div class="orbit__ring orbit__ring--two"></div>
               <div class="orbit__ring orbit__ring--three"></div>
-              <button id="objective-node" class="space-node space-node--objective" type="button">
+              <button id="objective-node" class="space-node space-node--objective" type="button" aria-label="Project一覧へ戻る">
                 <span class="space-node__glow"></span>
                 <span class="space-node__label">読み込み中…</span>
               </button>
               <div id="task-nodes" class="task-nodes"></div>
+              <p id="focus-empty" class="focus-empty" hidden>このProjectに未完了Highタスクはありません。</p>
             </div>
 
             <div class="focus-footer">
-              <div><span class="eyebrow">ACTIVE TASK</span><strong id="active-task-label">まだ実行中のタスクはありません</strong></div>
-              <span id="active-elapsed">0分</span>
+              <div class="active-copy">
+                <span class="eyebrow">WORK SESSION</span>
+                <strong id="active-task-label">作業は開始されていません</strong>
+                <small id="work-session-state">タスクを選択しただけでは時間は増えません。</small>
+              </div>
+              <div class="work-session-controls">
+                <span id="active-elapsed">0分</span>
+                <button id="work-session-continue" type="button" hidden>まだ続ける</button>
+                <button id="work-session-pause" type="button" hidden>一時停止</button>
+                <button id="work-session-end" type="button" hidden>終了</button>
+              </div>
             </div>
           </section>
 
@@ -71,21 +94,22 @@
             <div class="detail-panel__empty">
               <span class="eyebrow">TASK DETAIL</span>
               <h2>タスクを選択</h2>
-              <p>星または一覧のタスクを選ぶと、完了・分類変更・作業開始ができます。</p>
+              <p>星または一覧のタスクを選ぶと詳細を確認できます。時間計測は「作業開始」を押したときだけ始まります。</p>
             </div>
           </aside>
         </div>
       </section>
 
       <section class="view" data-view-panel="universe" hidden>
-        <div class="section-head">
+        <div class="section-head universe-section-head">
           <div>
-            <span class="eyebrow">IMPORTANT PROJECTS</span>
-            <h1>Project Universe</h1>
-            <p>重要タスクが残っているProjectだけを表示します。</p>
+            <span class="eyebrow">LIFE UNIVERSE</span>
+            <h1>Life → Project → Task</h1>
+            <p>Notion由来の未完了タスク全体をLifeとして、Projectごとに一覧表示します。</p>
           </div>
+          <div id="universe-summary" class="universe-summary" aria-live="polite">読み込み中…</div>
         </div>
-        <div id="constellation-grid" class="constellation-grid"></div>
+        <div id="constellation-grid" class="constellation-grid constellation-grid--list"></div>
       </section>
 
       <section class="view" data-view-panel="tasks" hidden>
