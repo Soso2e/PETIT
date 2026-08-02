@@ -10,17 +10,26 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from . import db, notifications, task_hierarchy
+from . import config, db, notifications, task_hierarchy
+from .tools import tasks as task_tools
 
 _INSTALLED = False
 _OPEN_STATUS_SQL = "lower(status) NOT IN ('done', 'canceled', 'cancelled', 'chancel', '完了')"
+_ALLOWED_PRIORITIES = {"high": "High", "mid": "Mid", "medium": "Mid", "low": "Low"}
 
 
 class TaskParentUpdate(BaseModel):
     parent_task_id: int | None = None
     move_to_life: bool = False
+
+
+class ChildTaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    due_date: str | None = None
+    priority: str = "High"
+    reason: str | None = Field(default=None, max_length=1000)
 
 
 def _ensure_universe_schema() -> None:
@@ -137,6 +146,88 @@ def patch_task_parent(task_id: int, payload: TaskParentUpdate) -> JSONResponse:
     return JSONResponse(result, status_code=200 if result.get("updated") else 400)
 
 
+def create_child_task(parent_task_id: int, payload: ChildTaskCreate) -> JSONResponse:
+    """Create one task and attach it to the selected Life-root task."""
+    parent = task_hierarchy._find_task(task_id=parent_task_id)
+    if parent is None:
+        return JSONResponse({"error": "親Taskが見つかりません。"}, status_code=404)
+    if parent.get("parent_task_id") is not None or str(parent.get("parent_external_id") or "").strip():
+        return JSONResponse(
+            {"error": "子タスクの下には追加できません。Life直下の親Taskを選んでください。"},
+            status_code=400,
+        )
+    if config.notion_configured() and not str(parent.get("external_id") or "").strip():
+        return JSONResponse(
+            {"error": "Notion同期中は、Notionへ同期済みの親Taskにだけ小タスクを追加できます。"},
+            status_code=400,
+        )
+
+    values = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    normalized_priority = _ALLOWED_PRIORITIES.get(str(values.get("priority") or "High").strip().casefold())
+    if normalized_priority is None:
+        return JSONResponse({"error": "priorityはHigh、Mid、Lowのいずれかです。"}, status_code=400)
+
+    created = task_tools.create_task(
+        title=str(values["title"]).strip(),
+        due_date=values.get("due_date"),
+        priority=normalized_priority,
+        area=parent.get("area"),
+        reason=values.get("reason"),
+    )
+    if not created.get("created"):
+        return JSONResponse(created, status_code=400)
+
+    created_task = dict(created.get("task") or {})
+    child = None
+    external_id = str(created_task.get("external_id") or "").strip()
+    local_id = created_task.get("id")
+    if external_id:
+        child = task_hierarchy._find_task(external_id=external_id)
+    if child is None and isinstance(local_id, int):
+        child = task_hierarchy._find_task(task_id=local_id)
+    if child is None:
+        child = task_hierarchy._find_task(title_query=str(values["title"]).strip())
+    if child is None:
+        return JSONResponse(
+            {
+                "created": True,
+                "linked": False,
+                "task": created_task,
+                "error": "小タスクは作成されましたが、親Taskへの接続対象を特定できませんでした。",
+            },
+            status_code=409,
+        )
+
+    linked = task_hierarchy.set_task_parent(
+        task_id=int(child["id"]),
+        parent_task_id=int(parent["id"]),
+    )
+    if not linked.get("updated"):
+        return JSONResponse(
+            {
+                "created": True,
+                "linked": False,
+                "task": child,
+                "parent": {"id": parent["id"], "title": parent["title"]},
+                "error": linked.get("error") or "親Taskへ接続できませんでした。",
+            },
+            status_code=409,
+        )
+
+    return JSONResponse(
+        {
+            "created": True,
+            "linked": True,
+            "source": linked.get("source") or created.get("source"),
+            "sync_status": linked.get("sync_status") or "synced",
+            "task": linked.get("task") or child,
+            "parent": {"id": parent["id"], "title": parent["title"]},
+            "message": f'「{values["title"]}」を「{parent["title"]}」の小タスクとして追加しました。',
+        },
+        status_code=201,
+    )
+
+
 def install() -> None:
     global _INSTALLED
     if _INSTALLED:
@@ -151,6 +242,12 @@ def install() -> None:
         "/tasks/{task_id}/parent",
         patch_task_parent,
         methods=["PATCH"],
+        tags=["task-ui"],
+    )
+    notifications.router.add_api_route(
+        "/tasks/{parent_task_id}/children",
+        create_child_task,
+        methods=["POST"],
         tags=["task-ui"],
     )
     _INSTALLED = True
