@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import agent_legacy as _legacy
-from . import agent_runtime, capability_router, config, project_router, task_completion_intent
+from . import agent_runtime, capability_router, config, project_router, task_completion_intent, time_context
 
 # Re-export the historical module surface while the runtime migration stabilizes.
 for _export_name in dir(_legacy):
@@ -66,6 +66,15 @@ _legacy.CHAT_SYSTEM_PROMPT = CHAT_SYSTEM_PROMPT
 _legacy.AGENT_SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
 _legacy.SYSTEM_PROMPT = SYSTEM_PROMPT
 
+_RUNTIME_AGENT_BASE_PROMPT = agent_runtime._AGENT_SYSTEM_PROMPT
+
+
+def _refresh_runtime_time_context() -> None:
+    """Inject a fresh local clock before every LLM-backed turn."""
+    agent_runtime._AGENT_SYSTEM_PROMPT = time_context.with_current_context(
+        _RUNTIME_AGENT_BASE_PROMPT
+    )
+
 
 def _sync_legacy_globals() -> None:
     """Propagate monkey-patched dependencies used by compatibility tests."""
@@ -107,10 +116,12 @@ def _related_tool_names(message: str) -> list[str]:
 
 
 def _run_notion_read(user_message: str, history: list[dict[str, str]] | None) -> dict[str, Any]:
+    _refresh_runtime_time_context()
     return agent_runtime.run(user_message, history=history)
 
 
 def _run_github_review(user_message: str) -> dict[str, Any]:
+    _refresh_runtime_time_context()
     return agent_runtime.run(user_message, history=None)
 
 
@@ -122,6 +133,7 @@ def run(
 ) -> dict[str, Any]:
     """Handle one turn through narrow safety gates, then Agent by default."""
     del allow_defer
+    _refresh_runtime_time_context()
     _sync_legacy_globals()
     recent_history = _legacy._recent_history(history)
 
