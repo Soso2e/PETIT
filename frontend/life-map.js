@@ -97,6 +97,7 @@
       task.style.setProperty("--task-angle", `${angle}deg`);
       task.style.setProperty("--task-radius", `${radius}px`);
       task.style.setProperty("--task-delay", `${(index * 45) + (taskIndex * 55)}ms`);
+      task.style.transform = `translate(-50%, -50%) rotate(${angle}deg) translateX(${radius}px) rotate(${-angle}deg)`;
       if (taskIndex >= 6) task.classList.add("life-task-star--overflow");
       const title = task.querySelector(".universe-task__title")?.textContent?.trim();
       if (title) task.setAttribute("aria-label", `${title}をFocusで開く`);
@@ -112,6 +113,10 @@
       map.classList.toggle("life-cosmos-map", cards.length > 0);
       if (!cards.length) return;
 
+      const mapHeight = mobileQuery.matches
+        ? Math.max(780, 250 + (cards.length * 150))
+        : (cards.length > 8 ? 840 : 720);
+      map.style.minHeight = `${mapHeight}px`;
       map.style.setProperty("--life-project-count", String(cards.length));
       const core = ensureCore(map);
       const svg = ensureLines(map);
