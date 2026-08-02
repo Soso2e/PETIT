@@ -194,6 +194,45 @@
   font-size: 1.1rem;
 }
 
+/*
+ * Universe's fifth navigation tab made the 981–1180px desktop range too tight.
+ * This file loads last, so keep the shared laptop-width safety overrides here
+ * until the Universe stylesheets are consolidated.
+ */
+@media (max-width: 1180px) and (min-width: 641px) {
+  .universe-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .view-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .view-tab {
+    flex: 1 0 auto;
+    white-space: nowrap;
+  }
+
+  .topbar-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .focus-layout,
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-panel {
+    min-height: auto;
+  }
+}
+
 @media (max-width: 640px) {
   .reminder-section-head {
     align-items: stretch;
