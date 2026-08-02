@@ -1,9 +1,7 @@
-// PETIT Universe enhancements: Project classification, zoom, and spatial motion.
+// PETIT Universe enhancements: Life-first task hierarchy, zoom, and spatial motion.
 (() => {
-  const ALL_LABEL = "All";
   const ZOOM = { min: 0.82, max: 1.22, step: 0.1, storage: "petit_universe_zoom" };
   const state = {
-    projects: [],
     tasks: [],
     selectedTaskId: null,
     zoom: Number(localStorage.getItem(ZOOM.storage)) || 1,
@@ -16,11 +14,14 @@
   const orbit = byId("orbit");
   const detailPanel = byId("detail-panel");
   const taskNodes = byId("task-nodes");
+  const constellationGrid = byId("constellation-grid");
+  const taskTableBody = byId("task-table-body");
   const zoomLabel = byId("focus-zoom-label");
 
   const text = (value) => String(value ?? "").trim();
   const taskId = (task) => String(task?.id || task?.external_id || "");
-  const taskProject = (task) => text(task?.project_title || task?.project_name) || ALL_LABEL;
+  const rootTitle = (task) => text(task?.root_title || task?.project_title || task?.title);
+  const isRoot = (task) => task?.hierarchy_role === "root" || !task?.parent_task_id;
 
   const requestJson = async (url, options = {}) => {
     const response = await fetch(url, { cache: "no-store", ...options });
@@ -41,23 +42,23 @@
   };
 
   const loadCatalog = async () => {
-    const [taskResult, projectResult] = await Promise.allSettled([
-      requestJson("/api/notifications/tasks?priority=all&limit=500"),
-      requestJson("/api/notifications/projects"),
-    ]);
-    if (taskResult.status === "fulfilled") state.tasks = taskResult.value.tasks || [];
-    if (projectResult.status === "fulfilled") state.projects = projectResult.value.projects || [];
-    decorateDetail();
+    try {
+      const data = await requestJson("/api/notifications/tasks?priority=all&limit=500");
+      state.tasks = data.tasks || [];
+      decorateAll();
+    } catch (error) {
+      console.warn("PETIT task hierarchy load failed", error);
+    }
   };
 
-  const findTask = ({ id = "", title = "", project = "", due = "" } = {}) => {
+  const findTask = ({ id = "", title = "", root = "", due = "" } = {}) => {
     if (id) {
       const exact = state.tasks.find((task) => taskId(task) === String(id));
       if (exact) return exact;
     }
     const matches = state.tasks.filter((task) => {
       if (title && text(task.title) !== title) return false;
-      if (project && taskProject(task) !== project) return false;
+      if (root && rootTitle(task) !== root) return false;
       if (due && text(task.due_date) !== due) return false;
       return true;
     });
@@ -80,7 +81,7 @@
       const task = findTask({
         title: text(tableRow.querySelector(".task-table__title")?.textContent),
         due: text(tableRow.querySelector(".task-table__due")?.textContent).replace("—", ""),
-        project: text(cells[3]?.textContent),
+        root: text(cells[3]?.dataset.rootTitle || ""),
       });
       state.selectedTaskId = task ? taskId(task) : null;
       return;
@@ -90,7 +91,7 @@
     if (universeTask) {
       const task = findTask({
         title: text(universeTask.querySelector(".universe-task__title")?.textContent),
-        project: text(universeTask.closest(".constellation-card")?.querySelector(".constellation-card__heading strong")?.textContent),
+        root: text(universeTask.closest(".constellation-card")?.querySelector(".constellation-card__heading strong")?.textContent),
       });
       state.selectedTaskId = task ? taskId(task) : null;
     }
@@ -100,67 +101,153 @@
     const remembered = findTask({ id: state.selectedTaskId || "" });
     if (remembered) return remembered;
     const title = text(detailPanel?.querySelector('[data-detail="title"]')?.textContent);
-    const project = text(detailPanel?.querySelector('[data-detail="project"]')?.textContent);
-    return findTask({ title, project });
+    return findTask({ title });
   };
 
-  const projectOption = (project, task) => {
-    const option = document.createElement("option");
-    option.value = String(project.id);
-    option.textContent = project.name;
-    option.disabled = task.source === "notion" && !project.notion_linked;
-    if (option.disabled) option.textContent += "（Notion未連携）";
-    return option;
-  };
+  const parentCandidates = (task) => state.tasks.filter((candidate) => {
+    if (!isRoot(candidate)) return false;
+    if (taskId(candidate) === taskId(task)) return false;
+    if (task.source === "notion" && (!candidate.external_id || candidate.source !== "notion")) return false;
+    return true;
+  });
 
-  const assignProject = async (task, select, help) => {
-    const projectId = select.value;
-    const project = state.projects.find((item) => String(item.id) === projectId);
-    if (!project || projectId === String(task.project_id || "")) return;
+  const assignParent = async (task, select, help) => {
+    const selected = select.value;
+    const movingToLife = selected === "";
+    const parent = movingToLife ? null : state.tasks.find((item) => taskId(item) === selected);
+    if (!movingToLife && !parent) return;
+    if (movingToLife && isRoot(task)) return;
+    if (parent && String(task.parent_task_id || "") === taskId(parent)) return;
+
     select.disabled = true;
-    help.textContent = `「${project.name}」へ移動しています…`;
+    help.textContent = movingToLife ? "Life直下へ戻しています…" : `「${parent.title}」の子タスクにしています…`;
     try {
-      await requestJson(`/api/notifications/tasks/${encodeURIComponent(taskId(task))}`, {
+      await requestJson(`/api/notifications/tasks/${encodeURIComponent(taskId(task))}/parent`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, resolve_notification: false }),
+        body: JSON.stringify(movingToLife ? { move_to_life: true } : { parent_task_id: Number(parent.id) }),
       });
       state.selectedTaskId = taskId(task);
-      showFeedback(`「${text(task.title) || "タスク"}」を「${project.name}」へ分類しました。`);
+      showFeedback(
+        movingToLife
+          ? `「${text(task.title) || "タスク"}」をLife直下へ戻しました。`
+          : `「${text(task.title) || "タスク"}」を「${parent.title}」の子タスクにしました。`,
+      );
       await loadCatalog();
       byId("refresh-universe")?.click();
     } catch (error) {
       help.textContent = error.message;
-      showFeedback(`Projectを変更できませんでした: ${error.message}`);
+      showFeedback(`親子関係を変更できませんでした: ${error.message}`);
       select.disabled = false;
-      select.value = String(task.project_id || "");
+      select.value = String(task.parent_task_id || "");
     }
   };
 
   const decorateDetail = () => {
-    const select = detailPanel?.querySelector('[data-action="project"]');
-    const help = detailPanel?.querySelector("[data-project-help]");
+    const select = detailPanel?.querySelector('[data-action="parent"]');
+    const help = detailPanel?.querySelector("[data-parent-help]");
     if (!(select instanceof HTMLSelectElement) || !help || select.dataset.ready === "1") return;
     const task = currentDetailTask();
     if (!task) return;
 
     state.selectedTaskId = taskId(task);
-    select.replaceChildren();
-    const all = document.createElement("option");
-    all.value = "";
-    all.textContent = `${ALL_LABEL}（Project未設定）`;
-    all.disabled = true;
-    select.appendChild(all);
+    const parentLabel = detailPanel.querySelector('[data-detail="project"]');
+    if (parentLabel) parentLabel.textContent = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
 
-    state.projects.forEach((project) => select.appendChild(projectOption(project, task)));
-    select.value = String(task.project_id || "");
-    select.disabled = !state.projects.some((project) => !(task.source === "notion" && !project.notion_linked));
-    help.textContent = task.source === "notion"
-      ? "確認済みNotion Projectだけ選択できます。変更はSQLiteへ即時反映され、Notionへ同期されます。"
-      : "既存Projectを選ぶと、このTaskをそのProjectへ移動します。";
+    select.replaceChildren();
+    const life = document.createElement("option");
+    life.value = "";
+    life.textContent = "Life直下";
+    select.appendChild(life);
+
+    parentCandidates(task).forEach((candidate) => {
+      const option = document.createElement("option");
+      option.value = taskId(candidate);
+      option.textContent = candidate.title;
+      select.appendChild(option);
+    });
+    select.value = String(task.parent_task_id || "");
+
+    const lockedParent = Boolean(task.has_children);
+    select.disabled = lockedParent;
+    help.textContent = lockedParent
+      ? "このタスクは子タスクを持つ親です。親子階層は2段までに制限しています。"
+      : task.source === "notion"
+        ? "Life直下のNotionタスクを親にできます。変更はSQLiteへ即時反映し、Notionへ同期します。"
+        : "Life直下に置くか、別のLife直下タスクの子にできます。";
     select.dataset.ready = "1";
     select.addEventListener("click", (event) => event.stopPropagation());
-    select.addEventListener("change", () => assignProject(task, select, help));
+    select.addEventListener("change", () => assignParent(task, select, help));
+  };
+
+  const decorateNodes = () => {
+    const selectedRoot = text(byId("focus-project-name")?.textContent);
+    let visibleChildren = 0;
+    taskNodes?.querySelectorAll(".space-node").forEach((node, index) => {
+      const task = findTask({ id: node.dataset.taskId || "" });
+      node.style.setProperty("--node-index", String(index));
+      if (task && isRoot(task) && rootTitle(task) === selectedRoot) {
+        node.classList.add("hierarchy-root-duplicate");
+        node.setAttribute("aria-hidden", "true");
+      } else {
+        node.classList.remove("hierarchy-root-duplicate");
+        node.removeAttribute("aria-hidden");
+        visibleChildren += 1;
+      }
+    });
+    const empty = byId("focus-empty");
+    if (empty) empty.hidden = visibleChildren > 0;
+  };
+
+  const decorateLife = () => {
+    constellationGrid?.querySelectorAll(".constellation-card").forEach((card) => {
+      const heading = text(card.querySelector(".constellation-card__heading strong")?.textContent);
+      const root = state.tasks.find((task) => isRoot(task) && text(task.title) === heading);
+      if (!root) return;
+      card.classList.toggle("constellation-card--parent", Boolean(root.has_children));
+      card.classList.toggle("constellation-card--single", !root.has_children);
+
+      const eyebrow = card.querySelector(".eyebrow");
+      if (eyebrow) eyebrow.textContent = root.has_children ? "LIFE DIRECT · PARENT TASK" : "LIFE DIRECT · TASK";
+
+      const children = state.tasks.filter((task) => Number(task.parent_task_id) === Number(root.id));
+      const counts = card.querySelector(".constellation-card__counts");
+      if (counts) counts.textContent = root.has_children ? `${children.length} Child Task` : "単独Task";
+
+      card.querySelectorAll(".universe-task").forEach((row) => {
+        const title = text(row.querySelector(".universe-task__title")?.textContent);
+        const task = state.tasks.find((item) => rootTitle(item) === heading && text(item.title) === title);
+        if (!task) return;
+        row.classList.toggle("universe-task--root-copy", isRoot(task));
+        row.classList.toggle("universe-task--child", !isRoot(task));
+      });
+    });
+
+    const groups = new Set(state.tasks.filter(isRoot).map((task) => taskId(task))).size;
+    const children = state.tasks.filter((task) => !isRoot(task)).length;
+    const summary = byId("universe-summary");
+    if (summary) summary.textContent = `Life · ${groups} Task · ${children} Child`;
+  };
+
+  const decorateTaskTable = () => {
+    taskTableBody?.querySelectorAll("tr").forEach((row) => {
+      const cells = row.querySelectorAll("td");
+      if (cells.length < 4) return;
+      const title = text(row.querySelector(".task-table__title")?.textContent);
+      const due = text(row.querySelector(".task-table__due")?.textContent).replace("—", "");
+      const task = findTask({ title, due });
+      if (!task) return;
+      cells[3].textContent = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
+      cells[3].dataset.rootTitle = rootTitle(task);
+      row.classList.toggle("task-row--child", !isRoot(task));
+    });
+  };
+
+  const decorateAll = () => {
+    decorateDetail();
+    decorateNodes();
+    decorateLife();
+    decorateTaskTable();
   };
 
   const zoomLevel = () => (state.zoom < 0.94 ? "far" : (state.zoom > 1.08 ? "near" : "normal"));
@@ -223,20 +310,20 @@
     });
   };
 
-  const decorateNodes = () => {
-    taskNodes?.querySelectorAll(".space-node").forEach((node, index) => {
-      node.style.setProperty("--node-index", String(index));
-    });
+  const observe = (element) => {
+    if (!element) return;
+    new MutationObserver(() => queueMicrotask(decorateAll)).observe(element, { childList: true, subtree: true });
   };
 
   document.addEventListener("click", rememberTaskFromClick, true);
-  new MutationObserver(() => queueMicrotask(decorateDetail)).observe(detailPanel, { childList: true, subtree: true });
-  new MutationObserver(decorateNodes).observe(taskNodes, { childList: true });
+  observe(detailPanel);
+  observe(taskNodes);
+  observe(constellationGrid);
+  observe(taskTableBody);
 
   document.documentElement.dataset.universeMotion = "ready";
   applyZoom(state.zoom, { persist: false });
   installZoom();
   installParallax();
-  decorateNodes();
   void loadCatalog();
 })();
