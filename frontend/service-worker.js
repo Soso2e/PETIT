@@ -1,13 +1,17 @@
 "use strict";
 
 const CACHE_NAME = "petit-shell-v7";
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v1`;
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v2`;
 const SHELL = [
   "/",
   "/static/universe.html",
   "/static/universe.css",
   "/static/universe-actions.css",
+  "/static/universe-next.css",
+  "/static/reminders.css",
   "/static/universe-app.js",
+  "/static/universe-next.js",
+  "/static/reminders.js",
   "/static/legacy.html",
   "/static/style.css",
   "/static/companion.css",
@@ -72,14 +76,15 @@ self.addEventListener("push", (event) => {
   }
 
   const title = payload.title || "PETIT";
+  const targetUrl = payload.url || "/";
   const options = {
     body: payload.body || "PETITから通知があります。",
     icon: payload.icon || "/static/icon-192.png",
     badge: payload.badge || "/static/favicon-64.png",
-    tag: payload.tag || "petit-notification",
+    tag: payload.tag ? `${payload.tag}-${targetUrl}` : "petit-notification",
     renotify: false,
     data: {
-      url: payload.url || "/",
+      url: targetUrl,
       category: payload.category || "unknown",
     },
   };

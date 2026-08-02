@@ -19,6 +19,7 @@ from . import (
     project_completion,
     project_registration,
     project_status,
+    reminders,
     schedule,
     tasks,
     tasks_phase2,
