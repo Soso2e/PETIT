@@ -10,6 +10,7 @@
 - `backend/capability_router.py`
 - `backend/tools/registry.py`
 - `backend/tools/agent_actions.py`
+- `backend/tools/task_hierarchy.py`
 - `backend/agent_state.py`
 - `backend/agent_progress.py`
 - `backend/project_router.py`
@@ -128,9 +129,9 @@ flowchart TD
     answer[回答本文を取得]
     empty{回答が空か}
     fallbackAnswer[言い換えを求める固定文]
-    deferred{作業予告だけか}
+    incomplete{作業予告またはRuntime外の確認だけか}
     retryUsed{再実行済みか}
-    forceTool[Toolをこのターンで実行するよう再指示]
+    forceTool[このターンでTool callし Runtime確認へ進むよう再指示]
     deferredFail[未実行を明示した失敗回答]
     finalizing[finalizing進捗を発行]
     final[/最終回答/]
@@ -144,8 +145,8 @@ flowchart TD
     stopTotal[tool_call_limitで停止]
     allowed{公開済みToolか}
     notAllowed[tool_not_allowed結果]
-    args{引数を解釈できるか}
-    badArgs[invalid_tool_arguments結果]
+    args{JSON解釈と確認対象schema検証に成功したか}
+    badArgs[理由付きinvalid_tool_arguments結果]
     duplicate{同じToolと引数を実行済みか}
     duplicateStop[duplicate_tool_call結果]
     confirmation{確認が必要か}
@@ -158,10 +159,10 @@ flowchart TD
 
     call --> hasCalls
     hasCalls -->|いいえ| answer --> empty
-    empty -->|はい| fallbackAnswer --> deferred
-    empty -->|いいえ| deferred
-    deferred -->|いいえ| finalizing --> final
-    deferred -->|はい| retryUsed
+    empty -->|はい| fallbackAnswer --> incomplete
+    empty -->|いいえ| incomplete
+    incomplete -->|いいえ| finalizing --> final
+    incomplete -->|はい| retryUsed
     retryUsed -->|いいえ| forceTool --> call
     retryUsed -->|はい| deferredFail --> finalizing
 
@@ -181,6 +182,8 @@ flowchart TD
     compact --> append --> call
 ```
 
+親子関係の変更は`set_task_parent`へ集約する。タスク名の変更も同時に必要な場合は、同じTool callの`title`へ含め、Runtimeの確認を1回だけ表示する。`update_task`へ`parent_id`や`parent_task_id`を渡した場合は、確認画面を出す前に不正引数としてAgentへ返し、正しいToolの再選択を促す。
+
 ---
 
 ## 4. Tool Registryとリスク判定
@@ -199,8 +202,12 @@ flowchart TD
 
     invoke[AgentがToolを選択]
     parse[引数JSONをdictへ]
+    writeRisk{confirm_write または destructiveか}
+    schema[properties required type enumを検証]
+    valid{schemaに適合するか}
+    invalid[[error]またはinvalid_tool_argumentsとしてAgentへ返す]
     dispatch[handlerを実行]
-    error{例外や不正引数か}
+    error{例外や実行時エラーか}
     errorText[[error]文字列を返す]
     result[JSONまたは文字列を返す]
 
@@ -212,10 +219,17 @@ flowchart TD
     legacy -->|はい| confirm --> register
     legacy -->|いいえ| safe --> register
 
-    invoke --> parse --> dispatch --> error
+    invoke --> parse --> writeRisk
+    writeRisk -->|はい| schema --> valid
+    valid -->|いいえ| invalid
+    valid -->|はい| dispatch
+    writeRisk -->|いいえ| dispatch
+    dispatch --> error
     error -->|はい| errorText
     error -->|いいえ| result
 ```
+
+確認対象Toolでは、未定義引数、必須不足、型不一致、enum外の値を承認前に拒否する。既存Toolが許容している数字文字列IDは、`integer`互換として維持する。
 
 ### リスク区分
 
@@ -242,9 +256,10 @@ flowchart LR
 ```mermaid
 flowchart TD
     proposal[Agentが確認対象Toolを提案]
+    args[Tool schema検証済みの引数]
     saveState[Agent stateをSQLiteへ保存]
     stored["original_request / messages / capabilities / selected_names / attempted / rounds / used_tools / request_id / session_id"]
-    confirmation[確認文とexecute_agent_writeを返す]
+    confirmation[Runtimeが確認文とexecute_agent_writeを1回だけ返す]
     register[main.pyがapproval_idを登録 10分TTL]
     decision{ユーザーが承認したか}
     cancel[書き込みをキャンセル]
@@ -262,7 +277,7 @@ flowchart TD
     final[自然な最終回答]
     delete[Agent stateを削除]
 
-    proposal --> saveState --> stored --> confirmation --> register --> decision
+    proposal --> args --> saveState --> stored --> confirmation --> register --> decision
     decision -->|いいえ| cancel
     decision -->|はい| wrapper --> load
     load -->|いいえ| expired
@@ -272,6 +287,8 @@ flowchart TD
     failed -->|いいえ| failure
     failed -->|はい| resume --> readOnly --> final --> delete
 ```
+
+Agentが自然文だけで「実行しますか？」と返した場合は承認として扱わず、確認対象Toolをcallするよう1回だけ再指示する。これにより、Agent本文とRuntimeカードの二重・三重確認を防ぐ。
 
 ---
 
@@ -419,8 +436,9 @@ flowchart LR
     calls[Tool総数6回]
     duplicate[同一Tool 同一引数の再実行禁止]
     allowed[Capability外Toolの拒否]
-    args[不正引数の拒否]
+    args[確認対象の未定義引数 必須 型 enumを承認前に拒否]
     defer[作業予告のみの回答を1回再実行]
+    manualConfirm[Runtime外の書き込み確認をTool callへ戻す]
     confirm[confirm_write destructiveは承認必須]
     resume[Agent state 30分TTL]
     approval[approval_id 10分TTL]
@@ -432,6 +450,7 @@ flowchart LR
     limits --> allowed
     limits --> args
     limits --> defer
+    limits --> manualConfirm
     limits --> confirm
     limits --> resume
     limits --> approval
