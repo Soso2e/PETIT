@@ -88,6 +88,12 @@
   };
 
   const currentDetailTask = () => {
+    const displayedId = byId("detail-panel")?.dataset.taskId || "";
+    const displayed = findTask({ id: displayedId });
+    if (displayed) {
+      state.selectedTaskId = taskId(displayed);
+      return displayed;
+    }
     const remembered = findTask({ id: state.selectedTaskId || "" });
     if (remembered) return remembered;
     const title = text(byId("detail-panel")?.querySelector('[data-detail="title"]')?.textContent);

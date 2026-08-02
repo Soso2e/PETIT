@@ -132,6 +132,17 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('"set_task_parent"', capability)
         self.assertNotIn("classify_task_project", capability)
 
+    def test_parent_assignment_uses_the_task_shown_in_detail_panel(self) -> None:
+        app = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        flow = (FRONTEND / "task-flow.js").read_text(encoding="utf-8")
+        decorator = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
+        self.assertIn("detailPanelEl.dataset.taskId = taskKey(task, index)", app)
+        self.assertIn("delete detailPanelEl.dataset.taskId", app)
+        for script in (flow, decorator):
+            displayed = script.index("const displayedId =")
+            remembered = script.index("const remembered =", displayed)
+            self.assertLess(displayed, remembered)
+
     def test_focus_orbit_uses_all_child_priorities_and_shared_refresh(self) -> None:
         script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
         self.assertIn("filter((task) => !isRootTask(task))", script)

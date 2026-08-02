@@ -535,10 +535,12 @@
   }).catch((error) => showFeedback(`分類を変更できませんでした: ${error.message}`));
 
   const renderDetailEmpty = () => {
+    delete detailPanelEl.dataset.taskId;
     detailPanelEl.innerHTML = '<div class="detail-panel__empty"><span class="eyebrow">TASK DETAIL</span><h2>タスクを選択</h2><p>星または一覧のタスクを選ぶと詳細を確認できます。時間計測は「作業開始」を押したときだけ始まります。</p></div>';
   };
 
   const renderDetail = (task, index = 0) => {
+    detailPanelEl.dataset.taskId = taskKey(task, index);
     detailPanelEl.replaceChildren();
     const fragment = detailTemplate.content.cloneNode(true);
     fragment.querySelector('[data-detail="title"]').textContent = text(task.title, "名称未設定");
