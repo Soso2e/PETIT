@@ -1,4 +1,4 @@
-window.PETIT_VERSION = "v0.5.1";
+window.PETIT_VERSION = "v0.6.0";
 
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-petit-version]").forEach((element) => {

@@ -215,16 +215,16 @@
     const ringStart = ringIndex * capacity;
     const ringTotal = Math.min(capacity, Math.max(1, total - ringStart));
     const slotIndex = index - ringStart;
-    const radiusX = Math.min(43, 25 + (ringIndex * 10));
-    const radiusY = Math.min(35, 20 + (ringIndex * 8));
+    const radiusX = Math.min(240, 140 + (ringIndex * 50));
+    const radiusY = Math.min(180, 100 + (ringIndex * 38));
     const duration = 74 + (ringIndex * 18);
     const direction = ringIndex % 2 === 0 ? 1 : -1;
     const angle = (-Math.PI / 2)
       + (Math.PI * 2 * slotIndex / ringTotal)
       + (direction * elapsedSeconds * Math.PI * 2 / duration);
     return {
-      left: `${50 + Math.cos(angle) * radiusX}%`,
-      top: `${50 + Math.sin(angle) * radiusY}%`,
+      x: Math.cos(angle) * radiusX,
+      y: Math.sin(angle) * radiusY,
       ring: ringIndex + 1,
     };
   };
@@ -256,8 +256,8 @@
           Number(node.dataset.orbitTotal || nodes.length),
           orbitClock,
         );
-        node.style.left = position.left;
-        node.style.top = position.top;
+        node.style.setProperty("--orbit-x", `${position.x.toFixed(2)}px`);
+        node.style.setProperty("--orbit-y", `${position.y.toFixed(2)}px`);
       });
       orbitFrame = window.requestAnimationFrame(tick);
     };
@@ -492,8 +492,8 @@
         sync === "failed" ? "space-node--failed" : sync === "conflict" ? "space-node--conflict" : "",
       ].filter(Boolean).join(" ");
       const position = orbitPosition(index, visible.length, orbitClock);
-      button.style.left = position.left;
-      button.style.top = position.top;
+      button.style.setProperty("--orbit-x", `${position.x.toFixed(2)}px`);
+      button.style.setProperty("--orbit-y", `${position.y.toFixed(2)}px`);
       button.dataset.orbitIndex = String(index);
       button.dataset.orbitTotal = String(visible.length);
       button.dataset.orbitRing = String(position.ring);
