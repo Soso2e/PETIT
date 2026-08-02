@@ -11,6 +11,7 @@
   <link rel="manifest" href="/static/manifest.webmanifest" />
   <link rel="stylesheet" href="/static/universe.css" />
   <link rel="stylesheet" href="/static/universe-actions.css" />
+  <link rel="stylesheet" href="/static/universe-next.css" />
 </head>
 <body>
   <div class="space" aria-hidden="true">
@@ -61,9 +62,15 @@
                 <button id="focus-project-next" class="icon-button" type="button" aria-label="次のProject">›</button>
                 <button id="refresh-universe" class="icon-button" type="button" aria-label="タスクを更新">↻</button>
               </div>
+              <div class="focus-zoom-controls" role="group" aria-label="Focus Orbitの拡大縮小">
+                <button id="focus-zoom-out" type="button" aria-label="縮小">−</button>
+                <span id="focus-zoom-label" aria-live="polite">100%</span>
+                <button id="focus-zoom-in" type="button" aria-label="拡大">＋</button>
+                <button id="focus-zoom-reset" type="button">Reset</button>
+              </div>
             </div>
 
-            <div id="orbit" class="orbit" role="list" aria-label="選択Projectの重要タスク">
+            <div id="orbit" class="orbit" role="list" aria-label="選択Projectの重要タスク" data-zoom-level="normal">
               <div class="orbit__ring orbit__ring--one"></div>
               <div class="orbit__ring orbit__ring--two"></div>
               <div class="orbit__ring orbit__ring--three"></div>
@@ -175,6 +182,11 @@
         <div><span>期限</span><strong data-detail="due"></strong></div>
         <div><span>Project</span><strong data-detail="project"></strong></div>
       </div>
+      <label class="detail-project-field">
+        <span>Project分類</span>
+        <select data-action="project" aria-label="TaskをProjectへ分類"></select>
+        <small data-project-help>Projectを読み込んでいます。</small>
+      </label>
       <p data-detail="reason" class="detail-reason"></p>
       <p data-detail="sync" class="detail-sync"></p>
       <div class="detail-actions detail-actions--primary">
@@ -189,5 +201,6 @@
   </template>
 
   <script src="/static/universe-app.js"></script>
+  <script src="/static/universe-next.js"></script>
 </body>
 </html>
