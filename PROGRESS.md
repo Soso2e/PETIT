@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.6.0**
+**Current Version: v0.7.0**
 
 **Last Updated: 2026-08-03**
 
@@ -9,8 +9,8 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
-- バージョン管理: v0.5.1。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
-- Life / Focus UI: LifeをPETITのホーム画面とし、主要ナビをLife・Focus・Tasks・Chatへ整理。LifeとTasksでは1回目のTask操作で選択・ハイライトし、同じTaskの2回目でFocusへ移る。親Task変更は候補選択と適用を分離し、明示的に適用するまでAPI送信しない。Focusは軌道ノードを再利用し、選択のたびに登場演出を再生せず、移動ループを止めずに連続移動する。CSS球体と子タスク周回を維持しつつ、390x844のブラウザ表示で最初のTaskが初期画面内に入るようLifeの縦間隔を調整した。PCブラウザと2段階選択、Focus連続移動、親候補の未保存状態、390x844レスポンシブ表示は動作確認済み。実Notionへの親変更と実iPhone PWAは未確認。
+- バージョン管理: v0.7.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
+- Life / Focus UI: 既存画面の上へ共通デザインシステムを追加し、全画面の色・余白・文字・角丸・影・操作状態・フォーカス表現を統一した。現在のView・選択対象・作業セッション・同期状態を常時表示するコンテキストバー、ライト／ダークテーマ切替、モバイル下部ナビ、44px前後の操作領域、reduced motion、ページ非表示時のアニメーション停止を実装。Three.jsは未導入のため依存を追加せず、既存OrbitへCSS 3Dの奥行き・視差・ノード階層を加えた。LifeとTasksでは1回目のTask操作で選択・ハイライトし、同じTaskの2回目でFocusへ移る。親Task変更は候補選択と適用を分離し、明示的に適用するまでAPI送信しない。実ブラウザと実iPhone PWAは未確認。
 - 制作伴走 / Today: 作業セッションをSQLiteで永続化し、20分ごとの継続確認と無応答時の自動停止をバックグラウンドWorkerで実行する。Todayは今日の合計、作業中状態、セッション数、取り組み数、最長Focus、タイムライン、取り組み別配分とLife・Focusへの行動導線を表示する。実ブラウザ・実Push・iPhone PWA E2Eは未確認。
 - 会話 / Agent Runtime: Project Continuity・挨拶・正確な現在時刻だけを決定論的な安全ゲートで処理し、通常会話はChatモデルのCapability Routerが最大4領域を選ぶ。Agentには選択領域内の登録済みToolだけを公開し、既定3ラウンド・Tool総数6・同一Tool同一引数1回の上限、結果圧縮、書き込み承認、30分以内のAgent状態再開、履歴へ残さない進捗表示を実装。確認対象Toolは承認前にschema検証し、親子タスク変更は`set_task_parent`へ集約、Runtime外の重複確認はTool callへ戻す。実装準拠フローは`docs/runtime-flows.md`を正とする。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
@@ -18,8 +18,8 @@
 - タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。作成・完了は確認付きでNotion同期する。親子移動のUI処理は`task-flow.js`へ一本化し、詳細パネルに表示中のタスクIDを更新対象として使い、移動後は同一タスクIDを再取得して新しい親のFocusへ移る。同じ親またはLife直下への重複要求はサーバーでno-opとし、Notion更新を二重登録しない。Life直下Taskを親として2階層まで扱い、親Task詳細から作成した小タスクは親Relationへ接続する。実Notionでの移動・Relation反映E2Eは未確認。
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
-- 今回の検証: Task・Focus・Life・親子関係・モバイル/PWAの関連72テストに加え、Focus演出の関連27テスト、3 JavaScriptファイルの構文、`git diff --check`は成功。実データ入りブラウザでLifeの1回目選択、2回目Focus遷移、遷移後の選択残り解消、親候補選択時の未保存表示、FocusノードのDOM再利用とクリック前後の連続移動、v0.5.1表示、390x844配置を確認済み。保存ボタンは実Notionデータを書き換えないよう未実行。全体394テストは既存のBackend・旧UI・外部依存範囲で30失敗・8エラー（`sona_agent_core`未導入、旧UI要素期待、Agent/LLMモック契約、既存SQLite schemaなど）。
-- 次にやること: テスト用Notionタスクで親変更の明示適用、変更後のFocus移動、Relation同期をE2E確認する。実iPhone PWAでLifeの縦幅・タップ領域・周回停止を確認する。
+- 今回の検証: 共通UI資産の読込、ライトテーマ、reduced motion、コンテキストバー、CSS 3D、タブARIA、IME Enter保護、v0.7.0表記を確認する5テストは成功。`chat_input.js`、`petit-ui-system.js`、`petit-version.js`のNode構文チェックも成功。既存のTask・Focus・Life・親子関係・モバイル/PWA関連テスト結果は維持する。全体394テストの既存Backend・旧UI・外部依存範囲の30失敗・8エラーは未解決。
+- 次にやること: PCブラウザと390x844で全View、状態バー、ライト／ダーク、Focus 3D、モバイル下部ナビを実画面確認する。実iPhone PWAでタップ領域、セーフエリア、キーボード表示時、アニメーション負荷を確認する。テスト用Notionタスクで親変更とRelation同期もE2E確認する。
 
 ## 履歴
 
@@ -41,4 +41,4 @@
 | 2026-08-02 | 19:51 | #12 | v0.6.0として大改造を完了。PWAスマホ通知のタップ同頭権限要求・SW一本化、Focus OrbitのGPUトランスフォーム化、Cosmic Glass UI全面刷新を実装 |
 | 2026-08-02 | 20:03 | #14 | Notion同期失敗（`親タスク`プロパティ欠落および`done_date`引数不一致）の安全ガード・フォールバック修正と失敗キューの修復 |
 | 2026-08-03 | 20:13 | #15 | task_sync_queue: createキュー再試行時のNotionページ重複作成を修正。external_id中間保存で冪等性を確保 |
-
+| 2026-08-02 | 20:45 | #16 | Issue #177: v0.7.0共通UIシステム、状態バー、テーマ切替、モバイル下部ナビ、CSS 3D、モーション統一と回帰テストを追加 |
