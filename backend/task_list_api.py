@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from . import db, notifications
+from .tools import task_hierarchy
 
 _INSTALLED = False
 _OPEN_STATUS_SQL = "lower(status) NOT IN ('done', 'canceled', 'cancelled', 'chancel', '完了')"
@@ -24,8 +25,6 @@ class TaskParentUpdate(BaseModel):
 
 
 def _ensure_universe_schema() -> None:
-    from .tools import task_hierarchy
-
     task_hierarchy.ensure_task_hierarchy_schema()
 
 
@@ -126,8 +125,6 @@ def list_ui_tasks(priority: str = "high", limit: int = 100) -> JSONResponse:
 
 
 def patch_task_parent(task_id: int, payload: TaskParentUpdate) -> JSONResponse:
-    from .tools import task_hierarchy
-
     values = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
     parent_task_id = values.get("parent_task_id")
     move_to_life = bool(values.get("move_to_life"))
