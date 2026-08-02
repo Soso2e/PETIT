@@ -25,9 +25,10 @@
     <header class="universe-topbar">
       <a class="brand" href="/" aria-label="PETIT Universe">
         <img src="/static/branding/icon_logo.png" alt="" />
-        <span><strong>PETIT</strong><small>UNIVERSE · v0.1.0</small></span>
+        <span><strong>PETIT</strong><small>UNIVERSE · <span data-petit-version></span></small></span>
       </a>
       <nav class="view-tabs" aria-label="ビュー切り替え">
+        <button class="view-tab" data-view="today">Today</button>
         <button class="view-tab is-active" data-view="focus">Focus</button>
         <button class="view-tab" data-view="universe">Life</button>
         <button class="view-tab" data-view="tasks">Tasks</button>
@@ -36,12 +37,43 @@
       </nav>
       <div class="topbar-actions">
         <span id="sync-pill" class="sync-pill" hidden>同期確認中</span>
-        <span class="version-pill" data-petit-version>v0.1.0</span>
+        <span class="version-pill" data-petit-version></span>
         <a class="legacy-link" href="/static/legacy.html">旧UI</a>
       </div>
     </header>
 
     <main class="universe-main">
+      <section class="view" data-view-panel="today" hidden>
+        <div class="section-head today-section-head">
+          <div>
+            <span class="eyebrow">TODAY</span>
+            <h1 id="today-title">今日の流れ</h1>
+            <p>予定と作業実績を一緒に見て、次に動くことを決めます。</p>
+          </div>
+          <button id="refresh-today" class="icon-button" type="button" aria-label="今日の情報を更新">↻</button>
+        </div>
+        <div class="today-grid">
+          <section class="today-card today-card--summary">
+            <span class="eyebrow">WORKED TODAY</span>
+            <strong id="today-total">0分</strong>
+            <p id="today-message">まだ作業記録はありません。</p>
+          </section>
+          <section class="today-card">
+            <span class="eyebrow">NOW</span>
+            <strong id="today-active">作業中ではありません</strong>
+            <p id="today-active-meta">Focusから作業を開始すると、ここに表示されます。</p>
+          </section>
+          <section class="today-card today-card--wide">
+            <div class="today-card__head"><span class="eyebrow">TIMELINE</span><strong>今日の作業</strong></div>
+            <div id="today-timeline" class="today-timeline"></div>
+          </section>
+          <section class="today-card today-card--wide">
+            <div class="today-card__head"><span class="eyebrow">BY PROJECT</span><strong>プロジェクト別</strong></div>
+            <div id="today-projects" class="today-projects"></div>
+          </section>
+        </div>
+      </section>
+
       <section class="view is-active" data-view-panel="focus">
         <div class="focus-layout">
           <section class="orbit-card" aria-label="Life直下の親タスクと子タスクを表示するFocus Orbit">
@@ -112,11 +144,7 @@
 
       <section class="view" data-view-panel="universe" hidden>
         <div class="section-head universe-section-head">
-          <div>
-            <span class="eyebrow">LIFE</span>
-            <h1>Life → Task → Child Task</h1>
-            <p>すべてのタスクはLife直下にあり、必要なタスクだけが親となって子タスクを持ちます。</p>
-          </div>
+          <div><span class="eyebrow">LIFE</span><h1>Life → Task → Child Task</h1><p>すべてのタスクはLife直下にあり、必要なタスクだけが親となって子タスクを持ちます。</p></div>
           <div id="universe-summary" class="universe-summary" aria-live="polite">読み込み中…</div>
         </div>
         <div id="constellation-grid" class="constellation-grid constellation-grid--list"></div>
@@ -124,112 +152,33 @@
 
       <section class="view" data-view-panel="tasks" hidden>
         <div class="section-head task-section-head">
-          <div>
-            <span class="eyebrow">TASKS</span>
-            <h1 id="task-view-title">重要なタスク</h1>
-            <p id="task-view-copy">今やる必要があるHighタスクだけを表示します。</p>
-          </div>
-          <div class="task-filter-wrap">
-            <span id="task-view-count" class="task-count">0件</span>
-            <div class="task-filters" role="group" aria-label="タスク表示切り替え">
-              <button class="filter-chip is-active" data-filter="high">重要</button>
-              <button class="filter-chip" data-filter="low">あとで</button>
-            </div>
-          </div>
+          <div><span class="eyebrow">TASKS</span><h1 id="task-view-title">重要なタスク</h1><p id="task-view-copy">今やる必要があるHighタスクだけを表示します。</p></div>
+          <div class="task-filter-wrap"><span id="task-view-count" class="task-count">0件</span><div class="task-filters" role="group" aria-label="タスク表示切り替え"><button class="filter-chip is-active" data-filter="high">重要</button><button class="filter-chip" data-filter="low">あとで</button></div></div>
         </div>
-        <div class="task-table-wrap">
-          <table class="task-table">
-            <thead><tr><th>完了</th><th>名前</th><th>期限</th><th>親Task</th><th>同期</th></tr></thead>
-            <tbody id="task-table-body"></tbody>
-          </table>
-        </div>
+        <div class="task-table-wrap"><table class="task-table"><thead><tr><th>完了</th><th>名前</th><th>期限</th><th>親Task</th><th>同期</th></tr></thead><tbody id="task-table-body"></tbody></table></div>
       </section>
 
       <section class="view" data-view-panel="reminders" hidden>
-        <div class="section-head reminder-section-head">
-          <div>
-            <span class="eyebrow">REMINDERS</span>
-            <h1>忘れないための約束</h1>
-            <p>Chatで登録したリマインダーを確認し、完了・延期・取消できます。</p>
-          </div>
-          <div class="reminder-toolbar">
-            <div class="reminder-filters" role="group" aria-label="リマインダー表示切り替え">
-              <button class="reminder-filter is-active" type="button" data-reminder-filter="upcoming">未完了</button>
-              <button class="reminder-filter" type="button" data-reminder-filter="history">履歴</button>
-              <button class="reminder-filter" type="button" data-reminder-filter="all">すべて</button>
-            </div>
-            <button id="refresh-reminders" class="reminder-refresh" type="button">更新</button>
-          </div>
-        </div>
-        <div class="reminder-summary-line">
-          <span id="reminder-count">0件</span>
-          <span id="reminder-status" class="reminder-status" aria-live="polite">読み込み中</span>
-        </div>
+        <div class="section-head reminder-section-head"><div><span class="eyebrow">REMINDERS</span><h1>忘れないための約束</h1><p>Chatで登録したリマインダーを確認し、完了・延期・取消できます。</p></div><div class="reminder-toolbar"><div class="reminder-filters" role="group" aria-label="リマインダー表示切り替え"><button class="reminder-filter is-active" type="button" data-reminder-filter="upcoming">未完了</button><button class="reminder-filter" type="button" data-reminder-filter="history">履歴</button><button class="reminder-filter" type="button" data-reminder-filter="all">すべて</button></div><button id="refresh-reminders" class="reminder-refresh" type="button">更新</button></div></div>
+        <div class="reminder-summary-line"><span id="reminder-count">0件</span><span id="reminder-status" class="reminder-status" aria-live="polite">読み込み中</span></div>
         <div id="reminder-list" class="reminder-list" aria-live="polite"></div>
       </section>
 
       <section class="view" data-view-panel="chat" hidden>
-        <div class="chat-layout">
-          <section class="chat-panel">
-            <div class="section-head section-head--compact">
-              <div><span class="eyebrow">PETIT CHAT</span><h1>宇宙と会話する</h1></div>
-              <span id="chat-status" class="chat-status">接続確認中</span>
-            </div>
-            <div id="messages" class="messages" aria-live="polite">
-              <div class="message message--assistant">いま必要なことを一緒に整理しよう。</div>
-            </div>
-            <form id="chat-form" class="chat-composer">
-              <textarea id="chat-input" rows="1" placeholder="PETITに話しかける"></textarea>
-              <button type="submit">送信</button>
-            </form>
-          </section>
-          <aside class="chat-context">
-            <span class="eyebrow">CURRENT CONTEXT</span>
-            <h2 id="chat-context-title">Focus未選択</h2>
-            <p id="chat-context-copy">タスクを選ぶと、その内容を意識しながら相談できます。</p>
-          </aside>
-        </div>
+        <div class="chat-layout"><section class="chat-panel"><div class="section-head section-head--compact"><div><span class="eyebrow">PETIT CHAT</span><h1>宇宙と会話する</h1></div><span id="chat-status" class="chat-status">接続確認中</span></div><div id="messages" class="messages" aria-live="polite"><div class="message message--assistant">いま必要なことを一緒に整理しよう。</div></div><form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="1" placeholder="PETITに話しかける"></textarea><button type="submit">送信</button></form></section><aside class="chat-context"><span class="eyebrow">CURRENT CONTEXT</span><h2 id="chat-context-title">Focus未選択</h2><p id="chat-context-copy">タスクを選ぶと、その内容を意識しながら相談できます。</p></aside></div>
       </section>
     </main>
   </div>
 
-  <div id="task-feedback" class="task-feedback" role="status" aria-live="polite" hidden>
-    <span data-feedback-copy></span>
-    <button type="button" data-feedback-action hidden></button>
-  </div>
+  <div id="task-feedback" class="task-feedback" role="status" aria-live="polite" hidden><span data-feedback-copy></span><button type="button" data-feedback-action hidden></button></div>
 
-  <template id="detail-template">
-    <div class="detail-panel__content">
-      <span class="eyebrow">TASK DETAIL</span>
-      <h2 data-detail="title"></h2>
-      <div class="detail-grid detail-grid--simple">
-        <div><span>状態</span><strong data-detail="status"></strong></div>
-        <div><span>分類</span><strong data-detail="bucket"></strong></div>
-        <div><span>期限</span><strong data-detail="due"></strong></div>
-        <div><span>親Task</span><strong data-detail="project"></strong></div>
-      </div>
-      <label class="detail-parent-field">
-        <span>親子関係</span>
-        <select data-action="parent" aria-label="Taskの親を選択"></select>
-        <small data-parent-help>親タスクを読み込んでいます。</small>
-      </label>
-      <p data-detail="reason" class="detail-reason"></p>
-      <p data-detail="sync" class="detail-sync"></p>
-      <div class="detail-actions detail-actions--primary">
-        <button type="button" data-action="complete">完了にする</button>
-        <button type="button" data-action="bucket">あとでに移す</button>
-      </div>
-      <div class="detail-actions detail-actions--secondary">
-        <button type="button" data-action="activate">作業開始</button>
-        <button type="button" data-action="chat">PETITに相談</button>
-      </div>
-    </div>
-  </template>
+  <template id="detail-template"><div class="detail-panel__content"><span class="eyebrow">TASK DETAIL</span><h2 data-detail="title"></h2><div class="detail-grid detail-grid--simple"><div><span>状態</span><strong data-detail="status"></strong></div><div><span>分類</span><strong data-detail="bucket"></strong></div><div><span>期限</span><strong data-detail="due"></strong></div><div><span>親Task</span><strong data-detail="project"></strong></div></div><label class="detail-parent-field"><span>親子関係</span><select data-action="parent" aria-label="Taskの親を選択"></select><small data-parent-help>親タスクを読み込んでいます。</small></label><p data-detail="reason" class="detail-reason"></p><p data-detail="sync" class="detail-sync"></p><div class="detail-actions detail-actions--primary"><button type="button" data-action="complete">完了にする</button><button type="button" data-action="bucket">あとでに移す</button></div><div class="detail-actions detail-actions--secondary"><button type="button" data-action="activate">作業開始</button><button type="button" data-action="chat">PETITに相談</button></div></div></template>
 
   <script src="/static/petit-version.js"></script>
   <script src="/static/universe-app.js"></script>
   <script src="/static/chat_keyboard.js"></script>
   <script src="/static/universe-next.js"></script>
+  <script src="/static/today.js"></script>
   <script src="/static/reminders.js"></script>
 </body>
 </html>
