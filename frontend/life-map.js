@@ -3,8 +3,11 @@
   const MAP_SELECTOR = "#constellation-grid";
   const SVG_NS = "http://www.w3.org/2000/svg";
   const mobileQuery = window.matchMedia("(max-width: 640px)");
+  const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const replayTargets = new WeakSet();
   let decorating = false;
   let scheduled = false;
+  let transitionBusy = false;
 
   const projectCards = (map) => Array.from(map.children)
     .filter((element) => element.classList?.contains("constellation-card"));
@@ -104,6 +107,66 @@
     });
   };
 
+  const replayClick = (target) => {
+    replayTargets.add(target);
+    window.requestAnimationFrame(() => target.click());
+  };
+
+  const finishDive = (target, portal) => {
+    portal.remove();
+    document.body.classList.remove("life-dive-active");
+    transitionBusy = false;
+    replayClick(target);
+  };
+
+  const diveToFocus = (event) => {
+    const target = event.target instanceof Element
+      ? event.target.closest(".constellation-card__header, .universe-task")
+      : null;
+    if (!(target instanceof HTMLElement)) return;
+    if (replayTargets.has(target)) {
+      replayTargets.delete(target);
+      return;
+    }
+    if (transitionBusy) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (reducedMotionQuery.matches) {
+      replayClick(target);
+      return;
+    }
+
+    transitionBusy = true;
+    const rect = target.getBoundingClientRect();
+    const portal = target.cloneNode(true);
+    portal.classList.add("life-dive-portal");
+    portal.removeAttribute("id");
+    portal.setAttribute("aria-hidden", "true");
+    portal.style.left = `${rect.left}px`;
+    portal.style.top = `${rect.top}px`;
+    portal.style.width = `${Math.max(44, rect.width)}px`;
+    portal.style.height = `${Math.max(44, rect.height)}px`;
+    document.body.appendChild(portal);
+    document.body.classList.add("life-dive-active");
+
+    let finished = false;
+    const complete = () => {
+      if (finished) return;
+      finished = true;
+      finishDive(target, portal);
+    };
+    portal.addEventListener("transitionend", complete, { once: true });
+    window.setTimeout(complete, 560);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => portal.classList.add("is-active"));
+    });
+  };
+
   const decorate = () => {
     const map = document.querySelector(MAP_SELECTOR);
     if (!map || decorating) return;
@@ -167,6 +230,7 @@
     const map = document.querySelector(MAP_SELECTOR);
     if (!map || map.dataset.lifeMapReady === "true") return;
     map.dataset.lifeMapReady = "true";
+    map.addEventListener("click", diveToFocus, true);
     const observer = new MutationObserver(scheduleDecorate);
     observer.observe(map, { childList: true });
     mobileQuery.addEventListener?.("change", scheduleDecorate);
