@@ -31,6 +31,36 @@
 
   let activeView = "today";
 
+  function installNewUiReturn() {
+    const settings = views.get("settings");
+    const content = settings?.querySelector(".view-content");
+    if (!content || content.querySelector("[data-new-ui-return]")) return;
+
+    const section = document.createElement("section");
+    section.className = "settings-card";
+    section.dataset.newUiReturn = "1";
+    const head = document.createElement("div");
+    head.className = "settings-card__head";
+    const copy = document.createElement("div");
+    const heading = document.createElement("h3");
+    heading.textContent = "新しいUI";
+    const description = document.createElement("p");
+    description.textContent = "重要タスクに集中するUniverse UIへ戻ります。";
+    copy.append(heading, description);
+    const link = document.createElement("a");
+    link.href = "/static/universe.html";
+    link.className = "work-button";
+    link.textContent = "新UIに戻る";
+    link.setAttribute("aria-label", "PETIT Universeの新UIに戻る");
+    link.style.display = "inline-flex";
+    link.style.alignItems = "center";
+    link.style.justifyContent = "center";
+    link.style.textDecoration = "none";
+    head.append(copy, link);
+    section.appendChild(head);
+    content.prepend(section);
+  }
+
   function updateUrl(view) {
     const url = new URL(window.location.href);
     if (view === "today") url.searchParams.delete("view");
@@ -51,9 +81,7 @@
     for (const button of navButtons) {
       const selected = button.dataset.appNav === target;
       button.setAttribute("aria-selected", String(selected));
-      if (button.id === "notification-toggle") {
-        button.setAttribute("aria-expanded", String(selected));
-      }
+      if (button.id === "notification-toggle") button.setAttribute("aria-expanded", String(selected));
     }
 
     const copy = metadata[target] || metadata.today;
@@ -74,9 +102,9 @@
     document.dispatchEvent(new CustomEvent("petit:viewchange", { detail: { view: target } }));
   }
 
-  for (const button of navButtons) {
-    button.addEventListener("click", () => navigate(button.dataset.appNav || "today"));
-  }
+  installNewUiReturn();
+
+  for (const button of navButtons) button.addEventListener("click", () => navigate(button.dataset.appNav || "today"));
 
   for (const button of document.querySelectorAll("[data-chat-prompt]")) {
     button.addEventListener("click", () => {
@@ -102,8 +130,5 @@
   const requested = deepLinkView || params.get("view") || localStorage.getItem("petit_active_view") || "today";
   navigate(requested, { updateUrl: false, focus: false });
 
-  window.PETITShell = {
-    navigate,
-    currentView: () => activeView,
-  };
+  window.PETITShell = { navigate, currentView: () => activeView };
 })();
