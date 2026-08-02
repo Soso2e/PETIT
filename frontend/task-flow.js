@@ -1,0 +1,272 @@
+// PETIT parent-task flow: keep hierarchy edits and child creation inside Focus.
+(() => {
+  const state = {
+    tasks: [],
+    selectedTaskId: null,
+    loading: false,
+  };
+
+  const byId = (id) => document.getElementById(id);
+  const text = (value) => String(value ?? "").trim();
+  const taskId = (task) => String(task?.id || task?.external_id || "");
+  const isRoot = (task) => task?.hierarchy_role === "root" || !task?.parent_task_id;
+  const rootTitle = (task) => text(task?.root_title || task?.project_title || task?.title);
+
+  const requestJson = async (url, options = {}) => {
+    const response = await fetch(url, { cache: "no-store", ...options });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  };
+
+  const showFeedback = (message) => {
+    const feedback = byId("task-feedback");
+    const copy = feedback?.querySelector("[data-feedback-copy]");
+    const action = feedback?.querySelector("[data-feedback-action]");
+    if (!feedback || !copy) return;
+    copy.textContent = message;
+    if (action) action.hidden = true;
+    feedback.hidden = false;
+    window.setTimeout(() => { feedback.hidden = true; }, 5200);
+  };
+
+  const loadCatalog = async () => {
+    if (state.loading) return;
+    state.loading = true;
+    try {
+      const data = await requestJson("/api/notifications/tasks?priority=all&limit=500");
+      state.tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      decorateDetail();
+    } catch (error) {
+      console.warn("PETIT task flow catalog load failed", error);
+    } finally {
+      state.loading = false;
+    }
+  };
+
+  const findTask = ({ id = "", title = "", root = "" } = {}) => {
+    if (id) {
+      const exact = state.tasks.find((task) => taskId(task) === String(id));
+      if (exact) return exact;
+    }
+    const matches = state.tasks.filter((task) => {
+      if (title && text(task.title) !== title) return false;
+      if (root && rootTitle(task) !== root) return false;
+      return true;
+    });
+    return matches[0] || null;
+  };
+
+  const rememberTaskFromClick = (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    const node = target.closest(".space-node[data-task-id]");
+    if (node) {
+      state.selectedTaskId = node.dataset.taskId || null;
+      return;
+    }
+    const universeTask = target.closest(".universe-task");
+    if (universeTask) {
+      const task = findTask({
+        title: text(universeTask.querySelector(".universe-task__title")?.textContent),
+        root: text(universeTask.closest(".constellation-card")?.querySelector(".constellation-card__heading strong")?.textContent),
+      });
+      state.selectedTaskId = task ? taskId(task) : null;
+      return;
+    }
+    const row = target.closest("#task-table-body tr");
+    if (row) {
+      const task = findTask({ title: text(row.querySelector(".task-table__title")?.textContent) });
+      state.selectedTaskId = task ? taskId(task) : null;
+    }
+  };
+
+  const currentDetailTask = () => {
+    const remembered = findTask({ id: state.selectedTaskId || "" });
+    if (remembered) return remembered;
+    const title = text(byId("detail-panel")?.querySelector('[data-detail="title"]')?.textContent);
+    const task = findTask({ title });
+    if (task) state.selectedTaskId = taskId(task);
+    return task;
+  };
+
+  const activateView = (view) => {
+    if (window.PetitAppShell?.activateView) {
+      window.PetitAppShell.activateView(view);
+      return;
+    }
+    document.querySelector(`[data-view="${view}"]`)?.click();
+  };
+
+  const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+  const focusRoot = async (title, selectedChildId = "") => {
+    activateView("focus");
+    byId("refresh-universe")?.click();
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const select = byId("focus-project-select");
+      const option = Array.from(select?.options || []).find((item) => item.value === title);
+      if (select && option) {
+        select.value = title;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        if (!selectedChildId) return;
+        for (let childAttempt = 0; childAttempt < 20; childAttempt += 1) {
+          const node = document.querySelector(`#task-nodes [data-task-id="${CSS.escape(String(selectedChildId))}"]`);
+          if (node instanceof HTMLElement) {
+            node.click();
+            return;
+          }
+          await wait(70);
+        }
+        return;
+      }
+      await wait(80);
+    }
+  };
+
+  const changeParent = async (task, select) => {
+    const help = select.closest(".detail-parent-field")?.querySelector("[data-parent-help]");
+    const parentId = text(select.value);
+    const moveToLife = !parentId;
+    const parent = moveToLife ? null : findTask({ id: parentId });
+    if (!moveToLife && !parent) return;
+
+    select.disabled = true;
+    if (help) help.textContent = moveToLife
+      ? "Life直下へ戻しています…"
+      : `「${parent.title}」へ移動しています…`;
+    try {
+      const data = await requestJson(`/api/notifications/tasks/${encodeURIComponent(taskId(task))}/parent`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(moveToLife
+          ? { move_to_life: true }
+          : { parent_task_id: Number(parent.id) }),
+      });
+      await loadCatalog();
+      const destination = data.parent?.title || text(task.title);
+      showFeedback(moveToLife
+        ? `「${text(task.title)}」をLife直下へ戻し、そのTaskへ移動しました。`
+        : `「${text(task.title)}」を「${destination}」の子タスクにし、親Taskへ移動しました。`);
+      await focusRoot(destination, moveToLife ? "" : taskId(task));
+    } catch (error) {
+      if (help) help.textContent = error.message;
+      showFeedback(`親子関係を変更できませんでした: ${error.message}`);
+      select.disabled = false;
+      select.value = String(task.parent_task_id || "");
+    }
+  };
+
+  const handleParentChange = (event) => {
+    const select = event.target instanceof Element
+      ? event.target.closest('[data-action="parent"]')
+      : null;
+    if (!(select instanceof HTMLSelectElement)) return;
+    const task = currentDetailTask();
+    if (!task) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    void changeParent(task, select);
+  };
+
+  const createChildComposer = (task) => {
+    const section = document.createElement("section");
+    section.className = "detail-child-create";
+    section.dataset.parentTaskId = taskId(task);
+    section.innerHTML = `
+      <div class="detail-child-create__head">
+        <div><span class="eyebrow">CHILD TASK</span><strong>この親Taskに小タスクを追加</strong></div>
+        <small>追加後も、この親TaskのFocusに留まります。</small>
+      </div>
+      <form data-child-form>
+        <div class="detail-child-create__fields">
+          <input name="title" type="text" maxlength="200" autocomplete="off" placeholder="小タスク名" aria-label="小タスク名" required />
+          <select name="priority" aria-label="優先度">
+            <option value="High">High</option>
+            <option value="Mid">Mid</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <button type="submit">追加してFocusに表示</button>
+      </form>
+      <div class="detail-child-create__status" data-child-status>親Taskを分けずに、ここへ実行単位を追加できます。</div>
+    `;
+    return section;
+  };
+
+  const submitChild = async (form, task) => {
+    const input = form.querySelector('input[name="title"]');
+    const priority = form.querySelector('select[name="priority"]');
+    const button = form.querySelector('button[type="submit"]');
+    const status = form.closest(".detail-child-create")?.querySelector("[data-child-status]");
+    const title = text(input?.value);
+    if (!title) return;
+
+    if (button) button.disabled = true;
+    if (input) input.disabled = true;
+    if (priority) priority.disabled = true;
+    if (status) status.textContent = "小タスクを追加しています…";
+    try {
+      const data = await requestJson(`/api/notifications/tasks/${encodeURIComponent(taskId(task))}/children`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          priority: text(priority?.value) || "High",
+        }),
+      });
+      if (input) input.value = "";
+      const childId = taskId(data.task);
+      state.selectedTaskId = childId || state.selectedTaskId;
+      await loadCatalog();
+      showFeedback(`「${title}」を「${text(task.title)}」の小タスクとして追加しました。`);
+      await focusRoot(text(task.title), childId);
+    } catch (error) {
+      if (status) status.textContent = error.message;
+      showFeedback(`小タスクを追加できませんでした: ${error.message}`);
+    } finally {
+      if (button) button.disabled = false;
+      if (input) input.disabled = false;
+      if (priority) priority.disabled = false;
+    }
+  };
+
+  const decorateDetail = () => {
+    const detail = byId("detail-panel")?.querySelector(".detail-panel__content");
+    if (!detail) return;
+    const task = currentDetailTask();
+    const existing = detail.querySelector(".detail-child-create");
+    if (!task || !isRoot(task)) {
+      existing?.remove();
+      return;
+    }
+    if (existing?.dataset.parentTaskId === taskId(task)) return;
+    existing?.remove();
+    const composer = createChildComposer(task);
+    const primaryActions = detail.querySelector(".detail-actions--primary");
+    detail.insertBefore(composer, primaryActions || null);
+    composer.querySelector("[data-child-form]")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void submitChild(event.currentTarget, task);
+    });
+  };
+
+  const initialize = () => {
+    document.addEventListener("click", rememberTaskFromClick, true);
+    document.addEventListener("change", handleParentChange, true);
+    const detailPanel = byId("detail-panel");
+    if (detailPanel) {
+      new MutationObserver(() => queueMicrotask(decorateDetail)).observe(detailPanel, {
+        childList: true,
+        subtree: true,
+      });
+    }
+    void loadCatalog();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initialize, { once: true });
+  } else {
+    initialize();
+  }
+})();

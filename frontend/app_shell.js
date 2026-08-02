@@ -1,8 +1,9 @@
 // Shared PETIT application shell for Universe UI.
 (() => {
-  const PRIMARY_VIEWS = ["today", "focus", "tasks", "chat"];
+  const HOME_VIEW = "universe";
+  const PRIMARY_VIEWS = ["universe", "focus", "tasks", "chat"];
   const MORE_VIEWS = [
-    { view: "universe", label: "Life" },
+    { view: "today", label: "Today" },
     { view: "reminders", label: "Reminders" },
   ];
 
@@ -24,14 +25,19 @@
     if (document.querySelector(`script[data-petit-module="${marker}"]`)) return;
     const script = document.createElement("script");
     script.src = src;
+    script.async = false;
     script.dataset.petitModule = marker;
     document.head.appendChild(script);
   };
 
-  const installLifeMap = () => {
+  const installUniverseModules = () => {
+    loadStylesheet("/static/today.css", "today-style");
     if (!document.querySelector('[data-view-panel="universe"]')) return;
     loadStylesheet("/static/life-map.css", "life-map-style");
+    loadStylesheet("/static/life-transition.css", "life-transition-style");
+    loadStylesheet("/static/task-flow.css", "task-flow-style");
     loadScript("/static/life-map.js", "life-map-script");
+    loadScript("/static/task-flow.js", "task-flow-script");
   };
 
   const createMoreMenu = (nav) => {
@@ -154,27 +160,36 @@
     document.head.appendChild(style);
   };
 
+  const reorderNavigation = (nav) => {
+    const buttons = new Map(
+      Array.from(nav.querySelectorAll("[data-view]")).map((button) => [button.dataset.view, button]),
+    );
+    PRIMARY_VIEWS.forEach((view) => {
+      const button = buttons.get(view);
+      if (button) nav.appendChild(button);
+    });
+    Array.from(buttons.entries()).forEach(([view, button]) => {
+      button.hidden = !PRIMARY_VIEWS.includes(view);
+    });
+  };
+
   const initialize = () => {
     const nav = document.querySelector(".view-tabs");
     if (!nav || nav.dataset.petitAppShellReady === "true") return;
     nav.dataset.petitAppShellReady = "true";
 
-    Array.from(nav.querySelectorAll("[data-view]")).forEach((button) => {
-      const view = button.dataset.view;
-      button.hidden = !PRIMARY_VIEWS.includes(view);
-    });
-
+    reorderNavigation(nav);
     installStyles();
-    installLifeMap();
+    installUniverseModules();
     createMoreMenu(nav);
 
     const requested = new URLSearchParams(window.location.search).get("view");
-    if (requested && [...PRIMARY_VIEWS, ...MORE_VIEWS.map((item) => item.view)].includes(requested)) {
-      window.requestAnimationFrame(() => activateView(requested));
-    }
+    const supported = [...PRIMARY_VIEWS, ...MORE_VIEWS.map((item) => item.view)];
+    const initialView = requested && supported.includes(requested) ? requested : HOME_VIEW;
+    window.requestAnimationFrame(() => activateView(initialView));
   };
 
-  window.PetitAppShell = { initialize, activateView };
+  window.PetitAppShell = { initialize, activateView, homeView: HOME_VIEW };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initialize, { once: true });
   } else {
