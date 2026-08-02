@@ -52,15 +52,31 @@ class RuntimePromptWiringTests(unittest.TestCase):
         self.assertIn("time_context.with_current_context(_ROUTER_SYSTEM_PROMPT)", router)
 
 
-class DesktopUniverseLayoutTests(unittest.TestCase):
-    def test_laptop_width_layout_safety_rules_exist(self) -> None:
+class ResponsiveUniverseLayoutTests(unittest.TestCase):
+    def test_laptop_layout_starts_above_phone_landscape_widths(self) -> None:
         css = (FRONTEND / "reminders.css").read_text(encoding="utf-8")
-        self.assertIn("@media (max-width: 1180px) and (min-width: 641px)", css)
-        self.assertIn(".universe-topbar", css)
-        self.assertIn(".view-tabs", css)
+        self.assertIn("@media (min-width: 981px) and (max-width: 1180px)", css)
+        self.assertNotIn("@media (max-width: 1180px) and (min-width: 641px)", css)
         self.assertIn(".focus-layout,", css)
         self.assertIn(".chat-layout", css)
         self.assertIn("grid-template-columns: 1fr", css)
+
+    def test_mobile_navigation_fits_five_tabs_inside_viewport(self) -> None:
+        css = (FRONTEND / "reminders.css").read_text(encoding="utf-8")
+        self.assertIn("@media (max-width: 980px)", css)
+        self.assertIn("grid-template-columns: repeat(5, minmax(0, 1fr))", css)
+        self.assertIn("overflow: visible", css)
+        self.assertIn("text-overflow: ellipsis", css)
+        self.assertIn("@media (max-width: 640px)", css)
+        self.assertIn("font-size: 10.5px", css)
+
+    def test_mobile_content_panels_use_compact_spacing(self) -> None:
+        css = (FRONTEND / "reminders.css").read_text(encoding="utf-8")
+        self.assertIn(".orbit-card__header", css)
+        self.assertIn("padding: 18px 16px 0", css)
+        self.assertIn(".chat-panel,", css)
+        self.assertIn(".detail-panel", css)
+        self.assertIn("padding: 18px", css)
 
 
 if __name__ == "__main__":
