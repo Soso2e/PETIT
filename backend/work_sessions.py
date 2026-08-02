@@ -1,9 +1,10 @@
-"""Server-side work-session check-ins and inactivity timeout."""
+"""Server-side work-session check-ins, daily summaries, and inactivity timeout."""
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -15,11 +16,13 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/work-sessions", tags=["work-sessions"])
 
 CHECK_INTERVAL_MINUTES = 20
+TOKYO = ZoneInfo("Asia/Tokyo")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS work_sessions (
     session_id              TEXT PRIMARY KEY,
     task                    TEXT NOT NULL,
+    project_id              TEXT,
     status                  TEXT NOT NULL DEFAULT 'active',
     started_at              TEXT NOT NULL,
     paused_at               TEXT,
@@ -33,12 +36,15 @@ CREATE TABLE IF NOT EXISTS work_sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_work_sessions_due
 ON work_sessions(status, next_check_at);
+CREATE INDEX IF NOT EXISTS idx_work_sessions_started
+ON work_sessions(started_at);
 """
 
 
 class WorkSessionStart(BaseModel):
     session_id: str = Field(min_length=1, max_length=120)
     task: str = Field(min_length=1, max_length=160)
+    project_id: str | None = Field(default=None, max_length=160)
 
 
 def _now(value: datetime | None = None) -> datetime:
@@ -49,22 +55,43 @@ def _iso(value: datetime) -> str:
     return value.isoformat()
 
 
+def _parse(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value).astimezone(timezone.utc)
+
+
 def ensure_schema() -> None:
     with db.get_connection() as conn:
         conn.executescript(_SCHEMA)
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(work_sessions)").fetchall()}
+        if "project_id" not in columns:
+            conn.execute("ALTER TABLE work_sessions ADD COLUMN project_id TEXT")
 
 
 def _row(session_id: str) -> dict[str, Any] | None:
     ensure_schema()
     with db.get_connection() as conn:
+        row = conn.execute("SELECT * FROM work_sessions WHERE session_id=?", (session_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def active_session() -> dict[str, Any] | None:
+    ensure_schema()
+    with db.get_connection() as conn:
         row = conn.execute(
-            "SELECT * FROM work_sessions WHERE session_id=?",
-            (session_id,),
+            "SELECT * FROM work_sessions WHERE status IN ('active', 'paused') ORDER BY updated_at DESC LIMIT 1"
         ).fetchone()
     return dict(row) if row else None
 
 
-def start_session(session_id: str, task: str, *, now: datetime | None = None) -> dict[str, Any]:
+def start_session(
+    session_id: str,
+    task: str,
+    *,
+    project_id: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
     ensure_schema()
     current = _now(now)
     current_iso = _iso(current)
@@ -76,13 +103,13 @@ def start_session(session_id: str, task: str, *, now: datetime | None = None) ->
             (current_iso, current_iso, session_id),
         )
         conn.execute(
-            "INSERT INTO work_sessions(session_id, task, status, started_at, next_check_at, updated_at) "
-            "VALUES (?, ?, 'active', ?, ?, ?) "
-            "ON CONFLICT(session_id) DO UPDATE SET task=excluded.task, status='active', "
+            "INSERT INTO work_sessions(session_id, task, project_id, status, started_at, next_check_at, updated_at) "
+            "VALUES (?, ?, ?, 'active', ?, ?, ?) "
+            "ON CONFLICT(session_id) DO UPDATE SET task=excluded.task, project_id=excluded.project_id, status='active', "
             "started_at=excluded.started_at, paused_at=NULL, paused_total_seconds=0, ended_at=NULL, "
             "next_check_at=excluded.next_check_at, awaiting_response_since=NULL, last_response_at=NULL, "
             "last_notification_at=NULL, updated_at=excluded.updated_at",
-            (session_id, task.strip(), current_iso, next_check, current_iso),
+            (session_id, task.strip(), (project_id or "").strip() or None, current_iso, next_check, current_iso),
         )
     return _row(session_id) or {}
 
@@ -130,12 +157,7 @@ def resume_session(session_id: str, *, now: datetime | None = None) -> dict[str,
         conn.execute(
             "UPDATE work_sessions SET status='active', paused_at=NULL, paused_total_seconds=?, "
             "next_check_at=?, awaiting_response_since=NULL, updated_at=? WHERE session_id=?",
-            (
-                paused_seconds,
-                _iso(current + timedelta(minutes=CHECK_INTERVAL_MINUTES)),
-                current_iso,
-                session_id,
-            ),
+            (paused_seconds, _iso(current + timedelta(minutes=CHECK_INTERVAL_MINUTES)), current_iso, session_id),
         )
     return _row(session_id)
 
@@ -150,6 +172,70 @@ def end_session(session_id: str, *, now: datetime | None = None, status: str = "
             (status, current_iso, current_iso, session_id),
         ).rowcount
     return _row(session_id) if changed else None
+
+
+def _overlap_seconds(row: dict[str, Any], start: datetime, end: datetime, now: datetime) -> int:
+    session_start = _parse(row.get("started_at"))
+    if not session_start:
+        return 0
+    session_end = _parse(row.get("ended_at")) or now
+    if row.get("status") == "paused":
+        session_end = _parse(row.get("paused_at")) or session_end
+    overlap_start = max(session_start, start)
+    overlap_end = min(session_end, end)
+    if overlap_end <= overlap_start:
+        return 0
+    total = int((overlap_end - overlap_start).total_seconds())
+    paused_total = int(row.get("paused_total_seconds") or 0)
+    if session_start >= start and session_end <= end:
+        total -= paused_total
+    return max(0, total)
+
+
+def today_summary(*, now: datetime | None = None) -> dict[str, Any]:
+    current = _now(now)
+    local_now = current.astimezone(TOKYO)
+    day_start_local = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end_local = day_start_local + timedelta(days=1)
+    day_start = day_start_local.astimezone(timezone.utc)
+    day_end = day_end_local.astimezone(timezone.utc)
+    ensure_schema()
+    with db.get_connection() as conn:
+        rows = [dict(row) for row in conn.execute(
+            "SELECT * FROM work_sessions WHERE started_at < ? AND COALESCE(ended_at, ?) > ? ORDER BY started_at ASC",
+            (_iso(day_end), _iso(current), _iso(day_start)),
+        ).fetchall()]
+
+    sessions: list[dict[str, Any]] = []
+    project_totals: dict[str, int] = {}
+    total_seconds = 0
+    for row in rows:
+        seconds = _overlap_seconds(row, day_start, day_end, current)
+        if seconds <= 0:
+            continue
+        project = str(row.get("project_id") or row.get("task") or "未分類")
+        total_seconds += seconds
+        project_totals[project] = project_totals.get(project, 0) + seconds
+        sessions.append({
+            "session_id": row["session_id"],
+            "task": row["task"],
+            "project_id": row.get("project_id"),
+            "status": row["status"],
+            "started_at": row["started_at"],
+            "ended_at": row.get("ended_at"),
+            "elapsed_seconds": seconds,
+        })
+    return {
+        "date": day_start_local.date().isoformat(),
+        "timezone": "Asia/Tokyo",
+        "total_seconds": total_seconds,
+        "sessions": sessions,
+        "projects": [
+            {"project": project, "elapsed_seconds": seconds}
+            for project, seconds in sorted(project_totals.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "active": active_session(),
+    }
 
 
 def run_due_checks(
@@ -180,13 +266,7 @@ def run_due_checks(
                 conn.execute(
                     "UPDATE work_sessions SET awaiting_response_since=?, last_notification_at=?, "
                     "next_check_at=?, updated_at=? WHERE session_id=? AND status='active'",
-                    (
-                        current_iso,
-                        current_iso,
-                        _iso(current + timedelta(minutes=CHECK_INTERVAL_MINUTES)),
-                        current_iso,
-                        row["session_id"],
-                    ),
+                    (current_iso, current_iso, _iso(current + timedelta(minutes=CHECK_INTERVAL_MINUTES)), current_iso, row["session_id"]),
                 )
                 row["event"] = "check_in"
             due.append(row)
@@ -203,14 +283,24 @@ def run_due_checks(
             body = f"「{row['task']}」は返事がなかったので、時間の加算を止めたよ。続けるときにもう一度開始してね。"
         try:
             dispatch(category="work_session", title=title, body=body, url="/", respect_preferences=True)
-        except Exception as exc:  # noqa: BLE001 - timeout must still be durable
+        except Exception as exc:  # noqa: BLE001
             log.warning("Work-session notification failed: %s", exc)
     return counts
 
 
 @router.post("/start")
 def start_work_session(payload: WorkSessionStart) -> dict[str, Any]:
-    return {"session": start_session(payload.session_id, payload.task)}
+    return {"session": start_session(payload.session_id, payload.task, project_id=payload.project_id)}
+
+
+@router.get("/active")
+def get_active_work_session() -> dict[str, Any]:
+    return {"session": active_session()}
+
+
+@router.get("/today")
+def get_today_work_sessions() -> dict[str, Any]:
+    return today_summary()
 
 
 @router.get("/{session_id}")

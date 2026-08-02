@@ -1,0 +1,32 @@
+.today-section-head { align-items: center; }
+.today-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.today-card {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 24px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(24px);
+}
+.today-card--wide { grid-column: 1 / -1; }
+.today-card--summary strong { display: block; margin: 14px 0 8px; font-size: clamp(38px, 7vw, 72px); letter-spacing: -.05em; }
+.today-card > strong { display: block; margin: 12px 0 8px; font-size: 24px; }
+.today-card p { margin-bottom: 0; }
+.today-card__head { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 18px; }
+.today-timeline, .today-projects { display: grid; gap: 10px; }
+.today-timeline__row { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 16px; border: 1px solid rgba(255,255,255,.07); border-radius: 16px; background: rgba(255,255,255,.025); }
+.today-timeline__row span, .today-timeline__row small { color: var(--muted); font-size: 12px; }
+.today-projects__row { display: grid; gap: 8px; }
+.today-projects__row div { display: flex; justify-content: space-between; gap: 16px; }
+.today-projects__row span { color: var(--muted); }
+.today-projects__row i { display: block; height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.06); }
+.today-projects__row i::after { content: ""; display: block; width: var(--today-progress); height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgba(157,180,255,.55), rgba(127,227,193,.75)); }
+.today-empty { margin: 0; padding: 16px; border: 1px dashed var(--line); border-radius: 16px; }
+@media (max-width: 760px) {
+  .today-grid { grid-template-columns: 1fr; }
+  .today-card--wide { grid-column: auto; }
+  .today-timeline__row { grid-template-columns: 1fr auto; }
+  .today-timeline__row strong { grid-column: 1 / -1; grid-row: 1; }
+  .today-timeline__row span { grid-column: 1; grid-row: 2; }
+  .today-timeline__row small { grid-column: 2; grid-row: 2; }
+}
