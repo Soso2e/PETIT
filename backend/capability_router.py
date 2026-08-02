@@ -17,6 +17,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "get_tasks",
         "create_task",
         "update_task",
+        "classify_task_project",
         "complete_task",
         "get_task_sync_status",
         "retry_task_sync",
