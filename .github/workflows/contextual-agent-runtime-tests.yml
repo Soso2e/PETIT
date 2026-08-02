@@ -11,12 +11,15 @@ on:
       - "backend/tools/agent_actions.py"
       - "backend/tools/__init__.py"
       - "backend/tools/registry.py"
+      - "backend/tools/task_hierarchy.py"
       - "frontend/app.js"
       - "frontend/action_confirm.js"
       - "tests/test_contextual_agent_runtime.py"
       - "tests/test_tool_risk_policy.py"
+      - "tests/test_task_parent_confirmation_guard.py"
       - "docs/contextual_agent_runtime.md"
       - "docs/generic_lists.md"
+      - "docs/runtime-flows.md"
       - ".github/workflows/contextual-agent-runtime-tests.yml"
 
 concurrency:
@@ -43,6 +46,11 @@ jobs:
           node --check frontend/app.js
           node --check frontend/action_confirm.js
       - name: Run contextual Agent tests
-        run: python -m unittest tests.test_contextual_agent_runtime tests.test_tool_risk_policy -v
+        run: |
+          python -m unittest \
+            tests.test_contextual_agent_runtime \
+            tests.test_tool_risk_policy \
+            tests.test_task_parent_confirmation_guard \
+            -v
       - name: Run related regression tests
         run: python -m unittest tests.test_generic_lists tests.test_task_conversation_flow tests.test_task_cancel_status -v

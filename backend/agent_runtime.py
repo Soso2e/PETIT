@@ -22,6 +22,13 @@ _DEFERRED_ACTION_END = re.compile(
     r")[。．.!！]*\s*$"
 )
 
+_MANUAL_WRITE_CONFIRMATION = re.compile(
+    r"(?:"
+    r"この内容で(?:実行|更新|変更|反映)(?:し|して)(?:ますか|よろしいですか)"
+    r"|(?:実行|更新|変更|書き込み|反映)(?:し|して)?(?:も)?(?:いいですか|よろしいですか|進めますか)"
+    r")[？?。．.!！]*\s*$"
+)
+
 _AGENT_SYSTEM_PROMPT = """あなたはPETIT。ユーザーの生活・制作・開発を支える実務的な相棒です。
 直近の会話と元の依頼を読み、必要なToolを選び、結果を受け取ったら目的を満たしたか判断してください。
 
@@ -31,6 +38,7 @@ _AGENT_SYSTEM_PROMPT = """あなたはPETIT。ユーザーの生活・制作・�
 - 既に得た結果で答えられるなら追加Toolを使わず終了する。
 - Tool結果にない外部事実を作らない。
 - 書き込みはTool callとして提案する。実行と承認はランタイムが管理する。
+- 明示的な書き込み依頼では、自然文で「実行しますか？」と事前確認せず、対応するToolをcallする。確認はランタイムが一度だけ表示する。
 - 「〜について」のような話題提示だけで、作成・追加・変更を推測しない。
 - 対象が曖昧なら勝手に別概念へ変換せず、必要な確認を短く返す。
 - 読み取りや調査を頼まれたら、このターン内でToolを実行して結果まで返す。
@@ -42,6 +50,7 @@ _CONFIRMATION_LABELS = {
     "create_task": "タスクを作成",
     "add_task": "ローカルタスクを作成",
     "update_task": "タスクを変更",
+    "set_task_parent": "タスクの親子関係を変更",
     "complete_task": "タスクを完了",
     "create_list": "リストを作成",
     "add_list_item": "リストへ項目を追加",
@@ -203,6 +212,14 @@ def _is_deferred_action_reply(reply: str) -> bool:
     return bool(_DEFERRED_ACTION_END.search(text))
 
 
+def _is_manual_write_confirmation(reply: str) -> bool:
+    """Detect confirmation prose that duplicates the Runtime approval card."""
+    text = " ".join(str(reply or "").split())
+    if not text or len(text) > 500:
+        return False
+    return bool(_MANUAL_WRITE_CONFIRMATION.search(text))
+
+
 def _confirmation_text(name: str, arguments: dict[str, Any]) -> str:
     label = _CONFIRMATION_LABELS.get(name, name)
     visible = {
@@ -303,7 +320,10 @@ def _execute_loop(
             reply = _answer(message, messages)
             if not reply:
                 reply = "うまく答えを確定できなかったよ。対象やしてほしいことを少し具体的に教えて。"
-            if capabilities and _is_deferred_action_reply(reply):
+            incomplete = capabilities and (
+                _is_deferred_action_reply(reply) or _is_manual_write_confirmation(reply)
+            )
+            if incomplete:
                 if not deferred_retry_used:
                     deferred_retry_used = True
                     messages.append({"role": "assistant", "content": reply})
@@ -311,17 +331,18 @@ def _execute_loop(
                         {
                             "role": "user",
                             "content": (
-                                "その返答は作業予告で、元の依頼を完了していません。"
-                                "利用可能なToolをこのターン内で実行し、結果まで返してください。"
+                                "その返答は作業予告またはRuntime外の重複確認で、元の依頼を完了していません。"
+                                "書き込み依頼が明確なら自然文で確認を求めず、確認対象Toolを今callしてください。"
+                                "確認画面はRuntimeが一度だけ表示します。"
+                                "読み取り依頼なら利用可能なToolをこのターン内で実行して結果まで返してください。"
                                 "Toolで実行できない場合は、できない理由と現在分かる範囲を今答えてください。"
-                                "『確認します』『調べます』『参照します』『更新します』だけで終わらないでください。"
                             ),
                         }
                     )
                     continue
                 reply = (
-                    "必要な確認をこのターン内で実行できなかったよ。"
-                    "実行していないのに『調べます』とは返さず、できなかったことを明示するね。"
+                    "必要なTool callをこのターン内で確定できなかったよ。"
+                    "重複確認は増やさず、実行できなかったことを明示するね。"
                 )
                 had_failure = True
                 deferred_failure = True
@@ -391,13 +412,17 @@ def _execute_loop(
                 continue
             try:
                 arguments = tools.parse_arguments(name, call["arguments"])
-            except ValueError:
+            except ValueError as exc:
                 had_failure = True
                 round_results.append(
                     {
                         "name": name,
                         "content": json.dumps(
-                            {"error": "invalid_tool_arguments", "tool": name},
+                            {
+                                "error": "invalid_tool_arguments",
+                                "tool": name,
+                                "message": str(exc),
+                            },
                             ensure_ascii=False,
                         ),
                     }

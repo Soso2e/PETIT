@@ -94,6 +94,15 @@ def tool(
     return decorator
 
 
+def append_description(name: str, suffix: str) -> None:
+    """Append guidance to one registered Tool without replacing its handler."""
+    tool_obj = _REGISTRY.get(name)
+    text = str(suffix or "").strip()
+    if tool_obj is None or not text or text in tool_obj.description:
+        return
+    tool_obj.description = f"{tool_obj.description.rstrip()} {text}"
+
+
 def registered_names() -> list[str]:
     return sorted(_REGISTRY.keys())
 
@@ -107,6 +116,62 @@ def requires_confirmation(name: str) -> bool:
     return risk_for(name) in {"confirm_write", "destructive"}
 
 
+def _matches_type(value: Any, expected: str) -> bool:
+    if expected == "object":
+        return isinstance(value, dict)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return (
+            isinstance(value, int)
+            and not isinstance(value, bool)
+        ) or (
+            isinstance(value, str)
+            and value.strip().isdigit()
+        )
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "null":
+        return value is None
+    return True
+
+
+def _validate_write_arguments(name: str, arguments: dict[str, Any]) -> None:
+    """Reject malformed confirmation-gated writes before asking the user."""
+    tool_obj = _REGISTRY.get(name)
+    if tool_obj is None or tool_obj.risk not in {"confirm_write", "destructive"}:
+        return
+
+    schema = tool_obj.parameters if isinstance(tool_obj.parameters, dict) else {}
+    properties = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+    required = [str(item) for item in schema.get("required") or []]
+
+    unknown = sorted(str(key) for key in arguments if key not in properties)
+    if unknown:
+        raise ValueError(f"unknown arguments for {name}: {', '.join(unknown)}")
+
+    missing = [key for key in required if key not in arguments]
+    if missing:
+        raise ValueError(f"missing required arguments for {name}: {', '.join(missing)}")
+
+    for key, value in arguments.items():
+        spec = properties.get(key)
+        if not isinstance(spec, dict):
+            continue
+        expected = spec.get("type")
+        expected_types = [expected] if isinstance(expected, str) else list(expected or [])
+        if expected_types and not any(_matches_type(value, item) for item in expected_types):
+            rendered = "/".join(str(item) for item in expected_types)
+            raise ValueError(f"invalid type for {name}.{key}: expected {rendered}")
+        enum = spec.get("enum")
+        if isinstance(enum, list) and value not in enum:
+            raise ValueError(f"invalid value for {name}.{key}: expected one of {enum}")
+
+
 def parse_arguments(name: str, arguments: dict[str, Any] | str | None) -> dict[str, Any]:
     if isinstance(arguments, str):
         try:
@@ -115,8 +180,11 @@ def parse_arguments(name: str, arguments: dict[str, Any] | str | None) -> dict[s
             raise ValueError(f"could not parse arguments for {name}") from exc
         if not isinstance(parsed, dict):
             raise ValueError(f"arguments for {name} must be an object")
-        return parsed
-    return dict(arguments or {})
+    else:
+        parsed = dict(arguments or {})
+
+    _validate_write_arguments(name, parsed)
+    return parsed
 
 
 def openai_tools_schema() -> list[dict[str, Any]]:
