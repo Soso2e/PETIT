@@ -17,9 +17,18 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn("/static/universe.html", index)
 
     def test_universe_assets_and_legacy_ui_exist(self) -> None:
-        for name in ("universe.html", "universe.css", "universe-actions.css", "universe-app.js", "legacy.html"):
+        for name in (
+            "universe.html",
+            "universe.css",
+            "universe-actions.css",
+            "universe-next.css",
+            "universe-app.js",
+            "universe-next.js",
+            "legacy.html",
+        ):
             self.assertTrue((FRONTEND / name).is_file(), name)
         self.assertTrue((BACKEND / "task_list_api.py").is_file())
+        self.assertTrue((BACKEND / "tools" / "task_projects.py").is_file())
 
     def test_universe_has_required_views(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
@@ -30,6 +39,8 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('id="detail-panel"', html)
         self.assertIn('id="task-nodes"', html)
         self.assertIn('/static/universe-app.js', html)
+        self.assertIn('/static/universe-next.js', html)
+        self.assertIn('/static/universe-next.css', html)
 
     def test_life_project_task_hierarchy_and_project_switching_exist(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
@@ -106,6 +117,39 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('priority: nextPriority', script)
         self.assertIn('resolve_notification: false', script)
 
+    def test_project_assignment_is_available_in_ui_and_chat(self) -> None:
+        html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        script = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
+        tool = (BACKEND / "tools" / "task_projects.py").read_text(encoding="utf-8")
+        tools_init = (BACKEND / "tools" / "__init__.py").read_text(encoding="utf-8")
+        capability = (BACKEND / "capability_router.py").read_text(encoding="utf-8")
+        self.assertIn('data-action="project"', html)
+        self.assertIn('/api/notifications/projects', script)
+        self.assertIn('project_id: projectId', script)
+        self.assertIn('name="classify_task_project"', tool)
+        self.assertIn("requires_confirmation=True", tool)
+        self.assertIn("task_projects", tools_init)
+        self.assertIn('"classify_task_project"', capability)
+
+    def test_all_replaces_unclassified_for_unassigned_tasks(self) -> None:
+        api = (BACKEND / "task_list_api.py").read_text(encoding="utf-8")
+        next_script = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
+        self.assertIn('_ALL_PROJECT_LABEL = "All"', api)
+        self.assertIn("AS project_title", api)
+        self.assertIn('const ALL_LABEL = "All"', next_script)
+
+    def test_focus_zoom_and_motion_controls_exist(self) -> None:
+        html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        script = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
+        css = (FRONTEND / "universe-next.css").read_text(encoding="utf-8")
+        for control in ("focus-zoom-out", "focus-zoom-in", "focus-zoom-reset", "focus-zoom-label"):
+            self.assertIn(f'id="{control}"', html)
+        self.assertIn('addEventListener("touchmove"', script)
+        self.assertIn('data-zoom-level', html)
+        self.assertIn('orbit[data-zoom-level="near"]', css)
+        self.assertIn("@keyframes nodeArrival", css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+
     def test_legacy_settings_can_return_to_new_ui(self) -> None:
         shell = (FRONTEND / "shell.js").read_text(encoding="utf-8")
         self.assertIn("installNewUiReturn", shell)
@@ -123,6 +167,7 @@ class UniverseUiTests(unittest.TestCase):
     def test_mobile_and_reduced_motion_styles_exist(self) -> None:
         css = (FRONTEND / "universe.css").read_text(encoding="utf-8")
         actions_css = (FRONTEND / "universe-actions.css").read_text(encoding="utf-8")
+        next_css = (FRONTEND / "universe-next.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 640px)", css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", css)
         self.assertIn("space-node--active", css)
@@ -132,6 +177,8 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn(".focus-project-switcher", actions_css)
         self.assertIn(".universe-task-list", actions_css)
         self.assertIn(".work-session-controls", actions_css)
+        self.assertIn("@media (max-width: 640px)", next_css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", next_css)
 
 
 class _Rows:
@@ -171,15 +218,17 @@ class UniverseTaskListApiTests(unittest.TestCase):
         ])
         with (
             patch.object(task_list_api.db, "get_connection", return_value=connection),
-            patch("backend.task_sync_queue.ensure_task_sync_schema"),
+            patch.object(task_list_api, "_ensure_universe_schema"),
         ):
             response = task_list_api.list_ui_tasks(priority="all", limit=500)
 
         payload = json.loads(response.body)
         self.assertEqual(payload["priority"], "all")
         self.assertEqual(payload["count"], 3)
-        self.assertNotIn("lower(COALESCE(priority, ''))=?", connection.sql)
-        self.assertEqual(connection.params, (500,))
+        self.assertEqual(payload["unassigned_label"], "All")
+        self.assertNotIn("lower(COALESCE(t.priority, ''))=?", connection.sql)
+        self.assertIn("LEFT JOIN projects", connection.sql)
+        self.assertEqual(connection.params, ("All", 500))
 
     def test_high_mode_keeps_explicit_priority_filter(self) -> None:
         from backend import task_list_api
@@ -187,14 +236,34 @@ class UniverseTaskListApiTests(unittest.TestCase):
         connection = _Connection([{"id": 1, "title": "High task", "priority": "High"}])
         with (
             patch.object(task_list_api.db, "get_connection", return_value=connection),
-            patch("backend.task_sync_queue.ensure_task_sync_schema"),
+            patch.object(task_list_api, "_ensure_universe_schema"),
         ):
             response = task_list_api.list_ui_tasks(priority="high", limit=200)
 
         payload = json.loads(response.body)
         self.assertEqual(payload["priority"], "high")
-        self.assertIn("lower(COALESCE(priority, ''))=?", connection.sql)
-        self.assertEqual(connection.params, ("high", 200))
+        self.assertIn("lower(COALESCE(t.priority, ''))=?", connection.sql)
+        self.assertEqual(connection.params, ("All", "high", 200))
+
+    def test_projects_endpoint_marks_confirmed_notion_links(self) -> None:
+        from backend import task_list_api
+
+        connection = _Connection([
+            {"id": "petit", "name": "PETIT", "status": "active", "description": None, "notion_linked": 1},
+            {"id": "roomies", "name": "Roomies", "status": "active", "description": None, "notion_linked": 0},
+        ])
+        with (
+            patch.object(task_list_api.db, "get_connection", return_value=connection),
+            patch.object(task_list_api, "_ensure_universe_schema"),
+        ):
+            response = task_list_api.list_ui_projects()
+
+        payload = json.loads(response.body)
+        self.assertEqual(payload["count"], 2)
+        self.assertTrue(payload["projects"][0]["notion_linked"])
+        self.assertFalse(payload["projects"][1]["notion_linked"])
+        self.assertIn("project_source_links", connection.sql)
+        self.assertEqual(connection.params, ())
 
     def test_invalid_priority_is_rejected(self) -> None:
         from backend import task_list_api
