@@ -43,10 +43,12 @@ class ReminderUiTests(unittest.TestCase):
         self.assertIn("reminders", tools_init)
         self.assertIn('"create_reminder"', capability)
 
-    def test_service_worker_precaches_reminder_assets(self) -> None:
+    def test_service_worker_precaches_and_separates_reminder_notifications(self) -> None:
         service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
         self.assertIn('/static/reminders.css', service_worker)
         self.assertIn('/static/reminders.js', service_worker)
+        self.assertIn('const targetUrl = payload.url || "/"', service_worker)
+        self.assertIn('`${payload.tag}-${targetUrl}`', service_worker)
 
 
 if __name__ == "__main__":
