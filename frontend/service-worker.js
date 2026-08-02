@@ -76,14 +76,15 @@ self.addEventListener("push", (event) => {
   }
 
   const title = payload.title || "PETIT";
+  const targetUrl = payload.url || "/";
   const options = {
     body: payload.body || "PETITから通知があります。",
     icon: payload.icon || "/static/icon-192.png",
     badge: payload.badge || "/static/favicon-64.png",
-    tag: payload.tag || "petit-notification",
+    tag: payload.tag ? `${payload.tag}-${targetUrl}` : "petit-notification",
     renotify: false,
     data: {
-      url: payload.url || "/",
+      url: targetUrl,
       category: payload.category || "unknown",
     },
   };
