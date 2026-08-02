@@ -101,14 +101,14 @@
 .orbit[data-zoom-level="near"] .space-node__label { -webkit-line-clamp: 4; font-size: 13px; }
 
 html[data-universe-motion="ready"] .task-nodes .space-node {
-  animation: nodeArrival .52s cubic-bezier(.18,.9,.28,1.16) both;
+  animation: nodeArrival .52s cubic-bezier(.18,.9,.28,1.16) backwards;
   animation-delay: calc(var(--node-index, 0) * 55ms);
 }
 html[data-universe-motion="ready"] .space-node.is-selected {
   animation: selectedSignal 2.2s ease-in-out infinite;
 }
 html[data-universe-motion="ready"] .view.is-active {
-  animation: viewArrival .34s cubic-bezier(.2,.82,.2,1) both;
+  animation: viewArrival .34s cubic-bezier(.2,.82,.2,1) backwards;
 }
 
 .detail-project-field {
