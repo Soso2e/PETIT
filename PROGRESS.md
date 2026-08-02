@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.1.0**  
+**Current Version: v0.1.1**  
 **Last Updated: 2026-08-02**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
@@ -8,8 +8,8 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。現状はFastAPI + ブラウザのテキストチャットMVPで、最終形はスマホとPCの音声中心常駐アシスタント。
-- バージョン管理: v0.1.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する運用を開始。
-- 会話 / Agent Runtime: Project Continuity・挨拶・正確な現在時刻だけを決定論的な安全ゲートで処理し、通常会話はChatモデルのCapability Routerが最大4領域を選ぶ。Agentには選択領域内の登録済みToolだけを公開し、既定3ラウンド・Tool総数6・同一Tool同一引数1回の上限、結果圧縮、書き込み承認、30分以内のAgent状態再開、履歴へ残さない進捗表示を実装。Toolが必要な依頼への「確認します／調べます」だけの最終回答を再実行へ戻すガードと、保存済みプロジェクト状況を読む`get_project_status`を追加。関連43テストと稼働中APIへのTool登録は確認済み、実DeepSeek会話での結果返答・承認後返答・iPhone進捗表示E2Eは未確認。
+- バージョン管理: v0.1.1。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する運用を開始。
+- 会話 / Agent Runtime: Project Continuity・挨拶・正確な現在時刻だけを決定論的な安全ゲートで処理し、通常会話はChatモデルのCapability Routerが最大4領域を選ぶ。Agentには選択領域内の登録済みToolだけを公開し、既定3ラウンド・Tool総数6・同一Tool同一引数1回の上限、結果圧縮、書き込み承認、30分以内のAgent状態再開、履歴へ残さない進捗表示を実装。Toolが必要な依頼への「確認します／調べます」だけの最終回答を再実行へ戻すガードと、保存済みプロジェクト状況を読む`get_project_status`を追加。実装準拠の会話・Capability・Tool Loop・確認・進捗・Project Continuityフローを`docs/runtime-flows.md`へMermaidで追加し、今後の関連変更では同時更新する運用にした。関連43テストと稼働中APIへのTool登録は確認済み、実DeepSeek会話での結果返答・承認後返答・iPhone進捗表示E2Eは未確認。
 - モデル切替: WebからChat／Agentを個別にローカルLM Studio・DeepSeek V4 Flash・DeepSeek V4 Proへ切替でき、選択だけをローカル保存する。DeepSeek APIキーはブラウザや保存ファイルへ返さず、Embeddingはローカルのまま。専用テスト5件成功、実DeepSeek／ブラウザE2Eは未確認。
 - 音声: AivisSpeech Engineの`/audio_query`→`/synthesis`をFastAPI経由で呼び、WAV再生・中断・再読上げ・ブラウザTTS fallback、一時的な429／502／503／504の1回再試行、合成直列化、上流エラー詳細診断、モバイル音声アンロック、文単位チャンク生成・先読み再生・5秒タイムアウト・生成キャンセル、独立診断CLI、2回連続失敗後の60秒回路遮断を実装。Windows初期セットアップ、音声モデル、Engine、`.env`、診断CLI、WAV確認、Docker／WSL差の手順書とREADME導線も追加。実AivisSpeechモデルとPC／スマホブラウザE2Eは未確認。
 - 汎用リスト: 組み込みタスクと任意のカスタムリストを保存先付きで取得し、ローカルSQLiteへリスト作成・項目取得・項目追加できる。`lists_and_tasks` Capability内でタスクとリストを文脈・対象存在・Tool結果から区別し、書き込みは確認必須、存在しないリストをタスクへ誤変換せず、Notion DBも自動生成しない。関連CI成功、実LM Studio／ブラウザ会話E2Eは未確認。
@@ -40,3 +40,4 @@
 | 日付 | 時間 | 回数 | 変更内容 |
 |------|------|------|----------|
 | 2026-08-02 | 08:54 | #1 | v0.1.0としてバージョン管理ルール、PROGRESS表記、Web UI表示を追加 |
+| 2026-08-02 | 09:12 | #2 | v0.1.1としてAgent Runtimeと会話ToolフローのMermaid図、AGENTS同期ルールを追加 |
