@@ -1,26 +1,103 @@
-"""Task and project read APIs for the Universe UI.
+"""Life-first task hierarchy APIs for the Universe UI.
 
-The daily briefing intentionally limits and date-filters tasks. Focus and Tasks
-need explicit High/Low buckets, while Life Universe needs every open task grouped
-under its Project. All reads come from PETIT's local SQLite cache.
+The UI treats every top-level task as a direct child of Life. A top-level task may
+act as a project-like parent, with child tasks beneath it. The existing
+``project_title`` response field is retained only as a compatibility alias for the
+root task title while the original Universe renderer is phased over.
 """
 from __future__ import annotations
 
 from typing import Any
 
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from . import db, notifications
 
 _INSTALLED = False
-_OPEN_STATUS_SQL = "lower(t.status) NOT IN ('done', 'canceled', 'cancelled', 'chancel', '完了')"
-_ALL_PROJECT_LABEL = "All"
+_OPEN_STATUS_SQL = "lower(status) NOT IN ('done', 'canceled', 'cancelled', 'chancel', '完了')"
+
+
+class TaskParentUpdate(BaseModel):
+    parent_task_id: int | None = None
+    move_to_life: bool = False
 
 
 def _ensure_universe_schema() -> None:
-    from . import notion_project_sync
+    from .tools import task_hierarchy
 
-    notion_project_sync.ensure_notion_project_schema()
+    task_hierarchy.ensure_task_hierarchy_schema()
+
+
+def _open_rows() -> list[dict[str, Any]]:
+    _ensure_universe_schema()
+    with db.get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tasks_cache "
+            f"WHERE {_OPEN_STATUS_SQL} "
+            "ORDER BY CASE lower(COALESCE(priority, '')) "
+            "WHEN 'high' THEN 0 WHEN 'mid' THEN 1 WHEN 'medium' THEN 1 "
+            "WHEN 'low' THEN 2 ELSE 3 END, "
+            "(due_date IS NULL), due_date ASC, id DESC",
+            (),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _annotate_hierarchy(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_id = {int(task["id"]): task for task in tasks if task.get("id") is not None}
+    by_external = {
+        str(task["external_id"]): task
+        for task in tasks
+        if str(task.get("external_id") or "").strip()
+    }
+
+    parent_ids: dict[int, int | None] = {}
+    for task in tasks:
+        task_id = int(task["id"])
+        parent_id: int | None = None
+        external_parent = str(task.get("parent_external_id") or "").strip()
+        if task.get("source") == "notion" and external_parent:
+            parent = by_external.get(external_parent)
+            if parent:
+                parent_id = int(parent["id"])
+        if parent_id is None and task.get("parent_task_id") is not None:
+            candidate = int(task["parent_task_id"])
+            if candidate in by_id:
+                parent_id = candidate
+        if parent_id == task_id:
+            parent_id = None
+        parent_ids[task_id] = parent_id
+
+    child_counts: dict[int, int] = {task_id: 0 for task_id in by_id}
+    for parent_id in parent_ids.values():
+        if parent_id in child_counts:
+            child_counts[parent_id] += 1
+
+    annotated: list[dict[str, Any]] = []
+    for task in tasks:
+        task_id = int(task["id"])
+        parent_id = parent_ids.get(task_id)
+        parent = by_id.get(parent_id) if parent_id is not None else None
+        root = parent or task
+        root_id = int(root["id"])
+        root_title = str(root.get("title") or "名称未設定タスク")
+        annotated.append(
+            {
+                **task,
+                "parent_task_id": parent_id,
+                "parent_title": str(parent.get("title") or "") if parent else None,
+                "root_task_id": root_id,
+                "root_title": root_title,
+                "project_title": root_title,
+                "hierarchy_role": "child" if parent else "root",
+                "depth": 1 if parent else 0,
+                "child_count": child_counts.get(task_id, 0),
+                "has_children": child_counts.get(task_id, 0) > 0,
+            }
+        )
+
+    return annotated
 
 
 def list_ui_tasks(priority: str = "high", limit: int = 100) -> JSONResponse:
@@ -31,59 +108,37 @@ def list_ui_tasks(priority: str = "high", limit: int = 100) -> JSONResponse:
             status_code=400,
         )
 
-    _ensure_universe_schema()
+    tasks = _annotate_hierarchy(_open_rows())
+    if normalized != "all":
+        tasks = [task for task in tasks if str(task.get("priority") or "").casefold() == normalized]
     bounded_limit = max(1, min(int(limit), 500))
-    where = _OPEN_STATUS_SQL
-    params: tuple[Any, ...]
-    if normalized == "all":
-        params = (bounded_limit,)
-    else:
-        where += " AND lower(COALESCE(t.priority, ''))=?"
-        params = (normalized, bounded_limit)
-
-    with db.get_connection() as conn:
-        rows = conn.execute(
-            "SELECT t.*, COALESCE(NULLIF(TRIM(p.name), ''), ?) AS project_title "
-            "FROM tasks_cache t LEFT JOIN projects p ON p.id=t.project_id "
-            f"WHERE {where} "
-            "ORDER BY CASE lower(COALESCE(t.priority, '')) "
-            "WHEN 'high' THEN 0 WHEN 'mid' THEN 1 WHEN 'medium' THEN 1 "
-            "WHEN 'low' THEN 2 ELSE 3 END, "
-            "(t.due_date IS NULL), t.due_date ASC, t.id DESC LIMIT ?",
-            (_ALL_PROJECT_LABEL, *params),
-        ).fetchall()
-    tasks: list[dict[str, Any]] = [dict(row) for row in rows]
+    tasks = tasks[:bounded_limit]
+    roots = [task for task in tasks if task.get("hierarchy_role") == "root"]
     return JSONResponse(
         {
             "tasks": tasks,
             "priority": normalized,
             "count": len(tasks),
-            "unassigned_label": _ALL_PROJECT_LABEL,
+            "root_count": len(roots),
+            "hierarchy": "life-task-child",
         }
     )
 
 
-def list_ui_projects() -> JSONResponse:
-    """Return selectable internal projects and whether Notion Relation is confirmed."""
-    _ensure_universe_schema()
-    with db.get_connection() as conn:
-        rows = conn.execute(
-            "SELECT p.id, p.name, p.status, p.description, "
-            "EXISTS(SELECT 1 FROM project_source_links l "
-            "WHERE l.project_id=p.id AND l.provider='notion' AND l.status='active' "
-            "AND l.confirmed_at IS NOT NULL) AS notion_linked "
-            "FROM projects p WHERE p.status!='archived' "
-            "ORDER BY CASE p.status WHEN 'active' THEN 0 ELSE 1 END, p.updated_at DESC, p.name ASC",
-            (),
-        ).fetchall()
-    projects = [
-        {
-            **dict(row),
-            "notion_linked": bool(row["notion_linked"]),
-        }
-        for row in rows
-    ]
-    return JSONResponse({"projects": projects, "count": len(projects)})
+def patch_task_parent(task_id: int, payload: TaskParentUpdate) -> JSONResponse:
+    from .tools import task_hierarchy
+
+    values = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    parent_task_id = values.get("parent_task_id")
+    move_to_life = bool(values.get("move_to_life"))
+    if parent_task_id is None and not move_to_life:
+        return JSONResponse({"error": "parent_task_idまたはmove_to_lifeを指定してください。"}, status_code=400)
+    result = task_hierarchy.set_task_parent(
+        task_id=task_id,
+        parent_task_id=parent_task_id,
+        move_to_life=move_to_life,
+    )
+    return JSONResponse(result, status_code=200 if result.get("updated") else 400)
 
 
 def install() -> None:
@@ -97,9 +152,9 @@ def install() -> None:
         tags=["task-ui"],
     )
     notifications.router.add_api_route(
-        "/projects",
-        list_ui_projects,
-        methods=["GET"],
+        "/tasks/{task_id}/parent",
+        patch_task_parent,
+        methods=["PATCH"],
         tags=["task-ui"],
     )
     _INSTALLED = True
