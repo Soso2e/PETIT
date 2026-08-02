@@ -1,6 +1,6 @@
 {
   "name": "PETIT",
-  "version": "0.5.1",
-  "release": "task-universe-navigation",
-  "includes": ["two-step task focus", "explicit parent apply", "mobile Life spacing"]
+  "version": "0.6.0",
+  "release": "cosmic-glass-redesign-pwa-push",
+  "includes": ["pwa notification fix", "gpu-accelerated orbit animation", "cosmic glass ui overhaul"]
 }

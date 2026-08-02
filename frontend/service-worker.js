@@ -1,7 +1,7 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v9";
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v4`;
+const CACHE_NAME = "petit-shell-v0.6.0";
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v0.6.0`;
 const SHELL = [
   "/",
   "/static/universe.html",
@@ -48,13 +48,22 @@ const SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(ACTIVE_CACHE_NAME).then((cache) => cache.addAll(SHELL)).catch(() => undefined));
+  event.waitUntil(
+    caches
+      .open(ACTIVE_CACHE_NAME)
+      .then((cache) => cache.addAll(SHELL))
+      .catch(() => undefined)
+  );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== ACTIVE_CACHE_NAME).map((key) => caches.delete(key))))
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== ACTIVE_CACHE_NAME).map((key) => caches.delete(key)))
+      )
   );
   self.clients.claim();
 });
@@ -68,8 +77,10 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(ACTIVE_CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
+        if (response.status === 200) {
+          const copy = response.clone();
+          caches.open(ACTIVE_CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
+        }
         return response;
       })
       .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
@@ -86,17 +97,18 @@ self.addEventListener("push", (event) => {
     }
   }
 
-  const title = payload.title || "PETIT";
+  const title = payload.title || "PETIT Assistant";
   const targetUrl = payload.url || "/";
   const options = {
-    body: payload.body || "PETITから通知があります。",
+    body: payload.body || "PETITからの通知メッセージです。",
     icon: payload.icon || "/static/icon-192.png",
     badge: payload.badge || "/static/favicon-64.png",
-    tag: payload.tag ? `${payload.tag}-${targetUrl}` : "petit-notification",
-    renotify: false,
+    tag: payload.tag ? `${payload.tag}-${Date.now()}` : `petit-notif-${Date.now()}`,
+    renotify: true,
+    vibrate: [200, 100, 200],
     data: {
       url: targetUrl,
-      category: payload.category || "unknown",
+      category: payload.category || "general",
     },
   };
 
@@ -107,13 +119,15 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = new URL(event.notification.data?.url || "/", self.location.origin).href;
 
-  event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const client of windows) {
-      if (new URL(client.url).origin !== self.location.origin) continue;
-      if ("navigate" in client && client.url !== targetUrl) await client.navigate(targetUrl);
-      return client.focus();
-    }
-    return self.clients.openWindow(targetUrl);
-  })());
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of windows) {
+        if (new URL(client.url).origin !== self.location.origin) continue;
+        if ("navigate" in client && client.url !== targetUrl) await client.navigate(targetUrl);
+        return client.focus();
+      }
+      return self.clients.openWindow(targetUrl);
+    })()
+  );
 });

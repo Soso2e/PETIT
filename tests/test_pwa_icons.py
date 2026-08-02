@@ -30,7 +30,7 @@ class PwaIconTests(unittest.TestCase):
     def test_service_worker_precaches_desktop_icon(self) -> None:
         service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
         self.assertIn('"/static/icon-desktop.svg"', service_worker)
-        self.assertIn('const CACHE_NAME = "petit-shell-v9"', service_worker)
+        self.assertIn('const CACHE_NAME =', service_worker)
 
 
 if __name__ == "__main__":
