@@ -39,11 +39,6 @@ def _project_candidate(project_name: str | None, project_id: str | None) -> tupl
             "project_id": {"type": "string", "description": "PETIT内部Project ID。分かる場合に指定する。"},
             "project_name": {"type": "string", "description": "登録済みProject名またはalias。"},
         },
-        "anyOf": [
-            {"required": ["task_id"]},
-            {"required": ["external_id"]},
-            {"required": ["title_query"]},
-        ],
     },
     requires_confirmation=True,
 )
@@ -54,6 +49,9 @@ def classify_task_project(
     project_id: str | None = None,
     project_name: str | None = None,
 ) -> dict[str, Any]:
+    if task_id is None and not external_id and not str(title_query or "").strip():
+        return {"updated": False, "error": "分類するTaskを指定してください。"}
+
     project, candidates = _project_candidate(project_name, project_id)
     if project is None:
         if candidates:
