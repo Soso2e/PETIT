@@ -1,198 +1,222 @@
-/* Spatial motion and Life-first task hierarchy for PETIT Universe. */
+/* PETIT Universe — Stellar Minimal v0.7.0 — Next Layer */
+/* Focus zoom, parallax, parent-field, detail extras */
+
 :root {
   --universe-zoom: 1;
   --orbit-parallax-x: 0px;
   --orbit-parallax-y: 0px;
 }
 
-.space__nebula--one { animation: nebulaBreathe 13s ease-in-out infinite alternate; }
-.space__nebula--two { animation: nebulaBreathe 17s ease-in-out -5s infinite alternate-reverse; }
+/* ====================================================
+   Nebula breathing (既に universe.css でも定義済みの補完)
+   ==================================================== */
+.space__nebula--one { animation: nebulaDrift 30s ease-in-out infinite alternate; }
+.space__nebula--two { animation: nebulaDrift 40s ease-in-out -8s infinite alternate-reverse; }
 
+/* ====================================================
+   Orbit Card — 内側の微細光効果（抑制版）
+   ==================================================== */
 .orbit-card {
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(circle at 50% 44%, rgba(92, 118, 238, .13), transparent 31%),
-    linear-gradient(155deg, rgba(13, 18, 38, .84), rgba(6, 9, 23, .7));
-}
-.orbit-card::before {
-  content: "";
-  position: absolute;
-  inset: 18% 12% 12%;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(157, 180, 255, .11), transparent 36%),
-    conic-gradient(from 80deg at 50% 50%, transparent, rgba(127, 227, 193, .04), transparent 35%, rgba(157, 180, 255, .05), transparent 70%);
-  filter: blur(22px);
-  transform: translate3d(var(--orbit-parallax-x), var(--orbit-parallax-y), 0);
-  transition: transform .6s cubic-bezier(.2, .8, .2, 1);
-  animation: cosmicTurn 28s linear infinite;
 }
 
-.focus-header { flex-wrap: wrap; }
+/* ====================================================
+   Focus Header Layout
+   ==================================================== */
+.focus-header { flex-wrap: wrap; align-items: center; }
+.focus-heading { min-width: 0; }
 .focus-project-switcher { flex: 1 1 auto; }
+
+/* ====================================================
+   Focus Zoom Controls
+   ==================================================== */
 .focus-zoom-controls {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   margin-left: auto;
-  padding: 5px;
-  border: 1px solid rgba(157, 180, 255, .18);
-  border-radius: 999px;
-  background: rgba(5, 8, 22, .62);
-  backdrop-filter: blur(16px);
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(5, 6, 13, 0.7);
 }
 .focus-zoom-controls button {
-  min-width: 38px;
-  min-height: 38px;
+  min-width: 34px;
+  min-height: 34px;
   border: 0;
-  border-radius: 999px;
-  color: var(--text);
+  border-radius: 4px;
+  color: var(--text-sub);
   background: transparent;
   cursor: pointer;
-  transition: transform .18s ease, background .18s ease, opacity .18s ease;
+  font-size: 14px;
+  transition: color 0.18s ease, background 0.18s ease;
 }
-.focus-zoom-controls button:hover { background: rgba(157, 180, 255, .16); transform: scale(1.06); }
-.focus-zoom-controls button:disabled { opacity: .35; cursor: default; transform: none; }
-#focus-zoom-label { min-width: 48px; color: var(--accent-strong); font-size: 11px; text-align: center; font-variant-numeric: tabular-nums; }
-#focus-zoom-reset { padding-inline: 12px; color: var(--muted); font-size: 11px; }
+.focus-zoom-controls button:hover {
+  color: var(--text);
+  background: rgba(200, 207, 222, 0.07);
+}
+.focus-zoom-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+#focus-zoom-label {
+  min-width: 44px;
+  color: var(--text-sub);
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+#focus-zoom-reset {
+  padding-inline: 10px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
 
+/* ====================================================
+   Orbit Touch
+   ==================================================== */
 .orbit { touch-action: pan-x pan-y; }
-.orbit::before {
-  content: "";
-  position: absolute;
-  inset: 7%;
-  border-radius: 50%;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 33% 28%, rgba(255,255,255,.07) 0 1px, transparent 1.8px),
-    radial-gradient(circle at 72% 62%, rgba(157,180,255,.13) 0 1px, transparent 2px),
-    radial-gradient(circle at 54% 78%, rgba(127,227,193,.1) 0 1px, transparent 1.8px);
-  background-size: 105px 105px, 170px 170px, 220px 220px;
-  opacity: .7;
-  transform: translate3d(calc(var(--orbit-parallax-x) * -.35), calc(var(--orbit-parallax-y) * -.35), 0);
-  transition: transform .7s cubic-bezier(.2,.8,.2,1);
-  animation: starTwinkle 5.5s ease-in-out infinite alternate;
+.orbit[data-zoom-level="near"] .space-node__label {
+  -webkit-line-clamp: 4;
+  font-size: 12px;
 }
-.task-nodes {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  transform: scale(var(--universe-zoom));
-  transform-origin: center;
-  transition: transform .48s cubic-bezier(.2, .82, .2, 1);
-}
-.orbit__ring {
-  transition: width .48s cubic-bezier(.2,.82,.2,1), height .48s cubic-bezier(.2,.82,.2,1), opacity .3s ease;
-  animation: orbitTurn 25s linear infinite;
-}
-.orbit__ring--two { animation-duration: 34s; animation-direction: reverse; }
-.orbit__ring--three { animation-duration: 44s; }
-.orbit[data-zoom-level="far"] .orbit__ring { opacity: .45; }
-.orbit[data-zoom-level="near"] .orbit__ring { opacity: .9; }
-.orbit[data-zoom-level="near"] .space-node__label { -webkit-line-clamp: 4; font-size: 13px; }
+
+/* ====================================================
+   Duplicate / visibility helpers
+   ==================================================== */
 .hierarchy-root-duplicate { display: none !important; }
+.universe-task--root-copy { display: none !important; }
 
-html[data-universe-motion="ready"] .task-nodes .space-node {
-  animation: nodeArrival .52s cubic-bezier(.18,.9,.28,1.16) backwards;
-  animation-delay: calc(var(--node-index, 0) * 55ms);
-}
-html[data-universe-motion="ready"] .space-node.is-selected {
-  animation: selectedSignal 2.2s ease-in-out infinite;
-}
-html[data-universe-motion="ready"] .view.is-entering {
-  animation: viewArrival .34s cubic-bezier(.2,.82,.2,1) backwards;
-}
-
+/* ====================================================
+   Detail Panel — Parent Field
+   ==================================================== */
 .detail-parent-field {
   display: grid;
   gap: 8px;
-  margin: 0 0 18px;
-  padding: 14px;
-  border: 1px solid rgba(157, 180, 255, .14);
-  border-radius: 16px;
-  background: rgba(255,255,255,.035);
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(200, 207, 222, 0.025);
 }
-.detail-parent-field > span { color: var(--muted); font-size: 11px; }
+.detail-parent-field > span {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.detail-parent-field__controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .detail-parent-field select {
-  width: 100%;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid rgba(157,180,255,.24);
-  border-radius: 12px;
+  flex: 1;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line-mid);
+  border-radius: 6px;
   color: var(--text);
-  background: rgba(8, 12, 29, .94);
+  background: rgba(5, 6, 13, 0.9);
   outline: none;
+  font-size: 12px;
+  transition: border-color 0.18s ease;
 }
-.detail-parent-field select:focus { border-color: rgba(157,180,255,.7); box-shadow: 0 0 0 3px rgba(157,180,255,.12); }
-.detail-parent-field small { color: var(--muted); line-height: 1.55; }
+.detail-parent-field select:focus {
+  border-color: var(--line-strong);
+}
+.detail-parent-field small {
+  color: var(--text-sub);
+  font-size: 11px;
+  line-height: 1.55;
+}
+button[data-action="parent-apply"] {
+  padding: 0 12px;
+  height: 38px;
+  border-radius: 6px;
+  border: 1px solid var(--line-mid);
+  background: transparent;
+  font-size: 11px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  transition: color 0.18s, border-color 0.18s;
+}
+button[data-action="parent-apply"]:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+button[data-action="parent-apply"]:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 
-.constellation-card--parent { border-color: rgba(157, 180, 255, .3); }
-.constellation-card--parent::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at 15% 10%, rgba(157,180,255,.13), transparent 38%);
+/* ====================================================
+   Constellation Card — Parent border accent
+   ==================================================== */
+.constellation-card--parent {
+  border-color: rgba(200, 207, 222, 0.18);
 }
-.constellation-card--single { min-height: 150px; }
-.universe-task--root-copy { display: none !important; }
+.constellation-card--single {
+  min-height: 140px;
+}
+
+/* ====================================================
+   Child Task Indentation
+   ==================================================== */
 .universe-task--child {
   position: relative;
-  margin-left: 18px;
+  margin-left: 16px;
 }
 .universe-task--child::before {
   content: "";
   position: absolute;
-  left: -13px;
+  left: -12px;
   top: 50%;
-  width: 8px;
+  width: 7px;
   height: 1px;
-  background: rgba(157,180,255,.35);
+  background: rgba(200, 207, 222, 0.2);
 }
-.task-row--child .task-table__title { padding-left: 30px; position: relative; }
+.task-row--child .task-table__title {
+  padding-left: 28px;
+  position: relative;
+}
 .task-row--child .task-table__title::before {
   content: "↳";
   position: absolute;
-  left: 12px;
-  color: var(--accent);
+  left: 10px;
+  color: var(--text-dim);
+  font-size: 11px;
 }
 
-@keyframes nebulaBreathe {
-  from { transform: scale(.92) translate3d(-2%, 1%, 0); opacity: .18; }
-  to { transform: scale(1.12) translate3d(3%, -2%, 0); opacity: .3; }
-}
-@keyframes cosmicTurn { to { transform: translate3d(var(--orbit-parallax-x), var(--orbit-parallax-y), 0) rotate(360deg); } }
-@keyframes orbitTurn {
-  from { transform: translate(-50%, -50%) rotateX(64deg) rotateZ(0deg); }
-  to { transform: translate(-50%, -50%) rotateX(64deg) rotateZ(360deg); }
-}
-@keyframes starTwinkle { from { opacity: .4; } to { opacity: .82; } }
-@keyframes nodeArrival {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(.55); filter: blur(5px); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
-}
-@keyframes selectedSignal {
-  0%, 100% { box-shadow: 0 0 34px rgba(157,180,255,.4), inset 0 0 24px rgba(255,255,255,.05); }
-  50% { box-shadow: 0 0 62px rgba(204,218,255,.68), 0 0 120px rgba(99,124,255,.28), inset 0 0 30px rgba(255,255,255,.1); }
-}
-@keyframes viewArrival {
-  from { opacity: 0; transform: translateY(8px) scale(.992); }
-  to { opacity: 1; transform: none; }
+/* ====================================================
+   Animations defined here
+   ==================================================== */
+@keyframes nebulaDrift {
+  from { transform: scale(0.95) translate3d(0, 0, 0); }
+  to   { transform: scale(1.08) translate3d(20px, -15px, 0); }
 }
 
+/* ====================================================
+   Responsive
+   ==================================================== */
 @media (max-width: 640px) {
-  .focus-zoom-controls { width: 100%; justify-content: center; margin: 4px 0 0; }
+  .focus-zoom-controls {
+    width: 100%;
+    justify-content: center;
+    margin: 4px 0 0;
+  }
   .orbit { min-height: 500px; margin-inline: 4px; }
-  .task-nodes { transform: scale(calc(var(--universe-zoom) * .9)); }
+  .task-nodes {
+    transform: scale(calc(var(--universe-zoom) * 0.9));
+  }
   .detail-parent-field select { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .space__nebula,
-  .orbit-card::before,
-  .orbit::before,
   .orbit__ring,
   .task-nodes .space-node,
   .space-node.is-selected,
@@ -201,7 +225,7 @@ html[data-universe-motion="ready"] .view.is-entering {
   }
   .task-nodes,
   .orbit__ring,
-  .focus-zoom-controls button,
-  .orbit-card::before,
-  .orbit::before { transition-duration: .01ms !important; }
+  .focus-zoom-controls button {
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -125,10 +125,24 @@ def _update_remote_task_with_parent(page_id: str, payload: dict[str, Any]) -> di
         reason=payload.get("reason"),
         done_date=payload.get("done_date"),
     )
-    props[config.NOTION_TASK_PROP_PARENT] = notion_client._relation_prop(payload.get("parent_external_ids"))
-    return notion_client.parse_task_page(
-        notion_client._patch(f"/pages/{page_id}", {"properties": props}, timeout=20)
-    )
+    if payload.get("parent_external_ids"):
+        props[config.NOTION_TASK_PROP_PARENT] = notion_client._relation_prop(payload.get("parent_external_ids"))
+    try:
+        return notion_client.parse_task_page(
+            notion_client._patch(f"/pages/{page_id}", {"properties": props}, timeout=20)
+        )
+    except notion_client.NotionError as exc:
+        err_msg = str(exc)
+        if "is not a property that exists" in err_msg:
+            for key in list(props.keys()):
+                if key in err_msg and key != config.NOTION_PROP_TITLE:
+                    props.pop(key, None)
+            if not props:
+                return notion_client.get_task_page(page_id)
+            return notion_client.parse_task_page(
+                notion_client._patch(f"/pages/{page_id}", {"properties": props}, timeout=20)
+            )
+        raise
 
 
 def install_parent_sync_support() -> None:

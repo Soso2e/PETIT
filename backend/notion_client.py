@@ -210,7 +210,25 @@ def _rich_text_prop(value: str) -> dict[str, Any]:
 
 
 def _date_prop(value: str | None) -> dict[str, Any]:
-    return {"date": {"start": value}} if value else {"date": None}
+    if not value or not str(value).strip():
+        return {"date": None}
+    val = str(value).strip()
+    from datetime import date, timedelta
+    if val == "今日":
+        val = date.today().isoformat()
+    elif val == "明日":
+        val = (date.today() + timedelta(days=1)).isoformat()
+    elif val == "昨日":
+        val = (date.today() - timedelta(days=1)).isoformat()
+    elif not (len(val) == 10 and val[4] == "-" and val[7] == "-"):
+        # YYYY-MM-DD 形式でない場合の安全基準
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(val.replace("Z", "+00:00"))
+            val = dt.date().isoformat()
+        except Exception:
+            val = date.today().isoformat()
+    return {"date": {"start": val}}
 
 
 def _select_prop(value: str | None) -> dict[str, Any]:
@@ -265,6 +283,10 @@ def _task_properties(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+
+def get_task_page(page_id: str) -> dict[str, Any]:
+    return parse_task_page(_get(f"/pages/{page_id}"))
 
 
 def query_database_raw(
@@ -346,22 +368,36 @@ def create_task_page(
     reason: str | None = None,
     status: str | None = None,
     db_id: str | None = None,
+    done_date: str | None = None,
 ) -> dict[str, Any]:
     db_id = db_id or config.NOTION_TASKS_DB_ID
+    props = _task_properties(
+        title=title,
+        status=status or config.NOTION_DEFAULT_STATUS,
+        due_date=due_date,
+        priority=priority,
+        categories=categories,
+        area=area,
+        project_external_ids=project_external_ids,
+        reason=reason,
+        done_date=done_date,
+    )
     body = {
         "parent": {"database_id": db_id},
-        "properties": _task_properties(
-            title=title,
-            status=status or config.NOTION_DEFAULT_STATUS,
-            due_date=due_date,
-            priority=priority,
-            categories=categories,
-            area=area,
-            project_external_ids=project_external_ids,
-            reason=reason,
-        ),
+        "properties": props,
     }
-    return parse_task_page(_post("/pages", body, timeout=20))
+    try:
+        return parse_task_page(_post("/pages", body, timeout=20))
+    except NotionError as exc:
+        err_msg = str(exc)
+        if "is not a property that exists" in err_msg:
+            # 存在しないプロパティを除外して1回リトライ
+            for key in list(props.keys()):
+                if key in err_msg and key != config.NOTION_PROP_TITLE:
+                    props.pop(key, None)
+            body["properties"] = props
+            return parse_task_page(_post("/pages", body, timeout=20))
+        raise
 
 
 def update_task_page(

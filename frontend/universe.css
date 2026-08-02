@@ -1,257 +1,356 @@
-/* PETIT Universe v0.6.0 — Cosmic Glass UI Architecture */
+/* PETIT Universe — Stellar Minimal v0.7.0 */
+/* コンセプト: 深宇宙の静寂。発光ではなく余白と軌道線で宇宙感を表現。 */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300&display=swap');
+
 :root {
   color-scheme: dark;
-  --bg: #03050c;
-  --bg-gradient: radial-gradient(circle at 50% -20%, #151c3d 0%, #060919 45%, #020308 100%);
-  --panel: rgba(12, 18, 38, 0.65);
-  --panel-strong: rgba(18, 26, 54, 0.88);
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --panel-border-glow: rgba(0, 242, 255, 0.25);
-  --line: rgba(163, 184, 255, 0.12);
-  
-  --text: #f8fafc;
-  --muted: #94a3b8;
-  --muted-dim: #64748b;
-  
-  --cyan: #00f2ff;
-  --cyan-glow: rgba(0, 242, 255, 0.35);
-  --violet: #a855f7;
-  --violet-glow: rgba(168, 85, 247, 0.35);
-  --amber: #f59e0b;
-  
-  --accent: #38bdf8;
-  --accent-strong: #7dd3fc;
-  --danger: #f43f5e;
-  --warning: #fbbf24;
-  --ok: #10b981;
-  
-  --shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  --glass-blur: blur(20px) saturate(180%);
-  
-  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* — 背景 — */
+  --bg: #05060d;
+  --bg-mid: #080a13;
+  --bg-surface: #0c0e18;     /* カード・パネル面 */
+
+  /* — 境界線 — */
+  --line: rgba(200, 207, 222, 0.09);
+  --line-mid: rgba(200, 207, 222, 0.14);
+  --line-strong: rgba(200, 207, 222, 0.20);
+
+  /* — テキスト — */
+  --text: #dde1ec;
+  --text-sub: #8c93a8;
+  --text-dim: #545a6e;
+
+  /* — アクセント (星明かり) — */
+  --accent: #a8b4d0;           /* 星の光 — 青みがかったオフホワイト */
+  --accent-warm: #d4b896;      /* 砂漠の星 — 暖色 */
+  --accent-cool: #7a8baa;      /* 暗い星 */
+
+  /* — ステータス — */
+  --ok:      #6dbf9a;
+  --warn:    #c8a96e;
+  --danger:  #c96070;
+
+  /* — 影 — */
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
+
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont,
+    'Hiragino Sans', 'Noto Sans JP', sans-serif;
 }
 
+/* ====================================================
+   Reset & Base
+   ==================================================== */
 * { box-sizing: border-box; }
 html, body { min-height: 100%; height: 100%; }
 body {
   margin: 0;
   overflow-x: hidden;
   background: var(--bg);
-  background-image: var(--bg-gradient);
-  background-attachment: fixed;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-button, textarea, input, select { font: inherit; }
-button { color: inherit; }
+button, textarea, input, select { font: inherit; color: inherit; }
+button { background: none; border: none; cursor: pointer; }
+h1, h2, h3 { margin: 0; }
 
-/* --- Cosmic Space Backdrop --- */
-.space { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+/* ====================================================
+   Space Backdrop — 星フィールド（控えめ）
+   ==================================================== */
+.space {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 星: 小さく、透明度を抑えて奥行き感のみ */
 .space::before,
 .space::after {
   content: "";
   position: absolute;
-  inset: -30%;
+  inset: -20%;
   background-image:
-    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.4px),
-    radial-gradient(circle at 70% 40%, rgba(56, 189, 248, 0.75) 0 1.2px, transparent 1.6px),
-    radial-gradient(circle at 45% 75%, rgba(168, 85, 247, 0.6) 0 1.2px, transparent 1.8px);
-  background-size: 160px 160px, 220px 220px, 280px 280px;
-  opacity: .35;
+    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.75) 0 0.8px, transparent 1px),
+    radial-gradient(circle at 67% 14%, rgba(200, 215, 255, 0.5)  0 0.7px, transparent 0.9px),
+    radial-gradient(circle at 41% 58%, rgba(255, 255, 255, 0.55) 0 0.8px, transparent 1px),
+    radial-gradient(circle at 82% 71%, rgba(200, 215, 255, 0.45) 0 0.6px, transparent 0.8px),
+    radial-gradient(circle at 9%  84%, rgba(255, 255, 255, 0.4)  0 0.7px, transparent 1px);
+  background-size: 190px 190px, 260px 260px, 310px 310px, 230px 230px, 280px 280px;
+  opacity: 0.55;
+  animation: starDrift 120s linear infinite;
   will-change: transform;
-  animation: cosmicDrift 100s linear infinite;
 }
 .space::after {
-  transform: scale(1.35) rotate(15deg);
-  opacity: .2;
-  animation-duration: 140s;
+  transform: scale(1.4) rotate(20deg);
+  opacity: 0.3;
+  animation-duration: 180s;
   animation-direction: reverse;
 }
+
+/* ネビュラ: 非常に暗く、形のヒントだけ残す */
 .space__nebula {
   position: absolute;
-  width: 70vw;
-  height: 70vw;
+  width: 80vw;
+  height: 80vw;
   border-radius: 50%;
-  filter: blur(90px);
-  opacity: .28;
+  filter: blur(120px);
+  opacity: 0.06;
   will-change: transform;
 }
 .space__nebula--one {
-  left: -20vw;
-  top: -15vw;
-  background: radial-gradient(circle, #1e3a8a, #00f2ff 40%, transparent 70%);
-  animation: nebulaPulse 18s ease-in-out infinite alternate;
+  left: -30vw;
+  top: -20vw;
+  background: radial-gradient(circle, #1a2d5a, #0d1a3a 50%, transparent 75%);
+  animation: nebulaDrift 30s ease-in-out infinite alternate;
 }
 .space__nebula--two {
-  right: -25vw;
-  bottom: -25vw;
-  background: radial-gradient(circle, #581c87, #a855f7 40%, transparent 70%);
-  animation: nebulaPulse 22s ease-in-out infinite alternate-reverse;
-}
-@keyframes cosmicDrift {
-  to { transform: translate3d(80px, 50px, 0) rotate(3deg); }
-}
-@keyframes nebulaPulse {
-  0% { transform: scale(1) translate3d(0, 0, 0); opacity: .22; }
-  100% { transform: scale(1.15) translate3d(30px, 20px, 0); opacity: .34; }
+  right: -35vw;
+  bottom: -30vw;
+  background: radial-gradient(circle, #1a1530, #0d0a22 50%, transparent 75%);
+  animation: nebulaDrift 40s ease-in-out -8s infinite alternate-reverse;
 }
 
-/* --- Topbar & Header --- */
-.universe-shell { position: relative; min-height: 100vh; z-index: 1; }
+@keyframes starDrift {
+  to { transform: translate3d(60px, 40px, 0) rotate(2deg); }
+}
+@keyframes nebulaDrift {
+  from { transform: scale(0.95) translate3d(0, 0, 0); }
+  to   { transform: scale(1.08) translate3d(20px, -15px, 0); }
+}
+
+/* ====================================================
+   App Shell
+   ==================================================== */
+.universe-shell {
+  position: relative;
+  min-height: 100vh;
+  z-index: 1;
+}
+
+/* ====================================================
+   Topbar
+   ==================================================== */
 .universe-topbar {
   position: sticky;
   top: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) auto minmax(200px, 1fr);
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
   align-items: center;
   gap: 20px;
   padding: max(14px, env(safe-area-inset-top)) 28px 14px;
-  border-bottom: 1px solid var(--panel-border);
-  background: rgba(3, 5, 12, 0.72);
-  backdrop-filter: var(--glass-blur);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid var(--line);
+  background: rgba(5, 6, 13, 0.88);
+  backdrop-filter: blur(16px) saturate(120%);
 }
-.brand { display: inline-flex; align-items: center; gap: 14px; color: inherit; text-decoration: none; width: fit-content; }
-.brand img {
-  width: 36px;
-  height: 36px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 12px var(--cyan-glow));
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.brand:hover img { transform: rotate(8deg) scale(1.05); }
-.brand span { display: flex; flex-direction: column; line-height: 1.1; }
-.brand strong { letter-spacing: .15em; font-size: 16px; font-weight: 800; background: linear-gradient(135deg, #ffffff, var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.brand small { color: var(--muted); letter-spacing: .25em; font-size: 9px; font-weight: 600; margin-top: 4px; }
 
+/* ブランド */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+  width: fit-content;
+}
+.brand img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  opacity: 0.9;
+  transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.brand:hover img {
+  opacity: 1;
+  transform: rotate(6deg) scale(1.04);
+}
+.brand span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.brand strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--text);
+}
+.brand small {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  margin-top: 3px;
+  font-weight: 400;
+}
+
+/* ナビゲーション タブ */
 .view-tabs {
   display: flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--panel-border);
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.6);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(8, 10, 19, 0.7);
 }
 .view-tab {
   border: 0;
   background: transparent;
-  border-radius: 999px;
-  padding: 8px 18px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
+  border-radius: 5px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--text-sub);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.2s ease, background 0.2s ease;
 }
-.view-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.view-tab:hover {
+  color: var(--text);
+  background: rgba(200, 207, 222, 0.05);
+}
 .view-tab.is-active {
-  color: #fff;
-  background: linear-gradient(135deg, rgba(0, 242, 255, 0.25), rgba(168, 85, 247, 0.25));
-  border: 1px solid rgba(0, 242, 255, 0.4);
-  box-shadow: 0 0 15px var(--cyan-glow);
+  color: var(--text);
+  background: rgba(200, 207, 222, 0.1);
+  border: 1px solid var(--line-mid);
+  box-shadow: none;
 }
-.topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
-.sync-pill, .version-pill, .legacy-link {
-  font-size: 11px;
-  font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--muted);
-  border: 1px solid var(--panel-border);
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-}
-.legacy-link { text-decoration: none; transition: all 0.2s; }
-.legacy-link:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.2); }
 
-/* --- View Panels & Transition --- */
-.universe-main { padding: 28px; }
+/* トップバー右側 */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.sync-pill,
+.version-pill,
+.legacy-link {
+  font-size: 10px;
+  font-weight: 500;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: transparent;
+}
+.legacy-link {
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s;
+}
+.legacy-link:hover {
+  color: var(--text-sub);
+  border-color: var(--line-mid);
+}
+
+/* ====================================================
+   View Panels
+   ==================================================== */
+.universe-main { padding: 24px 28px; }
 .view {
   max-width: 1540px;
   margin: 0 auto;
-  opacity: 1;
-  transform: translate3d(0, 0, 0);
-  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 .view.is-entering {
-  animation: cosmicFadeScale 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-@keyframes cosmicFadeScale {
-  0% { opacity: 0; transform: scale(0.97) translate3d(0, 10px, 0); }
-  100% { opacity: 1; transform: scale(1) translate3d(0, 0, 0); }
+  animation: viewArrival 0.28s cubic-bezier(0.2, 0.82, 0.2, 1) backwards;
 }
 
-/* --- Focus Layout & Orbit Card --- */
-.focus-layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 24px; }
-.orbit-card, .detail-panel, .chat-panel, .chat-context, .task-table-wrap, .constellation-card, .today-card {
-  border: 1px solid var(--panel-border);
-  background: var(--panel);
-  box-shadow: var(--shadow);
-  backdrop-filter: var(--glass-blur);
-  border-radius: 24px;
+/* セクションヘッド */
+.section-head,
+.orbit-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 22px 26px 0;
 }
+
+.eyebrow {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.section-copy {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.65;
+}
+
+/* ====================================================
+   Focus Layout & Orbit Card
+   ==================================================== */
+.focus-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+}
+
+/* パネル基本スタイル — ガラスではなくマットな暗面 */
+.orbit-card,
+.detail-panel,
+.chat-panel,
+.chat-context,
+.task-table-wrap,
+.constellation-card,
+.today-card {
+  border: 1px solid var(--line);
+  background: var(--bg-surface);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
 .orbit-card {
-  min-height: calc(100vh - 136px);
+  min-height: calc(100vh - 140px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   position: relative;
+  isolation: isolate;
 }
-.orbit-card__header, .section-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: flex-start;
-  padding: 24px 28px 0;
-}
-.eyebrow {
-  display: block;
-  color: var(--cyan);
-  font-size: 11px;
-  letter-spacing: .25em;
-  font-weight: 700;
-  text-transform: uppercase;
-  margin-bottom: 6px;
-  font-family: 'JetBrains Mono', monospace;
-}
-h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; }
 
-.focus-project-switcher {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(15, 23, 42, 0.6);
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--panel-border);
+/* Orbitカード内の微細な星フィールド */
+.orbit-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 28% 35%, rgba(255,255,255,0.6) 0 0.7px, transparent 1px),
+    radial-gradient(circle at 71% 22%, rgba(200,215,255,0.4) 0 0.6px, transparent 0.8px),
+    radial-gradient(circle at 55% 68%, rgba(255,255,255,0.45) 0 0.7px, transparent 1px),
+    radial-gradient(circle at 16% 80%, rgba(200,215,255,0.35) 0 0.5px, transparent 0.7px),
+    radial-gradient(circle at 88% 55%, rgba(255,255,255,0.4) 0 0.6px, transparent 0.9px);
+  background-size: 140px 140px, 200px 200px, 170px 170px, 250px 250px, 180px 180px;
+  opacity: 0.5;
+  animation: starTwinkle 6s ease-in-out infinite alternate;
 }
-.focus-project-switcher select {
-  background: transparent;
-  border: 0;
-  color: var(--text);
-  font-weight: 600;
-  padding: 6px 8px;
-  border-radius: 6px;
-  outline: none;
-  cursor: pointer;
-}
-.icon-button {
-  border: 1px solid var(--panel-border);
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.icon-button:hover { background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.3); }
 
-/* Orbit Container & Nodes (GPU Acceleration) */
+/* ====================================================
+   Orbit Rings & Nodes
+   ==================================================== */
 .orbit {
   position: relative;
   flex: 1;
@@ -260,115 +359,280 @@ h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  touch-action: pan-x pan-y;
+  z-index: 1;
 }
+
 .orbit__ring {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 1px dashed rgba(163, 184, 255, 0.15);
+  border: 1px solid rgba(200, 207, 222, 0.10);
   pointer-events: none;
+  transition: width 0.48s cubic-bezier(0.2, 0.82, 0.2, 1),
+              height 0.48s cubic-bezier(0.2, 0.82, 0.2, 1),
+              opacity 0.3s ease;
+  animation: orbitTurn 28s linear infinite;
 }
-.orbit__ring--one { width: 280px; height: 200px; }
-.orbit__ring--two { width: 380px; height: 270px; }
-.orbit__ring--three { width: 480px; height: 340px; }
+.orbit__ring--one  { width: 280px; height: 190px; }
+.orbit__ring--two  { width: 380px; height: 260px; animation-duration: 38s; animation-direction: reverse; }
+.orbit__ring--three { width: 490px; height: 340px; animation-duration: 50s; }
 
-/* Objective / Central Node */
+.orbit[data-zoom-level="far"]  .orbit__ring { opacity: 0.4; }
+.orbit[data-zoom-level="near"] .orbit__ring { opacity: 0.7; }
+
+/* 中心ノード（親タスク） */
 .space-node--objective {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   z-index: 10;
-  width: 140px;
-  height: 140px;
+  width: 128px;
+  height: 128px;
   border-radius: 50%;
-  border: 1px solid rgba(0, 242, 255, 0.4);
-  background: radial-gradient(circle at 35% 35%, rgba(0, 242, 255, 0.3), rgba(15, 23, 42, 0.95));
-  box-shadow: 0 0 35px var(--cyan-glow), inset 0 0 20px rgba(0, 242, 255, 0.2);
+  border: 1px solid var(--line-mid);
+  background: radial-gradient(circle at 38% 35%, rgba(200,207,222,0.08), rgba(8,10,19,0.98));
   color: var(--text);
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 16px;
   cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s ease;
 }
 .space-node--objective:hover {
-  transform: translate(-50%, -50%) scale(1.06);
-  box-shadow: 0 0 50px var(--cyan-glow), inset 0 0 30px rgba(0, 242, 255, 0.4);
+  transform: translate(-50%, -50%) scale(1.05);
+  border-color: var(--line-strong);
+}
+.space-node__glow { display: none; } /* 発光は使わない */
+.space-node__label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
-/* Child Task Orbit Nodes (GPU Accelerated Transform) */
+/* 子タスクノード */
 .space-node[data-orbit-index] {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 50%; left: 50%;
   z-index: 5;
-  min-width: 110px;
-  max-width: 160px;
-  padding: 10px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--panel-border);
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
+  min-width: 100px;
+  max-width: 150px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(8, 10, 19, 0.92);
   color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  /* GPU transform using CSS variable */
   transform: translate3d(calc(-50% + var(--orbit-x, 0px)), calc(-50% + var(--orbit-y, 0px)), 0);
   will-change: transform;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
-.space-node[data-orbit-index]:hover, .space-node[data-orbit-index].is-selected {
-  border-color: var(--cyan);
-  box-shadow: 0 0 20px var(--cyan-glow);
+.space-node[data-orbit-index]:hover {
+  border-color: var(--line-strong);
+  background: rgba(14, 16, 28, 0.97);
   z-index: 15;
 }
-.space-node--high { border-left: 3px solid var(--amber); }
-.space-node--active {
-  border-color: var(--violet) !important;
-  box-shadow: 0 0 25px var(--violet-glow) !important;
-  animation: activePulse 2s infinite alternate;
-}
-@keyframes activePulse {
-  0% { box-shadow: 0 0 15px var(--violet-glow); }
-  100% { box-shadow: 0 0 30px rgba(168, 85, 247, 0.6); }
+.space-node[data-orbit-index].is-selected {
+  border-color: var(--accent);
+  z-index: 15;
 }
 
-/* Detail Panel */
-.detail-panel { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
-.detail-panel__empty { color: var(--muted); text-align: center; margin: auto 0; }
-.detail-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+/* 重要度・作業中 */
+.space-node--high {
+  border-left: 2px solid var(--accent-warm);
+}
+.space-node--active {
+  border-color: var(--accent) !important;
+  animation: activePulse 2.4s ease-in-out infinite alternate;
+}
+
+/* ====================================================
+   Task Nodes Container
+   ==================================================== */
+.task-nodes {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  transform: scale(var(--universe-zoom, 1));
+  transform-origin: center;
+  transition: transform 0.48s cubic-bezier(0.2, 0.82, 0.2, 1);
+}
+
+/* ====================================================
+   Detail Panel
+   ==================================================== */
+.detail-panel {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.detail-panel__empty {
+  color: var(--text-sub);
+  text-align: center;
+  margin: auto 0;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.detail-panel__empty h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 12px 0 8px;
+  color: var(--text);
+}
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
 .detail-actions button {
   flex: 1;
-  min-width: 120px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--panel-border);
-  background: rgba(255, 255, 255, 0.05);
-  font-weight: 600;
+  min-width: 110px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--line-mid);
+  background: rgba(200, 207, 222, 0.04);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.detail-actions button:hover {
+  background: rgba(200, 207, 222, 0.09);
+  border-color: var(--line-strong);
 }
 .detail-actions button[data-action="activate"] {
-  background: linear-gradient(135deg, var(--cyan), #0284c7);
-  border: 0;
-  color: #000;
-  font-weight: 700;
-  box-shadow: 0 0 20px var(--cyan-glow);
+  border-color: var(--ok);
+  background: rgba(109, 191, 154, 0.08);
+  color: var(--ok);
+  font-weight: 600;
 }
 .detail-actions button[data-action="activate"]:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 30px var(--cyan-glow);
+  background: rgba(109, 191, 154, 0.15);
 }
 
-/* Mobile Responsiveness (390x844 etc.) */
+/* ====================================================
+   Icon Buttons
+   ==================================================== */
+.icon-button {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-sub);
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.icon-button:hover {
+  color: var(--text);
+  border-color: var(--line-mid);
+  background: rgba(200, 207, 222, 0.05);
+}
+
+/* ====================================================
+   Focus Project Switcher
+   ==================================================== */
+.focus-project-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.focus-project-switcher select {
+  background: rgba(8, 10, 19, 0.8);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.18s ease;
+}
+.focus-project-switcher select:focus {
+  border-color: var(--line-strong);
+}
+.focus-project-switcher button:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+/* 選択・アクティブ状態 */
+.constellation-card.is-selected,
+.universe-task.is-selected,
+.constellation-card__header.is-selected {
+  border-color: var(--line-mid) !important;
+  background: rgba(200, 207, 222, 0.04) !important;
+}
+
+/* ====================================================
+   Animations
+   ==================================================== */
+@keyframes starDrift {
+  to { transform: translate3d(60px, 40px, 0) rotate(2deg); }
+}
+@keyframes starTwinkle {
+  from { opacity: 0.35; }
+  to   { opacity: 0.65; }
+}
+@keyframes orbitTurn {
+  from { transform: translate(-50%, -50%) rotateX(60deg) rotateZ(0deg); }
+  to   { transform: translate(-50%, -50%) rotateX(60deg) rotateZ(360deg); }
+}
+@keyframes nodeArrival {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.6) blur(4px); filter: blur(4px); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+}
+@keyframes activePulse {
+  from { box-shadow: none; border-color: var(--accent); }
+  to   { box-shadow: 0 0 0 2px rgba(168, 180, 208, 0.18); border-color: var(--text); }
+}
+@keyframes selectedSignal {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(200,207,222,0.2); }
+  50%       { box-shadow: 0 0 0 2px rgba(200,207,222,0.35); }
+}
+@keyframes viewArrival {
+  from { opacity: 0; transform: translateY(6px) scale(0.995); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes cosmicFadeScale {
+  0%   { opacity: 0; transform: scale(0.98) translate3d(0, 8px, 0); }
+  100% { opacity: 1; transform: scale(1) translate3d(0, 0, 0); }
+}
+
+/* Motion declarations */
+html[data-universe-motion="ready"] .task-nodes .space-node {
+  animation: nodeArrival 0.44s cubic-bezier(0.18, 0.9, 0.28, 1.12) backwards;
+  animation-delay: calc(var(--node-index, 0) * 45ms);
+}
+html[data-universe-motion="ready"] .space-node.is-selected {
+  animation: selectedSignal 2.4s ease-in-out infinite;
+}
+html[data-universe-motion="ready"] .view.is-entering {
+  animation: viewArrival 0.28s cubic-bezier(0.2, 0.82, 0.2, 1) backwards;
+}
+
+/* ====================================================
+   Responsive
+   ==================================================== */
 @media (max-width: 900px) {
   .universe-topbar {
     grid-template-columns: 1fr auto;
@@ -388,32 +652,21 @@ h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em
 }
 
 @media (max-width: 640px) {
-  .universe-main { padding: 16px; }
-  .orbit-card__header { padding: 16px 16px 0; }
-  .space-node--objective { width: 110px; height: 110px; font-size: 13px; }
+  .universe-main { padding: 14px 16px; }
+  .orbit-card__header { padding: 14px 16px 0; }
+  .space-node--objective { width: 108px; height: 108px; font-size: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .space::before, .space::after, .space__nebula, .space-node--active, .view.is-entering, .constellation-card.is-selected, .universe-task.is-selected {
+  .space::before,
+  .space::after,
+  .space__nebula,
+  .orbit-card::before,
+  .orbit__ring,
+  .space-node--active,
+  .space-node.is-selected,
+  .view.is-entering {
     animation: none !important;
     transition: none !important;
   }
 }
-
-/* 1st Selection Glow & Pulse Animation (Smooth & Zero DOM Reload) */
-.constellation-card.is-selected,
-.universe-task.is-selected,
-.constellation-card__header.is-selected {
-  border-color: var(--cyan) !important;
-  box-shadow: 0 0 24px var(--cyan-glow), inset 0 0 12px rgba(0, 242, 255, 0.15) !important;
-  transform: translateY(-2px) scale(1.015);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
-  animation: selectGlowPulse 1.8s ease-in-out infinite alternate;
-}
-
-@keyframes selectGlowPulse {
-  0% { box-shadow: 0 0 16px var(--cyan-glow), inset 0 0 8px rgba(0, 242, 255, 0.1); }
-  100% { box-shadow: 0 0 30px rgba(0, 242, 255, 0.55), inset 0 0 18px rgba(0, 242, 255, 0.25); }
-}
-
-

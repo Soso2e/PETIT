@@ -1,82 +1,238 @@
+/* PETIT Universe — Stellar Minimal v0.7.0 — Actions & Components */
+
+/* ====================================================
+   Chat Actions (メッセージ内ボタン)
+   ==================================================== */
 .chat-actions {
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: 8px;
   align-items: center;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(157, 180, 255, 0.16);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }
-
-.chat-actions small { color: var(--muted); line-height: 1.5; }
+.chat-actions small {
+  color: var(--text-sub);
+  font-size: 11px;
+  line-height: 1.5;
+}
 .chat-actions button,
 .task-feedback button,
 .work-session-controls button,
 .constellation-card__header,
 .universe-task {
-  border: 1px solid rgba(157, 180, 255, 0.28);
-  border-radius: 12px;
-  padding: 8px 11px;
+  border: 1px solid var(--line-mid);
+  border-radius: 6px;
+  padding: 7px 10px;
   color: var(--text);
-  background: rgba(157, 180, 255, 0.14);
+  background: rgba(200, 207, 222, 0.04);
   cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
-.chat-actions button:last-child { background: transparent; }
-.chat-actions button:disabled { cursor: wait; opacity: 0.5; }
+.chat-actions button:hover,
+.work-session-controls button:hover {
+  background: rgba(200, 207, 222, 0.09);
+  border-color: var(--line-strong);
+}
+.chat-actions button:last-child {
+  background: transparent;
+}
+.chat-actions button:disabled {
+  cursor: wait;
+  opacity: 0.4;
+}
 
-.section-copy { margin: 0; font-size: 13px; }
+/* ====================================================
+   Section layout helpers
+   ==================================================== */
+.section-copy { margin: 0; font-size: 12px; color: var(--text-sub); line-height: 1.65; }
 .task-section-head { align-items: flex-end; }
-.task-filter-wrap { display: flex; align-items: center; gap: 12px; }
-.task-count { color: var(--muted); font-size: 12px; }
-.task-table { min-width: 650px; }
-.task-table th:first-child,
-.task-table td:first-child { width: 76px; text-align: center; }
-.task-table__empty { padding: 38px 18px !important; color: var(--muted); text-align: center !important; }
-.task-table__due { white-space: nowrap; }
+.task-filter-wrap { display: flex; align-items: center; gap: 10px; }
+.task-count {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em;
+}
 
-.task-check {
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(157, 180, 255, 0.3);
-  border-radius: 50%;
-  color: transparent;
-  background: rgba(255, 255, 255, 0.025);
+/* ====================================================
+   Task Filters (chip)
+   ==================================================== */
+.task-filters {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: rgba(8, 10, 19, 0.7);
+}
+.filter-chip {
+  border: 0;
+  background: transparent;
+  border-radius: 3px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-sub);
   cursor: pointer;
-  transition: color .18s ease, background .18s ease, transform .18s ease;
+  transition: color 0.18s, background 0.18s;
 }
-.task-check:hover {
+.filter-chip:hover { color: var(--text); }
+.filter-chip.is-active {
   color: var(--text);
-  background: rgba(127, 227, 193, 0.18);
-  border-color: rgba(127, 227, 193, 0.5);
-  transform: scale(1.05);
+  background: rgba(200, 207, 222, 0.1);
+  border: 1px solid var(--line-mid);
 }
-.task-check:disabled { cursor: wait; opacity: .45; }
 
-.detail-grid--simple { margin-bottom: 18px; }
-.detail-sync {
-  margin: -8px 0 18px;
-  color: var(--warning);
+/* ====================================================
+   Task Table
+   ==================================================== */
+.task-table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+.task-table {
+  min-width: 640px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.task-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  border-bottom: 1px solid var(--line);
+}
+.task-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  vertical-align: middle;
+}
+.task-table tbody tr { transition: background 0.15s ease; }
+.task-table tbody tr:hover { background: rgba(200, 207, 222, 0.03); }
+.task-table th:first-child,
+.task-table td:first-child { width: 70px; text-align: center; }
+.task-table__empty {
+  padding: 36px 18px !important;
+  color: var(--text-sub);
+  text-align: center !important;
   font-size: 12px;
 }
+.task-table__due { white-space: nowrap; color: var(--text-sub); font-size: 12px; }
+.task-table tbody tr.is-selected {
+  background: rgba(200, 207, 222, 0.05);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.task-table tbody tr:focus-visible {
+  outline: 1px solid var(--line-strong);
+  outline-offset: -1px;
+}
+
+/* タスク完了チェック */
+.task-check {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-mid);
+  border-radius: 50%;
+  color: transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.18s, background 0.18s, border-color 0.18s;
+}
+.task-check:hover {
+  color: var(--ok);
+  border-color: var(--ok);
+  background: rgba(109, 191, 154, 0.08);
+}
+.task-check:disabled { cursor: wait; opacity: 0.4; }
+
+/* ====================================================
+   Detail Grid
+   ==================================================== */
+.detail-grid--simple {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.detail-grid--simple > div {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(200, 207, 222, 0.02);
+}
+.detail-grid--simple span {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.detail-grid--simple strong {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.detail-reason {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.6;
+}
+.detail-sync {
+  margin: -6px 0 14px;
+  color: var(--warn);
+  font-size: 11px;
+}
+
 .detail-actions--primary { grid-template-columns: 1fr 1fr; }
 .detail-actions--primary button:first-child {
-  border-color: rgba(127, 227, 193, .38);
-  background: rgba(127, 227, 193, .12);
+  border-color: rgba(109, 191, 154, 0.3);
+  background: rgba(109, 191, 154, 0.06);
+  color: var(--ok);
 }
 .detail-actions--secondary {
   grid-template-columns: 1fr 1fr;
-  margin-top: 10px;
+  margin-top: 8px;
 }
-.detail-actions--secondary button { background: transparent; }
-.detail-actions button:disabled { cursor: wait; opacity: .5; }
+.detail-actions--secondary button {
+  background: transparent;
+  color: var(--text-sub);
+}
+.detail-actions--secondary button:hover {
+  color: var(--text);
+  background: rgba(200, 207, 222, 0.06);
+}
+.detail-actions button:disabled { cursor: wait; opacity: 0.4; }
+
+/* ====================================================
+   Constellation (Life/Task empty state)
+   ==================================================== */
 .constellation-empty {
   grid-column: 1 / -1;
   padding: 28px;
   border: 1px solid var(--line);
-  border-radius: 22px;
-  background: var(--panel);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-sub);
+  font-size: 13px;
+  text-align: center;
 }
 
+/* ====================================================
+   Task Feedback Toast
+   ==================================================== */
 .task-feedback {
   position: fixed;
   z-index: 80;
@@ -84,120 +240,166 @@
   bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
   display: flex;
   align-items: center;
-  gap: 16px;
-  max-width: min(92vw, 560px);
-  padding: 13px 15px 13px 18px;
-  border: 1px solid rgba(157, 180, 255, .25);
-  border-radius: 16px;
-  background: rgba(15, 20, 39, .96);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+  gap: 14px;
+  max-width: min(92vw, 540px);
+  padding: 11px 14px 11px 16px;
+  border: 1px solid var(--line-mid);
+  border-radius: 8px;
+  background: rgba(8, 10, 19, 0.97);
+  box-shadow: var(--shadow-lg);
   transform: translateX(-50%);
-  backdrop-filter: blur(20px);
+  font-size: 13px;
+  color: var(--text);
 }
 .task-feedback[hidden] { display: none; }
 .task-feedback span { line-height: 1.5; }
 .task-feedback button { white-space: nowrap; }
 
-/* Life > Project > Task hierarchy */
+/* ====================================================
+   Focus — Breadcrumb & Header
+   ==================================================== */
 .focus-header { align-items: center; }
 .focus-heading { min-width: 0; }
 .focus-breadcrumb {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 9px 0 5px;
-  color: var(--muted);
-  font-size: 12px;
+  gap: 6px;
+  margin: 8px 0 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em;
 }
 .focus-breadcrumb button {
   border: 0;
   padding: 0;
-  color: var(--accent);
+  color: var(--text-sub);
   background: transparent;
   cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  transition: color 0.18s;
 }
+.focus-breadcrumb button:hover { color: var(--text); }
 .focus-breadcrumb strong {
   overflow: hidden;
-  color: var(--accent-strong);
+  color: var(--accent);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .focus-project-switcher {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 .focus-project-switcher label {
   display: grid;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 10px;
-  letter-spacing: .12em;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
+  font-family: 'DM Mono', monospace;
 }
 .focus-project-switcher select {
-  min-width: 190px;
-  max-width: 300px;
+  min-width: 180px;
+  max-width: 280px;
   border: 1px solid var(--line);
-  border-radius: 13px;
-  padding: 10px 34px 10px 12px;
+  border-radius: 6px;
+  padding: 8px 28px 8px 10px;
   color: var(--text);
-  background: rgba(255, 255, 255, .055);
+  background: rgba(8, 10, 19, 0.85);
+  font-size: 12px;
+  transition: border-color 0.18s;
 }
-.focus-project-switcher button:disabled { cursor: default; opacity: .35; }
+.focus-project-switcher select:focus { border-color: var(--line-strong); }
+.focus-project-switcher button:disabled { cursor: default; opacity: 0.3; }
 .focus-empty {
   position: absolute;
   z-index: 7;
   left: 50%;
-  top: calc(50% + 115px);
+  top: calc(50% + 100px);
   margin: 0;
   transform: translateX(-50%);
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
+  color: var(--text-sub);
 }
 
-.active-copy {
-  min-width: 0;
+/* ====================================================
+   Focus Footer — Active Work Session
+   ==================================================== */
+.focus-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  background: rgba(5, 6, 13, 0.5);
 }
+.active-copy { min-width: 0; }
 .active-copy strong,
 .active-copy small { display: block; }
+.active-copy strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
 .active-copy small {
-  margin-top: 6px;
-  color: var(--muted);
+  margin-top: 4px;
+  color: var(--text-sub);
+  font-size: 11px;
   line-height: 1.5;
 }
 .work-session-controls {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .work-session-controls button {
   white-space: nowrap;
   background: transparent;
+  border-color: var(--line-mid);
 }
 .work-session-controls button:first-of-type {
-  border-color: rgba(127, 227, 193, .44);
-  background: rgba(127, 227, 193, .13);
+  border-color: rgba(109, 191, 154, 0.35);
+  color: var(--ok);
 }
-.work-session-controls button:disabled { cursor: wait; opacity: .5; }
-#active-elapsed { min-width: 62px; text-align: right; }
+.work-session-controls button:first-of-type:hover {
+  background: rgba(109, 191, 154, 0.08);
+}
+.work-session-controls button:disabled { cursor: wait; opacity: 0.4; }
+#active-elapsed {
+  min-width: 56px;
+  text-align: right;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--text-sub);
+  letter-spacing: 0.06em;
+}
 
-/* Universe is the list view of the complete Life hierarchy. */
+/* ====================================================
+   Universe (Life list) View
+   ==================================================== */
 .universe-section-head { align-items: flex-end; }
 .universe-summary {
-  padding: 10px 14px;
+  padding: 8px 12px;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  background: rgba(255, 255, 255, .035);
-  font-size: 12px;
+  border-radius: 5px;
+  color: var(--text-sub);
+  background: transparent;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em;
   white-space: nowrap;
 }
+
 .constellation-grid--list {
   grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 .constellation-card--list {
   min-height: 0;
@@ -206,80 +408,213 @@
 }
 .constellation-card--list::after { display: none; }
 .constellation-card--list.is-selected {
-  border-color: rgba(157, 180, 255, .48);
-  box-shadow: 0 0 0 1px rgba(157, 180, 255, .12), var(--shadow);
+  border-color: var(--line-strong) !important;
 }
 .constellation-card__header {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
   border: 0;
   border-radius: 0;
-  padding: 20px 22px;
+  padding: 16px 20px;
   text-align: left;
-  background: rgba(255, 255, 255, .025);
+  background: rgba(200, 207, 222, 0.02);
+  transition: background 0.18s ease;
 }
-.constellation-card__header:hover { background: rgba(157, 180, 255, .09); }
+.constellation-card__header:hover {
+  background: rgba(200, 207, 222, 0.05);
+}
 .constellation-card__heading { min-width: 0; }
 .constellation-card__heading strong {
   display: block;
-  margin-top: 7px;
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   overflow: hidden;
-  font-size: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text);
 }
 .constellation-card__counts {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--text-sub);
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.06em;
   white-space: nowrap;
 }
+
 .universe-task-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 0 14px 14px;
+  gap: 6px;
+  padding: 0 12px 12px;
 }
 .universe-task {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  border-color: rgba(255, 255, 255, .07);
-  padding: 11px 12px;
+  gap: 10px;
+  border-color: var(--line);
+  background: rgba(200, 207, 222, 0.015);
+  padding: 9px 11px;
   text-align: left;
-  background: rgba(255, 255, 255, .025);
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
-.universe-task:hover { background: rgba(157, 180, 255, .1); }
+.universe-task:hover {
+  background: rgba(200, 207, 222, 0.04);
+  border-color: var(--line-mid);
+}
 .universe-task.is-selected {
-  background: rgba(157, 180, 255, .2);
-  box-shadow: 0 0 0 2px rgba(157, 180, 255, .72), 0 0 28px rgba(112, 139, 255, .25);
+  background: rgba(200, 207, 222, 0.06);
+  border-color: var(--accent);
 }
 .universe-task__title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12px;
+  color: var(--text);
 }
 .universe-task__meta {
-  color: var(--muted);
-  font-size: 11px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
-.universe-task--high { border-left: 3px solid var(--accent); }
-.universe-task--mid { border-left: 3px solid var(--warning); }
-.universe-task--low { border-left: 3px solid rgba(165, 172, 199, .45); opacity: .72; }
-.task-table tbody tr.is-selected { background: rgba(157, 180, 255, .16); box-shadow: inset 3px 0 0 var(--accent); }
-.task-table tbody tr:focus-visible { outline: 2px solid rgba(157, 180, 255, .78); outline-offset: -2px; }
+.universe-task--high { border-left: 2px solid var(--accent-warm); }
+.universe-task--mid  { border-left: 2px solid var(--warn); }
+.universe-task--low  { border-left: 2px solid rgba(200, 207, 222, 0.2); opacity: 0.65; }
 
+/* ====================================================
+   Chat Layout
+   ==================================================== */
+.chat-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+}
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 140px);
+  overflow: hidden;
+}
+.chat-context {
+  padding: 22px;
+  color: var(--text-sub);
+  font-size: 13px;
+  line-height: 1.65;
+  align-self: flex-start;
+}
+.chat-context h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 10px 0 8px;
+}
+
+.section-head--compact {
+  padding: 16px 20px 0;
+}
+.chat-status {
+  font-size: 10px;
+  font-family: 'DM Mono', monospace;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  align-self: flex-start;
+  padding-top: 4px;
+}
+
+.messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+.message {
+  max-width: min(78%, 620px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.68;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  background: rgba(200, 207, 222, 0.03);
+}
+.message--user {
+  align-self: flex-end;
+  border-color: var(--line-mid);
+  background: rgba(200, 207, 222, 0.07);
+  border-bottom-right-radius: 3px;
+}
+.message--assistant {
+  align-self: flex-start;
+  border-bottom-left-radius: 3px;
+}
+
+.chat-composer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+  align-items: flex-end;
+}
+.chat-composer textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(8, 10, 19, 0.8);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  max-height: 140px;
+  outline: none;
+  transition: border-color 0.18s;
+}
+.chat-composer textarea:focus { border-color: var(--line-strong); }
+.chat-composer textarea::placeholder { color: var(--text-dim); }
+.chat-composer button[type="submit"] {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 6px;
+  border: 1px solid var(--line-mid);
+  background: rgba(200, 207, 222, 0.07);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.18s, border-color 0.18s;
+}
+.chat-composer button[type="submit"]:hover {
+  background: rgba(200, 207, 222, 0.13);
+  border-color: var(--line-strong);
+}
+
+/* ====================================================
+   Responsive
+   ==================================================== */
 @media (max-width: 980px) {
   .focus-header { align-items: flex-start; flex-direction: column; }
   .focus-project-switcher { width: 100%; }
   .focus-project-switcher label { flex: 1; }
   .focus-project-switcher select { width: 100%; max-width: none; }
   .universe-task-list { grid-template-columns: 1fr; }
+  .chat-layout { grid-template-columns: 1fr; }
+  .chat-context { display: none; }
 }
 
 @media (max-width: 640px) {
@@ -290,8 +625,16 @@
   .task-filter-wrap { justify-content: space-between; }
   .detail-actions--primary,
   .detail-actions--secondary { grid-template-columns: 1fr; }
-  .task-feedback { left: 14px; right: 14px; bottom: max(14px, calc(env(safe-area-inset-bottom) + 10px)); transform: none; }
-  .focus-project-switcher { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .task-feedback {
+    left: 14px;
+    right: 14px;
+    bottom: max(14px, calc(env(safe-area-inset-bottom) + 10px));
+    transform: none;
+  }
+  .focus-project-switcher {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
   .focus-footer { align-items: flex-start; flex-direction: column; }
   .work-session-controls { width: 100%; justify-content: flex-start; }
   #active-elapsed { margin-right: auto; text-align: left; }
@@ -299,4 +642,5 @@
   .constellation-card__header { align-items: flex-start; flex-direction: column; }
   .constellation-card__counts { white-space: normal; }
   .universe-task { grid-template-columns: 1fr; gap: 4px; }
+  .detail-grid--simple { grid-template-columns: 1fr; }
 }
