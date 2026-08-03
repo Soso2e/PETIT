@@ -1,0 +1,224 @@
+:root {
+  --petit-rail-width: 228px;
+  --petit-bottom-nav-height: calc(70px + env(safe-area-inset-bottom));
+}
+
+.petit-area-rail {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 80;
+  width: var(--petit-rail-width);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 24px 18px;
+  border-right: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(5 7 17 / 88%);
+  backdrop-filter: blur(24px);
+}
+
+.petit-area-rail__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.petit-area-rail__brand img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.petit-area-rail__brand span {
+  display: grid;
+  gap: 2px;
+}
+
+.petit-area-rail__brand small {
+  color: var(--muted, #8e98b5);
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+}
+
+.petit-area-rail__nav,
+.petit-area-rail__shortcuts {
+  display: grid;
+  gap: 8px;
+}
+
+.petit-area-rail__nav button,
+.petit-area-rail__shortcuts button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.petit-area-rail__nav button:hover,
+.petit-area-rail__nav button.is-active,
+.petit-area-rail__shortcuts button:hover {
+  border-color: rgb(255 255 255 / 12%);
+  background: rgb(255 255 255 / 7%);
+}
+
+.petit-area-rail__nav button.is-active {
+  box-shadow: inset 3px 0 0 rgb(151 195 255 / 92%);
+}
+
+.petit-area-rail__shortcuts {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgb(255 255 255 / 9%);
+}
+
+.petit-area-rail__shortcuts button {
+  color: var(--muted, #9aa4bd);
+  font-size: 13px;
+}
+
+.home-area-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.home-area-shortcuts button {
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 4%);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-area-shortcuts span {
+  color: var(--muted, #8e98b5);
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .12em;
+}
+
+.home-area-shortcuts strong {
+  font-size: 14px;
+}
+
+.petit-subnav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 0 14px;
+  margin-bottom: 8px;
+}
+
+.petit-subnav button {
+  min-height: 40px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 4%);
+  color: inherit;
+  font: inherit;
+}
+
+.petit-subnav button.is-active {
+  background: rgb(255 255 255 / 12%);
+}
+
+.petit-subnav button:disabled {
+  opacity: .42;
+}
+
+@media (min-width: 960px) {
+  .universe-shell {
+    padding-left: var(--petit-rail-width);
+  }
+
+  .universe-topbar {
+    left: var(--petit-rail-width);
+  }
+
+  .universe-topbar .brand,
+  .universe-topbar .view-tabs {
+    display: none;
+  }
+}
+
+@media (max-width: 959px) {
+  .petit-area-rail {
+    display: none;
+  }
+
+  .universe-topbar .brand {
+    display: flex;
+  }
+
+  .universe-topbar .view-tabs {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    min-height: var(--petit-bottom-nav-height);
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgb(255 255 255 / 12%);
+    background: rgb(5 7 17 / 92%);
+    backdrop-filter: blur(24px);
+  }
+
+  .universe-topbar .view-tab {
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 4px;
+    border-radius: 14px;
+  }
+
+  .universe-main {
+    padding-bottom: calc(var(--petit-bottom-nav-height) + 18px);
+  }
+
+  .topbar-actions .legacy-link {
+    display: none;
+  }
+
+  .home-area-shortcuts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .universe-topbar {
+    padding-inline: 14px;
+  }
+
+  .topbar-actions .version-pill {
+    display: none;
+  }
+
+  .home-area-shortcuts button {
+    min-height: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .petit-area-rail *,
+  .home-area-shortcuts *,
+  .petit-subnav * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
