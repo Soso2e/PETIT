@@ -1,28 +1,30 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.12.0**
+**Current Version: v0.13.0**
 
-**Last Updated: 2026-08-03**
+**Last Updated: 2026-08-04**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。FastAPIとPWAを基盤に、タスク・予定・会話・知識・開発状況を継続支援する個人用アシスタントとして開発中。
-- バージョン管理: v0.12.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
-- Univ UI: HomeとFocusの独立タブを廃止し、`Univ / Tasks / PETIT`の3領域へ再編。Univは中央のCoreからProject・Taskへ派生する同一空間で、ドラッグによる視点回転、ホイール／ボタンによるズーム、Task選択、Focus、詳細管理を行う。ProjectとTaskへZ方向の奥行きを与え、既存のタスク取得・選択・Notion同期・親子タスク管理処理は再利用する。
-- Front UI: Univ空間の手前に、現在モード、選択Project・Task、Focus、管理、Core復帰、ズーム、視点リセットを常設する。既存の`#detail-panel`はPCでは右側パネル、スマホでは下部シートとして同じ空間上へ表示する。
-- ナビゲーション: PCは左レール、スマホは下部3タブ。`home`、`focus`、`universe`、`projects`の旧URL／内部呼び出しはUnivへ互換転送する。
+- バージョン管理: v0.13.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
+- Univ UI: `Core = 中心惑星`、`親タスク = 惑星`、`子タスク = 衛星`として表現を統一。Project名は惑星の所属情報として扱い、Core overviewから親タスク惑星と子タスク衛星を見渡す。
+- Univ描画: WebGL依存を追加せず、CSS 3D・radial-gradient・既存SVG接続線で軽量な球体表現を実装。レイヤーは前面HUD、選択対象の説明、惑星・衛星、接続線、背景の順で固定する。
+- Univ Focus: 親タスク惑星または子タスク衛星を選ぶと、同じUniv内でカメラが対象系へ寄り、所属する衛星を見やすくする。他の惑星と接続線は暗くし、旧Focusパネルへ自動遷移しない。
+- Front UI: Univ空間の手前に、現在モード、所属Project、選択中の惑星／衛星、説明、Focus、管理、Core復帰、ズーム、視点リセットを常設する。既存の`#detail-panel`はPCでは右側パネル、スマホでは下部シートとして同じ空間上へ表示する。
+- ナビゲーション: PCは左レール、スマホは下部3タブ。既存タブを再クリックする方式を廃止し、対象パネルの`hidden`・ARIA・active状態を直接同期する。`home`、`focus`、`universe`、`projects`の旧URL／内部呼び出しはUnivへ互換転送する。
 - モーション: View間は既存の短いフェードを維持し、Univ内部だけCSS 3Dカメラを利用する。`prefers-reduced-motion`では空間アニメーションとパネル遷移を停止する。
 - 制作伴走 / Today: 作業セッションをSQLiteで永続化し、20分ごとの継続確認と無応答時の自動停止をバックグラウンドWorkerで実行する。Today機能自体は残し、トップレベルタブからは外す。
 - 会話 / Agent Runtime: Project Continuity・Capability Router・Tool制限・書き込み承認・進捗表示を実装済み。実装準拠フローは`docs/runtime-flows.md`を正とする。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
-- Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in、通知履歴を実装。Univ資産は動的ロード後に既存のnetwork-first Service Workerへキャッシュされる。precache一覧とcache名のv0.12.0同期は接続側の安全制限により未実施。
+- Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in、通知履歴を実装。Univ資産は動的ロード後に既存のnetwork-first Service Workerへキャッシュされる。precache一覧とcache名のv0.13.0同期は未実施。
 - タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。作成・完了・親子変更は確認付きでNotion同期する。
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
-- 今回の検証: `app_shell.js`と`univ-space.js`のNode構文確認、Univ CSSの括弧対応、3領域ナビ、3D視点、前面HUD、Focus、詳細管理、スマホ3列ナビ、reduced motion、v0.12.0表記を静的回帰テストへ追加。
-- 次にやること: 実データ入りPCブラウザでドラッグ、ズーム、Task Focus、詳細管理を確認する。390x844と実iPhone PWAで下部3タブ、safe-area、HUD重なり、詳細シート、長時間操作時の負荷を確認する。Service Workerのprecache名とUniv資産をv0.12.0へ同期する。
+- 今回の検証: `app_shell.js`、`univ-space.js`、`petit-version.js`のNode構文確認、Univ CSSの括弧対応、タブ直接同期、App Shell bootstrap、Core惑星、親タスク惑星、子タスク衛星、同一空間Focus、スマホ3列ナビ、reduced motion、v0.13.0表記を静的回帰テストへ追加。
+- 次にやること: 実データ入りPCブラウザでUniv初期Core表示、Univ／Tasks／PETIT切替、親タスク惑星と子タスク衛星のFocus、ドラッグ、ズーム、詳細管理を確認する。390x844と実iPhone PWAでHUD重なり、safe-area、下部3タブ、詳細シート、長時間操作負荷を確認する。Service Workerのprecache名とUniv資産をv0.13.0へ同期する。
 
 ## 履歴
 
@@ -48,3 +50,4 @@
 | 2026-08-03 | 04:17 | #17 | Issue #180: v0.8.0としてLife・Focus・Tasksの共有要素遷移、キャンセル可能なTransition Coordinator、タブ指標、スマホTaskカード、Chatシート、PWAキャッシュ統一を実装 |
 | 2026-08-03 | 05:12 | #18 | Issue #182: v0.9.0として共有要素演出を通常フェードへ戻し、全Viewの銀河空間デザイン、Life星系カード、PC・スマホレイアウトを刷新 |
 | 2026-08-03 | 09:32 | #19 | v0.12.0としてHomeとFocusをUnivへ統合し、Core中心の操作可能な3D空間、前面HUD、同一空間内のTask Focus・詳細管理、3領域ナビを追加 |
+| 2026-08-03 | 19:25 | #20 | Issue #189: v0.13.0としてCore／親タスク惑星／子タスク衛星へ意味構造を統一し、軽量3D球体、同一空間Focus、タブ直接同期を実装 |
