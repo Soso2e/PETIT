@@ -1,90 +1,31 @@
-/* Life -> Focus depth transition. */
+/*
+ * Life transitions are coordinated by petit-motion.js from v0.8.0.
+ * Keep only the environmental response here; the old cloned portal and
+ * click-replay transition were removed so visual completion cannot race state.
+ */
 .constellation-grid.life-cosmos-map,
 .universe-topbar {
-  transition: transform .46s cubic-bezier(.2, .82, .2, 1), opacity .32s ease, filter .4s ease;
-}
-
-body.life-dive-active {
-  overflow: hidden;
-}
-body.life-dive-active .universe-topbar {
-  opacity: .35;
-  transform: translateY(-8px);
-}
-body.life-dive-active .constellation-grid.life-cosmos-map {
-  opacity: .28;
-  filter: blur(7px) brightness(1.25);
-  transform: scale(1.16);
-}
-
-.life-dive-portal {
-  position: fixed !important;
-  z-index: 2400 !important;
-  display: grid !important;
-  place-content: center;
-  margin: 0 !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
-  border: 1px solid rgba(225, 233, 255, .72) !important;
-  border-radius: 50% !important;
-  background:
-    radial-gradient(circle at 34% 28%, rgba(255,255,255,.96), rgba(146,170,255,.76) 8%, rgba(46,64,138,.94) 42%, rgba(8,12,31,.98) 76%) !important;
-  box-shadow:
-    0 0 72px rgba(184, 204, 255, .7),
-    0 0 180px rgba(90, 117, 236, .45) !important;
-  opacity: 1;
-  filter: none;
-  transform: none !important;
   transition:
-    left .46s cubic-bezier(.18,.86,.22,1),
-    top .46s cubic-bezier(.18,.86,.22,1),
-    width .46s cubic-bezier(.18,.86,.22,1),
-    height .46s cubic-bezier(.18,.86,.22,1),
-    opacity .22s ease .2s,
-    filter .36s ease,
-    transform .46s cubic-bezier(.18,.86,.22,1) !important;
-}
-.life-dive-portal .universe-task__meta,
-.life-dive-portal .constellation-card__counts,
-.life-dive-portal .eyebrow {
-  display: none !important;
-}
-.life-dive-portal .universe-task__title,
-.life-dive-portal .constellation-card__heading strong {
-  display: block !important;
-  max-width: 180px;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 750;
-  line-height: 1.3;
-  text-align: center;
-  white-space: normal;
-}
-.life-dive-portal.is-active {
-  left: 50vw !important;
-  top: 50vh !important;
-  width: min(86vmin, 760px) !important;
-  height: min(86vmin, 760px) !important;
-  opacity: 0;
-  filter: blur(13px) brightness(1.8);
-  transform: translate(-50%, -50%) scale(1.35) !important;
+    transform var(--motion-depth, 520ms) var(--motion-spring, cubic-bezier(.18,.86,.22,1)),
+    opacity var(--motion-normal, 360ms) ease,
+    filter var(--motion-normal, 360ms) ease;
 }
 
-@media (max-width: 640px) {
-  .life-dive-portal.is-active {
-    width: 112vmax !important;
-    height: 112vmax !important;
-  }
+html[data-petit-transition-from="universe"][data-petit-transition-to="focus"] .universe-topbar {
+  opacity: .72;
+  transform: translateY(-3px);
+}
+html[data-petit-transition-from="universe"][data-petit-transition-to="focus"] .constellation-grid.life-cosmos-map {
+  opacity: .54;
+  filter: blur(3px) brightness(1.06);
+  transform: scale(1.035);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .constellation-grid.life-cosmos-map,
-  .universe-topbar,
-  .life-dive-portal {
+  .universe-topbar {
     transition-duration: .01ms !important;
-  }
-  body.life-dive-active .constellation-grid.life-cosmos-map {
-    filter: none;
-    transform: none;
+    filter: none !important;
+    transform: none !important;
   }
 }

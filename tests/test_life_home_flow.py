@@ -13,14 +13,17 @@ class LifeHomeFlowAssetTests(unittest.TestCase):
         self.assertIn('{ view: "today", label: "Today" }', shell)
         self.assertIn('activateView(initialView)', shell)
 
-    def test_life_to_focus_uses_depth_transition(self) -> None:
-        script = (FRONTEND / "life-map.js").read_text(encoding="utf-8")
+    def test_life_to_focus_uses_shared_motion_coordinator(self) -> None:
+        life_script = (FRONTEND / "life-map.js").read_text(encoding="utf-8")
+        motion_script = (FRONTEND / "petit-motion.js").read_text(encoding="utf-8")
         style = (FRONTEND / "life-transition.css").read_text(encoding="utf-8")
-        self.assertIn("life-dive-portal", script)
-        self.assertIn("prefers-reduced-motion: reduce", script)
-        self.assertIn("replayClick(target)", script)
-        self.assertIn("body.life-dive-active", style)
-        self.assertIn(".life-dive-portal.is-active", style)
+        self.assertNotIn("life-dive-portal", life_script)
+        self.assertNotIn("replayClick(target)", life_script)
+        self.assertIn("petit-motion.js", life_script)
+        self.assertIn("transitionTaskToFocus", motion_script)
+        self.assertIn("await activate();", motion_script)
+        self.assertIn("data-petit-transition-from", style)
+        self.assertIn("prefers-reduced-motion: reduce", style)
 
     def test_parent_flow_and_child_composer_are_loaded(self) -> None:
         shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")

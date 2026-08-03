@@ -1,7 +1,7 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v0.6.0";
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v0.6.0`;
+const CACHE_NAME = "petit-shell-v0.8.0";
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v0.8.0`;
 const SHELL = [
   "/",
   "/static/universe.html",
@@ -13,6 +13,8 @@ const SHELL = [
   "/static/task-flow.css",
   "/static/today.css",
   "/static/reminders.css",
+  "/static/petit-ui-system.css",
+  "/static/petit-motion.css",
   "/static/universe-app.js",
   "/static/universe-next.js",
   "/static/life-map.js",
@@ -20,6 +22,8 @@ const SHELL = [
   "/static/today.js",
   "/static/app_shell.js",
   "/static/chat_input.js",
+  "/static/petit-ui-system.js",
+  "/static/petit-motion.js",
   "/static/petit-version.js",
   "/static/reminders.js",
   "/static/legacy.html",
@@ -28,6 +32,7 @@ const SHELL = [
   "/static/notifications.css",
   "/static/session.js",
   "/static/version.js",
+  "/static/version.json",
   "/static/app.js",
   "/static/notifications.js",
   "/static/action_confirm.js",
@@ -103,7 +108,7 @@ self.addEventListener("push", (event) => {
     body: payload.body || "PETITからの通知メッセージです。",
     icon: payload.icon || "/static/icon-192.png",
     badge: payload.badge || "/static/favicon-64.png",
-    tag: payload.tag ? `${payload.tag}-${Date.now()}` : `petit-notif-${Date.now()}`,
+    tag: payload.tag ? `${payload.tag}-${targetUrl}` : `petit-notif-${Date.now()}`,
     renotify: true,
     vibrate: [200, 100, 200],
     data: {

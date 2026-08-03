@@ -14,6 +14,8 @@ class UnifiedUiSystemTests(unittest.TestCase):
         source = (FRONTEND / "chat_input.js").read_text(encoding="utf-8")
         self.assertIn("petit-ui-system.css", source)
         self.assertIn("petit-ui-system.js", source)
+        self.assertIn("petit-motion.css", source)
+        self.assertIn("petit-motion.js", source)
 
     def test_design_system_supports_light_mode_and_reduced_motion(self) -> None:
         source = (FRONTEND / "petit-ui-system.css").read_text(encoding="utf-8")
@@ -34,9 +36,10 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertRegex(source, re.compile(r"event\.isComposing|keyCode\s*===\s*229"))
         self.assertIn("form.requestSubmit()", source)
 
-    def test_version_is_v070(self) -> None:
+    def test_version_is_v080(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.7.0"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.8.0"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.8.0"', source)
 
 
 if __name__ == "__main__":
