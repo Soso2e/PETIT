@@ -1,7 +1,7 @@
 // Shared PETIT application shell for Universe UI.
 (() => {
   const HOME_VIEW = "universe";
-  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.8.0";
+  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.9.0";
   const PRIMARY_VIEWS = ["universe", "focus", "tasks", "chat"];
   const MORE_VIEWS = [
     { view: "today", label: "Today" },
@@ -37,6 +37,7 @@
     loadStylesheet("/static/life-map.css", "life-map-style");
     loadStylesheet("/static/life-transition.css", "life-transition-style");
     loadStylesheet("/static/task-flow.css", "task-flow-style");
+    loadStylesheet("/static/petit-galaxy.css", "galactic-spatial-style");
     loadScript("/static/life-map.js", "life-map-script");
     loadScript("/static/task-flow.js", "task-flow-script");
   };

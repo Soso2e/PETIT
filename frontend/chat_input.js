@@ -1,6 +1,6 @@
 // Shared PETIT chat input behavior for legacy and Universe UIs.
 (() => {
-  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.8.0";
+  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.9.0";
 
   const setup = ({ form, input, maxHeight = 160 }) => {
     if (!form || !input || input.dataset.petitChatInputReady === "true") return;
@@ -58,10 +58,10 @@
     });
     if (document.querySelector(".universe-shell")) {
       loadStylesheet("/static/petit-ui-system.css", "unified-ui-system");
-      loadStylesheet("/static/petit-motion.css", "motion-continuity");
+      loadStylesheet("/static/petit-motion.css", "ordinary-motion");
       loadSharedModule("/static/app_shell.js", "app-shell");
       loadSharedModule("/static/petit-ui-system.js", "unified-ui-system");
-      loadSharedModule("/static/petit-motion.js", "motion-continuity");
+      loadSharedModule("/static/petit-motion.js", "ordinary-motion");
     }
   };
 

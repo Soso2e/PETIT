@@ -1,0 +1,991 @@
+/* PETIT Galactic Spatial Design v0.9.0
+   Final visual layer. Space is expressed through depth, composition, and quiet light. */
+
+:root {
+  --galaxy-void: #050711;
+  --galaxy-deep: #090d1b;
+  --galaxy-panel: rgba(12, 17, 34, .82);
+  --galaxy-panel-solid: #0d1326;
+  --galaxy-panel-raised: rgba(18, 25, 48, .9);
+  --galaxy-line: rgba(191, 207, 255, .12);
+  --galaxy-line-strong: rgba(207, 220, 255, .24);
+  --galaxy-text: #f2f5ff;
+  --galaxy-muted: #a8b2cb;
+  --galaxy-dim: #707b98;
+  --galaxy-blue: #8facff;
+  --galaxy-cyan: #79d9e7;
+  --galaxy-violet: #a78bfa;
+  --galaxy-warm: #f1c982;
+  --galaxy-success: #7ad7b3;
+  --galaxy-radius-xl: 30px;
+  --galaxy-radius-lg: 24px;
+  --galaxy-radius-md: 18px;
+  --galaxy-radius-sm: 12px;
+  --galaxy-shadow: 0 22px 70px rgba(0, 0, 0, .34);
+  --galaxy-shadow-soft: 0 10px 34px rgba(0, 0, 0, .22);
+  --galaxy-inner: inset 0 1px 0 rgba(255, 255, 255, .055);
+}
+
+html[data-theme="light"] {
+  --galaxy-void: #eef2fa;
+  --galaxy-deep: #e4eaf5;
+  --galaxy-panel: rgba(255, 255, 255, .84);
+  --galaxy-panel-solid: #f9fbff;
+  --galaxy-panel-raised: rgba(255, 255, 255, .94);
+  --galaxy-line: rgba(43, 63, 100, .11);
+  --galaxy-line-strong: rgba(43, 63, 100, .22);
+  --galaxy-text: #11182a;
+  --galaxy-muted: #526079;
+  --galaxy-dim: #7a879d;
+  --galaxy-blue: #486db5;
+  --galaxy-cyan: #2c8492;
+  --galaxy-violet: #7253b4;
+  --galaxy-warm: #8f661e;
+  --galaxy-success: #267c60;
+  --galaxy-shadow: 0 22px 65px rgba(41, 56, 87, .14);
+  --galaxy-shadow-soft: 0 10px 30px rgba(41, 56, 87, .10);
+  --galaxy-inner: inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+
+html, body { background: var(--galaxy-void); }
+body {
+  color: var(--galaxy-text);
+  background:
+    radial-gradient(circle at 12% -5%, color-mix(in srgb, var(--galaxy-blue) 18%, transparent), transparent 36rem),
+    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--galaxy-violet) 13%, transparent), transparent 34rem),
+    radial-gradient(circle at 52% 115%, color-mix(in srgb, var(--galaxy-cyan) 8%, transparent), transparent 38rem),
+    linear-gradient(160deg, var(--galaxy-void), var(--galaxy-deep));
+}
+
+.space {
+  background:
+    linear-gradient(118deg, transparent 0 36%, rgba(115, 135, 220, .035) 47%, rgba(120, 199, 225, .028) 54%, transparent 68%);
+}
+.space__stars { opacity: .62; }
+.space__nebula { opacity: .075; filter: blur(145px) saturate(115%); }
+.space::before,
+.space::after { opacity: .32; animation-duration: 260s; }
+
+.universe-shell {
+  width: min(100%, 1720px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 14px 18px 0;
+}
+
+.universe-topbar {
+  position: sticky;
+  top: 12px;
+  z-index: 80;
+  width: 100%;
+  min-height: 64px;
+  margin: 0 auto;
+  padding: 10px 14px;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 22px;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, .035), transparent 30%),
+    color-mix(in srgb, var(--galaxy-panel-solid) 88%, transparent);
+  box-shadow: var(--galaxy-shadow-soft), var(--galaxy-inner);
+  backdrop-filter: blur(26px) saturate(125%);
+}
+
+.brand img {
+  width: 36px;
+  height: 36px;
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--galaxy-blue) 28%, transparent));
+}
+.brand strong { color: var(--galaxy-text); font-size: 13px; letter-spacing: .2em; }
+.brand small { color: var(--galaxy-dim); letter-spacing: .08em; }
+
+.view-tabs {
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 15px;
+  background: rgba(5, 8, 20, .36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+html[data-theme="light"] .view-tabs { background: rgba(238, 243, 252, .65); }
+.view-tab {
+  min-height: 40px;
+  padding-inline: 16px;
+  border-radius: 11px;
+  color: var(--galaxy-muted);
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: .02em;
+}
+.view-tab:hover { color: var(--galaxy-text); }
+
+.sync-pill,
+.version-pill,
+.legacy-link,
+.petit-theme-toggle {
+  border-color: var(--galaxy-line);
+  border-radius: 11px;
+  color: var(--galaxy-muted);
+  background: rgba(255, 255, 255, .025);
+}
+
+.petit-context-bar {
+  top: 90px;
+  z-index: 45;
+  width: calc(100% - 32px);
+  max-width: 1560px;
+  margin: 10px auto 0;
+  grid-template-columns: .78fr 1.15fr 1.4fr .78fr;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--galaxy-panel-solid) 88%, transparent);
+  box-shadow: var(--galaxy-shadow-soft), var(--galaxy-inner);
+}
+.petit-context-item {
+  min-height: 58px;
+  padding: 10px 16px;
+  border-right: 1px solid var(--galaxy-line);
+  background: transparent;
+}
+.petit-context-item:last-child { border-right: 0; }
+.petit-context-item span { color: var(--galaxy-dim); }
+.petit-context-item strong { color: var(--galaxy-muted); font-size: 12px; }
+
+.universe-main {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+.view { max-width: none; }
+.section-head,
+.orbit-card__header {
+  padding: 24px 26px 0;
+}
+.section-head {
+  align-items: end;
+  margin-bottom: 16px;
+}
+.eyebrow {
+  color: var(--galaxy-dim);
+  font-size: 9px;
+  letter-spacing: .2em;
+}
+h1 {
+  color: var(--galaxy-text);
+  font-size: clamp(23px, 2.25vw, 34px);
+  font-weight: 650;
+  letter-spacing: -.045em;
+}
+h2 { color: var(--galaxy-text); letter-spacing: -.025em; }
+.section-head p,
+.section-copy,
+.detail-panel p,
+.chat-context p { color: var(--galaxy-muted); line-height: 1.75; }
+
+.orbit-card,
+.detail-panel,
+.chat-panel,
+.chat-context,
+.task-table-wrap,
+.today-card,
+.reminder-list,
+.notification-panel {
+  border: 1px solid var(--galaxy-line);
+  background:
+    linear-gradient(132deg, rgba(255, 255, 255, .04), transparent 22%, transparent 76%, rgba(120, 148, 245, .025)),
+    var(--galaxy-panel);
+  box-shadow: var(--galaxy-shadow-soft), var(--galaxy-inner);
+  backdrop-filter: blur(22px) saturate(115%);
+}
+
+.orbit-card,
+.chat-panel { border-radius: var(--galaxy-radius-xl); }
+.detail-panel,
+.chat-context,
+.task-table-wrap,
+.today-card,
+.reminder-list,
+.notification-panel { border-radius: var(--galaxy-radius-lg); }
+
+/* Focus — a calm command deck. */
+.focus-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 370px);
+  gap: 20px;
+  align-items: start;
+}
+.orbit-card {
+  min-height: calc(100dvh - 194px);
+  overflow: hidden;
+  isolation: isolate;
+}
+.orbit-card::before {
+  content: "";
+  position: absolute;
+  inset: -18% -8% auto;
+  height: 70%;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--galaxy-blue) 15%, transparent), transparent 42%),
+    radial-gradient(circle at 72% 18%, color-mix(in srgb, var(--galaxy-violet) 10%, transparent), transparent 34%);
+  pointer-events: none;
+}
+.orbit-card > * { position: relative; z-index: 1; }
+
+.focus-header {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 18px 24px;
+  align-items: center;
+}
+.focus-heading { grid-row: span 2; }
+.focus-breadcrumb {
+  width: fit-content;
+  padding: 5px 9px;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .025);
+}
+.focus-project-switcher {
+  justify-self: end;
+  padding: 5px;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 14px;
+  background: rgba(4, 7, 17, .34);
+}
+html[data-theme="light"] .focus-project-switcher { background: rgba(240, 244, 252, .66); }
+.focus-project-switcher label { min-width: 180px; }
+.focus-project-switcher select,
+.detail-parent-field select {
+  border-color: var(--galaxy-line);
+  border-radius: 10px;
+  color: var(--galaxy-text);
+  background: var(--galaxy-panel-solid);
+}
+.focus-zoom-controls {
+  justify-self: end;
+  margin: 0;
+  border-color: var(--galaxy-line);
+  border-radius: 12px;
+  background: rgba(4, 7, 17, .34);
+}
+
+.orbit {
+  min-height: 560px;
+  margin: 10px 18px 0;
+  border: 1px solid rgba(190, 207, 255, .075);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--galaxy-blue) 12%, transparent), transparent 27%),
+    radial-gradient(circle at 48% 105%, rgba(94, 130, 220, .08), transparent 42%),
+    linear-gradient(180deg, rgba(4, 7, 18, .18), rgba(4, 7, 18, .5));
+  overflow: hidden;
+}
+html[data-theme="light"] .orbit {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(75, 111, 181, .11), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, .25), rgba(225, 233, 247, .54));
+}
+.orbit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 15% 22%, rgba(255, 255, 255, .7) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 73% 18%, rgba(143, 172, 255, .7) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 42% 74%, rgba(121, 217, 231, .55) 0 1px, transparent 1.4px);
+  background-size: 132px 132px, 194px 194px, 256px 256px;
+  opacity: .36;
+  pointer-events: none;
+}
+.orbit__ring {
+  border-color: color-mix(in srgb, var(--galaxy-blue) 20%, transparent);
+  opacity: .48;
+}
+.space-node--objective {
+  width: 142px;
+  height: 142px;
+  border-color: var(--galaxy-line-strong);
+  background:
+    radial-gradient(circle at 32% 25%, rgba(255, 255, 255, .2), transparent 20%),
+    radial-gradient(circle at 50% 55%, #263a78, #101834 65%, #080c1a);
+  box-shadow:
+    0 0 0 12px rgba(115, 145, 235, .035),
+    0 24px 64px rgba(0, 0, 0, .36),
+    0 0 70px rgba(111, 145, 245, .16),
+    var(--galaxy-inner);
+}
+.space-node[data-orbit-index] {
+  min-width: 116px;
+  max-width: 170px;
+  min-height: 44px;
+  border-color: var(--galaxy-line);
+  border-radius: 14px;
+  color: var(--galaxy-text);
+  background: color-mix(in srgb, var(--galaxy-panel-raised) 93%, transparent);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .24), var(--galaxy-inner);
+}
+.space-node[data-orbit-index]:hover,
+.space-node[data-orbit-index].is-selected {
+  border-color: color-mix(in srgb, var(--galaxy-blue) 58%, var(--galaxy-line));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .31), 0 0 0 3px rgba(127, 157, 245, .10);
+}
+
+.focus-footer {
+  margin: 14px 18px 18px;
+  min-height: 76px;
+  padding: 14px 16px;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 17px;
+  background: rgba(4, 7, 17, .32);
+}
+html[data-theme="light"] .focus-footer { background: rgba(242, 246, 253, .62); }
+
+.detail-panel {
+  position: sticky;
+  top: 174px;
+  max-height: calc(100dvh - 192px);
+  padding: 22px;
+}
+.detail-panel__content { display: grid; gap: 16px; }
+.detail-grid--simple { gap: 9px; }
+.detail-grid--simple > div,
+.detail-parent-field {
+  border: 1px solid var(--galaxy-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .025);
+}
+.detail-actions { gap: 8px; }
+.detail-actions button,
+.work-session-controls button,
+.filter-chip,
+.reminder-filter,
+.reminder-refresh {
+  border-radius: 11px;
+}
+
+/* Life — scalable galactic atlas instead of absolute-position planets. */
+.constellation-grid.life-cosmos-map {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
+  min-height: 0 !important;
+  padding: 20px;
+  overflow: visible;
+  border: 1px solid var(--galaxy-line);
+  border-radius: var(--galaxy-radius-xl);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(143, 172, 255, .09), transparent 30%),
+    radial-gradient(circle at 88% 88%, rgba(167, 139, 250, .07), transparent 32%),
+    rgba(5, 8, 20, .34);
+  box-shadow: var(--galaxy-shadow-soft), var(--galaxy-inner);
+}
+html[data-theme="light"] .constellation-grid.life-cosmos-map { background: rgba(255, 255, 255, .42); }
+.constellation-grid.life-cosmos-map::after { display: none !important; }
+.life-map__lines { display: none !important; }
+
+.life-map__core {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: auto;
+  height: auto;
+  min-height: 94px;
+  padding: 20px 24px;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 8% 50%, rgba(143, 172, 255, .18), transparent 28%),
+    linear-gradient(112deg, rgba(19, 28, 59, .9), rgba(8, 12, 27, .72));
+  box-shadow: var(--galaxy-shadow-soft), var(--galaxy-inner);
+  text-align: left;
+  transform: none !important;
+  animation: none !important;
+}
+html[data-theme="light"] .life-map__core {
+  background: linear-gradient(112deg, rgba(239, 244, 255, .96), rgba(226, 234, 249, .82));
+}
+.life-map__core .eyebrow { margin: 0; }
+.life-map__core strong {
+  margin: 0 auto 0 16px;
+  font-size: 25px;
+  letter-spacing: .18em;
+}
+.life-map__core small { color: var(--galaxy-muted); font-size: 11px; }
+
+.constellation-card.life-star-system {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  min-height: 286px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--galaxy-line) !important;
+  border-radius: 24px !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, .035), transparent 38%),
+    var(--galaxy-panel) !important;
+  box-shadow: var(--galaxy-shadow-soft), var(--galaxy-inner) !important;
+  transform: none !important;
+  animation: none !important;
+}
+.constellation-card.life-star-system::before {
+  content: "" !important;
+  position: absolute;
+  display: block !important;
+  width: 190px;
+  height: 190px;
+  right: -70px;
+  top: -75px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, .34), transparent 13%),
+    radial-gradient(circle, var(--planet-light), var(--planet-mid) 43%, var(--planet-dark) 76%);
+  opacity: .72;
+  box-shadow: 0 0 55px color-mix(in srgb, var(--planet-ring) 40%, transparent);
+  pointer-events: none;
+}
+.constellation-card.life-star-system::after {
+  content: "" !important;
+  position: absolute;
+  display: block !important;
+  width: 220px;
+  height: 62px;
+  right: -84px;
+  top: 0;
+  border: 1px solid color-mix(in srgb, var(--planet-ring) 75%, transparent);
+  border-radius: 50%;
+  transform: rotate(-18deg);
+  opacity: .5;
+  pointer-events: none;
+}
+
+.life-star-system .constellation-card__header {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: start;
+  align-content: end;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 138px;
+  padding: 22px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: var(--galaxy-text);
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: left;
+  transform: none !important;
+}
+.life-star-system .constellation-card__header::before { display: none !important; }
+.life-star-system .constellation-card__header:hover,
+.life-star-system .constellation-card__header:focus-visible {
+  background: linear-gradient(180deg, transparent, rgba(143, 172, 255, .045)) !important;
+  transform: none !important;
+}
+.life-star-system.is-selected {
+  border-color: color-mix(in srgb, var(--galaxy-blue) 48%, var(--galaxy-line)) !important;
+  box-shadow: var(--galaxy-shadow-soft), 0 0 0 3px rgba(127, 157, 245, .08) !important;
+}
+.life-star-system.is-selected .constellation-card__header,
+.life-star-system .constellation-card__header.is-selected {
+  animation: none !important;
+  box-shadow: none !important;
+}
+.life-star-system .constellation-card__heading {
+  justify-items: start;
+  gap: 7px;
+}
+.life-star-system .constellation-card__heading .eyebrow {
+  max-width: calc(100% - 70px);
+  color: var(--galaxy-dim);
+}
+.life-star-system .constellation-card__heading strong {
+  max-width: calc(100% - 54px);
+  font-size: 20px;
+  line-height: 1.25;
+  -webkit-line-clamp: 2;
+}
+.life-star-system .constellation-card__counts {
+  margin-top: 10px;
+  color: var(--galaxy-muted);
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+}
+
+.life-star-system .universe-task-list {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 3;
+  display: grid;
+  gap: 7px;
+  max-height: 236px;
+  padding: 0 12px 12px;
+  overflow: auto;
+  pointer-events: auto;
+}
+.life-star-system .universe-task.life-task-star {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 48px !important;
+  padding: 9px 12px !important;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 13px;
+  color: var(--galaxy-text);
+  background: rgba(255, 255, 255, .025);
+  box-shadow: none;
+  opacity: 1;
+  filter: none !important;
+  transform: none !important;
+  animation: none !important;
+}
+.life-star-system .universe-task.life-task-star::before { display: none; }
+.life-star-system .universe-task.life-task-star:hover,
+.life-star-system .universe-task.life-task-star:focus-visible,
+.life-star-system .universe-task.life-task-star.is-selected {
+  width: 100% !important;
+  padding: 9px 12px !important;
+  border-color: color-mix(in srgb, var(--galaxy-blue) 48%, var(--galaxy-line));
+  background: rgba(127, 157, 245, .08);
+  box-shadow: none;
+}
+.life-star-system .life-task-star .universe-task__title,
+.life-star-system .life-task-star .universe-task__meta,
+.life-star-system .life-task-star:hover .universe-task__title,
+.life-star-system .life-task-star:hover .universe-task__meta,
+.life-star-system .life-task-star:focus-visible .universe-task__title,
+.life-star-system .life-task-star:focus-visible .universe-task__meta {
+  display: block;
+  text-align: left;
+}
+.life-star-system .life-task-star .universe-task__title {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.life-star-system .life-task-star .universe-task__meta {
+  color: var(--galaxy-dim);
+  font-size: 8px;
+  white-space: nowrap;
+}
+.life-star-system .life-task-star--overflow { display: grid !important; }
+
+/* Tasks — route table on desktop, cards on mobile. */
+.task-table-wrap {
+  margin-top: 0;
+  overflow: hidden;
+}
+.task-table {
+  width: 100%;
+  min-width: 720px;
+}
+.task-table th {
+  top: 0;
+  padding: 13px 16px;
+  color: var(--galaxy-dim);
+  background: color-mix(in srgb, var(--galaxy-panel-solid) 94%, transparent);
+}
+.task-table td {
+  padding: 15px 16px;
+  border-color: var(--galaxy-line);
+}
+.task-table tbody tr.is-selected {
+  background: rgba(127, 157, 245, .075);
+}
+.task-table tbody tr.is-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--galaxy-blue);
+}
+
+/* Today, reminders, and chat use the same spatial rhythm. */
+.today-grid { gap: 16px; }
+.today-card {
+  min-height: 150px;
+  padding: 22px;
+}
+.today-card--summary {
+  background:
+    radial-gradient(circle at 90% 10%, rgba(121, 217, 231, .12), transparent 32%),
+    var(--galaxy-panel);
+}
+.today-card--wide { min-height: 220px; }
+
+.reminder-summary-line { padding-inline: 6px; }
+.reminder-list {
+  gap: 9px;
+  padding: 10px;
+}
+.reminder-card {
+  border-color: var(--galaxy-line);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.chat-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 20px;
+}
+.chat-panel {
+  min-height: calc(100dvh - 194px);
+  overflow: hidden;
+}
+.chat-context {
+  position: sticky;
+  top: 174px;
+  min-height: 220px;
+  padding: 22px;
+}
+.messages {
+  padding: 18px 24px;
+}
+.message {
+  max-width: min(78%, 720px);
+  border-radius: 17px;
+}
+.message--assistant {
+  border: 1px solid var(--galaxy-line);
+  background: rgba(255, 255, 255, .035);
+}
+.message--user {
+  background: color-mix(in srgb, var(--galaxy-blue) 20%, var(--galaxy-panel-solid));
+}
+.chat-composer {
+  margin: 12px;
+  padding: 8px;
+  border: 1px solid var(--galaxy-line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--galaxy-panel-solid) 90%, transparent);
+}
+.chat-composer textarea {
+  min-height: 44px;
+  color: var(--galaxy-text);
+}
+.chat-composer button { border-radius: 13px; }
+
+/* Tablet */
+@media (max-width: 1180px) {
+  .universe-topbar {
+    grid-template-columns: minmax(150px, 1fr) auto;
+  }
+  .topbar-actions { display: none; }
+  .focus-layout,
+  .chat-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .detail-panel,
+  .chat-context {
+    position: relative;
+    top: auto;
+    max-height: none;
+  }
+  .constellation-grid.life-cosmos-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile */
+@media (max-width: 720px) {
+  .universe-shell {
+    width: 100%;
+    padding: 0;
+  }
+  .universe-topbar {
+    position: sticky;
+    top: 0;
+    min-height: 58px;
+    padding: max(8px, env(safe-area-inset-top)) 14px 8px;
+    border-width: 0 0 1px;
+    border-radius: 0;
+    background: color-mix(in srgb, var(--galaxy-void) 90%, transparent);
+  }
+  .brand img { width: 32px; height: 32px; }
+  .brand small { display: none; }
+  .view-tabs {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    z-index: 120;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 3px;
+    padding: 5px;
+    border: 1px solid var(--galaxy-line-strong);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--galaxy-panel-solid) 92%, transparent);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .42), var(--galaxy-inner);
+    backdrop-filter: blur(24px) saturate(125%);
+  }
+  .view-tab {
+    min-width: 0;
+    min-height: 46px;
+    padding: 8px 4px;
+    overflow: hidden;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .petit-context-bar {
+    position: relative;
+    top: auto;
+    width: calc(100% - 20px);
+    margin: 10px auto 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 16px;
+  }
+  .petit-context-item {
+    min-height: 52px;
+    padding: 8px 11px;
+    border-right: 1px solid var(--galaxy-line);
+    border-bottom: 1px solid var(--galaxy-line);
+  }
+  .petit-context-item:nth-child(2n) { border-right: 0; }
+  .petit-context-item:nth-last-child(-n+2) { border-bottom: 0; }
+  .petit-context-item strong { font-size: 10px; }
+
+  .universe-main {
+    padding: 10px 10px calc(92px + env(safe-area-inset-bottom));
+  }
+  .section-head,
+  .orbit-card__header {
+    padding: 18px 16px 0;
+  }
+  .section-head {
+    align-items: start;
+    margin-bottom: 12px;
+  }
+  h1 { font-size: 24px; }
+  .section-head p,
+  .section-copy { font-size: 12px; }
+
+  .focus-layout,
+  .chat-layout { gap: 12px; }
+  .orbit-card,
+  .chat-panel { min-height: auto; border-radius: 22px; }
+  .detail-panel,
+  .chat-context,
+  .task-table-wrap,
+  .today-card,
+  .reminder-list { border-radius: 18px; }
+
+  .focus-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+  .focus-heading { grid-row: auto; }
+  .focus-project-switcher,
+  .focus-zoom-controls {
+    justify-self: stretch;
+    width: 100%;
+  }
+  .focus-project-switcher {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 42px 42px;
+  }
+  .focus-project-switcher label { min-width: 0; }
+  .focus-zoom-controls { justify-content: center; }
+  .orbit {
+    min-height: 430px;
+    margin: 10px 8px 0;
+    border-radius: 19px;
+  }
+  .space-node--objective { width: 108px; height: 108px; }
+  .space-node[data-orbit-index] {
+    min-width: 92px;
+    max-width: 126px;
+    min-height: 40px;
+    padding: 7px 9px;
+    border-radius: 12px;
+  }
+  .space-node__label { font-size: 10px; }
+  .focus-footer {
+    display: grid;
+    gap: 12px;
+    margin: 10px 8px 8px;
+    padding: 13px;
+  }
+  .work-session-controls {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .detail-panel {
+    position: relative;
+    top: auto;
+    max-height: none;
+    padding: 18px;
+  }
+  .detail-parent-field__controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .constellation-grid.life-cosmos-map {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+    border-radius: 22px;
+  }
+  .life-map__core {
+    display: grid;
+    justify-content: start;
+    min-height: 82px;
+    padding: 16px;
+    border-radius: 17px;
+  }
+  .life-map__core strong {
+    margin: 5px 0 0;
+    font-size: 19px;
+  }
+  .life-map__core small { display: block; }
+  .constellation-card.life-star-system {
+    min-height: 0;
+    border-radius: 19px !important;
+  }
+  .constellation-card.life-star-system::before {
+    width: 145px;
+    height: 145px;
+    right: -60px;
+    top: -58px;
+  }
+  .constellation-card.life-star-system::after {
+    width: 170px;
+    right: -68px;
+  }
+  .life-star-system .constellation-card__header {
+    min-height: 112px;
+    padding: 17px;
+  }
+  .life-star-system .constellation-card__heading strong {
+    max-width: calc(100% - 42px);
+    font-size: 17px;
+  }
+  .life-star-system .universe-task-list {
+    max-height: none;
+    padding: 0 8px 8px;
+  }
+  .life-star-system .universe-task.life-task-star {
+    min-height: 46px !important;
+  }
+
+  .task-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .task-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .task-table thead { display: none; }
+  .task-table tbody {
+    display: grid;
+    gap: 9px;
+  }
+  .task-table tbody tr {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "check title sync"
+      "check due due"
+      "check project project";
+    gap: 4px 9px;
+    padding: 13px 12px 13px 9px;
+    border: 1px solid var(--galaxy-line);
+    border-radius: 16px;
+    background: var(--galaxy-panel);
+    box-shadow: var(--galaxy-shadow-soft), var(--galaxy-inner);
+  }
+  .task-table tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+  .task-table tbody td:nth-child(1) { grid-area: check; align-self: center; }
+  .task-table tbody td:nth-child(2) { grid-area: title; font-size: 14px; font-weight: 650; }
+  .task-table tbody td:nth-child(3) { grid-area: due; color: var(--galaxy-muted); font-size: 11px; }
+  .task-table tbody td:nth-child(3)::before { content: "期限  "; color: var(--galaxy-dim); }
+  .task-table tbody td:nth-child(4) { grid-area: project; color: var(--galaxy-muted); font-size: 11px; }
+  .task-table tbody td:nth-child(4)::before { content: "親Task  "; color: var(--galaxy-dim); }
+  .task-table tbody td:nth-child(5) { grid-area: sync; justify-self: end; }
+
+  .today-grid { grid-template-columns: 1fr; gap: 10px; }
+  .today-card,
+  .today-card--wide { min-height: 0; padding: 17px; }
+
+  .reminder-toolbar,
+  .reminder-card {
+    align-items: stretch;
+  }
+  .reminder-card {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+  }
+  .reminder-card__actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .chat-panel { min-height: calc(100dvh - 236px); }
+  .chat-context {
+    position: relative;
+    top: auto;
+    min-height: 0;
+    padding: 18px;
+  }
+  .messages { padding: 12px; }
+  .message { max-width: 90%; border-radius: 15px; }
+  .chat-composer {
+    position: sticky;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 4;
+    margin: 8px;
+  }
+}
+
+@media (max-width: 390px) {
+  .universe-main { padding-inline: 8px; }
+  .view-tabs { left: 7px; right: 7px; }
+  .view-tab { font-size: 9.5px; }
+  .focus-project-switcher { grid-template-columns: 40px minmax(0, 1fr) 40px 40px; }
+  .orbit { min-height: 404px; }
+  .space-node[data-orbit-index] { max-width: 112px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .space::before,
+  .space::after,
+  .space__nebula,
+  .orbit__ring,
+  .space-node--active {
+    animation: none !important;
+  }
+  .constellation-card.life-star-system,
+  .life-star-system .universe-task.life-task-star,
+  .space-node,
+  .view-tab {
+    transition-duration: .01ms !important;
+  }
+}
