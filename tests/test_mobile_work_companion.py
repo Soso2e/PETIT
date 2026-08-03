@@ -76,7 +76,8 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
         self.assertIn("window.PETITShell", source)
 
         service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('const CACHE_NAME = "petit-shell-v9"', service_worker)
+        self.assertIn('const CACHE_NAME = "petit-shell-v0.8.0"', service_worker)
+        self.assertIn('const ACTIVE_CACHE_NAME = `${CACHE_NAME}-universe-v0.8.0`', service_worker)
         self.assertIn('"/static/shell.js"', service_worker)
         self.assertIn('"/static/branding/icon_logo.png"', service_worker)
         self.assertIn('"/static/branding/name_logo.png"', service_worker)
