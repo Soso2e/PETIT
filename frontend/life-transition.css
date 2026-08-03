@@ -1,31 +1,19 @@
 /*
- * Life transitions are coordinated by petit-motion.js from v0.8.0.
- * Keep only the environmental response here; the old cloned portal and
- * click-replay transition were removed so visual completion cannot race state.
+ * PETIT v0.9.0
+ * Life and Focus no longer use a dedicated dive, portal, zoom, blur, or shared-element transition.
+ * petit-motion.js applies the same short fade used by every other view.
  */
 .constellation-grid.life-cosmos-map,
 .universe-topbar {
   transition:
-    transform var(--motion-depth, 520ms) var(--motion-spring, cubic-bezier(.18,.86,.22,1)),
-    opacity var(--motion-normal, 360ms) ease,
-    filter var(--motion-normal, 360ms) ease;
-}
-
-html[data-petit-transition-from="universe"][data-petit-transition-to="focus"] .universe-topbar {
-  opacity: .72;
-  transform: translateY(-3px);
-}
-html[data-petit-transition-from="universe"][data-petit-transition-to="focus"] .constellation-grid.life-cosmos-map {
-  opacity: .54;
-  filter: blur(3px) brightness(1.06);
-  transform: scale(1.035);
+    border-color var(--ui-fast, 140ms) ease,
+    background-color var(--ui-normal, 220ms) ease,
+    box-shadow var(--ui-normal, 220ms) ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .constellation-grid.life-cosmos-map,
   .universe-topbar {
     transition-duration: .01ms !important;
-    filter: none !important;
-    transform: none !important;
   }
 }

@@ -1,11 +1,11 @@
 {
   "name": "PETIT",
-  "version": "0.8.0",
-  "release": "motion-continuity",
+  "version": "0.9.0",
+  "release": "galactic-spatial-redesign",
   "includes": [
-    "shared-element transitions across Life Focus Tasks",
-    "cancelable transition coordinator",
-    "mobile task cards and chat sheet",
-    "unified PWA asset cache"
+    "ordinary view fade without Life Focus shared-element motion",
+    "galactic spatial design system across all views",
+    "scalable Life atlas cards",
+    "desktop and mobile layout redesign"
   ]
 }

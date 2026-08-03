@@ -11,18 +11,21 @@ FRONTEND = ROOT / "frontend"
 
 class UnifiedUiSystemTests(unittest.TestCase):
     def test_universe_bootstrap_loads_unified_assets(self) -> None:
-        source = (FRONTEND / "chat_input.js").read_text(encoding="utf-8")
-        self.assertIn("petit-ui-system.css", source)
-        self.assertIn("petit-ui-system.js", source)
-        self.assertIn("petit-motion.css", source)
-        self.assertIn("petit-motion.js", source)
+        chat = (FRONTEND / "chat_input.js").read_text(encoding="utf-8")
+        shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
+        self.assertIn("petit-ui-system.css", chat)
+        self.assertIn("petit-ui-system.js", chat)
+        self.assertIn("petit-motion.css", chat)
+        self.assertIn("petit-motion.js", chat)
+        self.assertIn("petit-galaxy.css", shell)
 
     def test_design_system_supports_light_mode_and_reduced_motion(self) -> None:
         source = (FRONTEND / "petit-ui-system.css").read_text(encoding="utf-8")
+        galaxy = (FRONTEND / "petit-galaxy.css").read_text(encoding="utf-8")
         self.assertIn('html[data-theme="light"]', source)
-        self.assertIn("@media (prefers-reduced-motion:reduce)", source)
-        self.assertIn(".petit-context-bar", source)
-        self.assertIn("perspective:", source)
+        self.assertIn('@media (prefers-reduced-motion: reduce)', galaxy)
+        self.assertIn(".petit-context-bar", galaxy)
+        self.assertIn("--galaxy-panel", galaxy)
 
     def test_ui_script_sets_accessibility_and_context_state(self) -> None:
         source = (FRONTEND / "petit-ui-system.js").read_text(encoding="utf-8")
@@ -36,10 +39,10 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertRegex(source, re.compile(r"event\.isComposing|keyCode\s*===\s*229"))
         self.assertIn("form.requestSubmit()", source)
 
-    def test_version_is_v080(self) -> None:
+    def test_version_is_v090(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.8.0"', source)
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.8.0"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.9.0"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.9.0"', source)
 
 
 if __name__ == "__main__":

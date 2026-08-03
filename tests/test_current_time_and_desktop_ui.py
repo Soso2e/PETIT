@@ -57,7 +57,7 @@ class ResponsiveUniverseLayoutTests(unittest.TestCase):
     def _responsive_css() -> str:
         return "\n".join(
             (FRONTEND / name).read_text(encoding="utf-8")
-            for name in ("petit-ui-system.css", "petit-motion.css")
+            for name in ("petit-ui-system.css", "petit-motion.css", "petit-galaxy.css")
         )
 
     def test_laptop_layout_stacks_focus_and_chat_before_phone_width(self) -> None:
@@ -65,20 +65,22 @@ class ResponsiveUniverseLayoutTests(unittest.TestCase):
         self.assertIn("@media (max-width:1040px)", css)
         self.assertIn(".focus-layout,.chat-layout { grid-template-columns:1fr; }", css)
         self.assertIn(".detail-panel,.chat-context { position:static; max-height:none; }", css)
+        self.assertIn("@media (max-width: 1180px)", css)
 
     def test_mobile_navigation_fits_primary_tabs_inside_viewport(self) -> None:
         css = self._responsive_css()
-        self.assertIn("@media (max-width:720px)", css)
+        self.assertIn("@media (max-width: 720px)", css)
         self.assertIn("grid-template-columns: repeat(5, minmax(0, 1fr))", css)
         self.assertIn(".petit-tab-indicator", css)
-        self.assertIn("overflow:visible", css)
+        self.assertIn("overflow: visible", css)
 
     def test_mobile_content_panels_use_compact_spacing_and_cards(self) -> None:
         css = self._responsive_css()
         self.assertIn(".section-head,.orbit-card__header { padding:16px 14px 0; }", css)
         self.assertIn(".detail-panel { padding:16px; }", css)
         self.assertIn("grid-template-areas:", css)
-        self.assertIn('[data-view-panel="chat"] .chat-panel', css)
+        self.assertIn(".chat-composer", css)
+        self.assertIn("bottom: calc(72px + env(safe-area-inset-bottom))", css)
 
 
 if __name__ == "__main__":
