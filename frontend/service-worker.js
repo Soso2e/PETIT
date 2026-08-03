@@ -108,7 +108,7 @@ self.addEventListener("push", (event) => {
     body: payload.body || "PETITからの通知メッセージです。",
     icon: payload.icon || "/static/icon-192.png",
     badge: payload.badge || "/static/favicon-64.png",
-    tag: payload.tag ? `${payload.tag}-${Date.now()}` : `petit-notif-${Date.now()}`,
+    tag: payload.tag ? `${payload.tag}-${targetUrl}` : `petit-notif-${Date.now()}`,
     renotify: true,
     vibrate: [200, 100, 200],
     data: {

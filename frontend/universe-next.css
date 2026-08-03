@@ -1,4 +1,4 @@
-/* PETIT Universe — Stellar Minimal v0.7.0 — Next Layer */
+/* PETIT Universe — Stellar Minimal v0.8.0 — Next Layer */
 /* Focus zoom, parallax, parent-field, detail extras */
 
 :root {
@@ -191,12 +191,38 @@ button[data-action="parent-apply"]:disabled {
   font-size: 11px;
 }
 
+/* A node is created only once and then reused, so this arrival animation does
+   not restart on normal selection or orbit updates. */
+.task-nodes .space-node[data-orbit-index] {
+  animation: nodeArrival 0.36s cubic-bezier(.2, .82, .2, 1) both;
+}
+
 /* ====================================================
    Animations defined here
    ==================================================== */
 @keyframes nebulaDrift {
   from { transform: scale(0.95) translate3d(0, 0, 0); }
   to   { transform: scale(1.08) translate3d(20px, -15px, 0); }
+}
+@keyframes nodeArrival {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translate3d(
+      calc(-50% + var(--orbit-x, 0px)),
+      calc(-50% + var(--orbit-y, 0px)),
+      var(--node-depth, 0px)
+    ) scale(0.94);
+  }
+  to {
+    opacity: var(--node-opacity, 1);
+    filter: blur(0);
+    transform: translate3d(
+      calc(-50% + var(--orbit-x, 0px)),
+      calc(-50% + var(--orbit-y, 0px)),
+      var(--node-depth, 0px)
+    ) scale(var(--node-scale, 1));
+  }
 }
 
 /* ====================================================
