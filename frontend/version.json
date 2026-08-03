@@ -1,11 +1,12 @@
 {
   "name": "PETIT",
-  "version": "0.9.0",
-  "release": "galactic-spatial-redesign",
+  "version": "0.14.0",
+  "release": "univ-corner-shell",
   "includes": [
-    "ordinary view fade without Life Focus shared-element motion",
-    "galactic spatial design system across all views",
-    "scalable Life atlas cards",
-    "desktop and mobile layout redesign"
+    "top-left status and sync information",
+    "top-right Univ, Tasks, and PETIT icon navigation",
+    "bottom-left reminders and settings utilities",
+    "classic UI fallback and detailed settings access",
+    "iPhone safe-area responsive layout"
   ]
 }
