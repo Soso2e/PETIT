@@ -28,11 +28,11 @@ class ThreeAreaAppShellTests(unittest.TestCase):
         self.assertIn(".petit-area-rail", source)
         self.assertIn("padding-left: var(--petit-rail-width)", source)
 
-    def test_pwa_cache_contains_univ_assets(self):
-        source = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('petit-shell-v0.12.0', source)
-        self.assertIn('/static/univ-space.css', source)
-        self.assertIn('/static/univ-space.js', source)
+    def test_univ_assets_are_versioned_and_loaded(self):
+        shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
+        self.assertIn('window.PETIT_ASSET_VERSION || "0.12.0"', shell)
+        self.assertIn('/static/univ-space.css', shell)
+        self.assertIn('/static/univ-space.js', shell)
 
     def test_version_is_v0120(self):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
