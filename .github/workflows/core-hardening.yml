@@ -17,6 +17,7 @@ on:
       - "tests/test_motion_continuity.py"
       - "tests/test_galactic_spatial_design.py"
       - "tests/test_four_area_app_shell.py"
+      - "tests/test_core_home_universe.py"
       - ".github/workflows/core-hardening.yml"
   workflow_dispatch:
 
@@ -43,7 +44,7 @@ jobs:
           python -m pip install --quiet fastapi uvicorn httpx pydantic chromadb timetree-exporter
 
       - name: Compile Python sources
-        run: python -m compileall backend tests/test_core_hardening.py tests/test_chat_context_budget.py tests/test_schedule_date_parsing.py tests/test_notion_search.py tests/test_task_completion_intent.py tests/test_life_map_assets.py tests/test_life_home_flow.py tests/test_task_child_api.py tests/test_unified_ui_system.py tests/test_motion_continuity.py tests/test_galactic_spatial_design.py tests/test_four_area_app_shell.py
+        run: python -m compileall backend tests/test_core_hardening.py tests/test_chat_context_budget.py tests/test_schedule_date_parsing.py tests/test_notion_search.py tests/test_task_completion_intent.py tests/test_life_map_assets.py tests/test_life_home_flow.py tests/test_task_child_api.py tests/test_unified_ui_system.py tests/test_motion_continuity.py tests/test_galactic_spatial_design.py tests/test_four_area_app_shell.py tests/test_core_home_universe.py
 
       - name: Check frontend syntax
         run: |
@@ -56,6 +57,7 @@ jobs:
           node --check frontend/petit-ui-system.js
           node --check frontend/petit-motion.js
           node --check frontend/petit-version.js
+          node --check frontend/core-home.js
 
       - name: Run Life UI flow tests
         run: |
@@ -66,6 +68,7 @@ jobs:
           python -m unittest tests.test_motion_continuity -v
           python -m unittest tests.test_galactic_spatial_design -v
           python -m unittest tests.test_four_area_app_shell -v
+          python -m unittest tests.test_core_home_universe -v
 
       - name: Run existing core hardening tests
         run: |
