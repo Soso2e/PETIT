@@ -57,7 +57,7 @@ jobs:
           node --check frontend/petit-ui-system.js
           node --check frontend/petit-motion.js
           node --check frontend/petit-version.js
-          node --check frontend/core-home.js
+          node --check frontend/univ-space.js
 
       - name: Run Life UI flow tests
         run: |
