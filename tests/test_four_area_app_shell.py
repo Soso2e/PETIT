@@ -24,30 +24,39 @@ class ThreeAreaAppShellTests(unittest.TestCase):
         self.assertNotIn("target.click()", source)
         self.assertNotIn("clickPanelTrigger", source)
 
-    def test_mobile_navigation_is_overridden_to_three_columns(self):
-        source = (FRONTEND / "univ-space.css").read_text(encoding="utf-8")
-        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", source)
-        shell = (FRONTEND / "petit-four-area-shell.css").read_text(encoding="utf-8")
-        self.assertIn("env(safe-area-inset-bottom)", shell)
-        self.assertIn("min-height: 48px", shell)
+    def test_mobile_navigation_uses_top_right_icon_tabs(self):
+        source = (FRONTEND / "petit-corner-shell.js").read_text(encoding="utf-8")
+        style = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
+        self.assertIn('planet:', source)
+        self.assertIn('check:', source)
+        self.assertIn('chat:', source)
+        self.assertIn('.view-tabs.petit-corner-nav', style)
+        self.assertIn('top: var(--petit-corner-top)', style)
+        self.assertIn('.petit-corner-nav__label', style)
+        self.assertIn('env(safe-area-inset-top)', style)
 
-    def test_desktop_uses_left_area_rail(self):
-        source = (FRONTEND / "petit-four-area-shell.css").read_text(encoding="utf-8")
-        self.assertIn(".petit-area-rail", source)
-        self.assertIn("padding-left: var(--petit-rail-width)", source)
+    def test_desktop_uses_corner_shell_instead_of_left_rail(self):
+        source = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
+        self.assertIn('.petit-area-rail', source)
+        self.assertIn('display: none !important', source)
+        self.assertIn('.petit-corner-status', source)
+        self.assertIn('.petit-utility-dock', source)
 
     def test_univ_assets_are_versioned_loaded_and_bootstrapped(self):
         shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
         version = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_ASSET_VERSION || "0.13.0"', shell)
+        self.assertIn('window.PETIT_ASSET_VERSION || "0.14.0"', shell)
         self.assertIn('/static/univ-space.css', shell)
         self.assertIn('/static/univ-space.js', shell)
         self.assertIn('/static/app_shell.js', version)
+        self.assertIn('/static/petit-corner-shell.js', version)
         self.assertIn('data-petit-bootstrap="app-shell"', version)
+        self.assertIn('data-petit-bootstrap="corner-shell"', version)
 
-    def test_version_is_v0130(self):
+    def test_version_is_v0140(self):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.13.0"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.14.0"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.0"', source)
 
 
 if __name__ == "__main__":
