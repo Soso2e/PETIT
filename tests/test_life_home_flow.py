@@ -5,23 +5,26 @@ ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
 
 
-class LifeHomeFlowAssetTests(unittest.TestCase):
-    def test_life_is_the_app_shell_home(self) -> None:
+class UnivHomeFlowAssetTests(unittest.TestCase):
+    def test_univ_is_the_app_shell_home(self) -> None:
         shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
         self.assertIn('const HOME_VIEW = "universe"', shell)
-        self.assertIn('const PRIMARY_VIEWS = ["universe", "focus", "tasks", "chat"]', shell)
-        self.assertIn('{ view: "today", label: "Today" }', shell)
+        self.assertIn('{ view: "univ", target: "universe", label: "Univ" }', shell)
+        self.assertIn('home: "univ"', shell)
+        self.assertIn('focus: "univ"', shell)
         self.assertIn('activateView(initialView)', shell)
 
-    def test_life_to_focus_uses_normal_view_fade(self) -> None:
+    def test_univ_focus_uses_same_space_instead_of_view_transition(self) -> None:
         life_script = (FRONTEND / "life-map.js").read_text(encoding="utf-8")
         motion_script = (FRONTEND / "petit-motion.js").read_text(encoding="utf-8")
         style = (FRONTEND / "life-transition.css").read_text(encoding="utf-8")
+        univ = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
         self.assertNotIn("life-dive-portal", life_script)
         self.assertNotIn("replayClick(target)", life_script)
         self.assertNotIn("performTransition", motion_script)
         self.assertIn("replayViewFade", motion_script)
         self.assertNotIn("data-petit-transition-from", style)
+        self.assertIn("is-univ-focus-target", univ)
         self.assertIn("prefers-reduced-motion: reduce", style)
 
     def test_parent_flow_and_child_composer_are_loaded(self) -> None:
@@ -35,7 +38,7 @@ class LifeHomeFlowAssetTests(unittest.TestCase):
         self.assertIn("window.PetitUniverse.refreshAndFocusTask", script)
         self.assertIn("この親Taskに小タスクを追加", script)
 
-    def test_today_dashboard_has_actions_and_metrics(self) -> None:
+    def test_today_dashboard_actions_remain_available(self) -> None:
         script = (FRONTEND / "today.js").read_text(encoding="utf-8")
         style = (FRONTEND / "today.css").read_text(encoding="utf-8")
         self.assertIn('id = "today-metrics"', script)
