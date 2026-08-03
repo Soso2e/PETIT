@@ -1,7 +1,7 @@
 // Shared PETIT application shell for the Univ-first UI.
 (() => {
   const HOME_VIEW = "universe";
-  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.12.0";
+  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.13.0";
   const PRIMARY_VIEWS = [
     { view: "univ", target: "universe", label: "Univ" },
     { view: "tasks", target: "tasks", label: "Tasks" },
@@ -16,17 +16,57 @@
     reminders: "reminders",
   };
 
-  const clickPanelTrigger = (view) => {
-    const target = document.querySelector(`[data-view="${view}"]`);
-    if (target) target.click();
+  const resolveArea = (view) => VIEW_ALIASES[view] || view;
+  const panelForArea = (area) => area === "univ" ? "universe" : area;
+
+  const switchPanelDirectly = (panelView) => {
+    const tabs = Array.from(document.querySelectorAll("[data-view]"));
+    const panels = Array.from(document.querySelectorAll("[data-view-panel]"));
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    tabs.forEach((tab) => {
+      const active = tab.dataset.view === panelView;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", String(active));
+    });
+
+    panels.forEach((panel) => {
+      const active = panel.dataset.viewPanel === panelView;
+      panel.hidden = !active;
+      panel.setAttribute("aria-hidden", String(!active));
+      panel.classList.toggle("is-active", active);
+      panel.classList.remove("is-entering");
+      if (active && panel.dataset.motionSeen !== "true" && !reducedMotion) {
+        panel.dataset.motionSeen = "true";
+        panel.classList.add("is-entering");
+        panel.addEventListener("animationend", () => panel.classList.remove("is-entering"), { once: true });
+      }
+    });
+
+    if (panelView === "chat") {
+      window.requestAnimationFrame(() => document.querySelector("#chat-input")?.focus?.());
+    }
+
+    window.dispatchEvent(new CustomEvent("petit:panel-change", {
+      detail: { panel: panelView },
+    }));
   };
 
-  const resolveArea = (view) => VIEW_ALIASES[view] || view;
+  const syncUrl = (area) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", area);
+    window.history.replaceState({ petitArea: area }, "", url);
+  };
 
   const activateView = (view, detail = {}) => {
     const area = resolveArea(view);
-    const panelView = area === "univ" ? "universe" : area;
-    clickPanelTrigger(panelView);
+    const panelView = panelForArea(area);
+
+    // Do not click the relabelled tab again. That path can re-enter the shell
+    // capture handler and leave the old panel visible. Keep one source of truth.
+    switchPanelDirectly(panelView);
+    syncActiveState(area);
+    syncUrl(area);
 
     window.requestAnimationFrame(() => {
       if (area === "univ") {
@@ -38,7 +78,6 @@
         }));
       }
       window.dispatchEvent(new CustomEvent("petit:area-change", { detail: { area } }));
-      syncActiveState(area);
     });
   };
 
@@ -171,6 +210,22 @@
     panel.prepend(subnav);
   };
 
+  const installPanelObserver = () => {
+    const panels = Array.from(document.querySelectorAll("[data-view-panel]"));
+    if (!panels.length) return;
+    const observer = new MutationObserver(() => {
+      const visible = panels.find((panel) => !panel.hidden);
+      if (!visible) return;
+      const area = visible.dataset.viewPanel === "universe" ? "univ" : visible.dataset.viewPanel;
+      syncActiveState(area);
+      document.body.classList.toggle("petit-univ-active", area === "univ");
+    });
+    panels.forEach((panel) => observer.observe(panel, {
+      attributes: true,
+      attributeFilter: ["hidden", "class"],
+    }));
+  };
+
   const initialize = () => {
     const nav = document.querySelector(".view-tabs");
     if (!nav || nav.dataset.petitAppShellReady === "true") return;
@@ -180,12 +235,19 @@
     installUniverseModules();
     createDesktopRail();
     installPetitSubnav();
+    installPanelObserver();
 
     const requested = new URLSearchParams(window.location.search).get("view");
     const supported = ["univ", "home", "focus", "tasks", "chat", "universe", "reminders", "petit", "projects"];
     const initialView = requested && supported.includes(requested) ? requested : "univ";
     window.requestAnimationFrame(() => activateView(initialView));
   };
+
+  window.addEventListener("popstate", (event) => {
+    const requested = event.state?.petitArea || new URLSearchParams(window.location.search).get("view") || "univ";
+    activateView(requested);
+  });
+  window.addEventListener("petit:navigate", (event) => activateView(event.detail?.view || "univ", event.detail || {}));
 
   window.PetitAppShell = { initialize, activateView, homeView: HOME_VIEW };
   if (document.readyState === "loading") {

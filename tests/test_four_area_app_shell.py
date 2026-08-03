@@ -16,6 +16,14 @@ class ThreeAreaAppShellTests(unittest.TestCase):
         self.assertNotIn('textContent = "More"', source)
         self.assertNotIn('legacy.html?view=', source)
 
+    def test_tab_switching_uses_direct_panel_sync(self):
+        source = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
+        self.assertIn("const switchPanelDirectly", source)
+        self.assertIn('panel.hidden = !active', source)
+        self.assertIn('panel.setAttribute("aria-hidden", String(!active))', source)
+        self.assertNotIn("target.click()", source)
+        self.assertNotIn("clickPanelTrigger", source)
+
     def test_mobile_navigation_is_overridden_to_three_columns(self):
         source = (FRONTEND / "univ-space.css").read_text(encoding="utf-8")
         self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr))", source)
@@ -28,15 +36,18 @@ class ThreeAreaAppShellTests(unittest.TestCase):
         self.assertIn(".petit-area-rail", source)
         self.assertIn("padding-left: var(--petit-rail-width)", source)
 
-    def test_univ_assets_are_versioned_and_loaded(self):
+    def test_univ_assets_are_versioned_loaded_and_bootstrapped(self):
         shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_ASSET_VERSION || "0.12.0"', shell)
+        version = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
+        self.assertIn('window.PETIT_ASSET_VERSION || "0.13.0"', shell)
         self.assertIn('/static/univ-space.css', shell)
         self.assertIn('/static/univ-space.js', shell)
+        self.assertIn('/static/app_shell.js', version)
+        self.assertIn('data-petit-bootstrap="app-shell"', version)
 
-    def test_version_is_v0120(self):
+    def test_version_is_v0130(self):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.12.0"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.13.0"', source)
 
 
 if __name__ == "__main__":
