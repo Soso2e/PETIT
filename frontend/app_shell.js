@@ -1,17 +1,18 @@
-// Shared PETIT application shell for Universe UI.
+// Shared PETIT application shell for the Univ-first UI.
 (() => {
   const HOME_VIEW = "universe";
-  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.11.0";
+  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.12.0";
   const PRIMARY_VIEWS = [
-    { view: "home", target: "universe", label: "Home" },
-    { view: "focus", target: "universe", label: "Focus" },
+    { view: "univ", target: "universe", label: "Univ" },
     { view: "tasks", target: "tasks", label: "Tasks" },
     { view: "chat", target: "chat", label: "PETIT" },
   ];
   const VIEW_ALIASES = {
-    home: "universe",
+    home: "univ",
+    focus: "univ",
+    universe: "univ",
+    projects: "univ",
     petit: "chat",
-    projects: "universe",
     reminders: "reminders",
   };
 
@@ -20,18 +21,23 @@
     if (target) target.click();
   };
 
-  const activateView = (view) => {
-    const area = view === "focus" ? "focus" : (view === "home" || view === "universe" ? "home" : view);
-    const resolved = VIEW_ALIASES[view] || view;
-    const panelView = area === "focus" ? "universe" : resolved;
+  const resolveArea = (view) => VIEW_ALIASES[view] || view;
+
+  const activateView = (view, detail = {}) => {
+    const area = resolveArea(view);
+    const panelView = area === "univ" ? "universe" : area;
     clickPanelTrigger(panelView);
 
     window.requestAnimationFrame(() => {
-      if (area === "focus") {
-        window.dispatchEvent(new CustomEvent("petit:core-focus"));
-      } else if (area === "home") {
-        window.dispatchEvent(new CustomEvent("petit:core-home"));
+      if (area === "univ") {
+        window.dispatchEvent(new CustomEvent("petit:univ-open", {
+          detail: {
+            mode: view === "focus" ? "focus" : (detail.mode || "overview"),
+            taskId: detail.taskId || null,
+          },
+        }));
       }
+      window.dispatchEvent(new CustomEvent("petit:area-change", { detail: { area } }));
       syncActiveState(area);
     });
   };
@@ -61,11 +67,11 @@
     loadStylesheet("/static/life-transition.css", "life-transition-style");
     loadStylesheet("/static/task-flow.css", "task-flow-style");
     loadStylesheet("/static/petit-galaxy.css", "galactic-spatial-style");
-    loadStylesheet("/static/petit-four-area-shell.css", "four-area-shell-style");
-    loadStylesheet("/static/core-home.css", "core-home-style");
+    loadStylesheet("/static/petit-four-area-shell.css", "three-area-shell-style");
+    loadStylesheet("/static/univ-space.css", "univ-space-style");
     loadScript("/static/life-map.js", "life-map-script");
     loadScript("/static/task-flow.js", "task-flow-script");
-    loadScript("/static/core-home.js", "core-home-script");
+    loadScript("/static/univ-space.js", "univ-space-script");
   };
 
   const relabelNavigation = (nav) => {
@@ -73,8 +79,7 @@
       Array.from(nav.querySelectorAll("[data-view]")).map((button) => [button.dataset.view, button]),
     );
     const source = {
-      home: buttons.get("today") || buttons.get("universe"),
-      focus: buttons.get("focus"),
+      univ: buttons.get("universe") || buttons.get("today"),
       tasks: buttons.get("tasks"),
       chat: buttons.get("chat"),
     };
@@ -110,7 +115,7 @@
 
     const brand = document.createElement("a");
     brand.className = "petit-area-rail__brand";
-    brand.href = "/";
+    brand.href = "/?view=univ";
     brand.innerHTML = '<img src="/static/branding/icon_logo.png" alt=""><span><strong>PETIT</strong><small data-petit-version></small></span>';
     rail.appendChild(brand);
 
@@ -129,7 +134,6 @@
     const shortcuts = document.createElement("div");
     shortcuts.className = "petit-area-rail__shortcuts";
     shortcuts.innerHTML = `
-      <button type="button" data-shell-target="home">Projects</button>
       <button type="button" data-shell-target="reminders">Reminders</button>
       <button type="button" data-shell-target="chat">Settings</button>
     `;
@@ -141,7 +145,7 @@
   };
 
   const syncActiveState = (view) => {
-    const area = view === "universe" ? "home" : view;
+    const area = resolveArea(view);
     document.querySelectorAll("[data-rail-view], [data-shell-area]").forEach((button) => {
       const key = button.dataset.railView || button.dataset.shellArea;
       const active = key === area;
@@ -178,8 +182,8 @@
     installPetitSubnav();
 
     const requested = new URLSearchParams(window.location.search).get("view");
-    const supported = ["home", "focus", "tasks", "chat", "universe", "reminders", "petit", "projects"];
-    const initialView = requested && supported.includes(requested) ? requested : "home";
+    const supported = ["univ", "home", "focus", "tasks", "chat", "universe", "reminders", "petit", "projects"];
+    const initialView = requested && supported.includes(requested) ? requested : "univ";
     window.requestAnimationFrame(() => activateView(initialView));
   };
 
