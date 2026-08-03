@@ -1,15 +1,23 @@
 // Shared PETIT application shell for Universe UI.
 (() => {
-  const HOME_VIEW = "universe";
-  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.9.0";
-  const PRIMARY_VIEWS = ["universe", "focus", "tasks", "chat"];
-  const MORE_VIEWS = [
-    { view: "today", label: "Today" },
-    { view: "reminders", label: "Reminders" },
+  const HOME_VIEW = "today";
+  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.10.0";
+  const PRIMARY_VIEWS = [
+    { view: "today", label: "Home" },
+    { view: "focus", label: "Focus" },
+    { view: "tasks", label: "Tasks" },
+    { view: "chat", label: "PETIT" },
   ];
+  const VIEW_ALIASES = {
+    home: "today",
+    petit: "chat",
+    projects: "universe",
+    reminders: "reminders",
+  };
 
   const activateView = (view) => {
-    const target = document.querySelector(`[data-view="${view}"]`);
+    const resolved = VIEW_ALIASES[view] || view;
+    const target = document.querySelector(`[data-view="${resolved}"]`);
     if (target) target.click();
   };
 
@@ -38,141 +46,115 @@
     loadStylesheet("/static/life-transition.css", "life-transition-style");
     loadStylesheet("/static/task-flow.css", "task-flow-style");
     loadStylesheet("/static/petit-galaxy.css", "galactic-spatial-style");
+    loadStylesheet("/static/petit-four-area-shell.css", "four-area-shell-style");
     loadScript("/static/life-map.js", "life-map-script");
     loadScript("/static/task-flow.js", "task-flow-script");
   };
 
-  const createMoreMenu = (nav) => {
-    if (document.getElementById("petit-more-menu")) return;
-
-    const moreButton = document.createElement("button");
-    moreButton.type = "button";
-    moreButton.className = "view-tab";
-    moreButton.dataset.appShellMore = "true";
-    moreButton.textContent = "More";
-    moreButton.setAttribute("aria-expanded", "false");
-    moreButton.setAttribute("aria-controls", "petit-more-menu");
-    nav.appendChild(moreButton);
-
-    const menu = document.createElement("div");
-    menu.id = "petit-more-menu";
-    menu.className = "petit-more-menu";
-    menu.hidden = true;
-
-    const panel = document.createElement("div");
-    panel.className = "petit-more-menu__panel";
-    panel.setAttribute("role", "dialog");
-    panel.setAttribute("aria-label", "その他の機能");
-
-    MORE_VIEWS.forEach(({ view, label }) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = label;
-      button.addEventListener("click", () => {
-        activateView(view);
-        menu.hidden = true;
-        moreButton.setAttribute("aria-expanded", "false");
-      });
-      panel.appendChild(button);
-    });
-
-    const notificationLink = document.createElement("a");
-    notificationLink.href = "/static/legacy.html?view=notifications";
-    notificationLink.textContent = "Notifications";
-    panel.appendChild(notificationLink);
-
-    const calendarLink = document.createElement("a");
-    calendarLink.href = "/static/legacy.html?view=calendar";
-    calendarLink.textContent = "Calendar（read-only）";
-    panel.appendChild(calendarLink);
-
-    const settingsLink = document.createElement("a");
-    settingsLink.href = "/static/legacy.html?view=settings";
-    settingsLink.textContent = "Settings";
-    panel.appendChild(settingsLink);
-
-    menu.appendChild(panel);
-    document.body.appendChild(menu);
-
-    moreButton.addEventListener("click", () => {
-      menu.hidden = !menu.hidden;
-      moreButton.setAttribute("aria-expanded", String(!menu.hidden));
-    });
-
-    menu.addEventListener("click", (event) => {
-      if (event.target === menu) {
-        menu.hidden = true;
-        moreButton.setAttribute("aria-expanded", "false");
-      }
-    });
-
-    window.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || menu.hidden) return;
-      menu.hidden = true;
-      moreButton.setAttribute("aria-expanded", "false");
-      moreButton.focus();
-    });
-  };
-
-  const installStyles = () => {
-    if (document.getElementById("petit-app-shell-style")) return;
-    const style = document.createElement("style");
-    style.id = "petit-app-shell-style";
-    style.textContent = `
-      .petit-more-menu {
-        position: fixed;
-        inset: 0;
-        z-index: 1000;
-        display: grid;
-        place-items: end center;
-        padding: 24px;
-        background: rgb(2 4 12 / 68%);
-        backdrop-filter: blur(12px);
-      }
-      .petit-more-menu[hidden] { display: none; }
-      .petit-more-menu__panel {
-        width: min(100%, 420px);
-        display: grid;
-        gap: 10px;
-        padding: 18px;
-        border: 1px solid rgb(255 255 255 / 16%);
-        border-radius: 20px;
-        background: #0d1222;
-        box-shadow: 0 24px 70px rgb(0 0 0 / 45%);
-      }
-      .petit-more-menu__panel button,
-      .petit-more-menu__panel a {
-        display: block;
-        width: 100%;
-        box-sizing: border-box;
-        padding: 14px 16px;
-        border: 0;
-        border-radius: 14px;
-        background: rgb(255 255 255 / 7%);
-        color: inherit;
-        font: inherit;
-        text-align: left;
-        text-decoration: none;
-      }
-      @media (min-width: 720px) {
-        .petit-more-menu { place-items: start end; padding-top: 82px; }
-        .petit-more-menu__panel { width: 320px; }
-      }
-    `;
-    document.head.appendChild(style);
-  };
-
-  const reorderNavigation = (nav) => {
+  const relabelNavigation = (nav) => {
     const buttons = new Map(
       Array.from(nav.querySelectorAll("[data-view]")).map((button) => [button.dataset.view, button]),
     );
-    PRIMARY_VIEWS.forEach((view) => {
+
+    PRIMARY_VIEWS.forEach(({ view, label }) => {
       const button = buttons.get(view);
-      if (button) nav.appendChild(button);
+      if (!button) return;
+      button.hidden = false;
+      button.textContent = label;
+      button.dataset.primaryArea = label.toLowerCase();
+      nav.appendChild(button);
     });
+
     Array.from(buttons.entries()).forEach(([view, button]) => {
-      button.hidden = !PRIMARY_VIEWS.includes(view);
+      button.hidden = !PRIMARY_VIEWS.some((item) => item.view === view);
     });
+  };
+
+  const createDesktopRail = (nav) => {
+    if (document.querySelector(".petit-area-rail")) return;
+    const rail = document.createElement("aside");
+    rail.className = "petit-area-rail";
+    rail.setAttribute("aria-label", "PETIT主要領域");
+
+    const brand = document.createElement("a");
+    brand.className = "petit-area-rail__brand";
+    brand.href = "/";
+    brand.innerHTML = '<img src="/static/branding/icon_logo.png" alt=""><span><strong>PETIT</strong><small data-petit-version></small></span>';
+    rail.appendChild(brand);
+
+    const railNav = document.createElement("nav");
+    railNav.className = "petit-area-rail__nav";
+    PRIMARY_VIEWS.forEach(({ view, label }) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.railView = view;
+      button.textContent = label;
+      button.addEventListener("click", () => activateView(view));
+      railNav.appendChild(button);
+    });
+    rail.appendChild(railNav);
+
+    const shortcuts = document.createElement("div");
+    shortcuts.className = "petit-area-rail__shortcuts";
+    shortcuts.innerHTML = `
+      <button type="button" data-shell-target="universe">Projects</button>
+      <button type="button" data-shell-target="reminders">Reminders</button>
+      <button type="button" data-shell-target="chat">Settings</button>
+    `;
+    shortcuts.querySelectorAll("[data-shell-target]").forEach((button) => {
+      button.addEventListener("click", () => activateView(button.dataset.shellTarget));
+    });
+    rail.appendChild(shortcuts);
+
+    document.body.appendChild(rail);
+
+    nav.querySelectorAll("[data-view]").forEach((button) => {
+      button.addEventListener("click", () => syncActiveState(button.dataset.view));
+    });
+  };
+
+  const syncActiveState = (view) => {
+    document.querySelectorAll("[data-rail-view]").forEach((button) => {
+      const active = button.dataset.railView === view;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-current", active ? "page" : "false");
+    });
+  };
+
+  const installHomeShortcuts = () => {
+    const homePanel = document.querySelector('[data-view-panel="today"]');
+    if (!homePanel || homePanel.querySelector(".home-area-shortcuts")) return;
+
+    const shortcuts = document.createElement("section");
+    shortcuts.className = "home-area-shortcuts";
+    shortcuts.setAttribute("aria-label", "Homeの追加情報");
+    shortcuts.innerHTML = `
+      <button type="button" data-home-target="universe"><span>PROJECTS</span><strong>プロジェクト状況を見る</strong></button>
+      <button type="button" data-home-target="reminders"><span>REMINDERS</span><strong>直近のリマインダーを見る</strong></button>
+      <button type="button" data-home-target="chat"><span>PETIT</span><strong>PETITに相談する</strong></button>
+    `;
+    shortcuts.querySelectorAll("[data-home-target]").forEach((button) => {
+      button.addEventListener("click", () => activateView(button.dataset.homeTarget));
+    });
+    const header = homePanel.querySelector(".section-head");
+    if (header) header.insertAdjacentElement("afterend", shortcuts);
+  };
+
+  const installPetitSubnav = () => {
+    const panel = document.querySelector('[data-view-panel="chat"]');
+    if (!panel || panel.querySelector(".petit-subnav")) return;
+    const subnav = document.createElement("nav");
+    subnav.className = "petit-subnav";
+    subnav.setAttribute("aria-label", "PETIT機能");
+    subnav.innerHTML = `
+      <button type="button" class="is-active">Chat</button>
+      <button type="button" disabled>Voice</button>
+      <button type="button" disabled>Context</button>
+      <button type="button" disabled>History</button>
+      <button type="button" disabled>Automations</button>
+      <button type="button" disabled>Settings</button>
+    `;
+    panel.prepend(subnav);
   };
 
   const initialize = () => {
@@ -180,15 +162,24 @@
     if (!nav || nav.dataset.petitAppShellReady === "true") return;
     nav.dataset.petitAppShellReady = "true";
 
-    reorderNavigation(nav);
-    installStyles();
+    relabelNavigation(nav);
     installUniverseModules();
-    createMoreMenu(nav);
+    createDesktopRail(nav);
+    installHomeShortcuts();
+    installPetitSubnav();
 
     const requested = new URLSearchParams(window.location.search).get("view");
-    const supported = [...PRIMARY_VIEWS, ...MORE_VIEWS.map((item) => item.view)];
+    const supported = [
+      ...PRIMARY_VIEWS.map((item) => item.view),
+      "universe",
+      "reminders",
+      ...Object.keys(VIEW_ALIASES),
+    ];
     const initialView = requested && supported.includes(requested) ? requested : HOME_VIEW;
-    window.requestAnimationFrame(() => activateView(initialView));
+    window.requestAnimationFrame(() => {
+      activateView(initialView);
+      syncActiveState(VIEW_ALIASES[initialView] || initialView);
+    });
   };
 
   window.PetitAppShell = { initialize, activateView, homeView: HOME_VIEW };
