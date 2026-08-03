@@ -104,7 +104,7 @@
           <button type="button" data-univ-action="zoom-in" aria-label="拡大">＋</button>
           <button type="button" data-univ-action="reset" title="視点をリセット">Reset</button>
         </div>
-        <p class="univ-hud__help">Drag to orbit · Wheel / pinch to zoom · Select a star</p>
+        <p class="univ-hud__help">Drag to orbit · Wheel / +/- to zoom · Select a star</p>
       `;
       frame.appendChild(hud);
     }
@@ -280,6 +280,11 @@
     }, { passive: false });
 
     frame.addEventListener("keydown", (event) => {
+      if (event.target.closest?.(".life-map__core") && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        resetCamera();
+        return;
+      }
       if (event.key === "Escape") resetCamera();
       if (event.key === "ArrowLeft") state.yaw -= 4;
       if (event.key === "ArrowRight") state.yaw += 4;
@@ -304,11 +309,23 @@
     else resetCamera({ keepSelection: true });
   };
 
+  const syncInitialArea = () => {
+    window.requestAnimationFrame(() => {
+      const root = panel();
+      if (!root) return;
+      const active = !root.hidden
+        && root.getAttribute("aria-hidden") !== "true"
+        && window.getComputedStyle(root).display !== "none";
+      document.body.classList.toggle("petit-univ-active", active);
+    });
+  };
+
   const initialize = () => {
     ensureHud();
     decorateDepth();
     bindInteraction();
     applyCamera();
+    syncInitialArea();
     window.addEventListener(OPEN_EVENT, (event) => showUniv(event.detail || {}));
     window.addEventListener(AREA_EVENT, (event) => {
       const active = event.detail?.area === "univ";
