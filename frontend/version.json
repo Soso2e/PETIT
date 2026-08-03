@@ -1,6 +1,11 @@
 {
   "name": "PETIT",
-  "version": "0.6.0",
-  "release": "cosmic-glass-redesign-pwa-push",
-  "includes": ["pwa notification fix", "gpu-accelerated orbit animation", "cosmic glass ui overhaul"]
+  "version": "0.8.0",
+  "release": "motion-continuity",
+  "includes": [
+    "shared-element transitions across Life Focus Tasks",
+    "cancelable transition coordinator",
+    "mobile task cards and chat sheet",
+    "unified PWA asset cache"
+  ]
 }

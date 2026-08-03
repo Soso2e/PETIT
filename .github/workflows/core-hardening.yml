@@ -14,6 +14,7 @@ on:
       - "tests/test_life_home_flow.py"
       - "tests/test_task_child_api.py"
       - "tests/test_unified_ui_system.py"
+      - "tests/test_motion_continuity.py"
       - ".github/workflows/core-hardening.yml"
   workflow_dispatch:
 
@@ -40,7 +41,7 @@ jobs:
           python -m pip install --quiet fastapi uvicorn httpx pydantic chromadb timetree-exporter
 
       - name: Compile Python sources
-        run: python -m compileall backend tests/test_core_hardening.py tests/test_chat_context_budget.py tests/test_schedule_date_parsing.py tests/test_notion_search.py tests/test_task_completion_intent.py tests/test_life_map_assets.py tests/test_life_home_flow.py tests/test_task_child_api.py tests/test_unified_ui_system.py
+        run: python -m compileall backend tests/test_core_hardening.py tests/test_chat_context_budget.py tests/test_schedule_date_parsing.py tests/test_notion_search.py tests/test_task_completion_intent.py tests/test_life_map_assets.py tests/test_life_home_flow.py tests/test_task_child_api.py tests/test_unified_ui_system.py tests/test_motion_continuity.py
 
       - name: Check frontend syntax
         run: |
@@ -51,6 +52,7 @@ jobs:
           node --check frontend/today.js
           node --check frontend/chat_input.js
           node --check frontend/petit-ui-system.js
+          node --check frontend/petit-motion.js
           node --check frontend/petit-version.js
 
       - name: Run Life UI flow tests
@@ -59,6 +61,7 @@ jobs:
           python -m unittest tests.test_life_home_flow -v
           python -m unittest tests.test_task_child_api -v
           python -m unittest tests.test_unified_ui_system -v
+          python -m unittest tests.test_motion_continuity -v
 
       - name: Run existing core hardening tests
         run: |
