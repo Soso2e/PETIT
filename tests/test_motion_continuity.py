@@ -15,22 +15,24 @@ class MotionContinuityTests(unittest.TestCase):
         self.chat_input = (FRONTEND / "chat_input.js").read_text(encoding="utf-8")
         self.app_shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
         self.version = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
+        self.univ = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
 
-    def test_motion_layer_uses_v090_assets(self) -> None:
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.9.0"', self.version)
-        self.assertIn('window.PETIT_VERSION = "v0.9.0"', self.version)
-        self.assertIn('window.PETIT_ASSET_VERSION || "0.9.0"', self.chat_input)
-        self.assertIn('window.PETIT_ASSET_VERSION || "0.9.0"', self.app_shell)
+    def test_motion_layer_uses_v0120_assets(self) -> None:
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.12.0"', self.version)
+        self.assertIn('window.PETIT_VERSION = "v0.12.0"', self.version)
+        self.assertIn('window.PETIT_ASSET_VERSION || "0.12.0"', self.app_shell)
         self.assertIn('loadStylesheet("/static/petit-motion.css"', self.chat_input)
         self.assertIn('loadSharedModule("/static/petit-motion.js"', self.chat_input)
 
-    def test_life_focus_has_no_shared_element_or_depth_transition(self) -> None:
+    def test_univ_keeps_short_view_fades_and_adds_camera_motion(self) -> None:
         self.assertNotIn("petit-shared-ghost", self.motion_js)
         self.assertNotIn("performTransition", self.motion_js)
         self.assertNotIn("animateGhost", self.motion_js)
         self.assertNotIn("data-petit-transition-from", self.life_transition)
         self.assertNotIn("life-dive-portal", self.life_map)
-        self.assertIn("short fade", self.life_transition)
+        self.assertIn("replayViewFade", self.motion_js)
+        self.assertIn("applyCamera", self.univ)
+        self.assertIn("pointermove", self.univ)
 
     def test_view_change_is_an_ordinary_short_fade(self) -> None:
         self.assertIn("replayViewFade", self.motion_js)
@@ -46,7 +48,7 @@ class MotionContinuityTests(unittest.TestCase):
         self.assertIn(".task-table tbody tr.is-completing", self.motion_css)
         self.assertIn("installTaskFeedback", self.motion_js)
 
-    def test_navigation_does_not_intercept_normal_click_flow(self) -> None:
+    def test_navigation_does_not_intercept_normal_motion_click_flow(self) -> None:
         self.assertNotIn("stopImmediatePropagation", self.motion_js)
         self.assertNotIn("preventDefault()", self.motion_js)
         self.assertIn("tab.click()", self.motion_js)
