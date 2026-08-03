@@ -1,24 +1,39 @@
 // Shared PETIT application shell for Universe UI.
 (() => {
-  const HOME_VIEW = "today";
-  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.10.0";
+  const HOME_VIEW = "universe";
+  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.11.0";
   const PRIMARY_VIEWS = [
-    { view: "today", label: "Home" },
-    { view: "focus", label: "Focus" },
-    { view: "tasks", label: "Tasks" },
-    { view: "chat", label: "PETIT" },
+    { view: "home", target: "universe", label: "Home" },
+    { view: "focus", target: "universe", label: "Focus" },
+    { view: "tasks", target: "tasks", label: "Tasks" },
+    { view: "chat", target: "chat", label: "PETIT" },
   ];
   const VIEW_ALIASES = {
-    home: "today",
+    home: "universe",
     petit: "chat",
     projects: "universe",
     reminders: "reminders",
   };
 
-  const activateView = (view) => {
-    const resolved = VIEW_ALIASES[view] || view;
-    const target = document.querySelector(`[data-view="${resolved}"]`);
+  const clickPanelTrigger = (view) => {
+    const target = document.querySelector(`[data-view="${view}"]`);
     if (target) target.click();
+  };
+
+  const activateView = (view) => {
+    const area = view === "focus" ? "focus" : (view === "home" || view === "universe" ? "home" : view);
+    const resolved = VIEW_ALIASES[view] || view;
+    const panelView = area === "focus" ? "universe" : resolved;
+    clickPanelTrigger(panelView);
+
+    window.requestAnimationFrame(() => {
+      if (area === "focus") {
+        window.dispatchEvent(new CustomEvent("petit:core-focus"));
+      } else if (area === "home") {
+        window.dispatchEvent(new CustomEvent("petit:core-home"));
+      }
+      syncActiveState(area);
+    });
   };
 
   const loadStylesheet = (href, marker) => {
@@ -47,30 +62,47 @@
     loadStylesheet("/static/task-flow.css", "task-flow-style");
     loadStylesheet("/static/petit-galaxy.css", "galactic-spatial-style");
     loadStylesheet("/static/petit-four-area-shell.css", "four-area-shell-style");
+    loadStylesheet("/static/core-home.css", "core-home-style");
     loadScript("/static/life-map.js", "life-map-script");
     loadScript("/static/task-flow.js", "task-flow-script");
+    loadScript("/static/core-home.js", "core-home-script");
   };
 
   const relabelNavigation = (nav) => {
     const buttons = new Map(
       Array.from(nav.querySelectorAll("[data-view]")).map((button) => [button.dataset.view, button]),
     );
+    const source = {
+      home: buttons.get("today") || buttons.get("universe"),
+      focus: buttons.get("focus"),
+      tasks: buttons.get("tasks"),
+      chat: buttons.get("chat"),
+    };
 
     PRIMARY_VIEWS.forEach(({ view, label }) => {
-      const button = buttons.get(view);
+      const button = source[view];
       if (!button) return;
       button.hidden = false;
       button.textContent = label;
-      button.dataset.primaryArea = label.toLowerCase();
+      button.dataset.primaryArea = view;
+      button.dataset.shellArea = view;
       nav.appendChild(button);
     });
 
-    Array.from(buttons.entries()).forEach(([view, button]) => {
-      button.hidden = !PRIMARY_VIEWS.some((item) => item.view === view);
+    Array.from(buttons.values()).forEach((button) => {
+      button.hidden = !Object.values(source).includes(button);
     });
+
+    nav.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-shell-area]");
+      if (!button) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      activateView(button.dataset.shellArea);
+    }, true);
   };
 
-  const createDesktopRail = (nav) => {
+  const createDesktopRail = () => {
     if (document.querySelector(".petit-area-rail")) return;
     const rail = document.createElement("aside");
     rail.className = "petit-area-rail";
@@ -97,7 +129,7 @@
     const shortcuts = document.createElement("div");
     shortcuts.className = "petit-area-rail__shortcuts";
     shortcuts.innerHTML = `
-      <button type="button" data-shell-target="universe">Projects</button>
+      <button type="button" data-shell-target="home">Projects</button>
       <button type="button" data-shell-target="reminders">Reminders</button>
       <button type="button" data-shell-target="chat">Settings</button>
     `;
@@ -105,39 +137,17 @@
       button.addEventListener("click", () => activateView(button.dataset.shellTarget));
     });
     rail.appendChild(shortcuts);
-
     document.body.appendChild(rail);
-
-    nav.querySelectorAll("[data-view]").forEach((button) => {
-      button.addEventListener("click", () => syncActiveState(button.dataset.view));
-    });
   };
 
   const syncActiveState = (view) => {
-    document.querySelectorAll("[data-rail-view]").forEach((button) => {
-      const active = button.dataset.railView === view;
+    const area = view === "universe" ? "home" : view;
+    document.querySelectorAll("[data-rail-view], [data-shell-area]").forEach((button) => {
+      const key = button.dataset.railView || button.dataset.shellArea;
+      const active = key === area;
       button.classList.toggle("is-active", active);
       button.setAttribute("aria-current", active ? "page" : "false");
     });
-  };
-
-  const installHomeShortcuts = () => {
-    const homePanel = document.querySelector('[data-view-panel="today"]');
-    if (!homePanel || homePanel.querySelector(".home-area-shortcuts")) return;
-
-    const shortcuts = document.createElement("section");
-    shortcuts.className = "home-area-shortcuts";
-    shortcuts.setAttribute("aria-label", "Homeの追加情報");
-    shortcuts.innerHTML = `
-      <button type="button" data-home-target="universe"><span>PROJECTS</span><strong>プロジェクト状況を見る</strong></button>
-      <button type="button" data-home-target="reminders"><span>REMINDERS</span><strong>直近のリマインダーを見る</strong></button>
-      <button type="button" data-home-target="chat"><span>PETIT</span><strong>PETITに相談する</strong></button>
-    `;
-    shortcuts.querySelectorAll("[data-home-target]").forEach((button) => {
-      button.addEventListener("click", () => activateView(button.dataset.homeTarget));
-    });
-    const header = homePanel.querySelector(".section-head");
-    if (header) header.insertAdjacentElement("afterend", shortcuts);
   };
 
   const installPetitSubnav = () => {
@@ -164,22 +174,13 @@
 
     relabelNavigation(nav);
     installUniverseModules();
-    createDesktopRail(nav);
-    installHomeShortcuts();
+    createDesktopRail();
     installPetitSubnav();
 
     const requested = new URLSearchParams(window.location.search).get("view");
-    const supported = [
-      ...PRIMARY_VIEWS.map((item) => item.view),
-      "universe",
-      "reminders",
-      ...Object.keys(VIEW_ALIASES),
-    ];
-    const initialView = requested && supported.includes(requested) ? requested : HOME_VIEW;
-    window.requestAnimationFrame(() => {
-      activateView(initialView);
-      syncActiveState(VIEW_ALIASES[initialView] || initialView);
-    });
+    const supported = ["home", "focus", "tasks", "chat", "universe", "reminders", "petit", "projects"];
+    const initialView = requested && supported.includes(requested) ? requested : "home";
+    window.requestAnimationFrame(() => activateView(initialView));
   };
 
   window.PetitAppShell = { initialize, activateView, homeView: HOME_VIEW };
