@@ -1,6 +1,5 @@
 // Home and Focus share one Core-centered task universe.
 (() => {
-  const HOME_PANEL = "universe";
   const FOCUS_EVENT = "petit:core-focus";
   const HOME_EVENT = "petit:core-home";
   let focusTaskId = null;
@@ -14,9 +13,18 @@
     const eyebrow = root.querySelector(".universe-section-head .eyebrow");
     const title = root.querySelector(".universe-section-head h1");
     const copy = root.querySelector(".universe-section-head p");
+    const core = root.querySelector(".life-map__core");
     if (eyebrow) eyebrow.textContent = "HOME / CORE";
     if (title) title.textContent = "Core";
     if (copy) copy.textContent = "Coreを中心に、いま動いているProjectとTaskを眺めます。星を選ぶとFocusします。";
+    if (core) {
+      const coreEyebrow = core.querySelector(".eyebrow");
+      const coreTitle = core.querySelector("strong");
+      const coreHint = core.querySelector("small");
+      if (coreEyebrow) coreEyebrow.textContent = "YOUR UNIVERSE";
+      if (coreTitle) coreTitle.textContent = "CORE";
+      if (coreHint) coreHint.textContent = "Home · Select a star to Focus";
+    }
   };
 
   const taskNodeById = (id) => {
@@ -30,6 +38,7 @@
     const root = panel();
     const graph = map();
     if (!root || !graph) return;
+    ensureCopy();
 
     focusTaskId = mode === "focus" ? taskId : null;
     root.dataset.coreMode = mode;
@@ -40,11 +49,7 @@
       node.classList.remove("is-core-focus-target", "is-core-focus-family");
     });
 
-    if (mode !== "focus") {
-      graph.style.removeProperty("--core-focus-x");
-      graph.style.removeProperty("--core-focus-y");
-      return;
-    }
+    if (mode !== "focus") return;
 
     const target = taskNodeById(taskId)
       || graph.querySelector(".universe-task.is-selected")
@@ -56,16 +61,6 @@
     target?.classList.add("is-core-focus-target");
     family?.classList.add("is-core-focus-family");
     target?.focus?.({ preventScroll: true });
-
-    window.requestAnimationFrame(() => {
-      const graphRect = graph.getBoundingClientRect();
-      const targetRect = (target || family)?.getBoundingClientRect();
-      if (!targetRect || !graphRect.width || !graphRect.height) return;
-      const x = ((targetRect.left + targetRect.width / 2 - graphRect.left) / graphRect.width) * 100;
-      const y = ((targetRect.top + targetRect.height / 2 - graphRect.top) / graphRect.height) * 100;
-      graph.style.setProperty("--core-focus-x", `${x}%`);
-      graph.style.setProperty("--core-focus-y", `${y}%`);
-    });
   };
 
   const focusFromSelection = () => {
@@ -91,6 +86,7 @@
     });
 
     const observer = new MutationObserver(() => {
+      ensureCopy();
       if (panel()?.dataset.coreMode === "focus") focusFromSelection();
     });
     observer.observe(graph, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
