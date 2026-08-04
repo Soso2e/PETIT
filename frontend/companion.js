@@ -24,6 +24,8 @@
   const dashboardRefreshEl = byId("dashboard-refresh");
 
   if (!messagesEl || !formEl || !inputEl) return;
+  if (window.__PETIT_COMPANION_INITIALIZED) return;
+  window.__PETIT_COMPANION_INITIALIZED = true;
 
   const defaultState = () => ({
     active: false,
@@ -567,9 +569,4 @@
   void loadBriefing();
   window.setInterval(tick, 1000);
 
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(() => undefined);
-    });
-  }
 })();

@@ -22,6 +22,8 @@
     !categories || !refreshButton || !unreadBadge || !eventList || !eventEmpty ||
     !taskPanel || !taskClose || !taskForm || !taskState || !taskComplete
   ) return;
+  if (window.__PETIT_NOTIFICATIONS_INITIALIZED) return;
+  window.__PETIT_NOTIFICATIONS_INITIALIZED = true;
 
   let serverStatus = null;
   let registration = null;
@@ -31,6 +33,15 @@
   let activeTaskId = null;
   let activeNotificationId = null;
   let activeTask = null;
+
+  const ensureServiceWorker = () => {
+    if (!("serviceWorker" in navigator)) return Promise.resolve(null);
+    if (!window.__PETIT_SERVICE_WORKER_PROMISE) {
+      window.__PETIT_SERVICE_WORKER_PROMISE = navigator.serviceWorker
+        .register("/service-worker.js", { scope: "/" });
+    }
+    return window.__PETIT_SERVICE_WORKER_PROMISE;
+  };
 
   function isSupported() {
     return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -343,9 +354,11 @@
   async function loadStatus() {
     if (isSupported()) {
       try {
-        registration = await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
-        await navigator.serviceWorker.ready;
-        subscription = await registration.pushManager.getSubscription();
+        // Do not install or wait for a Service Worker during page startup.
+        // An existing registration is enough to restore the local subscription;
+        // a first install is performed only from the explicit Enable action.
+        registration = await navigator.serviceWorker.getRegistration("/");
+        subscription = registration ? await registration.pushManager.getSubscription() : null;
       } catch (error) {
         registration = null;
         subscription = null;
@@ -386,7 +399,7 @@
       }
 
       if (!registration) {
-        registration = await navigator.serviceWorker.register("/service-worker.js", { scope: "/" });
+        registration = await ensureServiceWorker();
         await navigator.serviceWorker.ready;
       }
 

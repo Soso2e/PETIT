@@ -16,6 +16,7 @@ localStorage.setItem("petit_session_id", sessionId);
 let modelRoutingSnapshot = null;
 let activeRequestId = null;
 let agentOperationActive = false;
+let jobsPollInFlight = false;
 
 function freshnessLabel(status, label) {
   if (!status || !status.configured) return `${label}: 未使用`;
@@ -257,6 +258,8 @@ async function acknowledgeJobs(ids) {
 }
 
 async function pollJobs() {
+  if (jobsPollInFlight) return;
+  jobsPollInFlight = true;
   try {
     const res = await fetch(`/api/jobs?limit=20&session_id=${encodeURIComponent(sessionId)}`);
     const data = await res.json();
@@ -289,6 +292,8 @@ async function pollJobs() {
     await acknowledgeJobs(delivered);
   } catch (e) {
     // Background job polling should not interrupt chat.
+  } finally {
+    jobsPollInFlight = false;
   }
 }
 

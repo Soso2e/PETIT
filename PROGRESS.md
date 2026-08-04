@@ -24,8 +24,8 @@
 - タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。作成・完了・親子変更は確認付きでNotion同期する。
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
-- 今回の検証: v0.14.1へ静的資産参照・fallback・Service Worker cacheを統一し、App Shell系の重複読込／初期化ガードとTask Flowの初回API重複取得防止を静的回帰45件・Node構文・HTTPアクセスログで確認。ブラウザ操作接続が応答停止したため、PC／390x844の表示・タブ・アニメーションと実iPhone PWAは未確認。
-- 次にやること: 旧Service Worker cacheを削除した実データ入りPCブラウザと390x844で、表示、タブ切替、フェード／Univ空間アニメーション、初回タスクAPIが1回であることをDevTools Networkで再確認する。実iPhone PWAでDynamic Island周辺、横向き、キーボード表示中、長時間操作負荷を確認する。
+- 今回の検証: 全画面共通の応答停止調査で、同一HTML内の優先スクリプト重複は確認できなかった。notifications／companionの再初期化、Service Workerの起動時自動登録、LegacyのJobポーリング重複、Corner Shell Observerの自己誘発DOM監視を抑止し、Node構文と関連回帰37件に成功。実ブラウザは初期化後のCDP応答が停止し、Service Worker削除後／有効時のUniverse・Legacy確認は未完了。
+- 次にやること: FastAPIを実行中のPCブラウザで旧Service Worker cache削除後と有効時を分け、Universe／Legacy双方の操作、Long Task、Observer loop、CPU、Networkの初期化回数を確認する。残る高負荷があればPriority JSを1本ずつ無効化して二分探索する。
 
 ## 履歴
 
@@ -55,3 +55,5 @@
 | 2026-08-03 | 20:23 | #21 | Issue #189: v0.14.0として四隅型App Shell、右上3アイコン、左上状態表示、左下補助ドック、旧UI設定導線、PWA cache同期を追加 |
 | 2026-08-04 | 07:12 | #22 | v0.14.1として静的資産とPWA cacheの版を統一し、App Shell系の二重読込・初期化と初回タスクAPI重複取得を修正（静的回帰・構文確認済み、PC／スマホ実ブラウザ未確認） |
 | 2026-08-04 | 07:57 | #23 | Notionプロパティ解析に英語名・日英フォールバック検索（`Parent item`/`親タスク`, `DoneDate`/`Done`等）を追加し、新規端末初期同期時のプロパティ名不一致エラーを自動修正（単体テスト追加・全件通過確認） |
+| 2026-08-04 | 08:34 | #24 | 全画面共通UIの再初期化・Service Worker登録共有・Legacy Jobポーリング重複・Corner Shell Observerの自己誘発監視を抑止（Node構文・関連回帰37件成功、実ブラウザ未完了） |
+| 2026-08-04 | 08:34 | #25 | Service WorkerをPush有効化操作まで遅延登録し、通常のUniverse／Legacy起動時の登録・precache待ちを除去（Node構文・関連回帰37件成功、実ブラウザ未完了） |

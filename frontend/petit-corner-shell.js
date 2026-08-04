@@ -212,9 +212,8 @@
       syncState();
     }).observe(root, {
       subtree: true,
-      childList: true,
       attributes: true,
-      attributeFilter: ["hidden", "class", "aria-hidden"],
+      attributeFilter: ["hidden", "aria-hidden"],
     });
   };
 
