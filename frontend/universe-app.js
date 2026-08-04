@@ -440,18 +440,13 @@
 
   const selectOverviewTask = (task, index = 0) => {
     const key = taskKey(task, index);
-    const openFocus = state.overviewSelectionId === key;
     selectTask(task, index);
-    if (openFocus) {
-      state.overviewSelectionId = null;
-      renderConstellations();
-      renderTaskTable();
-      switchView("focus");
-      return;
-    }
     state.overviewSelectionId = key;
     updateOverviewSelectionUI(key);
-    showFeedback(`「${text(task.title, "タスク")}」を選択しました。もう一度押すとFocusへ移ります。`);
+    if (window.PetitUnivSpace?.focusTask) {
+      window.PetitUnivSpace.focusTask(key);
+    }
+    showFeedback(`「${text(task.title, "タスク")}」を選択しました。`);
   };
 
   const renderProjectControls = () => {
@@ -733,7 +728,7 @@
   const renderConstellations = () => {
     constellationGridEl.replaceChildren();
     const groups = projectGroups();
-    universeSummaryEl.textContent = `Life · ${groups.length} Project · ${openTasks().length} Task`;
+    universeSummaryEl.textContent = `Core · ${groups.length} Project · ${openTasks().length} Task`;
     
     if (!groups.length) {
       const empty = document.createElement("p");
@@ -749,7 +744,7 @@
     core.setAttribute("role", "button");
     core.setAttribute("tabindex", "0");
     core.setAttribute("aria-label", "Core overviewへ戻る");
-    core.innerHTML = '<span class="eyebrow">YOUR LIFE</span><strong>LIFE</strong><small>Core Overview</small>';
+    core.innerHTML = '<span class="eyebrow">YOUR CORE</span><strong>CORE</strong><small>Core Overview</small>';
     core.addEventListener("click", () => {
       if (window.PetitUnivSpace?.reset) {
         window.PetitUnivSpace.reset();

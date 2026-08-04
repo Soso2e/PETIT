@@ -209,7 +209,7 @@
   box-shadow: none;
   pointer-events: none;
   transform:
-    translate3d(-50%, -50%, var(--univ-depth, 0px))
+    translate3d(-50%, -50%, var(--life-z, var(--univ-depth, 0px)))
     scale(var(--life-scale, 1));
   transform-style: preserve-3d;
   transition: opacity .34s ease, filter .34s ease, transform .62s cubic-bezier(.2, .8, .2, 1);
@@ -317,7 +317,7 @@
     inset 13px 12px 19px rgba(255,255,255,.14);
 }
 
-/* Layer 3: Planet Heading & Satellite Counts Label */
+/* Layer 3: Planet Heading & Satellite Counts Label (Billboard to Camera) */
 .univ-task-planet .constellation-card__heading {
   position: absolute;
   left: 50%;
@@ -327,7 +327,7 @@
   display: grid;
   gap: 4px;
   text-align: center;
-  transform: translate3d(-50%, 0, 58px);
+  transform: translate3d(-50%, 0, 58px) rotateY(var(--inv-yaw, 0deg)) rotateX(var(--inv-pitch, 0deg));
   pointer-events: none;
 }
 
@@ -363,7 +363,7 @@
   font-family: "DM Mono", monospace;
   font-size: 8px;
   letter-spacing: .04em;
-  transform: translate3d(-50%, 0, 50px);
+  transform: translate3d(-50%, 0, 50px) rotateY(var(--inv-yaw, 0deg)) rotateX(var(--inv-pitch, 0deg));
   backdrop-filter: blur(10px);
   pointer-events: none;
 }
@@ -400,7 +400,7 @@
     rotate(var(--satellite-angle, 0deg))
     translateX(var(--satellite-radius, 80px))
     rotate(calc(-1 * var(--satellite-angle, 0deg)))
-    translateZ(30px) !important;
+    translateZ(calc(30px + var(--satellite-z, 0px))) !important;
   transform-style: preserve-3d;
   background:
     radial-gradient(circle at 31% 27%, rgba(255,255,255,.76) 0 5%, transparent 17%),
@@ -424,7 +424,7 @@
   pointer-events: none;
 }
 
-/* Layer 3: Satellite Title Label */
+/* Layer 3: Satellite Title Label (Billboard to Camera) */
 .univ-satellite .universe-task__title {
   position: absolute;
   left: 50%;
@@ -442,7 +442,7 @@
   text-overflow: ellipsis;
   text-shadow: 0 2px 8px rgba(0,0,0,.8);
   white-space: nowrap;
-  transform: translate3d(-50%, 0, 34px);
+  transform: translate3d(-50%, 0, 34px) rotateY(var(--inv-yaw, 0deg)) rotateX(var(--inv-pitch, 0deg));
   backdrop-filter: blur(9px);
   pointer-events: none;
 }

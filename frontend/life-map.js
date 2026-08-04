@@ -23,7 +23,7 @@
     core.setAttribute("role", "button");
     core.setAttribute("tabindex", "0");
     core.setAttribute("aria-label", "Core overviewへ戻る");
-    core.innerHTML = '<span class="eyebrow">YOUR LIFE</span><strong>LIFE</strong><small>Core Overview</small>';
+    core.innerHTML = '<span class="eyebrow">YOUR CORE</span><strong>CORE</strong><small>Core Overview</small>';
     map.prepend(core);
     return core;
   };
@@ -42,28 +42,31 @@
   };
 
   const desktopLayout = (count) => {
-    if (count === 1) return [{ x: 50, y: 24, scale: 1.05 }];
+    if (count === 1) return [{ x: 50, y: 24, z: 20, scale: 1.05 }];
     const radiusX = count <= 4 ? 35 : (count <= 7 ? 38 : 42);
     const radiusY = count <= 4 ? 30 : (count <= 7 ? 34 : 38);
     return Array.from({ length: count }, (_, index) => {
       const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / count);
       const ringFactor = count > 6 && index % 2 === 1 ? 0.78 : 1;
+      const zOffset = Math.sin(angle * 2) * 80 + (index % 3 - 1) * 30;
       return {
         x: 50 + Math.cos(angle) * radiusX * ringFactor,
         y: 50 + Math.sin(angle) * radiusY * ringFactor,
+        z: Math.round(zOffset),
         scale: index === 0 ? 1.06 : 1,
       };
     });
   };
 
   const mobileLayout = (count) => {
-    if (count === 1) return [{ x: 50, y: 30, scale: 1.02 }];
+    if (count === 1) return [{ x: 50, y: 30, z: 0, scale: 1.02 }];
     const startY = 18;
     const endY = 92;
     const step = (endY - startY) / Math.max(1, count - 1);
     return Array.from({ length: count }, (_, index) => ({
       x: index % 2 === 0 ? 28 : 72,
       y: startY + (step * index),
+      z: (index % 2 === 0 ? 25 : -25),
       scale: index === 0 ? 1.02 : 0.96,
     }));
   };
@@ -95,8 +98,10 @@
     satellites.forEach((sat, satIndex) => {
       const angle = -90 + ((360 / Math.max(1, count)) * satIndex);
       const radius = 80 + ((satIndex % 2) * 18);
+      const satZ = Math.round(Math.sin((satIndex / Math.max(1, count)) * Math.PI * 2) * 35);
       sat.style.setProperty("--satellite-angle", `${angle}deg`);
       sat.style.setProperty("--satellite-radius", `${radius}px`);
+      sat.style.setProperty("--satellite-z", `${satZ}px`);
       sat.style.setProperty("--satellite-delay", `${(index * 50) + (satIndex * 40)}ms`);
       if (sat.dataset.taskId) {
         sat.dataset.motionKey = `task-${sat.dataset.taskId}`;
@@ -134,6 +139,7 @@
 
         system.style.setProperty("--life-x", `${position.x}%`);
         system.style.setProperty("--life-y", `${position.y}%`);
+        system.style.setProperty("--life-z", `${position.z}px`);
         system.style.setProperty("--life-scale", String(position.scale));
         system.style.setProperty("--life-delay", `${index * 60}ms`);
 

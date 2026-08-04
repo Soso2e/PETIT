@@ -35,7 +35,7 @@
       <nav class="view-tabs" aria-label="ビュー切り替え">
         <button class="view-tab" data-view="today">Today</button>
         <button class="view-tab is-active" data-view="focus">Focus</button>
-        <button class="view-tab" data-view="universe">Life</button>
+        <button class="view-tab" data-view="universe">Core</button>
         <button class="view-tab" data-view="tasks">Tasks</button>
         <button class="view-tab" data-view="reminders">Remind</button>
         <button class="view-tab" data-view="chat">Chat</button>
@@ -86,12 +86,12 @@
               <div class="focus-heading">
                 <span class="eyebrow">LIFE / TASK / CHILD</span>
                 <div id="focus-breadcrumb" class="focus-breadcrumb" aria-label="現在の階層">
-                  <button type="button" data-life-root>Life</button>
+                  <button type="button" data-life-root>Core</button>
                   <span>›</span>
                   <strong id="focus-project-name">親Task</strong>
                 </div>
                 <h1 id="focus-title">今日のFocus</h1>
-                <p class="section-copy">Life直下の親タスクを中心に、その子タスクへ集中します。</p>
+                <p class="section-copy">Core直下の親タスクを中心に、その子タスクへ集中します。</p>
               </div>
               <div class="focus-project-switcher" aria-label="親タスク切り替え">
                 <button id="focus-project-prev" class="icon-button" type="button" aria-label="前の親タスク">‹</button>
@@ -114,7 +114,7 @@
               <div class="orbit__ring orbit__ring--one"></div>
               <div class="orbit__ring orbit__ring--two"></div>
               <div class="orbit__ring orbit__ring--three"></div>
-              <button id="objective-node" class="space-node space-node--objective" type="button" aria-label="Life一覧へ戻る">
+              <button id="objective-node" class="space-node space-node--objective" type="button" aria-label="Core一覧へ戻る">
                 <span class="space-node__glow"></span>
                 <span class="space-node__label">読み込み中…</span>
               </button>
@@ -149,7 +149,7 @@
 
       <section class="view" data-view-panel="universe" hidden>
         <div class="section-head universe-section-head">
-          <div><span class="eyebrow">LIFE</span><h1>Life → Task → Child Task</h1><p>1回押して選択、同じTaskをもう1回押すとFocusへ移ります。</p></div>
+          <div><span class="eyebrow">CORE</span><h1>Core → Task → Child Task</h1><p>星を選択すると詳細オーバーレイが表示されます。</p></div>
           <div id="universe-summary" class="universe-summary" aria-live="polite">読み込み中…</div>
         </div>
         <div id="constellation-grid" class="constellation-grid constellation-grid--list"></div>

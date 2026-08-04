@@ -42,6 +42,8 @@
     if (!graph) return;
     graph.style.setProperty("--univ-yaw", `${state.yaw}deg`);
     graph.style.setProperty("--univ-pitch", `${state.pitch}deg`);
+    graph.style.setProperty("--inv-yaw", `${-state.yaw}deg`);
+    graph.style.setProperty("--inv-pitch", `${-state.pitch}deg`);
     graph.style.setProperty("--univ-zoom", String(state.zoom));
     graph.style.setProperty("--univ-pan-x", `${state.panX}px`);
     graph.style.setProperty("--univ-pan-y", `${state.panY}px`);
