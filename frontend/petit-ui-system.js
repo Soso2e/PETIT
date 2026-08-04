@@ -161,9 +161,19 @@
     document.querySelectorAll(".space-node[data-orbit-index]").forEach((node, index) => {
       const layer = (index % 7) - 3;
       const depth = layer * 7;
-      node.style.setProperty("--node-depth", `${depth}px`);
-      node.style.setProperty("--node-scale", (1 + depth / 900).toFixed(3));
-      node.style.setProperty("--node-opacity", (0.92 + Math.max(0, depth) / 450).toFixed(3));
+      const nextDepth = `${depth}px`;
+      const nextScale = (1 + depth / 900).toFixed(3);
+      const nextOpacity = (0.92 + Math.max(0, depth) / 450).toFixed(3);
+
+      if (node.style.getPropertyValue("--node-depth") !== nextDepth) {
+        node.style.setProperty("--node-depth", nextDepth);
+      }
+      if (node.style.getPropertyValue("--node-scale") !== nextScale) {
+        node.style.setProperty("--node-scale", nextScale);
+      }
+      if (node.style.getPropertyValue("--node-opacity") !== nextOpacity) {
+        node.style.setProperty("--node-opacity", nextOpacity);
+      }
     });
   };
 
@@ -189,35 +199,50 @@
   };
 
   const installObservers = () => {
-    const stateTargets = [
-      document.querySelector(".view-tabs"),
-      byId("detail-panel"),
+    const viewTabs = document.querySelector(".view-tabs");
+    if (viewTabs) {
+      const tabsObserver = new MutationObserver(() => {
+        scheduleContextUpdate();
+        document.querySelectorAll(".view-tab[data-view]").forEach((tab) => {
+          const nextAria = String(tab.classList.contains("is-active"));
+          if (tab.getAttribute("aria-selected") !== nextAria) {
+            tab.setAttribute("aria-selected", nextAria);
+          }
+        });
+      });
+      tabsObserver.observe(viewTabs, {
+        attributes: true,
+        attributeFilter: ["class"],
+        subtree: true,
+      });
+    }
+
+    const detailTitle = document.querySelector('#detail-panel [data-detail="title"]');
+    const infoTargets = [
+      detailTitle,
       byId("active-task-label"),
       byId("active-elapsed"),
       byId("sync-pill"),
       byId("focus-project-name"),
     ].filter(Boolean);
 
-    const stateObserver = new MutationObserver(() => {
-      scheduleContextUpdate();
-      document.querySelectorAll(".view-tab[data-view]").forEach((tab) => {
-        tab.setAttribute("aria-selected", String(tab.classList.contains("is-active")));
+    if (infoTargets.length > 0) {
+      const infoObserver = new MutationObserver(() => {
+        scheduleContextUpdate();
       });
-    });
-
-    stateTargets.forEach((target) => stateObserver.observe(target, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["class", "hidden", "data-task-id"],
-      characterData: true,
-    }));
+      infoTargets.forEach((target) => {
+        infoObserver.observe(target, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      });
+    }
 
     const taskNodes = byId("task-nodes");
     if (taskNodes) {
       new MutationObserver(decorateDepth).observe(taskNodes, {
         childList: true,
-        subtree: true,
       });
     }
   };

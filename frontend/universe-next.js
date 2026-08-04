@@ -35,12 +35,12 @@
       const sharedTasks = window.PetitUniverse?.tasks?.() || [];
       if (sharedTasks.length) {
         state.tasks = sharedTasks;
-        decorateAll();
+        scheduleDecorate();
         return;
       }
       const data = await requestJson("/api/notifications/tasks?priority=all&limit=500");
       state.tasks = data.tasks || [];
-      decorateAll();
+      scheduleDecorate();
     } catch (error) {
       console.warn("PETIT task hierarchy load failed", error);
     }
@@ -122,7 +122,10 @@
 
     state.selectedTaskId = taskId(task);
     const parentLabel = detailPanel.querySelector('[data-detail="project"]');
-    if (parentLabel) parentLabel.textContent = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
+    if (parentLabel) {
+      const nextLabel = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
+      if (parentLabel.textContent !== nextLabel) parentLabel.textContent = nextLabel;
+    }
 
     select.replaceChildren();
     const life = document.createElement("option");
@@ -142,11 +145,12 @@
 
     const lockedParent = Boolean(task.has_children);
     select.disabled = lockedParent;
-    help.textContent = lockedParent
+    const nextHelp = lockedParent
       ? "このタスクは子タスクを持つ親です。親子階層は2段までに制限しています。"
       : task.source === "notion"
         ? "Life直下のNotionタスクを選び、「親Taskを変更」で保存します。"
         : "Life直下または別の親Taskを選び、明示的に保存します。";
+    if (help.textContent !== nextHelp) help.textContent = nextHelp;
     select.dataset.ready = "1";
     select.addEventListener("click", (event) => event.stopPropagation());
   };
@@ -156,18 +160,32 @@
     let visibleChildren = 0;
     taskNodes?.querySelectorAll(".space-node").forEach((node, index) => {
       const task = findTask({ id: node.dataset.taskId || "" });
-      node.style.setProperty("--node-index", String(index));
+      const idxStr = String(index);
+      if (node.style.getPropertyValue("--node-index") !== idxStr) {
+        node.style.setProperty("--node-index", idxStr);
+      }
       if (task && isRoot(task) && rootTitle(task) === selectedRoot) {
-        node.classList.add("hierarchy-root-duplicate");
-        node.setAttribute("aria-hidden", "true");
+        if (!node.classList.contains("hierarchy-root-duplicate")) {
+          node.classList.add("hierarchy-root-duplicate");
+        }
+        if (node.getAttribute("aria-hidden") !== "true") {
+          node.setAttribute("aria-hidden", "true");
+        }
       } else {
-        node.classList.remove("hierarchy-root-duplicate");
-        node.removeAttribute("aria-hidden");
+        if (node.classList.contains("hierarchy-root-duplicate")) {
+          node.classList.remove("hierarchy-root-duplicate");
+        }
+        if (node.hasAttribute("aria-hidden")) {
+          node.removeAttribute("aria-hidden");
+        }
         visibleChildren += 1;
       }
     });
     const empty = byId("focus-empty");
-    if (empty) empty.hidden = visibleChildren > 0;
+    if (empty) {
+      const shouldHide = visibleChildren > 0;
+      if (empty.hidden !== shouldHide) empty.hidden = shouldHide;
+    }
   };
 
   const decorateLife = () => {
@@ -175,29 +193,48 @@
       const heading = text(card.querySelector(".constellation-card__heading strong")?.textContent);
       const root = state.tasks.find((task) => isRoot(task) && text(task.title) === heading);
       if (!root) return;
-      card.classList.toggle("constellation-card--parent", Boolean(root.has_children));
-      card.classList.toggle("constellation-card--single", !root.has_children);
+      const hasChildren = Boolean(root.has_children);
+      if (card.classList.contains("constellation-card--parent") !== hasChildren) {
+        card.classList.toggle("constellation-card--parent", hasChildren);
+      }
+      if (card.classList.contains("constellation-card--single") !== !hasChildren) {
+        card.classList.toggle("constellation-card--single", !hasChildren);
+      }
 
       const eyebrow = card.querySelector(".eyebrow");
-      if (eyebrow) eyebrow.textContent = root.has_children ? "LIFE DIRECT · PARENT TASK" : "LIFE DIRECT · TASK";
+      if (eyebrow) {
+        const nextEyebrow = hasChildren ? "LIFE DIRECT · PARENT TASK" : "LIFE DIRECT · TASK";
+        if (eyebrow.textContent !== nextEyebrow) eyebrow.textContent = nextEyebrow;
+      }
 
       const children = state.tasks.filter((task) => Number(task.parent_task_id) === Number(root.id));
       const counts = card.querySelector(".constellation-card__counts");
-      if (counts) counts.textContent = root.has_children ? `${children.length} Child Task` : "単独Task";
+      if (counts) {
+        const nextCounts = hasChildren ? `${children.length} Child Task` : "単独Task";
+        if (counts.textContent !== nextCounts) counts.textContent = nextCounts;
+      }
 
       card.querySelectorAll(".universe-task").forEach((row) => {
         const title = text(row.querySelector(".universe-task__title")?.textContent);
         const task = state.tasks.find((item) => rootTitle(item) === heading && text(item.title) === title);
         if (!task) return;
-        row.classList.toggle("universe-task--root-copy", isRoot(task));
-        row.classList.toggle("universe-task--child", !isRoot(task));
+        const taskIsRoot = isRoot(task);
+        if (row.classList.contains("universe-task--root-copy") !== taskIsRoot) {
+          row.classList.toggle("universe-task--root-copy", taskIsRoot);
+        }
+        if (row.classList.contains("universe-task--child") !== !taskIsRoot) {
+          row.classList.toggle("universe-task--child", !taskIsRoot);
+        }
       });
     });
 
     const groups = new Set(state.tasks.filter(isRoot).map((task) => taskId(task))).size;
     const children = state.tasks.filter((task) => !isRoot(task)).length;
     const summary = byId("universe-summary");
-    if (summary) summary.textContent = `Life · ${groups} Task · ${children} Child`;
+    if (summary) {
+      const nextSummary = `Life · ${groups} Task · ${children} Child`;
+      if (summary.textContent !== nextSummary) summary.textContent = nextSummary;
+    }
   };
 
   const decorateTaskTable = () => {
@@ -208,17 +245,60 @@
       const due = text(row.querySelector(".task-table__due")?.textContent).replace("—", "");
       const task = findTask({ title, due });
       if (!task) return;
-      cells[3].textContent = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
-      cells[3].dataset.rootTitle = rootTitle(task);
-      row.classList.toggle("task-row--child", !isRoot(task));
+      const nextText = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
+      if (cells[3].textContent !== nextText) cells[3].textContent = nextText;
+      const nextRoot = rootTitle(task);
+      if (cells[3].dataset.rootTitle !== nextRoot) cells[3].dataset.rootTitle = nextRoot;
+      const childClass = !isRoot(task);
+      if (row.classList.contains("task-row--child") !== childClass) {
+        row.classList.toggle("task-row--child", childClass);
+      }
     });
   };
 
   const decorateAll = () => {
-    decorateDetail();
-    decorateNodes();
-    decorateLife();
-    decorateTaskTable();
+    stopObserving();
+    try {
+      decorateDetail();
+      decorateNodes();
+      decorateLife();
+      decorateTaskTable();
+    } finally {
+      startObserving();
+    }
+  };
+
+  let isDecoratingScheduled = false;
+  let activeObservers = [];
+
+  const startObserving = () => {
+    stopObserving();
+    const targets = [
+      detailPanel,
+      taskNodes,
+      constellationGrid,
+      taskTableBody,
+    ].filter(Boolean);
+
+    activeObservers = targets.map((element) => {
+      const observer = new MutationObserver(() => scheduleDecorate());
+      observer.observe(element, { childList: true });
+      return observer;
+    });
+  };
+
+  const stopObserving = () => {
+    activeObservers.forEach((obs) => obs.disconnect());
+    activeObservers = [];
+  };
+
+  const scheduleDecorate = () => {
+    if (isDecoratingScheduled) return;
+    isDecoratingScheduled = true;
+    queueMicrotask(() => {
+      isDecoratingScheduled = false;
+      decorateAll();
+    });
   };
 
   const zoomLevel = () => (state.zoom < 0.94 ? "far" : (state.zoom > 1.08 ? "near" : "normal"));
@@ -281,22 +361,14 @@
     });
   };
 
-  const observe = (element) => {
-    if (!element) return;
-    new MutationObserver(() => queueMicrotask(decorateAll)).observe(element, { childList: true });
-  };
-
   document.addEventListener("click", rememberTaskFromClick, true);
   document.addEventListener("petit:tasks-updated", (event) => {
     const tasks = event.detail?.tasks;
     if (!Array.isArray(tasks)) return;
     state.tasks = tasks;
-    queueMicrotask(decorateAll);
+    scheduleDecorate();
   });
-  observe(detailPanel);
-  observe(taskNodes);
-  observe(constellationGrid);
-  observe(taskTableBody);
+  startObserving();
 
   document.documentElement.dataset.universeMotion = "ready";
   applyZoom(state.zoom, { persist: false });

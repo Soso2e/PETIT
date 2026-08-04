@@ -189,8 +189,13 @@
     document.querySelectorAll("[data-rail-view], [data-shell-area]").forEach((button) => {
       const key = button.dataset.railView || button.dataset.shellArea;
       const active = key === area;
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-current", active ? "page" : "false");
+      if (button.classList.contains("is-active") !== active) {
+        button.classList.toggle("is-active", active);
+      }
+      const nextAria = active ? "page" : "false";
+      if (button.getAttribute("aria-current") !== nextAria) {
+        button.setAttribute("aria-current", nextAria);
+      }
     });
   };
 
@@ -219,7 +224,10 @@
       if (!visible) return;
       const area = visible.dataset.viewPanel === "universe" ? "univ" : visible.dataset.viewPanel;
       syncActiveState(area);
-      document.body.classList.toggle("petit-univ-active", area === "univ");
+      const isUniv = area === "univ";
+      if (document.body.classList.contains("petit-univ-active") !== isUniv) {
+        document.body.classList.toggle("petit-univ-active", isUniv);
+      }
     });
     panels.forEach((panel) => observer.observe(panel, {
       attributes: true,
