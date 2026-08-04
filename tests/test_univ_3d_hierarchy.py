@@ -17,8 +17,8 @@ class Univ3dHierarchyTests(unittest.TestCase):
         self.assertIn("add3dConnection", source)
         self.assertIn("rotateY", source)
         self.assertIn("translate3d", source)
-        self.assertNotIn('createElementNS', source)
-        self.assertNotIn('life-map__lines', source)
+        self.assertNotIn("createElementNS", source)
+        self.assertNotIn("life-map__lines", source)
 
     def test_core_task_and_child_connections_are_separate(self) -> None:
         source = (FRONTEND / "life-map.js").read_text(encoding="utf-8")
@@ -38,6 +38,23 @@ class Univ3dHierarchyTests(unittest.TestCase):
         self.assertNotIn("petit-univ-manage-open", source)
         self.assertNotIn("#detail-panel", source)
         self.assertNotIn("openFocusedDetail", source)
+
+    def test_detail_panel_lists_direct_child_tasks(self) -> None:
+        source = (FRONTEND / "univ-detail-children.js").read_text(encoding="utf-8")
+        self.assertIn("parent_task_id", source)
+        self.assertIn("parent_external_id", source)
+        self.assertIn("root_task_id", source)
+        self.assertIn("detail-children__list", source)
+        self.assertIn("detail-children__item", source)
+        self.assertIn("focusChild", source)
+        self.assertIn("MutationObserver", source)
+        self.assertIn("petit:tasks-updated", source)
+
+    def test_detail_children_extension_is_loaded_by_version_bootstrap(self) -> None:
+        source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
+        self.assertIn("/static/univ-detail-children.js", source)
+        self.assertIn('"univ-detail-children"', source)
+        self.assertIn("loadUnivDetailChildren", source)
 
 
 if __name__ == "__main__":
