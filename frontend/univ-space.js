@@ -1,5 +1,6 @@
 // PETIT Univ: lightweight 3D planet system with Core, task planets, and child satellites.
 (() => {
+  if (window.PetitUnivSpace?.initialized) return;
   const OPEN_EVENT = "petit:univ-open";
   const AREA_EVENT = "petit:area-change";
   const state = {
@@ -488,6 +489,7 @@
 
   window.PetitUnivSpace = {
     initialize,
+    initialized: true,
     reset: resetCamera,
     focusTask: (requestedTaskId) => {
       state.selectedTaskId = requestedTaskId ? String(requestedTaskId) : null;

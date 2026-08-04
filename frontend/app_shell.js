@@ -1,7 +1,8 @@
 // Shared PETIT application shell for the Univ-first UI.
 (() => {
+  if (window.PetitAppShell?.initialized) return;
   const HOME_VIEW = "universe";
-  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.14.0";
+  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.14.1";
   const PRIMARY_VIEWS = [
     { view: "univ", target: "universe", label: "Univ" },
     { view: "tasks", target: "tasks", label: "Tasks" },
@@ -249,7 +250,7 @@
   });
   window.addEventListener("petit:navigate", (event) => activateView(event.detail?.view || "univ", event.detail || {}));
 
-  window.PetitAppShell = { initialize, activateView, homeView: HOME_VIEW };
+  window.PetitAppShell = { initialize, activateView, homeView: HOME_VIEW, initialized: true };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initialize, { once: true });
   } else {

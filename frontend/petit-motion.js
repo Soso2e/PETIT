@@ -1,4 +1,4 @@
-// PETIT Simple View Motion v0.9.0
+// PETIT Simple View Motion v0.14.1
 // View changes use a short, ordinary fade. No shared-element or depth transition.
 (() => {
   if (!document.querySelector(".universe-shell") || window.PetitMotion) return;

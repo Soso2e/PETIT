@@ -1,7 +1,7 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v0.14.0";
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-v0.14.0`;
+const CACHE_NAME = "petit-shell-v0.14.1";
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-v0.14.1`;
 const SHELL = [
   "/",
   "/static/universe.html",

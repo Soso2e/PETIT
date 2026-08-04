@@ -302,7 +302,11 @@
         subtree: true,
       });
     }
-    void loadCatalog();
+    const sharedTasks = window.PetitUniverse?.tasks?.() || [];
+    if (sharedTasks.length) {
+      state.tasks = sharedTasks;
+      queueMicrotask(decorateDetail);
+    }
   };
 
   if (document.readyState === "loading") {

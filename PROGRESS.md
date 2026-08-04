@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.14.0**
+**Current Version: v0.14.1**
 
 **Last Updated: 2026-08-04**
 
@@ -9,7 +9,7 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。FastAPIとPWAを基盤に、タスク・予定・会話・知識・開発状況を継続支援する個人用アシスタントとして開発中。
-- バージョン管理: v0.14.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
+- バージョン管理: v0.14.1。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
 - Univ UI: `Core = 中心惑星`、`親タスク = 惑星`、`子タスク = 衛星`として表現を統一。Project名は惑星の所属情報として扱い、Core overviewから親タスク惑星と子タスク衛星を見渡す。
 - Univ描画: WebGL依存を追加せず、CSS 3D・radial-gradient・既存SVG接続線で軽量な球体表現を実装。レイヤーは前面HUD、選択対象の説明、惑星・衛星、接続線、背景の順で固定する。
 - Univ Focus: 親タスク惑星または子タスク衛星を選ぶと、同じUniv内でカメラが対象系へ寄り、所属する衛星を見やすくする。他の惑星と接続線は暗くし、旧Focusパネルへ自動遷移しない。
@@ -20,12 +20,12 @@
 - 制作伴走 / Today: 作業セッションをSQLiteで永続化し、20分ごとの継続確認と無応答時の自動停止をバックグラウンドWorkerで実行する。Today機能自体は残し、トップレベルタブからは外す。
 - 会話 / Agent Runtime: Project Continuity・Capability Router・Tool制限・書き込み承認・進捗表示を実装済み。実装準拠フローは`docs/runtime-flows.md`を正とする。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
-- Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in、通知履歴を実装。cache名をv0.14.0へ更新し、Univ空間と四隅App Shellの資産をprecacheへ追加。
+- Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in、通知履歴を実装。cache名をv0.14.1へ更新し、Univ空間と四隅App Shellの資産をprecacheへ追加。
 - タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。作成・完了・親子変更は確認付きでNotion同期する。
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
-- 今回の検証: `petit-corner-shell.js`、`petit-version.js`、`service-worker.js`のNode構文確認、CSS括弧対応、3アイコン、状態表示、補助ドック、safe-area、旧UI設定導線、v0.14.0表記、precache資産を静的回帰テストへ追加。
-- 次にやること: 実データ入りPCブラウザと390x844で、右上3アイコン、左上状態表示、左下補助ドック、設定メニュー、Univのドラッグ／ズーム／Focus／詳細管理を確認する。実iPhone PWAでDynamic Island周辺、横向き、キーボード表示中、長時間操作負荷を確認する。
+- 今回の検証: v0.14.1へ静的資産参照・fallback・Service Worker cacheを統一し、App Shell系の重複読込／初期化ガードとTask Flowの初回API重複取得防止を静的回帰45件・Node構文・HTTPアクセスログで確認。ブラウザ操作接続が応答停止したため、PC／390x844の表示・タブ・アニメーションと実iPhone PWAは未確認。
+- 次にやること: 旧Service Worker cacheを削除した実データ入りPCブラウザと390x844で、表示、タブ切替、フェード／Univ空間アニメーション、初回タスクAPIが1回であることをDevTools Networkで再確認する。実iPhone PWAでDynamic Island周辺、横向き、キーボード表示中、長時間操作負荷を確認する。
 
 ## 履歴
 
@@ -53,3 +53,4 @@
 | 2026-08-03 | 09:32 | #19 | v0.12.0としてHomeとFocusをUnivへ統合し、Core中心の操作可能な3D空間、前面HUD、同一空間内のTask Focus・詳細管理、3領域ナビを追加 |
 | 2026-08-03 | 19:25 | #20 | Issue #189: v0.13.0としてCore／親タスク惑星／子タスク衛星へ意味構造を統一し、軽量3D球体、同一空間Focus、タブ直接同期を実装 |
 | 2026-08-03 | 20:23 | #21 | Issue #189: v0.14.0として四隅型App Shell、右上3アイコン、左上状態表示、左下補助ドック、旧UI設定導線、PWA cache同期を追加 |
+| 2026-08-04 | 07:12 | #22 | v0.14.1として静的資産とPWA cacheの版を統一し、App Shell系の二重読込・初期化と初回タスクAPI重複取得を修正（静的回帰・構文確認済み、PC／スマホ実ブラウザ未確認） |
