@@ -42,31 +42,32 @@
   };
 
   const desktopLayout = (count) => {
-    if (count === 1) return [{ x: 50, y: 24, z: 20, scale: 1.05 }];
-    const radiusX = count <= 4 ? 35 : (count <= 7 ? 38 : 42);
-    const radiusY = count <= 4 ? 30 : (count <= 7 ? 34 : 38);
+    if (count === 1) return [{ x: 50, y: 24, z: 150, scale: 1.06 }];
+    const radiusX = count <= 4 ? 34 : (count <= 7 ? 38 : 42);
+    const radiusY = count <= 4 ? 29 : (count <= 7 ? 34 : 38);
     return Array.from({ length: count }, (_, index) => {
       const angle = (-Math.PI / 2) + ((Math.PI * 2 * index) / count);
       const ringFactor = count > 6 && index % 2 === 1 ? 0.78 : 1;
-      const zOffset = Math.sin(angle * 2) * 80 + (index % 3 - 1) * 30;
+      const depthBand = [170, -150, 95, -80, 35, -30][index % 6];
+      const wave = Math.sin(angle * 1.5) * 45;
       return {
         x: 50 + Math.cos(angle) * radiusX * ringFactor,
         y: 50 + Math.sin(angle) * radiusY * ringFactor,
-        z: Math.round(zOffset),
-        scale: index === 0 ? 1.06 : 1,
+        z: Math.round(depthBand + wave),
+        scale: index === 0 ? 1.06 : (index % 3 === 1 ? 0.94 : 1),
       };
     });
   };
 
   const mobileLayout = (count) => {
-    if (count === 1) return [{ x: 50, y: 30, z: 0, scale: 1.02 }];
+    if (count === 1) return [{ x: 50, y: 30, z: 45, scale: 1.02 }];
     const startY = 18;
     const endY = 92;
     const step = (endY - startY) / Math.max(1, count - 1);
     return Array.from({ length: count }, (_, index) => ({
       x: index % 2 === 0 ? 28 : 72,
       y: startY + (step * index),
-      z: (index % 2 === 0 ? 25 : -25),
+      z: (index % 2 === 0 ? 55 : -55),
       scale: index === 0 ? 1.02 : 0.96,
     }));
   };
@@ -74,7 +75,7 @@
   const layoutFor = (count) => mobileQuery.matches ? mobileLayout(count) : desktopLayout(count);
   const corePosition = () => mobileQuery.matches ? { x: 50, y: 8 } : { x: 50, y: 50 };
 
-  const addConnection = (svg, from, to, active = false, secondary = false) => {
+  const addConnection = (svg, from, to, active = false, secondary = false, child = false) => {
     const line = createSvgElement("line", {
       x1: from.x,
       y1: from.y,
@@ -84,28 +85,39 @@
         "life-map__connection",
         active ? "is-active" : "",
         secondary ? "is-secondary" : "",
+        child ? "is-child" : "",
       ].filter(Boolean).join(" "),
       "vector-effect": "non-scaling-stroke",
     });
     svg.appendChild(line);
   };
 
-  const arrangeSatellites = (systemNode, index) => {
+  const arrangeSatellites = (systemNode, index, svg, systemPosition) => {
     const satelliteList = systemNode.querySelector(".universe-task-list");
     if (!satelliteList) return;
     const satellites = Array.from(satelliteList.querySelectorAll(":scope > .univ-satellite"));
     const count = satellites.length;
     satellites.forEach((sat, satIndex) => {
-      const angle = -90 + ((360 / Math.max(1, count)) * satIndex);
-      const radius = 80 + ((satIndex % 2) * 18);
-      const satZ = Math.round(Math.sin((satIndex / Math.max(1, count)) * Math.PI * 2) * 35);
-      sat.style.setProperty("--satellite-angle", `${angle}deg`);
+      const angleDeg = -90 + ((360 / Math.max(1, count)) * satIndex);
+      const angle = angleDeg * Math.PI / 180;
+      const radius = 82 + ((satIndex % 2) * 20);
+      const satZ = Math.round(Math.sin((satIndex / Math.max(1, count)) * Math.PI * 2) * 54);
+      sat.style.setProperty("--satellite-angle", `${angleDeg}deg`);
       sat.style.setProperty("--satellite-radius", `${radius}px`);
       sat.style.setProperty("--satellite-z", `${satZ}px`);
       sat.style.setProperty("--satellite-delay", `${(index * 50) + (satIndex * 40)}ms`);
-      if (sat.dataset.taskId) {
-        sat.dataset.motionKey = `task-${sat.dataset.taskId}`;
-      }
+      if (sat.dataset.taskId) sat.dataset.motionKey = `task-${sat.dataset.taskId}`;
+
+      const xOffset = Math.cos(angle) * (radius / 12);
+      const yOffset = Math.sin(angle) * (radius / 12);
+      addConnection(
+        svg,
+        systemPosition,
+        { x: systemPosition.x + xOffset, y: systemPosition.y + yOffset },
+        sat.classList.contains("is-selected"),
+        false,
+        true,
+      );
     });
   };
 
@@ -143,13 +155,8 @@
         system.style.setProperty("--life-scale", String(position.scale));
         system.style.setProperty("--life-delay", `${index * 60}ms`);
 
-        arrangeSatellites(system, index);
         addConnection(svg, center, position, selected);
-
-        if (!mobileQuery.matches && systems.length > 2) {
-          const nextPos = positions[(index + 1) % positions.length];
-          addConnection(svg, position, nextPos, false, true);
-        }
+        arrangeSatellites(system, index, svg, position);
       });
 
       window.PetitMotion?.refresh?.();
@@ -171,8 +178,6 @@
     const map = document.querySelector(MAP_SELECTOR);
     if (!map || map.dataset.lifeMapReady === "true") return;
     map.dataset.lifeMapReady = "true";
-
-    // Rely primarily on custom event from universe-app render to avoid mutation loops
     window.addEventListener("petit:universe-rendered", scheduleDecorate);
     mobileQuery.addEventListener?.("change", scheduleDecorate);
     window.addEventListener("resize", scheduleDecorate, { passive: true });
