@@ -56,7 +56,7 @@ class Univ3dHierarchyTests(unittest.TestCase):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
         self.assertIn("/static/univ-detail-children.js", source)
         self.assertIn('"univ-detail-children"', source)
-        self.assertIn("loadUnivDetailChildren", source)
+        self.assertIn("loadScript", source)
 
 
 if __name__ == "__main__":
