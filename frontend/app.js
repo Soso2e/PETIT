@@ -229,7 +229,7 @@ async function updateModelRouting(route, profile) {
     renderModelRouting(data);
     const active = data.routes[route].active;
     modelRoutingStateEl.textContent = `${route === "chat" ? "Chat" : "Agent"}を${active.label}へ切替済み`;
-    await checkHealth();
+    void checkHealth();
   } catch (e) {
     const selectEl = route === "chat" ? chatModelSelectEl : agentModelSelectEl;
     if (selectEl) selectEl.value = previous;
@@ -421,15 +421,25 @@ async function loadOpener() {
   }
 }
 
-async function initialize() {
-  await loadModelRouting();
-  await checkHealth();
+async function restoreConversationOrOpener() {
   const restored = await restoreHistory();
   if (!restored) await loadOpener();
-  await pollJobs();
-  inputEl.focus();
 }
 
-setInterval(checkHealth, 60000);
-setInterval(pollJobs, 700);
+function initialize() {
+  // The input is usable immediately. Slow integrations must never block startup.
+  inputEl.focus();
+  void loadModelRouting();
+  void checkHealth();
+  void restoreConversationOrOpener();
+
+  // Job polling is intentionally deferred so the first paint and history restore
+  // are not competing with background delivery requests.
+  window.setTimeout(() => {
+    void pollJobs();
+    window.setInterval(pollJobs, 2000);
+  }, 1500);
+}
+
+window.setInterval(checkHealth, 60000);
 initialize();
