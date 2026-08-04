@@ -12,9 +12,7 @@ window.PETIT_ASSET_VERSION = "0.15.0";
   };
 
   const loadCornerShell = () => loadScript("/static/petit-corner-shell.js", "corner-shell");
-  const loadUnivDetailChildren = () => loadScript("/static/univ-detail-children.js", "univ-detail-children");
-
-  loadUnivDetailChildren();
+  loadScript("/static/univ-detail-children.js", "univ-detail-children");
 
   const existingShell = document.querySelector('script[data-petit-bootstrap="app-shell"]');
   if (existingShell) {
