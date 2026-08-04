@@ -1,7 +1,7 @@
 // Shared PETIT application shell for the Univ-first UI.
 (() => {
   const HOME_VIEW = "universe";
-  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.13.0";
+  const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.14.0";
   const PRIMARY_VIEWS = [
     { view: "univ", target: "universe", label: "Univ" },
     { view: "tasks", target: "tasks", label: "Tasks" },

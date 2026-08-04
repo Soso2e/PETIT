@@ -17,10 +17,10 @@ class MotionContinuityTests(unittest.TestCase):
         self.version = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
         self.univ = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
 
-    def test_motion_layer_uses_v0120_assets(self) -> None:
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.12.0"', self.version)
-        self.assertIn('window.PETIT_VERSION = "v0.12.0"', self.version)
-        self.assertIn('window.PETIT_ASSET_VERSION || "0.12.0"', self.app_shell)
+    def test_motion_layer_uses_v0140_assets(self) -> None:
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.0"', self.version)
+        self.assertIn('window.PETIT_VERSION = "v0.14.0"', self.version)
+        self.assertIn('window.PETIT_ASSET_VERSION || "0.14.0"', self.app_shell)
         self.assertIn('loadStylesheet("/static/petit-motion.css"', self.chat_input)
         self.assertIn('loadSharedModule("/static/petit-motion.js"', self.chat_input)
 
