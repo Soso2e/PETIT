@@ -12,12 +12,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon-64.png" />
   <link rel="manifest" href="/static/manifest.webmanifest" />
-  <link rel="stylesheet" href="/static/universe.css?v=0.14.1" />
-  <link rel="stylesheet" href="/static/universe-actions.css?v=0.14.1" />
-  <link rel="stylesheet" href="/static/universe-next.css?v=0.14.1" />
-  <link rel="stylesheet" href="/static/notifications.css?v=0.14.1" />
-  <link rel="stylesheet" href="/static/today.css?v=0.14.1" />
-  <link rel="stylesheet" href="/static/reminders.css?v=0.14.1" />
+  <link rel="stylesheet" href="/static/universe.css?v=0.15.0" />
+  <link rel="stylesheet" href="/static/universe-actions.css?v=0.15.0" />
+  <link rel="stylesheet" href="/static/universe-next.css?v=0.15.0" />
+  <link rel="stylesheet" href="/static/notifications.css?v=0.15.0" />
+  <link rel="stylesheet" href="/static/today.css?v=0.15.0" />
+  <link rel="stylesheet" href="/static/reminders.css?v=0.15.0" />
 </head>
 <body>
   <div class="space" aria-hidden="true">
@@ -35,7 +35,7 @@
       <nav class="view-tabs" aria-label="ビュー切り替え">
         <button class="view-tab" data-view="today">Today</button>
         <button class="view-tab is-active" data-view="focus">Focus</button>
-        <button class="view-tab" data-view="universe">Life</button>
+        <button class="view-tab" data-view="universe">Core</button>
         <button class="view-tab" data-view="tasks">Tasks</button>
         <button class="view-tab" data-view="reminders">Remind</button>
         <button class="view-tab" data-view="chat">Chat</button>
@@ -86,12 +86,12 @@
               <div class="focus-heading">
                 <span class="eyebrow">LIFE / TASK / CHILD</span>
                 <div id="focus-breadcrumb" class="focus-breadcrumb" aria-label="現在の階層">
-                  <button type="button" data-life-root>Life</button>
+                  <button type="button" data-life-root>Core</button>
                   <span>›</span>
                   <strong id="focus-project-name">親Task</strong>
                 </div>
                 <h1 id="focus-title">今日のFocus</h1>
-                <p class="section-copy">Life直下の親タスクを中心に、その子タスクへ集中します。</p>
+                <p class="section-copy">Core直下の親タスクを中心に、その子タスクへ集中します。</p>
               </div>
               <div class="focus-project-switcher" aria-label="親タスク切り替え">
                 <button id="focus-project-prev" class="icon-button" type="button" aria-label="前の親タスク">‹</button>
@@ -114,7 +114,7 @@
               <div class="orbit__ring orbit__ring--one"></div>
               <div class="orbit__ring orbit__ring--two"></div>
               <div class="orbit__ring orbit__ring--three"></div>
-              <button id="objective-node" class="space-node space-node--objective" type="button" aria-label="Life一覧へ戻る">
+              <button id="objective-node" class="space-node space-node--objective" type="button" aria-label="Core一覧へ戻る">
                 <span class="space-node__glow"></span>
                 <span class="space-node__label">読み込み中…</span>
               </button>
@@ -149,7 +149,7 @@
 
       <section class="view" data-view-panel="universe" hidden>
         <div class="section-head universe-section-head">
-          <div><span class="eyebrow">LIFE</span><h1>Life → Task → Child Task</h1><p>1回押して選択、同じTaskをもう1回押すとFocusへ移ります。</p></div>
+          <div><span class="eyebrow">CORE</span><h1>Core → Task → Child Task</h1><p>星を選択すると詳細オーバーレイが表示されます。</p></div>
           <div id="universe-summary" class="universe-summary" aria-live="polite">読み込み中…</div>
         </div>
         <div id="constellation-grid" class="constellation-grid constellation-grid--list"></div>
@@ -179,12 +179,12 @@
 
   <template id="detail-template"><div class="detail-panel__content"><span class="eyebrow">TASK DETAIL</span><h2 data-detail="title"></h2><div class="detail-grid detail-grid--simple"><div><span>状態</span><strong data-detail="status"></strong></div><div><span>分類</span><strong data-detail="bucket"></strong></div><div><span>期限</span><strong data-detail="due"></strong></div><div><span>親Task</span><strong data-detail="project"></strong></div></div><div class="detail-parent-field"><span>親子関係</span><div class="detail-parent-field__controls"><select data-action="parent" aria-label="Taskの親を選択"></select><button type="button" data-action="parent-apply" disabled>親Taskを変更</button></div><small data-parent-help>親タスクを読み込んでいます。</small></div><p data-detail="reason" class="detail-reason"></p><p data-detail="sync" class="detail-sync"></p><div class="detail-actions detail-actions--primary"><button type="button" data-action="complete">完了にする</button><button type="button" data-action="bucket">あとでに移す</button></div><div class="detail-actions detail-actions--secondary"><button type="button" data-action="activate">作業開始</button><button type="button" data-action="chat">PETITに相談</button></div></div></template>
 
-  <script src="/static/petit-version.js?v=0.14.1"></script>
-  <script src="/static/chat_input.js?v=0.14.1"></script>
-  <script src="/static/notifications.js?v=0.14.1"></script>
-  <script src="/static/universe-app.js?v=0.14.1"></script>
-  <script src="/static/universe-next.js?v=0.14.1"></script>
-  <script src="/static/today.js?v=0.14.1"></script>
-  <script src="/static/reminders.js?v=0.14.1"></script>
+  <script src="/static/petit-version.js?v=0.15.0"></script>
+  <script src="/static/chat_input.js?v=0.15.0"></script>
+  <script src="/static/notifications.js?v=0.15.0"></script>
+  <script src="/static/universe-app.js?v=0.15.0"></script>
+  <script src="/static/universe-next.js?v=0.15.0"></script>
+  <script src="/static/today.js?v=0.15.0"></script>
+  <script src="/static/reminders.js?v=0.15.0"></script>
 </body>
 </html>

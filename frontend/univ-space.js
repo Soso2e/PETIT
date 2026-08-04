@@ -27,30 +27,23 @@
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const text = (value, fallback = "") => String(value ?? "").trim() || fallback;
 
-  const taskTitle = (task) => text(task?.querySelector(".universe-task__title")?.textContent, "Task");
-  const taskId = (task) => text(task?.dataset.taskId);
-  const systemCard = (node) => node?.closest?.(".constellation-card") || null;
-  const systemHeader = (card) => card?.querySelector(".constellation-card__header") || null;
-  const systemTasks = (card) => Array.from(card?.querySelectorAll(".universe-task[data-task-id]") || []);
-  const rootTask = (card) => {
-    if (!card) return null;
-    const rootId = text(card.dataset.rootTaskId);
-    if (rootId) {
-      const exact = card.querySelector(`.universe-task[data-task-id="${CSS.escape(rootId)}"]`);
-      if (exact) return exact;
-    }
-    return card.querySelector(".universe-task--root-copy[data-task-id]") || systemTasks(card)[0] || null;
-  };
-  const childTasks = (card) => {
-    const root = rootTask(card);
-    return systemTasks(card).filter((task) => task !== root && !task.classList.contains("univ-root-task-copy"));
+  const isPanelActive = () => {
+    const root = panel();
+    return root && !root.hidden && root.getAttribute("aria-hidden") !== "true";
   };
 
+  const systemNode = (element) => element?.closest?.(".univ-task-system") || null;
+  const planetNode = (system) => system?.querySelector(".univ-task-planet") || null;
+  const satelliteNodes = (system) => Array.from(system?.querySelectorAll(".univ-satellite") || []);
+
   const applyCamera = () => {
+    if (!isPanelActive()) return;
     const graph = map();
     if (!graph) return;
     graph.style.setProperty("--univ-yaw", `${state.yaw}deg`);
     graph.style.setProperty("--univ-pitch", `${state.pitch}deg`);
+    graph.style.setProperty("--inv-yaw", `${-state.yaw}deg`);
+    graph.style.setProperty("--inv-pitch", `${-state.pitch}deg`);
     graph.style.setProperty("--univ-zoom", String(state.zoom));
     graph.style.setProperty("--univ-pan-x", `${state.panX}px`);
     graph.style.setProperty("--univ-pan-y", `${state.panY}px`);
@@ -60,7 +53,7 @@
   const selectedTask = () => {
     const graph = map();
     if (!graph || !state.selectedTaskId) return null;
-    return graph.querySelector(`.universe-task[data-task-id="${CSS.escape(String(state.selectedTaskId))}"]`);
+    return graph.querySelector(`[data-task-id="${CSS.escape(String(state.selectedTaskId))}"]`);
   };
 
   const setHud = ({ project = "PETIT", title = "Core", description = "中心の惑星から、親タスク惑星と子タスク衛星を見渡します。", canManage = false } = {}) => {
@@ -110,7 +103,7 @@
           <p data-univ-selected-description>中心の惑星から、親タスク惑星と子タスク衛星を見渡します。</p>
           <div>
             <button type="button" data-univ-action="focus" disabled>Focus</button>
-            <button type="button" data-univ-action="manage" disabled>管理</button>
+            <button type="button" data-univ-action="manage" disabled>詳細</button>
           </div>
         </div>
         <div class="univ-hud__controls" aria-label="Univ camera controls">
@@ -128,7 +121,7 @@
       const dismiss = document.createElement("button");
       dismiss.type = "button";
       dismiss.className = "univ-detail-dismiss";
-      dismiss.textContent = "Close";
+      dismiss.textContent = "閉じる";
       dismiss.addEventListener("click", () => document.body.classList.remove("petit-univ-manage-open"));
       document.body.appendChild(dismiss);
     }
@@ -137,75 +130,17 @@
     const heading = root.querySelector(".universe-section-head h1");
     const copy = root.querySelector(".universe-section-head p");
     if (eyebrow) eyebrow.textContent = "UNIV";
-    if (heading) heading.textContent = "Core / Task Planet / Satellite";
-    if (copy) copy.textContent = "Coreを中心に、親タスクを惑星、子タスクを衛星として同じ空間で操作します。";
+    if (heading) heading.textContent = "Core / Planet / Satellite";
+    if (copy) copy.textContent = "中心惑星Core、親タスク惑星、子タスク衛星からなる空間で直接操作・フォーカスできます。";
     return frame;
-  };
-
-  const decorateCore = (graph) => {
-    const core = graph.querySelector(":scope > .life-map__core");
-    if (!core) return;
-    core.classList.add("univ-core-planet");
-    core.setAttribute("role", "button");
-    core.setAttribute("tabindex", "0");
-    core.setAttribute("aria-label", "Core overviewへ戻る");
-    const eyebrow = core.querySelector(".eyebrow");
-    const title = core.querySelector("strong");
-    const hint = core.querySelector("small");
-    if (eyebrow) eyebrow.textContent = "CENTER PLANET";
-    if (title) title.textContent = "CORE";
-    if (hint) hint.textContent = "Overview";
-  };
-
-  const decorateSystem = (card, index) => {
-    const header = systemHeader(card);
-    if (!header) return;
-    const root = rootTask(card);
-    systemTasks(card).forEach((task) => task.classList.remove("univ-root-task-copy", "univ-satellite"));
-    const children = childTasks(card);
-    const heading = header.querySelector(".constellation-card__heading strong");
-    const eyebrow = header.querySelector(".constellation-card__heading .eyebrow");
-    const counts = header.querySelector(".constellation-card__counts");
-
-    const originalProject = card.dataset.univProject || text(heading?.textContent, "Project");
-    card.dataset.univProject = originalProject;
-    card.dataset.univSystemKey = taskId(root) || card.dataset.rootTaskId || `system-${index}`;
-    card.dataset.univVariant = String(index % 5);
-    card.classList.add("univ-task-system");
-    header.classList.add("univ-task-planet");
-
-    const rootTitle = root ? taskTitle(root) : originalProject;
-    if (heading) heading.textContent = rootTitle;
-    if (eyebrow) eyebrow.textContent = originalProject;
-    if (counts) counts.textContent = `${children.length} satellite${children.length === 1 ? "" : "s"}`;
-    header.setAttribute("aria-label", `${rootTitle}のタスク惑星を選択`);
-
-    if (root) {
-      root.classList.add("univ-root-task-copy");
-      root.setAttribute("aria-hidden", "true");
-      root.tabIndex = -1;
-    }
-
-    children.forEach((task, taskIndex) => {
-      const count = Math.max(1, children.length);
-      const angle = -90 + ((360 / count) * taskIndex);
-      const radius = 84 + ((taskIndex % 2) * 18) + Math.min(20, Math.floor(taskIndex / 6) * 12);
-      task.classList.add("univ-satellite");
-      task.style.setProperty("--satellite-angle", `${angle}deg`);
-      task.style.setProperty("--satellite-radius", `${radius}px`);
-      task.style.setProperty("--satellite-depth", `${30 + ((taskIndex % 4) * 14)}px`);
-      task.style.setProperty("--satellite-delay", `${(index * 60) + (taskIndex * 45)}ms`);
-      task.setAttribute("aria-label", `${taskTitle(task)}。${rootTitle}の子タスク衛星`);
-    });
   };
 
   const decorateScene = () => {
     decorateQueued = false;
+    if (!isPanelActive()) return;
     const graph = map();
     if (!graph) return;
     graph.classList.add("univ-space");
-    decorateCore(graph);
-    graph.querySelectorAll(":scope > .constellation-card").forEach(decorateSystem);
     applyCamera();
   };
 
@@ -238,14 +173,14 @@
     setHud();
   };
 
-  const centerSystem = (card) => {
+  const centerSystem = (system) => {
     const frame = viewport();
-    if (!frame || !card) return;
+    if (!frame || !system) return;
     state.panX = 0;
     state.panY = 0;
     applyCamera();
     window.requestAnimationFrame(() => {
-      const targetRect = card.getBoundingClientRect();
+      const targetRect = system.getBoundingClientRect();
       const frameRect = frame.getBoundingClientRect();
       state.panX = clamp((frameRect.left + frameRect.width / 2) - (targetRect.left + targetRect.width / 2), -520, 520);
       state.panY = clamp((frameRect.top + frameRect.height / 2) - (targetRect.top + targetRect.height / 2), -360, 360);
@@ -253,35 +188,36 @@
     });
   };
 
-  const focusSystem = (card, target = null) => {
-    if (!card) return;
+  const focusSystem = (system, target = null) => {
+    if (!system) return;
     clearFocusClasses();
     state.mode = "focus";
-    state.selectedSystemKey = card.dataset.univSystemKey || card.dataset.rootTaskId || null;
-    state.selectedTaskId = target ? taskId(target) : taskId(rootTask(card));
+    state.selectedSystemKey = system.dataset.rootTaskId || system.dataset.univProject || null;
+    state.selectedTaskId = target ? target.dataset.taskId : planetNode(system)?.dataset.taskId;
     state.yaw = 0;
     state.pitch = 3;
     state.zoom = target ? 1.42 : 1.34;
-    card.classList.add("is-univ-focus-family");
+    system.classList.add("is-univ-focus-family");
     if (target) target.classList.add("is-univ-focus-target");
     applyCamera();
-    centerSystem(card);
+    centerSystem(system);
 
-    const project = card.dataset.univProject || "Project";
-    const planetTitle = text(systemHeader(card)?.querySelector(".constellation-card__heading strong")?.textContent, "Task");
+    const project = system.dataset.univProject || "Project";
+    const planetTitle = text(planetNode(system)?.querySelector("strong")?.textContent, project);
     if (target) {
+      const targetTitle = text(target.querySelector(".universe-task__title")?.textContent, "子タスク");
       setHud({
         project,
-        title: taskTitle(target),
-        description: `「${planetTitle}」を周回する子タスク衛星です。親タスク惑星と同じ空間で管理します。`,
+        title: targetTitle,
+        description: `「${planetTitle}」を周回する子タスク衛星です。`,
         canManage: true,
       });
     } else {
       setHud({
         project,
         title: planetTitle,
-        description: `親タスク惑星です。周囲の${childTasks(card).length}個の衛星が子タスクです。`,
-        canManage: Boolean(rootTask(card)),
+        description: `親タスク惑星です。周囲の${satelliteNodes(system).length}個の衛星が子タスクです。`,
+        canManage: Boolean(planetNode(system)?.dataset.taskId),
       });
     }
   };
@@ -292,26 +228,26 @@
     scheduleDecorate();
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
       let task = requestedTaskId
-        ? graph.querySelector(`.universe-task[data-task-id="${CSS.escape(String(requestedTaskId))}"]`)
+        ? graph.querySelector(`[data-task-id="${CSS.escape(String(requestedTaskId))}"]`)
         : null;
-      let card = systemCard(task);
-      if (!card && project) {
-        card = Array.from(graph.querySelectorAll(":scope > .constellation-card"))
-          .find((candidate) => candidate.dataset.univProject === project
-            || text(candidate.querySelector(".constellation-card__heading .eyebrow")?.textContent) === project)
+      let system = systemNode(task);
+      if (!system && project) {
+        system = Array.from(graph.querySelectorAll(":scope > .univ-task-system"))
+          .find((candidate) => candidate.dataset.univProject === project)
           || null;
-        task = rootTask(card);
+        task = planetNode(system);
       }
-      focusSystem(card, satellite ? task : null);
+      focusSystem(system, satellite ? task : null);
     }));
   };
 
   const focusCurrent = () => {
     const graph = map();
     if (!graph || !state.selectedSystemKey) return;
-    const card = graph.querySelector(`.constellation-card[data-univ-system-key="${CSS.escape(String(state.selectedSystemKey))}"]`);
+    const system = graph.querySelector(`.univ-task-system[data-root-task-id="${CSS.escape(String(state.selectedSystemKey))}"]`)
+      || graph.querySelector(`.univ-task-system[data-univ-project="${CSS.escape(String(state.selectedSystemKey))}"]`);
     const task = selectedTask();
-    focusSystem(card, task?.classList.contains("univ-satellite") ? task : null);
+    focusSystem(system, task?.classList.contains("univ-satellite") ? task : null);
   };
 
   const openManagement = () => {
@@ -337,6 +273,7 @@
 
   const installSelectionCapture = () => {
     document.addEventListener("click", (event) => {
+      if (!isPanelActive()) return;
       const graph = map();
       const target = event.target instanceof Element ? event.target : null;
       if (!graph || !target || !graph.contains(target)) return;
@@ -349,33 +286,22 @@
         return;
       }
 
-      const satellite = target.closest(".universe-task[data-task-id]");
-      if (satellite && !satellite.classList.contains("univ-root-task-copy")) {
-        const alreadySelected = satellite.classList.contains("is-selected") || state.selectedTaskId === taskId(satellite);
-        if (alreadySelected) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-        }
-        const requestedTaskId = taskId(satellite);
+      const satellite = target.closest(".univ-satellite[data-task-id]");
+      if (satellite) {
+        const requestedTaskId = satellite.dataset.taskId;
         state.selectedTaskId = requestedTaskId;
-        state.selectedSystemKey = systemCard(satellite)?.dataset.univSystemKey || null;
+        state.selectedSystemKey = systemNode(satellite)?.dataset.rootTaskId || systemNode(satellite)?.dataset.univProject || null;
         focusByTaskId(requestedTaskId, { satellite: true });
         return;
       }
 
-      const header = target.closest(".constellation-card__header");
-      if (header) {
-        const card = systemCard(header);
-        const root = rootTask(card);
-        const alreadySelected = header.classList.contains("is-selected") || state.selectedTaskId === taskId(root);
-        if (alreadySelected) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-        }
-        const requestedTaskId = taskId(root);
-        const project = card?.dataset.univProject || text(header.querySelector(".constellation-card__heading .eyebrow")?.textContent);
+      const planet = target.closest(".univ-task-planet");
+      if (planet) {
+        const system = systemNode(planet);
+        const requestedTaskId = planet.dataset.taskId;
+        const project = system?.dataset.univProject || "";
         state.selectedTaskId = requestedTaskId;
-        state.selectedSystemKey = card?.dataset.univSystemKey || null;
+        state.selectedSystemKey = system?.dataset.rootTaskId || project;
         focusByTaskId(requestedTaskId, { project });
       }
     }, true);
@@ -394,7 +320,7 @@
     });
 
     frame.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
+      if (!isPanelActive() || event.button !== 0) return;
       if (event.target.closest("button, a, input, select, textarea, .life-map__core")) return;
       state.dragging = true;
       state.pointerId = event.pointerId;
@@ -426,12 +352,14 @@
     frame.addEventListener("pointercancel", endDrag);
 
     frame.addEventListener("wheel", (event) => {
+      if (!isPanelActive()) return;
       event.preventDefault();
       state.zoom = clamp(state.zoom - (event.deltaY * 0.0012), 0.68, 1.72);
       applyCamera();
     }, { passive: false });
 
     frame.addEventListener("keydown", (event) => {
+      if (!isPanelActive()) return;
       if (event.key === "Escape") resetCamera();
       if (event.key === "ArrowLeft") state.yaw -= 4;
       if (event.key === "ArrowRight") state.yaw += 4;
@@ -442,9 +370,6 @@
       if (event.key === "0") resetCamera({ keepSelection: true });
       applyCamera();
     });
-
-    mutationObserver = new MutationObserver(scheduleDecorate);
-    mutationObserver.observe(graph, { childList: true, subtree: true });
   };
 
   const showUniv = ({ mode = "overview", taskId: requestedTaskId = null } = {}) => {
@@ -455,7 +380,7 @@
       state.selectedTaskId = String(requestedTaskId);
       window.requestAnimationFrame(() => {
         const task = selectedTask();
-        focusSystem(systemCard(task), task?.classList.contains("univ-satellite") ? task : null);
+        focusSystem(systemNode(task), task?.classList.contains("univ-satellite") ? task : null);
       });
       return;
     }
@@ -464,9 +389,7 @@
 
   const syncInitialArea = () => {
     window.requestAnimationFrame(() => {
-      const root = panel();
-      if (!root) return;
-      const active = !root.hidden && root.getAttribute("aria-hidden") !== "true";
+      const active = isPanelActive();
       document.body.classList.toggle("petit-univ-active", active);
       if (active) resetCamera();
     });
@@ -476,11 +399,11 @@
     ensureHud();
     bindInteraction();
     installSelectionCapture();
-    scheduleDecorate();
+    window.addEventListener("petit:universe-rendered", scheduleDecorate);
     syncInitialArea();
     window.addEventListener(OPEN_EVENT, (event) => showUniv(event.detail || {}));
     window.addEventListener(AREA_EVENT, (event) => {
-      const active = event.detail?.area === "univ";
+      const active = event.detail?.area === "univ" || isPanelActive();
       document.body.classList.toggle("petit-univ-active", active);
       if (!active) document.body.classList.remove("petit-univ-manage-open");
     });
@@ -494,7 +417,7 @@
     focusTask: (requestedTaskId) => {
       state.selectedTaskId = requestedTaskId ? String(requestedTaskId) : null;
       const task = selectedTask();
-      focusSystem(systemCard(task), task?.classList.contains("univ-satellite") ? task : null);
+      focusSystem(systemNode(task), task?.classList.contains("univ-satellite") ? task : null);
     },
     state: () => ({ ...state }),
   };

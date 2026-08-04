@@ -70,8 +70,8 @@ class UnifiedUiSystemTests(unittest.TestCase):
 
     def test_version_is_v0140(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.14.1"', source)
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.1"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.15.0"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.15.0"', source)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.14.1**
+**Current Version: v0.15.0**
 
 **Last Updated: 2026-08-04**
 
@@ -9,8 +9,8 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。FastAPIとPWAを基盤に、タスク・予定・会話・知識・開発状況を継続支援する個人用アシスタントとして開発中。
-- バージョン管理: v0.14.1。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
-- Univ UI: `Core = 中心惑星`、`親タスク = 惑星`、`子タスク = 衛星`として表現を統一。Project名は惑星の所属情報として扱い、Core overviewから親タスク惑星と子タスク衛星を見渡す。
+- バージョン管理: v0.15.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
+- Univ UI 刷新: 大きなカード矩形を全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: WebGL依存を追加せず、CSS 3D・radial-gradient・既存SVG接続線で軽量な球体表現を実装。レイヤーは前面HUD、選択対象の説明、惑星・衛星、接続線、背景の順で固定する。
 - Univ Focus: 親タスク惑星または子タスク衛星を選ぶと、同じUniv内でカメラが対象系へ寄り、所属する衛星を見やすくする。他の惑星と接続線は暗くし、旧Focusパネルへ自動遷移しない。
 - Front UI: 左上に現在領域・同期状態・バージョン、右上にUniv／Tasks／PETITの3アイコン、左下にReminders／Settingsを置く四隅型App Shellへ更新。スマホでは主要タブをアイコンだけにし、safe-areaを考慮する。
@@ -58,3 +58,4 @@
 | 2026-08-04 | 08:34 | #24 | 全画面共通UIの再初期化・Service Worker登録共有・Legacy Jobポーリング重複・Corner Shell Observerの自己誘発監視を抑止（Node構文・関連回帰37件成功、実ブラウザ未完了） |
 | 2026-08-04 | 08:34 | #25 | Service WorkerをPush有効化操作まで遅延登録し、通常のUniverse／Legacy起動時の登録・precache待ちを除去（Node構文・関連回帰37件成功、実ブラウザ未完了） |
 | 2026-08-04 | 08:54 | #26 | universe-next.jsの更新中Observer一時切断と重複軽減・petit-ui-system/app_shellの監視責務分離および差分DOM更新を実装（関連回帰34件全件成功） |
+| 2026-08-04 | 09:10 | #27 | v0.15.0としてUniverse UIを根本刷新。カード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、軌道・接続線からなる純粋な天体システムを実装 |

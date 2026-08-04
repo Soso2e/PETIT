@@ -440,18 +440,13 @@
 
   const selectOverviewTask = (task, index = 0) => {
     const key = taskKey(task, index);
-    const openFocus = state.overviewSelectionId === key;
     selectTask(task, index);
-    if (openFocus) {
-      state.overviewSelectionId = null;
-      renderConstellations();
-      renderTaskTable();
-      switchView("focus");
-      return;
-    }
     state.overviewSelectionId = key;
     updateOverviewSelectionUI(key);
-    showFeedback(`「${text(task.title, "タスク")}」を選択しました。もう一度押すとFocusへ移ります。`);
+    if (window.PetitUnivSpace?.focusTask) {
+      window.PetitUnivSpace.focusTask(key);
+    }
+    showFeedback(`「${text(task.title, "タスク")}」を選択しました。`);
   };
 
   const renderProjectControls = () => {
@@ -701,32 +696,40 @@
     });
   };
 
-  const createUniverseTaskRow = (task) => {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = `universe-task universe-task--${isHigh(task) ? "high" : (isLow(task) ? "low" : "mid")}`;
-    row.dataset.taskId = taskKey(task, state.tasks.indexOf(task));
-    const selected = state.overviewSelectionId === row.dataset.taskId;
-    row.classList.toggle("is-selected", selected);
-    row.setAttribute("aria-pressed", String(selected));
+  const createSatelliteNode = (task, parentTask) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    const index = state.tasks.indexOf(task);
+    const key = taskKey(task, index);
+    button.className = [
+      "universe-task",
+      "univ-satellite",
+      `universe-task--${isHigh(task) ? "high" : (isLow(task) ? "low" : "mid")}`,
+      key === state.activeTaskId && state.workSession ? "space-node--active" : "",
+      key === state.selectedTaskId ? "is-selected" : "",
+    ].filter(Boolean).join(" ");
+    button.dataset.taskId = key;
+    const selected = state.overviewSelectionId === key;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+    
     const title = document.createElement("span");
     title.className = "universe-task__title";
     title.textContent = text(task.title, "名称未設定");
-    const meta = document.createElement("span");
-    meta.className = "universe-task__meta";
-    meta.textContent = `${isHigh(task) ? "High" : (isLow(task) ? "Low" : "Mid")} · ${text(task.due_date, "期限なし")}`;
-    row.append(title, meta);
-    row.addEventListener("click", (event) => {
+    button.appendChild(title);
+    
+    button.addEventListener("click", (event) => {
       event.stopPropagation();
-      selectOverviewTask(task, state.tasks.indexOf(task));
+      selectOverviewTask(task, index);
     });
-    return row;
+    return button;
   };
 
   const renderConstellations = () => {
     constellationGridEl.replaceChildren();
     const groups = projectGroups();
-    universeSummaryEl.textContent = `Life · ${groups.length} Project · ${openTasks().length} Task`;
+    universeSummaryEl.textContent = `Core · ${groups.length} Project · ${openTasks().length} Task`;
+    
     if (!groups.length) {
       const empty = document.createElement("p");
       empty.className = "constellation-empty";
@@ -735,47 +738,75 @@
       return;
     }
 
-    groups.forEach((group) => {
-      const card = document.createElement("article");
-      card.className = "constellation-card constellation-card--list";
+    // Ensure Core planet exists at top of grid
+    const core = document.createElement("div");
+    core.className = "life-map__core univ-core-planet";
+    core.setAttribute("role", "button");
+    core.setAttribute("tabindex", "0");
+    core.setAttribute("aria-label", "Core overviewへ戻る");
+    core.innerHTML = '<span class="eyebrow">YOUR CORE</span><strong>CORE</strong><small>Core Overview</small>';
+    core.addEventListener("click", () => {
+      if (window.PetitUnivSpace?.reset) {
+        window.PetitUnivSpace.reset();
+      }
+    });
+    constellationGridEl.appendChild(core);
+
+    groups.forEach((group, groupIndex) => {
+      const system = document.createElement("div");
+      system.className = "univ-task-system";
+      system.dataset.univProject = group.project;
+      system.dataset.area = String(group.area || "unsorted").toLowerCase();
+      system.dataset.univVariant = String(groupIndex % 5);
+
       const rootTask = group.tasks.find(isRootTask) || group.tasks[0];
-      if (rootTask) card.dataset.rootTaskId = taskKey(rootTask, state.tasks.indexOf(rootTask));
-      card.dataset.area = String(group.area || "unsorted").toLowerCase();
-      if (group.project === state.selectedProject) card.classList.add("is-selected");
+      const rootKey = rootTask ? taskKey(rootTask, state.tasks.indexOf(rootTask)) : "";
+      if (rootTask) system.dataset.rootTaskId = rootKey;
+      if (group.project === state.selectedProject) system.classList.add("is-selected");
 
       const header = document.createElement("button");
       header.type = "button";
-      header.className = "constellation-card__header";
+      header.className = "univ-task-planet";
+      if (rootKey) header.dataset.taskId = rootKey;
+      
+      const rootSelected = Boolean(rootKey && state.overviewSelectionId === rootKey);
+      header.classList.toggle("is-selected", rootSelected);
+      header.setAttribute("aria-pressed", String(rootSelected));
+
       const headingWrap = document.createElement("span");
       headingWrap.className = "constellation-card__heading";
       const eyebrow = document.createElement("span");
       eyebrow.className = "eyebrow";
-      eyebrow.textContent = `${areaLabel(group.area)} · PROJECT UNIVERSE`;
+      eyebrow.textContent = group.project;
       const heading = document.createElement("strong");
-      heading.textContent = group.project;
+      heading.textContent = rootTask ? text(rootTask.title, group.project) : group.project;
       headingWrap.append(eyebrow, heading);
+
+      const childTasks = group.tasks.filter((t) => t !== rootTask);
       const counts = document.createElement("span");
       counts.className = "constellation-card__counts";
-      const highCount = group.tasks.filter(isHigh).length;
-      const midCount = group.tasks.filter(isMid).length;
-      const lowCount = group.tasks.filter(isLow).length;
-      counts.textContent = `High ${highCount} / Mid ${midCount} / Low ${lowCount}`;
+      counts.textContent = `${childTasks.length} satellite${childTasks.length === 1 ? "" : "s"}`;
+      
       header.append(headingWrap, counts);
-      const rootKey = rootTask ? taskKey(rootTask, state.tasks.indexOf(rootTask)) : "";
-      const rootSelected = Boolean(rootKey && state.overviewSelectionId === rootKey);
-      header.classList.toggle("is-selected", rootSelected);
-      header.setAttribute("aria-pressed", String(rootSelected));
-      header.addEventListener("click", () => {
+      header.addEventListener("click", (event) => {
+        event.stopPropagation();
         if (rootTask) selectOverviewTask(rootTask, state.tasks.indexOf(rootTask));
         else selectProject(group.project, { openFocus: false });
       });
 
-      const taskList = document.createElement("div");
-      taskList.className = "universe-task-list";
-      group.tasks.forEach((task) => taskList.appendChild(createUniverseTaskRow(task)));
-      card.append(header, taskList);
-      constellationGridEl.appendChild(card);
+      system.appendChild(header);
+
+      const satelliteList = document.createElement("div");
+      satelliteList.className = "universe-task-list";
+      childTasks.forEach((satelliteTask) => {
+        satelliteList.appendChild(createSatelliteNode(satelliteTask, rootTask));
+      });
+      system.appendChild(satelliteList);
+
+      constellationGridEl.appendChild(system);
     });
+
+    window.dispatchEvent(new CustomEvent("petit:universe-rendered"));
   };
 
   const renderActive = () => {
