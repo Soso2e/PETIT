@@ -21,15 +21,19 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertIn("petit-galaxy.css", shell)
         self.assertIn("univ-space.css", shell)
         self.assertIn("petit-corner-shell.js", version)
+        self.assertIn("universe-webgl-scene.js", version)
+        self.assertIn("universe-webgl-bridge.js", version)
 
     def test_design_system_supports_light_mode_and_reduced_motion(self) -> None:
         source = (FRONTEND / "petit-ui-system.css").read_text(encoding="utf-8")
         galaxy = (FRONTEND / "petit-galaxy.css").read_text(encoding="utf-8")
         univ = (FRONTEND / "univ-space.css").read_text(encoding="utf-8")
+        webgl = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
         corner = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
         self.assertIn('html[data-theme="light"]', source)
         self.assertIn('@media (prefers-reduced-motion: reduce)', galaxy)
         self.assertIn('@media (prefers-reduced-motion: reduce)', univ)
+        self.assertIn('@media (prefers-reduced-motion: reduce)', webgl)
         self.assertIn('@media (prefers-reduced-motion: reduce)', corner)
         self.assertIn(".petit-context-bar", galaxy)
         self.assertIn("--galaxy-panel", galaxy)
@@ -57,9 +61,13 @@ class UnifiedUiSystemTests(unittest.TestCase):
 
     def test_service_worker_precaches_current_univ_shell(self) -> None:
         source = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('petit-shell-v0.14.1', source)
+        self.assertIn('petit-shell-v0.15.0-webgl1', source)
         self.assertIn('/static/univ-space.js', source)
         self.assertIn('/static/univ-space.css', source)
+        self.assertIn('/static/universe-render-scheduler.js', source)
+        self.assertIn('/static/universe-webgl-scene.js', source)
+        self.assertIn('/static/universe-webgl-scene.css', source)
+        self.assertIn('/static/universe-webgl-bridge.js', source)
         self.assertIn('/static/petit-corner-shell.js', source)
         self.assertIn('/static/petit-corner-shell.css', source)
 
@@ -68,7 +76,7 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertRegex(source, re.compile(r"event\.isComposing|keyCode\s*===\s*229"))
         self.assertIn("form.requestSubmit()", source)
 
-    def test_version_is_v0140(self) -> None:
+    def test_version_is_v0150(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
         self.assertIn('window.PETIT_VERSION = "v0.15.0"', source)
         self.assertIn('window.PETIT_ASSET_VERSION = "0.15.0"', source)

@@ -20,47 +20,73 @@ class UnivSpaceTests(unittest.TestCase):
         self.assertIn("switchPanelDirectly(panelView)", source)
 
     def test_univ_assets_are_loaded(self):
-        source = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
-        self.assertIn('/static/univ-space.css', source)
-        self.assertIn('/static/univ-space.js', source)
-        self.assertTrue((FRONTEND / "univ-space.css").exists())
-        self.assertTrue((FRONTEND / "univ-space.js").exists())
+        shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
+        version = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
+        self.assertIn('/static/univ-space.css', shell)
+        self.assertIn('/static/univ-space.js', shell)
+        self.assertIn('/static/universe-webgl-hierarchy.js', version)
+        self.assertIn('/static/universe-webgl-scene.js', version)
+        self.assertIn('/static/universe-webgl-bridge.js', version)
+        for filename in (
+            "univ-space.css",
+            "univ-space.js",
+            "universe-webgl-hierarchy.js",
+            "universe-webgl-scene.js",
+            "universe-webgl-scene.css",
+            "universe-webgl-bridge.js",
+        ):
+            self.assertTrue((FRONTEND / filename).exists())
 
-    def test_univ_camera_hud_and_in_space_focus_exist(self):
-        source = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
-        self.assertIn('className = "univ-viewport"', source)
-        self.assertIn('className = "univ-hud"', source)
-        self.assertIn('data-univ-selected-description', source)
-        self.assertIn('data-univ-action="focus"', source)
-        self.assertIn('data-univ-action="manage"', source)
-        self.assertIn('addEventListener("pointermove"', source)
-        self.assertIn('addEventListener("wheel"', source)
-        self.assertIn('is-univ-focus-target', source)
-        self.assertIn('petit-univ-manage-open', source)
-        self.assertIn('event.stopImmediatePropagation()', source)
-        self.assertNotIn('switchView("focus")', source)
+    def test_univ_hud_and_real_camera_focus_exist(self):
+        fallback = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
+        webgl = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        bridge = (FRONTEND / "universe-webgl-bridge.js").read_text(encoding="utf-8")
+        self.assertIn('className = "univ-viewport"', fallback)
+        self.assertIn('className = "univ-hud"', fallback)
+        self.assertIn('data-univ-selected-description', fallback)
+        self.assertIn('data-univ-action="focus"', fallback)
+        self.assertIn('data-univ-action="manage"', fallback)
+        self.assertIn("new THREE.PerspectiveCamera", webgl)
+        self.assertIn("new OrbitControls", webgl)
+        self.assertIn("new THREE.Raycaster", webgl)
+        self.assertIn("startCameraTween", webgl)
+        self.assertIn("focusEntry", webgl)
+        self.assertIn("petit-univ-manage-open", bridge)
+        self.assertIn("ensureDetailPortal", bridge)
+        self.assertNotIn('switchView("focus")', fallback)
 
     def test_planet_semantics_are_explicit(self):
-        source = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
-        self.assertIn('univ-core-planet', source)
-        self.assertIn('univ-task-planet', source)
-        self.assertIn('univ-satellite', source)
-        self.assertIn('univ-root-task-copy', source)
-        self.assertIn('CENTER PLANET', source)
-        self.assertIn('親タスク惑星', source)
-        self.assertIn('子タスク衛星', source)
+        scene = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        hierarchy = (FRONTEND / "universe-webgl-hierarchy.js").read_text(encoding="utf-8")
+        css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
+        self.assertIn('type: "core"', scene)
+        self.assertIn('type: "parent"', scene)
+        self.assertIn('type: "child"', scene)
+        self.assertIn("createPlanet(coreEntry", scene)
+        self.assertIn("createPlanet(model", scene)
+        self.assertIn("createPlanet(child", scene)
+        self.assertIn('button.className = "univ-task-planet"', hierarchy)
+        self.assertIn('button.className = "universe-task univ-satellite"', hierarchy)
+        self.assertIn("univ-webgl-label--core", css)
+        self.assertIn("univ-webgl-label--parent", css)
+        self.assertIn("univ-webgl-label--child", css)
+        self.assertIn("parent_task_id", hierarchy)
+        self.assertIn("root_task_id", hierarchy)
 
-    def test_css_uses_lightweight_3d_spheres_and_mobile_three_tab_nav(self):
-        source = (FRONTEND / "univ-space.css").read_text(encoding="utf-8")
-        self.assertIn('perspective: 1400px', source)
-        self.assertIn('transform-style: preserve-3d', source)
-        self.assertIn('translateZ(var(--satellite-depth))', source)
-        self.assertIn('.univ-core-planet', source)
-        self.assertIn('.univ-task-planet', source)
-        self.assertIn('.univ-satellite', source)
-        self.assertIn('grid-template-columns: repeat(3, minmax(0, 1fr))', source)
-        self.assertIn('.petit-univ-active #detail-panel', source)
-        self.assertIn('@media (prefers-reduced-motion: reduce)', source)
+    def test_webgl_uses_real_spheres_and_mobile_dom_labels(self):
+        scene = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
+        fallback = (FRONTEND / "univ-space.css").read_text(encoding="utf-8")
+        self.assertIn("new THREE.WebGLRenderer", scene)
+        self.assertIn("new THREE.SphereGeometry", scene)
+        self.assertIn("new THREE.MeshStandardMaterial", scene)
+        self.assertIn("new THREE.Line", scene)
+        self.assertIn("world.clone().project(state.camera)", scene)
+        self.assertIn(".univ-webgl-label", css)
+        self.assertIn("@media (max-width: 640px)", css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", css)
+        self.assertIn('grid-template-columns: repeat(3, minmax(0, 1fr))', fallback)
+        self.assertIn('.petit-univ-active #detail-panel', fallback)
 
 
 if __name__ == "__main__":
