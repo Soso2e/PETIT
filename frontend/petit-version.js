@@ -2,31 +2,63 @@ window.PETIT_VERSION = "v0.15.0";
 window.PETIT_ASSET_VERSION = "0.15.0";
 
 (() => {
-  const loadScript = (src, key) => {
-    if (document.querySelector(`script[data-petit-bootstrap="${key}"]`)) return;
+  const loadStylesheet = (href, key) => {
+    const selector = `link[data-petit-bootstrap="${key}"]`;
+    const existing = document.querySelector(selector);
+    if (existing) return existing;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = `${href}?v=${window.PETIT_ASSET_VERSION}`;
+    link.dataset.petitBootstrap = key;
+    document.head.appendChild(link);
+    return link;
+  };
+
+  const loadScript = (src, key, onLoad = null) => {
+    const selector = `script[data-petit-bootstrap="${key}"]`;
+    const existing = document.querySelector(selector);
+    if (existing) {
+      if (typeof onLoad === "function") {
+        if (existing.dataset.loaded === "true") onLoad();
+        else existing.addEventListener("load", onLoad, { once: true });
+      }
+      return existing;
+    }
+
     const script = document.createElement("script");
     script.src = `${src}?v=${window.PETIT_ASSET_VERSION}`;
     script.async = false;
     script.dataset.petitBootstrap = key;
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "true";
+      onLoad?.();
+    }, { once: true });
     document.head.appendChild(script);
+    return script;
   };
 
-  const loadCornerShell = () => loadScript("/static/petit-corner-shell.js", "corner-shell");
+  const loadPostShellAssets = () => {
+    loadStylesheet("/static/universe-3d-foundation.css", "universe-3d-foundation");
+    loadScript("/static/petit-corner-shell.js", "corner-shell");
+  };
+
+  const loadAppShell = () => {
+    const existingShell = document.querySelector('script[data-petit-bootstrap="app-shell"]');
+    if (existingShell) {
+      if (window.PetitAppShell) loadPostShellAssets();
+      else existingShell.addEventListener("load", loadPostShellAssets, { once: true });
+      return;
+    }
+    loadScript("/static/app_shell.js", "app-shell", loadPostShellAssets);
+  };
+
   loadScript("/static/univ-detail-children.js", "univ-detail-children");
 
-  const existingShell = document.querySelector('script[data-petit-bootstrap="app-shell"]');
-  if (existingShell) {
-    if (window.PetitAppShell) loadCornerShell();
-    else existingShell.addEventListener("load", loadCornerShell, { once: true });
-    return;
+  if (window.PetitUniverseRenderScheduler?.initialized) {
+    loadAppShell();
+  } else {
+    loadScript("/static/universe-render-scheduler.js", "universe-render-scheduler", loadAppShell);
   }
-
-  const script = document.createElement("script");
-  script.src = `/static/app_shell.js?v=${window.PETIT_ASSET_VERSION}`;
-  script.async = false;
-  script.dataset.petitBootstrap = "app-shell";
-  script.addEventListener("load", loadCornerShell, { once: true });
-  document.head.appendChild(script);
 })();
 
 document.addEventListener("DOMContentLoaded", () => {
