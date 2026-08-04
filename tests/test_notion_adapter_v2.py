@@ -156,6 +156,31 @@ class NotionAdapterV2Tests(unittest.TestCase):
         self.assertEqual(parsed["area"], "university")
         self.assertEqual(parsed["area_source"], "legacy_category")
 
+    def test_english_property_names_fallback(self) -> None:
+        page = {
+            "id": "task-eng",
+            "url": "https://notion.so/task-eng",
+            "created_time": "2026-08-01T00:00:00.000Z",
+            "last_edited_time": "2026-08-01T00:00:00.000Z",
+            "properties": {
+                "name": self.title("English prop task"),
+                "Status": {"select": {"name": "Yet"}},
+                "Priority": {"select": {"name": "High"}},
+                "Category": {"multi_select": [{"name": "LiT"}]},
+                "Area": {"select": {"name": "Life"}},
+                "Parent item": self.relation("task-parent-eng"),
+                "Project": self.relation("project-eng"),
+                "Sub-item": self.relation("subtask-eng"),
+                "DoneDate": {"date": {"start": "2026-08-04"}},
+            },
+        }
+        parsed = notion_client.parse_task_page(page)
+        self.assertEqual(parsed["title"], "English prop task")
+        self.assertEqual(parsed["parent_external_id"], "task-parent-eng")
+        self.assertEqual(parsed["project_external_id"], "project-eng")
+        self.assertEqual(parsed["subtask_external_ids"], ["subtask-eng"])
+        self.assertEqual(parsed["done_date"], "2026-08-04")
+
     def test_same_name_creates_candidate_but_does_not_auto_link(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
         notion_project_sync.upsert_projects([notion_client.parse_project_page(self.project_page())])

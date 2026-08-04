@@ -133,6 +133,26 @@ def _extract_people_ids(prop: dict[str, Any] | None) -> list[str]:
     return result
 
 
+def _get_prop(props: dict[str, Any], key: str, fallbacks: list[str] | None = None) -> dict[str, Any] | None:
+    if not props:
+        return None
+    if key in props and props[key] is not None:
+        return props[key]
+    key_lower = key.lower()
+    for prop_name, prop_val in props.items():
+        if prop_name.lower() == key_lower:
+            return prop_val
+    if fallbacks:
+        for fb in fallbacks:
+            if fb in props and props[fb] is not None:
+                return props[fb]
+            fb_lower = fb.lower()
+            for prop_name, prop_val in props.items():
+                if prop_name.lower() == fb_lower:
+                    return prop_val
+    return None
+
+
 def _page_meta(page: dict[str, Any]) -> dict[str, Any]:
     return {
         "external_id": str(page.get("id") or ""),
@@ -146,48 +166,48 @@ def _page_meta(page: dict[str, Any]) -> dict[str, Any]:
 def parse_project_page(page: dict[str, Any]) -> dict[str, Any]:
     """Convert one project database page while preserving source Relations."""
     props = page.get("properties") or {}
-    period_start, period_end = _extract_date_range(props.get(config.NOTION_PROJECT_PROP_PERIOD))
-    area, area_source = resolve_area(_extract_select(props.get(config.NOTION_PROJECT_PROP_AREA)))
+    period_start, period_end = _extract_date_range(_get_prop(props, config.NOTION_PROJECT_PROP_PERIOD, ["期間", "Period"]))
+    area, area_source = resolve_area(_extract_select(_get_prop(props, config.NOTION_PROJECT_PROP_AREA, ["エリア", "Area"])))
     return _page_meta(page) | {
-        "title": _extract_text(props.get(config.NOTION_PROJECT_PROP_TITLE)),
-        "status": _extract_select(props.get(config.NOTION_PROJECT_PROP_STATUS)) or "unknown",
-        "owner_external_ids": _extract_people_ids(props.get(config.NOTION_PROJECT_PROP_OWNER)),
-        "priority": _extract_select(props.get(config.NOTION_PROJECT_PROP_PRIORITY)) or None,
+        "title": _extract_text(_get_prop(props, config.NOTION_PROJECT_PROP_TITLE, ["プロジェクト名", "Project", "name", "Name"])),
+        "status": _extract_select(_get_prop(props, config.NOTION_PROJECT_PROP_STATUS, ["ステータス", "Status"])) or "unknown",
+        "owner_external_ids": _extract_people_ids(_get_prop(props, config.NOTION_PROJECT_PROP_OWNER, ["オーナー", "Owner"])),
+        "priority": _extract_select(_get_prop(props, config.NOTION_PROJECT_PROP_PRIORITY, ["優先度", "Priority"])) or None,
         "area": area,
         "area_source": area_source,
         "period_start": period_start,
         "period_end": period_end,
-        "summary": _extract_text(props.get(config.NOTION_PROJECT_PROP_SUMMARY)) or None,
-        "task_external_ids": _extract_relation_ids(props.get(config.NOTION_PROJECT_PROP_TASKS)),
-        "blocked_by_external_ids": _extract_relation_ids(props.get(config.NOTION_PROJECT_PROP_BLOCKED_BY)),
+        "summary": _extract_text(_get_prop(props, config.NOTION_PROJECT_PROP_SUMMARY, ["要約", "Summary"])) or None,
+        "task_external_ids": _extract_relation_ids(_get_prop(props, config.NOTION_PROJECT_PROP_TASKS, ["タスク", "Tasks", "Task"])),
+        "blocked_by_external_ids": _extract_relation_ids(_get_prop(props, config.NOTION_PROJECT_PROP_BLOCKED_BY, ["次のプロジェクトを保留中：", "Blocked By"])),
     }
 
 
 def parse_task_page(page: dict[str, Any]) -> dict[str, Any]:
     """Convert one task page, preserving Project, assignee, and task hierarchy."""
     props = page.get("properties") or {}
-    categories = _extract_multi_select(props.get(config.NOTION_PROP_CATEGORY))
+    categories = _extract_multi_select(_get_prop(props, config.NOTION_PROP_CATEGORY, ["Category", "カテゴリー", "カテゴリ"]))
     category = ", ".join(categories) if categories else None
-    area, area_source = resolve_area(_extract_select(props.get(config.NOTION_PROP_AREA)), category)
-    project_ids = _extract_relation_ids(props.get(config.NOTION_TASK_PROP_PROJECT))
-    parent_ids = _extract_relation_ids(props.get(config.NOTION_TASK_PROP_PARENT))
+    area, area_source = resolve_area(_extract_select(_get_prop(props, config.NOTION_PROP_AREA, ["Area", "エリア"])), category)
+    project_ids = _extract_relation_ids(_get_prop(props, config.NOTION_TASK_PROP_PROJECT, ["Project", "プロジェクト"]))
+    parent_ids = _extract_relation_ids(_get_prop(props, config.NOTION_TASK_PROP_PARENT, ["Parent item", "親タスク", "Parent"]))
     return _page_meta(page) | {
-        "title": _extract_text(props.get(config.NOTION_PROP_TITLE)),
-        "status": _extract_select(props.get(config.NOTION_PROP_STATUS)) or "unknown",
-        "due_date": _extract_date(props.get(config.NOTION_PROP_DUE)),
-        "priority": _extract_select(props.get(config.NOTION_PROP_PRIORITY)) or None,
+        "title": _extract_text(_get_prop(props, config.NOTION_PROP_TITLE, ["name", "Name", "タイトル", "Title"])),
+        "status": _extract_select(_get_prop(props, config.NOTION_PROP_STATUS, ["Status", "ステータス"])) or "unknown",
+        "due_date": _extract_date(_get_prop(props, config.NOTION_PROP_DUE, ["Date", "日付", "期日"])),
+        "priority": _extract_select(_get_prop(props, config.NOTION_PROP_PRIORITY, ["Priority", "優先度"])) or None,
         "category": category,
         "area": area,
         "area_source": area_source,
-        "reason": _extract_text(props.get(config.NOTION_PROP_REASON)) or None,
-        "done_date": _extract_date(props.get(config.NOTION_PROP_DONE_DATE)),
-        "summary": _extract_text(props.get(config.NOTION_TASK_PROP_SUMMARY)) or None,
+        "reason": _extract_text(_get_prop(props, config.NOTION_PROP_REASON, ["reason", "Reason", "理由"])) or None,
+        "done_date": _extract_date(_get_prop(props, config.NOTION_PROP_DONE_DATE, ["DoneDate", "Done", "完了日"])),
+        "summary": _extract_text(_get_prop(props, config.NOTION_TASK_PROP_SUMMARY, ["Summary", "要約"])) or None,
         "project_external_ids": project_ids,
         "project_external_id": project_ids[0] if project_ids else None,
-        "assignee_external_ids": _extract_people_ids(props.get(config.NOTION_TASK_PROP_ASSIGNEE)),
+        "assignee_external_ids": _extract_people_ids(_get_prop(props, config.NOTION_TASK_PROP_ASSIGNEE, ["Assignee", "担当者"])),
         "parent_external_ids": parent_ids,
         "parent_external_id": parent_ids[0] if parent_ids else None,
-        "subtask_external_ids": _extract_relation_ids(props.get(config.NOTION_TASK_PROP_SUBTASKS)),
+        "subtask_external_ids": _extract_relation_ids(_get_prop(props, config.NOTION_TASK_PROP_SUBTASKS, ["Sub-item", "サブタスク", "Subtasks"])),
     }
 
 
