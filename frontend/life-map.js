@@ -174,10 +174,40 @@
     });
   };
 
+  const openFocusedDetail = (requestedTaskId = null) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const state = window.PetitUnivSpace?.state?.();
+      const selectedId = String(state?.selectedTaskId || "");
+      if (state?.mode !== "focus" || !selectedId) return;
+      if (requestedTaskId && selectedId !== String(requestedTaskId)) return;
+      document.body.classList.add("petit-univ-manage-open");
+      document.querySelector("#detail-panel")?.focus?.({ preventScroll: true });
+    }));
+  };
+
+  const installFocusDetailLink = (map) => {
+    if (map.dataset.focusDetailReady === "true") return;
+    map.dataset.focusDetailReady = "true";
+
+    document.addEventListener("click", (event) => {
+      const target = event.target instanceof Element
+        ? event.target.closest(".univ-task-planet[data-task-id], .univ-satellite[data-task-id]")
+        : null;
+      if (!target || !map.contains(target)) return;
+      openFocusedDetail(target.dataset.taskId);
+    });
+
+    window.addEventListener("petit:univ-open", (event) => {
+      if (event.detail?.mode !== "focus") return;
+      openFocusedDetail(event.detail?.taskId || null);
+    });
+  };
+
   const initialize = () => {
     const map = document.querySelector(MAP_SELECTOR);
     if (!map || map.dataset.lifeMapReady === "true") return;
     map.dataset.lifeMapReady = "true";
+    installFocusDetailLink(map);
     window.addEventListener("petit:universe-rendered", scheduleDecorate);
     mobileQuery.addEventListener?.("change", scheduleDecorate);
     window.addEventListener("resize", scheduleDecorate, { passive: true });
