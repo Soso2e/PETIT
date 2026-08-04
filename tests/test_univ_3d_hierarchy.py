@@ -49,6 +49,8 @@ class Univ3dHierarchyTests(unittest.TestCase):
         self.assertIn("focusChild", source)
         self.assertIn("MutationObserver", source)
         self.assertIn("petit:tasks-updated", source)
+        self.assertIn("meaningful", source)
+        self.assertIn("existing.replaceWith(next)", source)
 
     def test_detail_children_extension_is_loaded_by_version_bootstrap(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
