@@ -1,4 +1,4 @@
-/* Univ v0.13: Core planet, task planets, child-task satellites, lines, background, HUD. */
+/* Univ: Core planet, task planets, child-task satellites, lines, background, HUD. */
 [data-view-panel="universe"].univ-panel {
   position: relative;
   padding: 0;
@@ -97,6 +97,7 @@
 
 .univ-viewport.is-dragging #constellation-grid.univ-space { transition: none; }
 
+/* Layer 5: Lines & Orbits */
 .univ-space .life-map__lines {
   z-index: 1;
   transform: translateZ(-160px);
@@ -115,6 +116,7 @@
   stroke-dasharray: 1.2 2.8;
 }
 
+/* Layer 4: Core Center Planet */
 .univ-space .life-map__core.univ-core-planet {
   z-index: 28;
   width: 154px;
@@ -168,6 +170,7 @@
   animation: univPlanetSurface 16s linear infinite;
 }
 
+/* Layer 3: Labels */
 .univ-core-planet .eyebrow,
 .univ-core-planet strong,
 .univ-core-planet small {
@@ -191,7 +194,11 @@
     inset 16px 15px 24px rgba(255,255,255,.16);
 }
 
-.univ-space .constellation-card.univ-task-system {
+/* Layer 4: Parent Task Planet System */
+.univ-space .univ-task-system {
+  position: absolute;
+  left: var(--life-x, 50%);
+  top: var(--life-y, 50%);
   z-index: 12;
   width: 250px;
   height: 250px;
@@ -208,13 +215,14 @@
   transition: opacity .34s ease, filter .34s ease, transform .62s cubic-bezier(.2, .8, .2, 1);
 }
 
-.univ-space .constellation-card.univ-task-system:nth-of-type(5n + 1) { --univ-depth: 30px; }
-.univ-space .constellation-card.univ-task-system:nth-of-type(5n + 2) { --univ-depth: -30px; }
-.univ-space .constellation-card.univ-task-system:nth-of-type(5n + 3) { --univ-depth: 70px; }
-.univ-space .constellation-card.univ-task-system:nth-of-type(5n + 4) { --univ-depth: -70px; }
-.univ-space .constellation-card.univ-task-system:nth-of-type(5n + 5) { --univ-depth: 0px; }
+.univ-space .univ-task-system:nth-of-type(5n + 1) { --univ-depth: 30px; }
+.univ-space .univ-task-system:nth-of-type(5n + 2) { --univ-depth: -30px; }
+.univ-space .univ-task-system:nth-of-type(5n + 3) { --univ-depth: 70px; }
+.univ-space .univ-task-system:nth-of-type(5n + 4) { --univ-depth: -70px; }
+.univ-space .univ-task-system:nth-of-type(5n + 5) { --univ-depth: 0px; }
 
-.univ-space .constellation-card__header.univ-task-planet {
+/* Parent Task Planet Sphere */
+.univ-space .univ-task-planet {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -309,6 +317,7 @@
     inset 13px 12px 19px rgba(255,255,255,.14);
 }
 
+/* Layer 3: Planet Heading & Satellite Counts Label */
 .univ-task-planet .constellation-card__heading {
   position: absolute;
   left: 50%;
@@ -368,16 +377,7 @@
   pointer-events: none;
 }
 
-.univ-space .universe-task.univ-root-task-copy {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  opacity: 0 !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
-  transform: none !important;
-}
-
+/* Layer 4: Child Task Satellite Sphere */
 .univ-space .universe-task.univ-satellite {
   position: absolute;
   left: 50%;
@@ -397,10 +397,10 @@
   backface-visibility: hidden;
   transform:
     translate(-50%, -50%)
-    rotate(var(--satellite-angle))
-    translateX(var(--satellite-radius))
-    rotate(calc(-1 * var(--satellite-angle)))
-    translateZ(var(--satellite-depth)) !important;
+    rotate(var(--satellite-angle, 0deg))
+    translateX(var(--satellite-radius, 80px))
+    rotate(calc(-1 * var(--satellite-angle, 0deg)))
+    translateZ(30px) !important;
   transform-style: preserve-3d;
   background:
     radial-gradient(circle at 31% 27%, rgba(255,255,255,.76) 0 5%, transparent 17%),
@@ -424,6 +424,7 @@
   pointer-events: none;
 }
 
+/* Layer 3: Satellite Title Label */
 .univ-satellite .universe-task__title {
   position: absolute;
   left: 50%;
@@ -446,7 +447,7 @@
   pointer-events: none;
 }
 
-.univ-satellite .universe-task__meta { display: none; }
+.univ-satellite .universe-task__meta { display: none !important; }
 
 .univ-satellite:hover,
 .univ-satellite:focus-visible,
@@ -461,15 +462,16 @@
     inset 6px 6px 9px rgba(255,255,255,.15);
 }
 
+/* Focused System Mode */
 .univ-space[data-univ-mode="focus"] .life-map__core,
-.univ-space[data-univ-mode="focus"] .constellation-card.univ-task-system {
+.univ-space[data-univ-mode="focus"] .univ-task-system {
   opacity: .12;
   filter: saturate(.36) brightness(.48) blur(.35px);
 }
 
 .univ-space[data-univ-mode="focus"] .life-map__lines { opacity: .1; filter: none; }
 
-.univ-space[data-univ-mode="focus"] .constellation-card.is-univ-focus-family {
+.univ-space[data-univ-mode="focus"] .univ-task-system.is-univ-focus-family {
   z-index: 44;
   opacity: 1;
   filter: none;
@@ -512,6 +514,7 @@
   white-space: normal;
 }
 
+/* Layer 1: HUD Controls */
 .univ-hud {
   position: absolute;
   inset: var(--univ-hud-offset);
@@ -546,6 +549,7 @@
 .univ-hud__brand strong { font-size: 21px; letter-spacing: .04em; }
 .univ-hud__brand small { color: rgba(206, 218, 255, .58); font-family: "DM Mono", monospace; font-size: 9px; letter-spacing: .12em; }
 
+/* Layer 2: Selection HUD & Detail Panel */
 .univ-hud__selection {
   align-self: start;
   justify-self: center;
@@ -647,6 +651,7 @@
   backdrop-filter: blur(14px);
 }
 
+/* Layer 2: Slide-in Detail Panel Overlay */
 .petit-univ-active #detail-panel {
   position: fixed;
   inset: 86px 24px 24px auto;
@@ -714,7 +719,7 @@
 
   .univ-viewport {
     --univ-hud-offset: 13px;
-    min-height: calc(100dvh - var(--petit-bottom-nav-height) - 76px);
+    min-height: calc(100dvh - var(--petit-bottom-nav-height, 60px) - 76px);
     border-radius: 23px;
   }
 
@@ -739,11 +744,11 @@
   .univ-hud__help { display: none; }
 
   .univ-space .life-map__core.univ-core-planet { width: 132px; height: 132px; }
-  .univ-space .constellation-card.univ-task-system { width: 220px; height: 220px; }
-  .univ-space .constellation-card__header.univ-task-planet { width: 112px; height: 112px; }
+  .univ-space .univ-task-system { width: 220px; height: 220px; }
+  .univ-space .univ-task-planet { width: 112px; height: 112px; }
 
   .petit-univ-active #detail-panel {
-    inset: auto 10px calc(var(--petit-bottom-nav-height) + 10px) 10px;
+    inset: auto 10px calc(var(--petit-bottom-nav-height, 60px) + 10px) 10px;
     width: auto;
     max-height: min(68dvh, 640px);
     border-radius: 24px 24px 18px 18px;
@@ -751,11 +756,11 @@
   }
 
   .petit-univ-active.petit-univ-manage-open #detail-panel { transform: translateY(0); }
-  .univ-detail-dismiss { inset: auto 22px calc(var(--petit-bottom-nav-height) + min(68dvh, 640px) - 4px) auto; }
+  .univ-detail-dismiss { inset: auto 22px calc(var(--petit-bottom-nav-height, 60px) + min(68dvh, 640px) - 4px) auto; }
 }
 
 @media (max-width: 640px) {
-  .univ-viewport { min-height: calc(100dvh - var(--petit-bottom-nav-height) - 64px); border-radius: 0; border-left: 0; border-right: 0; }
+  .univ-viewport { min-height: calc(100dvh - var(--petit-bottom-nav-height, 60px) - 64px); border-radius: 0; border-left: 0; border-right: 0; }
   .univ-hud__brand { display: none; }
   .univ-hud__selection { width: 100%; margin-left: 0; padding: 10px 10px 10px 13px; }
   .univ-hud__selection > strong { max-width: 54vw; font-size: 13px; }
@@ -763,8 +768,8 @@
   .univ-hud__controls { grid-column: 1 / -1; justify-self: center; }
   .univ-hud__controls button:last-child { display: none; }
   .univ-space .life-map__core.univ-core-planet { width: 116px; height: 116px; }
-  .univ-space .constellation-card.univ-task-system { width: 198px; height: 198px; }
-  .univ-space .constellation-card__header.univ-task-planet { width: 96px; height: 96px; }
+  .univ-space .univ-task-system { width: 198px; height: 198px; }
+  .univ-space .univ-task-planet { width: 96px; height: 96px; }
   .univ-space .universe-task.univ-satellite { width: 46px; height: 46px; }
   .univ-task-planet .constellation-card__heading { width: 170px; }
   .univ-task-planet .constellation-card__heading strong { font-size: 11px; }
@@ -779,7 +784,7 @@
   .univ-satellite { animation: none !important; }
 
   .univ-viewport #constellation-grid.univ-space,
-  .univ-space .constellation-card.univ-task-system,
+  .univ-space .univ-task-system,
   .univ-space .univ-task-planet,
   .petit-univ-active #detail-panel { transition: none !important; }
 }
