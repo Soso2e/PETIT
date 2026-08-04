@@ -1,5 +1,5 @@
-window.PETIT_VERSION = "v0.14.0";
-window.PETIT_ASSET_VERSION = "0.14.0";
+window.PETIT_VERSION = "v0.14.1";
+window.PETIT_ASSET_VERSION = "0.14.1";
 
 (() => {
   const loadCornerShell = () => {

@@ -45,7 +45,7 @@ class ThreeAreaAppShellTests(unittest.TestCase):
     def test_univ_assets_are_versioned_loaded_and_bootstrapped(self):
         shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
         version = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_ASSET_VERSION || "0.14.0"', shell)
+        self.assertIn('window.PETIT_ASSET_VERSION || "0.14.1"', shell)
         self.assertIn('/static/univ-space.css', shell)
         self.assertIn('/static/univ-space.js', shell)
         self.assertIn('/static/app_shell.js', version)
@@ -55,8 +55,21 @@ class ThreeAreaAppShellTests(unittest.TestCase):
 
     def test_version_is_v0140(self):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.14.0"', source)
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.0"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.14.1"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.1"', source)
+
+    def test_universe_assets_use_current_version_without_duplicate_app_shell_loader(self):
+        html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        chat_input = (FRONTEND / "chat_input.js").read_text(encoding="utf-8")
+        self.assertNotIn("0.8.0", html)
+        self.assertNotIn('loadSharedModule("/static/app_shell.js"', chat_input)
+        self.assertIn("Array.from(document.scripts)", chat_input)
+
+    def test_task_flow_reuses_universe_catalog_on_initialization(self):
+        source = (FRONTEND / "task-flow.js").read_text(encoding="utf-8")
+        initialize = source[source.index("  const initialize = () => {") :]
+        self.assertIn("petit:tasks-updated", initialize)
+        self.assertNotIn("void loadCatalog();", initialize)
 
 
 if __name__ == "__main__":

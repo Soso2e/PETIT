@@ -1,5 +1,6 @@
 // PETIT corner shell: iPhone-first navigation, status, and utility access.
 (() => {
+  if (window.PetitCornerShell?.initialized) return;
   const AREA_META = {
     univ: { label: "Univ", title: "Universe", icon: "planet" },
     tasks: { label: "Tasks", title: "Tasks", icon: "check" },
@@ -46,7 +47,7 @@
     if (document.querySelector('link[data-petit-module="corner-shell-style"]')) return;
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = `/static/petit-corner-shell.css?v=${window.PETIT_ASSET_VERSION || "0.14.0"}`;
+    link.href = `/static/petit-corner-shell.css?v=${window.PETIT_ASSET_VERSION || "0.14.1"}`;
     link.dataset.petitModule = "corner-shell-style";
     document.head.appendChild(link);
   };
@@ -237,6 +238,8 @@
     };
     waitForShell();
   };
+
+  window.PetitCornerShell = { initialize, initialized: true };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initialize, { once: true });

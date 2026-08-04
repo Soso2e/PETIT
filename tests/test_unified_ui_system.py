@@ -57,7 +57,7 @@ class UnifiedUiSystemTests(unittest.TestCase):
 
     def test_service_worker_precaches_current_univ_shell(self) -> None:
         source = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('petit-shell-v0.14.0', source)
+        self.assertIn('petit-shell-v0.14.1', source)
         self.assertIn('/static/univ-space.js', source)
         self.assertIn('/static/univ-space.css', source)
         self.assertIn('/static/petit-corner-shell.js', source)
@@ -70,8 +70,8 @@ class UnifiedUiSystemTests(unittest.TestCase):
 
     def test_version_is_v0140(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.14.0"', source)
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.0"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.14.1"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.1"', source)
 
 
 if __name__ == "__main__":

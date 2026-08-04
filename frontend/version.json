@@ -1,6 +1,6 @@
 {
   "name": "PETIT",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "release": "univ-corner-shell",
   "includes": [
     "top-left status and sync information",
