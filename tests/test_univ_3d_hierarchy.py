@@ -47,6 +47,7 @@ class Univ3dHierarchyTests(unittest.TestCase):
         self.assertIn("detail-children__list", source)
         self.assertIn("detail-children__item", source)
         self.assertIn("focusChild", source)
+        self.assertIn("target.click()", source)
         self.assertIn("MutationObserver", source)
         self.assertIn("petit:tasks-updated", source)
         self.assertIn("meaningful", source)
