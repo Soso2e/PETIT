@@ -1,9 +1,10 @@
 // PETIT Life map: Core, parent task planets, child satellites, and 3D connections.
 (() => {
   const MAP_SELECTOR = "#constellation-grid";
+  const RENDER_JOB = "life-map";
   const mobileQuery = window.matchMedia("(max-width: 640px)");
   let decorating = false;
-  let scheduled = false;
+  let unregisterRenderJob = null;
 
   const systemsOf = (map) => Array.from(map.children)
     .filter((node) => node.classList?.contains("univ-task-system"));
@@ -22,19 +23,10 @@
   };
 
   const ensureConnectionLayer = (map) => {
-    map.querySelector(":scope > .life-map__lines")?.remove();
     let layer = map.querySelector(":scope > .univ-connection-layer");
     if (layer) return layer;
     layer = document.createElement("div");
     layer.className = "univ-connection-layer";
-    Object.assign(layer.style, {
-      position: "absolute",
-      inset: "0",
-      zIndex: "1",
-      pointerEvents: "none",
-      transformStyle: "preserve-3d",
-      overflow: "visible",
-    });
     map.prepend(layer);
     return layer;
   };
@@ -96,25 +88,12 @@
       child ? "is-child" : "is-core",
       active ? "is-active" : "",
     ].filter(Boolean).join(" ");
-    Object.assign(line.style, {
-      position: "absolute",
-      left: "0",
-      top: "0",
-      width: `${length}px`,
-      height: child ? "1px" : "1.5px",
-      transformOrigin: "0 50%",
-      transformStyle: "preserve-3d",
-      transform: `translate3d(${from.x}px, ${from.y}px, ${from.z}px) rotateY(${-yaw}deg) rotateZ(${pitch}deg)`,
-      background: active
-        ? "linear-gradient(90deg, rgba(236,242,255,.82), rgba(157,180,255,.5))"
-        : child
-          ? "linear-gradient(90deg, rgba(127,227,193,.42), rgba(157,180,255,.15))"
-          : "linear-gradient(90deg, rgba(157,180,255,.5), rgba(157,180,255,.12))",
-      boxShadow: active ? "0 0 9px rgba(157,180,255,.72)" : "0 0 5px rgba(120,150,255,.26)",
-      opacity: child ? ".8" : ".72",
-      borderRadius: "999px",
-      backfaceVisibility: "visible",
-    });
+    line.style.setProperty("--connection-x", `${from.x}px`);
+    line.style.setProperty("--connection-y", `${from.y}px`);
+    line.style.setProperty("--connection-z", `${from.z}px`);
+    line.style.setProperty("--connection-length", `${length}px`);
+    line.style.setProperty("--connection-yaw", `${-yaw}deg`);
+    line.style.setProperty("--connection-pitch", `${pitch}deg`);
     layer.appendChild(line);
   };
 
@@ -192,24 +171,33 @@
     }
   };
 
-  const scheduleDecorate = () => {
-    if (scheduled) return;
-    scheduled = true;
-    window.requestAnimationFrame(() => {
-      scheduled = false;
-      decorate();
-    });
+  const requestRender = (reason) => {
+    const scheduler = window.PetitUniverseRenderScheduler;
+    if (scheduler?.initialized) {
+      scheduler.request(RENDER_JOB, reason);
+      return;
+    }
+    window.requestAnimationFrame(decorate);
+  };
+
+  const registerRenderJob = () => {
+    if (unregisterRenderJob || !window.PetitUniverseRenderScheduler?.initialized) return;
+    unregisterRenderJob = window.PetitUniverseRenderScheduler.register(RENDER_JOB, decorate);
+    requestRender("register");
   };
 
   const initialize = () => {
     const map = document.querySelector(MAP_SELECTOR);
     if (!map || map.dataset.lifeMapReady === "true") return;
     map.dataset.lifeMapReady = "true";
-    window.addEventListener("petit:universe-rendered", scheduleDecorate);
-    document.addEventListener("petit:tasks-updated", scheduleDecorate);
-    mobileQuery.addEventListener?.("change", scheduleDecorate);
-    window.addEventListener("resize", scheduleDecorate, { passive: true });
-    scheduleDecorate();
+
+    registerRenderJob();
+    window.addEventListener("petit:render-scheduler-ready", registerRenderJob, { once: true });
+    window.addEventListener("petit:universe-rendered", () => requestRender("universe-rendered"));
+    document.addEventListener("petit:tasks-updated", () => requestRender("tasks-updated"));
+    mobileQuery.addEventListener?.("change", () => requestRender("responsive-change"));
+    window.addEventListener("resize", () => requestRender("resize"), { passive: true });
+    requestRender("initialize");
   };
 
   if (document.readyState === "loading") {

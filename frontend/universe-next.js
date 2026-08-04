@@ -1,5 +1,6 @@
 // PETIT Universe enhancements: Life-first task hierarchy, zoom, and spatial motion.
 (() => {
+  const RENDER_JOB = "universe-next";
   const ZOOM = { min: 0.82, max: 1.22, step: 0.1, storage: "petit_universe_zoom" };
   const state = {
     tasks: [],
@@ -18,6 +19,9 @@
   const taskTableBody = byId("task-table-body");
   const zoomLabel = byId("focus-zoom-label");
 
+  let activeObservers = [];
+  let unregisterRenderJob = null;
+
   const text = (value) => String(value ?? "").trim();
   const taskId = (task) => String(task?.id || task?.external_id || "");
   const rootTitle = (task) => text(task?.root_title || task?.project_title || task?.title);
@@ -30,17 +34,26 @@
     return data;
   };
 
+  const requestDecorate = (reason) => {
+    const scheduler = window.PetitUniverseRenderScheduler;
+    if (scheduler?.initialized) {
+      scheduler.request(RENDER_JOB, reason);
+      return;
+    }
+    queueMicrotask(decorateAll);
+  };
+
   const loadCatalog = async () => {
     try {
       const sharedTasks = window.PetitUniverse?.tasks?.() || [];
       if (sharedTasks.length) {
         state.tasks = sharedTasks;
-        scheduleDecorate();
+        requestDecorate("shared-tasks");
         return;
       }
       const data = await requestJson("/api/notifications/tasks?priority=all&limit=500");
       state.tasks = data.tasks || [];
-      scheduleDecorate();
+      requestDecorate("catalog-loaded");
     } catch (error) {
       console.warn("PETIT task hierarchy load failed", error);
     }
@@ -256,7 +269,22 @@
     });
   };
 
-  const decorateAll = () => {
+  const stopObserving = () => {
+    activeObservers.forEach((observer) => observer.disconnect());
+    activeObservers = [];
+  };
+
+  const startObserving = () => {
+    stopObserving();
+    const targets = [detailPanel, taskNodes, constellationGrid, taskTableBody].filter(Boolean);
+    activeObservers = targets.map((element) => {
+      const observer = new MutationObserver(() => requestDecorate("dom-mutation"));
+      observer.observe(element, { childList: true });
+      return observer;
+    });
+  };
+
+  function decorateAll() {
     stopObserving();
     try {
       decorateDetail();
@@ -266,39 +294,12 @@
     } finally {
       startObserving();
     }
-  };
+  }
 
-  let isDecoratingScheduled = false;
-  let activeObservers = [];
-
-  const startObserving = () => {
-    stopObserving();
-    const targets = [
-      detailPanel,
-      taskNodes,
-      constellationGrid,
-      taskTableBody,
-    ].filter(Boolean);
-
-    activeObservers = targets.map((element) => {
-      const observer = new MutationObserver(() => scheduleDecorate());
-      observer.observe(element, { childList: true });
-      return observer;
-    });
-  };
-
-  const stopObserving = () => {
-    activeObservers.forEach((obs) => obs.disconnect());
-    activeObservers = [];
-  };
-
-  const scheduleDecorate = () => {
-    if (isDecoratingScheduled) return;
-    isDecoratingScheduled = true;
-    queueMicrotask(() => {
-      isDecoratingScheduled = false;
-      decorateAll();
-    });
+  const registerRenderJob = () => {
+    if (unregisterRenderJob || !window.PetitUniverseRenderScheduler?.initialized) return;
+    unregisterRenderJob = window.PetitUniverseRenderScheduler.register(RENDER_JOB, decorateAll);
+    requestDecorate("register");
   };
 
   const zoomLevel = () => (state.zoom < 0.94 ? "far" : (state.zoom > 1.08 ? "near" : "normal"));
@@ -366,13 +367,17 @@
     const tasks = event.detail?.tasks;
     if (!Array.isArray(tasks)) return;
     state.tasks = tasks;
-    scheduleDecorate();
+    requestDecorate("tasks-updated");
   });
+
+  registerRenderJob();
+  window.addEventListener("petit:render-scheduler-ready", registerRenderJob, { once: true });
   startObserving();
 
   document.documentElement.dataset.universeMotion = "ready";
   applyZoom(state.zoom, { persist: false });
   installZoom();
   installParallax();
+  requestDecorate("initialize");
   void loadCatalog();
 })();

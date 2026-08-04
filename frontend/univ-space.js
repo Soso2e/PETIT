@@ -3,6 +3,7 @@
   if (window.PetitUnivSpace?.initialized) return;
   const OPEN_EVENT = "petit:univ-open";
   const AREA_EVENT = "petit:area-change";
+  const RENDER_JOB = "univ-space";
   const state = {
     yaw: -7,
     pitch: 6,
@@ -18,8 +19,7 @@
     lastY: 0,
   };
 
-  let mutationObserver = null;
-  let decorateQueued = false;
+  let unregisterRenderJob = null;
 
   const panel = () => document.querySelector('[data-view-panel="universe"]');
   const map = () => document.querySelector("#constellation-grid");
@@ -135,8 +135,7 @@
     return frame;
   };
 
-  const decorateScene = () => {
-    decorateQueued = false;
+  const renderScene = () => {
     if (!isPanelActive()) return;
     const graph = map();
     if (!graph) return;
@@ -144,10 +143,19 @@
     applyCamera();
   };
 
-  const scheduleDecorate = () => {
-    if (decorateQueued) return;
-    decorateQueued = true;
-    window.requestAnimationFrame(decorateScene);
+  const requestRender = (reason) => {
+    const scheduler = window.PetitUniverseRenderScheduler;
+    if (scheduler?.initialized) {
+      scheduler.request(RENDER_JOB, reason);
+      return;
+    }
+    window.requestAnimationFrame(renderScene);
+  };
+
+  const registerRenderJob = () => {
+    if (unregisterRenderJob || !window.PetitUniverseRenderScheduler?.initialized) return;
+    unregisterRenderJob = window.PetitUniverseRenderScheduler.register(RENDER_JOB, renderScene);
+    requestRender("register");
   };
 
   const clearFocusClasses = () => {
@@ -225,7 +233,7 @@
   const focusByTaskId = (requestedTaskId, { satellite = false, project = "" } = {}) => {
     const graph = map();
     if (!graph) return;
-    scheduleDecorate();
+    requestRender("focus-request");
     window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
       let task = requestedTaskId
         ? graph.querySelector(`[data-task-id="${CSS.escape(String(requestedTaskId))}"]`)
@@ -375,7 +383,7 @@
   const showUniv = ({ mode = "overview", taskId: requestedTaskId = null } = {}) => {
     document.body.classList.add("petit-univ-active");
     ensureHud();
-    scheduleDecorate();
+    requestRender("univ-open");
     if (mode === "focus" && requestedTaskId) {
       state.selectedTaskId = String(requestedTaskId);
       window.requestAnimationFrame(() => {
@@ -399,15 +407,19 @@
     ensureHud();
     bindInteraction();
     installSelectionCapture();
-    window.addEventListener("petit:universe-rendered", scheduleDecorate);
+    registerRenderJob();
+    window.addEventListener("petit:render-scheduler-ready", registerRenderJob, { once: true });
+    window.addEventListener("petit:universe-rendered", () => requestRender("universe-rendered"));
     syncInitialArea();
     window.addEventListener(OPEN_EVENT, (event) => showUniv(event.detail || {}));
     window.addEventListener(AREA_EVENT, (event) => {
       const active = event.detail?.area === "univ" || isPanelActive();
       document.body.classList.toggle("petit-univ-active", active);
       if (!active) document.body.classList.remove("petit-univ-manage-open");
+      if (active) requestRender("area-change");
     });
-    document.addEventListener("petit:tasks-updated", scheduleDecorate);
+    document.addEventListener("petit:tasks-updated", () => requestRender("tasks-updated"));
+    requestRender("initialize");
   };
 
   window.PetitUnivSpace = {
