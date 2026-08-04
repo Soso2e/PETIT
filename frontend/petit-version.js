@@ -2,6 +2,8 @@ window.PETIT_VERSION = "v0.15.0";
 window.PETIT_ASSET_VERSION = "0.15.0";
 
 (() => {
+  const forceCssRenderer = new URLSearchParams(window.location.search).get("renderer") === "css";
+
   const loadStylesheet = (href, key) => {
     const selector = `link[data-petit-bootstrap="${key}"]`;
     const existing = document.querySelector(selector);
@@ -14,7 +16,7 @@ window.PETIT_ASSET_VERSION = "0.15.0";
     return link;
   };
 
-  const loadScript = (src, key, onLoad = null) => {
+  const loadScript = (src, key, onLoad = null, { module = false } = {}) => {
     const selector = `script[data-petit-bootstrap="${key}"]`;
     const existing = document.querySelector(selector);
     if (existing) {
@@ -28,6 +30,7 @@ window.PETIT_ASSET_VERSION = "0.15.0";
     const script = document.createElement("script");
     script.src = `${src}?v=${window.PETIT_ASSET_VERSION}`;
     script.async = false;
+    if (module) script.type = "module";
     script.dataset.petitBootstrap = key;
     script.addEventListener("load", () => {
       script.dataset.loaded = "true";
@@ -37,9 +40,17 @@ window.PETIT_ASSET_VERSION = "0.15.0";
     return script;
   };
 
+  const loadWebGLScene = () => {
+    loadScript("/static/universe-webgl-scene.js", "universe-webgl-scene", null, { module: true });
+    loadScript("/static/universe-webgl-bridge.js", "universe-webgl-bridge");
+  };
+
   const loadPostShellAssets = () => {
     loadStylesheet("/static/universe-3d-foundation.css", "universe-3d-foundation");
     loadScript("/static/petit-corner-shell.js", "corner-shell");
+    if (forceCssRenderer) return;
+    loadStylesheet("/static/universe-webgl-scene.css", "universe-webgl-scene-style");
+    loadScript("/static/universe-webgl-hierarchy.js", "universe-webgl-hierarchy", loadWebGLScene);
   };
 
   const loadAppShell = () => {
