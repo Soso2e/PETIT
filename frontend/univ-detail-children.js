@@ -121,12 +121,17 @@
     rendering = true;
     try {
       await loadTasks();
-      detailPanel.querySelector('[data-univ-detail-children="true"]')?.remove();
+      const existing = detailPanel.querySelector('[data-univ-detail-children="true"]');
       const parent = selectedTask(selectedId);
       const children = childTasksOf(parent);
-      if (!children.length) return;
+      if (!children.length) {
+        existing?.remove();
+        return;
+      }
       ensureStyles();
-      detailPanel.querySelector(".detail-panel__content")?.appendChild(buildSection(children));
+      const next = buildSection(children);
+      if (existing) existing.replaceWith(next);
+      else detailPanel.querySelector(".detail-panel__content")?.appendChild(next);
     } finally {
       rendering = false;
     }
@@ -135,7 +140,12 @@
   const initialize = () => {
     const detailPanel = panel();
     if (!detailPanel) return;
-    const observer = new MutationObserver(() => void render());
+    const observer = new MutationObserver((records) => {
+      const meaningful = records.some((record) => Array.from(record.addedNodes).some((node) => (
+        node instanceof Element && !node.matches('[data-univ-detail-children="true"]')
+      )));
+      if (meaningful) void render();
+    });
     observer.observe(detailPanel, { childList: true });
     document.addEventListener("click", (event) => {
       const target = event.target instanceof Element
