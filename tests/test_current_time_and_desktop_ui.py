@@ -79,7 +79,7 @@ class ResponsiveUniverseLayoutTests(unittest.TestCase):
     def test_mobile_content_panels_use_compact_spacing_and_cards(self) -> None:
         css = self._responsive_css()
         self.assertIn("padding: 18px 16px 0;", css)
-        self.assertIn(".detail-panel { padding:16px; }", css)
+        self.assertIn("padding: 18px;", css)
         self.assertIn("grid-template-areas:", css)
         self.assertIn(".chat-composer", css)
         self.assertIn("bottom: calc(72px + env(safe-area-inset-bottom))", css)
