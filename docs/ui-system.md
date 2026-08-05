@@ -48,7 +48,7 @@ Three.jsは現時点で導入されていない。新しい依存や描画ルー
 
 ## 入力
 
-日本語IME変換中のEnterでは送信しない。送信は `Ctrl+Enter` または `Cmd+Enter` とし、既存の`compositionstart`、`compositionend`、`event.isComposing`、`keyCode 229`の保護を維持する。
+日本語IME変換中および確定時のEnterでは送信しない（変換確定のみ）。変換完了後のEnterで送信し、`Shift+Enter`で改行を挿入する。既存の`compositionstart`、`compositionend`（タイマーガード）、`event.isComposing`、`keyCode 229`の保護を維持する。
 
 ## 検証
 

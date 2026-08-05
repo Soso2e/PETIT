@@ -367,10 +367,26 @@ formEl.addEventListener("submit", (e) => {
   sendMessage(text);
 });
 
-// Enter to send, Shift+Enter for newline. IME confirmation must not submit.
+let appComposing = false;
+let appComposeTimer = null;
+inputEl.addEventListener("compositionstart", () => {
+  appComposing = true;
+  if (appComposeTimer) clearTimeout(appComposeTimer);
+});
+inputEl.addEventListener("compositionend", () => {
+  appComposing = true;
+  if (appComposeTimer) clearTimeout(appComposeTimer);
+  appComposeTimer = setTimeout(() => {
+    appComposing = false;
+  }, 50);
+});
+
+// Enter to send after IME conversion, Shift+Enter for newline. IME confirmation must not submit.
 inputEl.addEventListener("keydown", (e) => {
-  const isComposing = e.isComposing || e.keyCode === 229;
-  if (e.key === "Enter" && !e.shiftKey && !isComposing) {
+  if (e.key !== "Enter") return;
+  if (e.shiftKey) return;
+  const isComposing = e.isComposing || e.keyCode === 229 || appComposing;
+  if (!isComposing) {
     e.preventDefault();
     formEl.requestSubmit();
   }

@@ -1031,8 +1031,26 @@
     sendChat(message);
   });
 
+  let univComposing = false;
+  let univComposeTimer = null;
+
+  chatInputEl?.addEventListener("compositionstart", () => {
+    univComposing = true;
+    if (univComposeTimer) clearTimeout(univComposeTimer);
+  });
+  chatInputEl?.addEventListener("compositionend", () => {
+    univComposing = true;
+    if (univComposeTimer) clearTimeout(univComposeTimer);
+    univComposeTimer = setTimeout(() => {
+      univComposing = false;
+    }, 50);
+  });
+
   chatInputEl?.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    if (event.key !== "Enter") return;
+    if (event.shiftKey) return;
+    const isComposing = event.isComposing || event.keyCode === 229 || univComposing;
+    if (!isComposing) {
       event.preventDefault();
       chatFormEl.requestSubmit();
     }

@@ -7,19 +7,29 @@
     input.dataset.petitChatInputReady = "true";
 
     let composing = false;
+    let composeTimer = null;
 
     const resize = () => {
       input.style.height = "auto";
       input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`;
     };
 
-    input.addEventListener("compositionstart", () => { composing = true; });
-    input.addEventListener("compositionend", () => { composing = false; });
+    input.addEventListener("compositionstart", () => {
+      composing = true;
+      if (composeTimer) clearTimeout(composeTimer);
+    });
+    input.addEventListener("compositionend", () => {
+      composing = true;
+      if (composeTimer) clearTimeout(composeTimer);
+      composeTimer = setTimeout(() => {
+        composing = false;
+      }, 50);
+    });
     input.addEventListener("input", resize);
     input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
+      if (event.shiftKey) return;
       if (composing || event.isComposing || event.keyCode === 229) return;
-      if (!(event.ctrlKey || event.metaKey)) return;
       event.preventDefault();
       form.requestSubmit();
     }, true);
