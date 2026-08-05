@@ -62,6 +62,24 @@ class OnePassRouterTests(unittest.TestCase):
         self.assertIn("2026-08-05", route["goal"])
         self.assertEqual(route["source"], "one_pass_tool_route")
 
+    def test_text_reply_cannot_bypass_required_tool_guard(self) -> None:
+        response = {"content": "今日は予定がありません。", "tool_calls": []}
+        with patch.object(capability_router, "chat_completion", return_value=response):
+            route = capability_router.choose("今日の予定を教えて", history=[])
+
+        self.assertEqual(route["type"], "agent")
+        self.assertEqual(route["capabilities"], ["calendar"])
+        self.assertEqual(route["source"], "forced_tool_guard")
+
+    def test_explicit_write_reply_is_forced_to_write_capability(self) -> None:
+        response = {"content": "追加しました。", "tool_calls": []}
+        with patch.object(capability_router, "chat_completion", return_value=response):
+            route = capability_router.choose("タスクに卒研資料を追加して", history=[])
+
+        self.assertEqual(route["type"], "agent")
+        self.assertEqual(route["capabilities"], ["lists_and_tasks"])
+        self.assertEqual(route["source"], "forced_tool_guard")
+
     def test_router_failure_exposes_only_explicit_read_fallback(self) -> None:
         with patch.object(
             capability_router,
@@ -96,6 +114,32 @@ class OnePassRouterTests(unittest.TestCase):
         self.assertTrue(selected)
         self.assertTrue(selected.isdisjoint(forbidden_writes))
 
+    def test_truncated_direct_reply_is_continued_once(self) -> None:
+        first = {
+            "content": "前半です。",
+            "tool_calls": [],
+            "_finish_reason": "length",
+        }
+        second = {
+            "content": "後半です。",
+            "tool_calls": [],
+            "_finish_reason": "stop",
+        }
+        with patch.object(
+            capability_router,
+            "chat_completion",
+            side_effect=[first, second],
+        ) as completion:
+            route = capability_router.choose("長めに説明して", history=[])
+
+        self.assertEqual(route["type"], "reply")
+        self.assertEqual(route["reply"], "前半です。\n後半です。")
+        self.assertEqual(completion.call_count, 2)
+        self.assertGreaterEqual(
+            completion.call_args_list[0].kwargs["max_tokens"],
+            1024,
+        )
+
     def test_dynamic_clock_is_user_side_and_system_prefix_is_stable(self) -> None:
         captured: list[list[dict[str, str]]] = []
 
@@ -115,6 +159,13 @@ class OnePassRouterTests(unittest.TestCase):
         self.assertNotEqual(captured[0][-1]["content"], captured[1][-1]["content"])
         self.assertNotIn("2026-08-05", captured[0][0]["content"])
         self.assertIn("2026-08-05", captured[0][-1]["content"])
+
+    def test_one_pass_prompt_keeps_personality_and_quality_rules(self) -> None:
+        prompt = capability_router._ROUTER_SYSTEM_PROMPT
+        self.assertIn("親しい大学の同級生", prompt)
+        self.assertIn("率直な意見", prompt)
+        self.assertIn("読み上げやすいプレーンテキスト", prompt)
+        self.assertIn("推測で作らない", prompt)
 
     def test_agent_prompt_keeps_safety_rules_and_allows_minimal_markdown(self) -> None:
         prompt = agent.AGENT_SYSTEM_PROMPT
