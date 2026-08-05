@@ -21,6 +21,10 @@
   height: 100%;
   outline: none;
   cursor: grab;
+  touch-action: none;
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .univ-webgl-stage canvas:active { cursor: grabbing; }

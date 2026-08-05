@@ -52,6 +52,23 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn("document.body.appendChild(detail)", bridge)
         self.assertIn('detail.classList.add("univ-detail-portal")', bridge)
 
+    def test_webgl_input_is_owned_by_orbit_controls_and_taps_are_not_drags(self) -> None:
+        source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
+
+        self.assertIn("state.controls.enableRotate = true", source)
+        self.assertIn("state.controls.enableZoom = true", source)
+        self.assertIn("state.controls.enableDamping = false", source)
+        self.assertIn("state.controls.touches.ONE = THREE.TOUCH.ROTATE", source)
+        self.assertIn("state.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN", source)
+        self.assertIn("const activePointers = new Set()", source)
+        self.assertIn("suppressSelectionUntilPointersClear", source)
+        self.assertIn("start.pointerId !== event.pointerId", source)
+        self.assertIn("if (start.moved || distance > threshold", source)
+        self.assertIn('canvas.addEventListener("pointercancel", cancelPointer)', source)
+        self.assertIn('canvas.addEventListener("wheel"', source)
+        self.assertIn("overscroll-behavior: contain", css)
+
     def test_labels_remain_dom_text_instead_of_canvas_textures(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")

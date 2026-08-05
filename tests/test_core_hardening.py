@@ -175,9 +175,9 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         self.assertEqual(result["model_route"]["tool_rounds"], 2)
 
     def test_agent_prompt_allows_complete_analysis(self) -> None:
-        self.assertIn("十分な長さ", agent.AGENT_SYSTEM_PROMPT)
         self.assertIn("結論", agent.AGENT_SYSTEM_PROMPT)
         self.assertNotIn("1〜2文", agent.AGENT_SYSTEM_PROMPT)
+
 
     def test_episode_summarizer_calls_agent_endpoint(self) -> None:
         rows = [

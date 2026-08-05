@@ -20,7 +20,7 @@ class UnivPointerInteractionTests(unittest.TestCase):
         self.assertIn('frame.addEventListener("pointerdown"', source)
         self.assertIn('frame.addEventListener("pointermove"', source)
         self.assertIn("if (!state.dragging || state.pointerId !== event.pointerId) return;", source)
-        self.assertIn('event.pointerType === "touch" ? 0.075 : 0.11', source)
+        self.assertIn('const yawSensitivity = event.pointerType === "touch" ? 0.14 : 0.11', source)
 
     def test_mobile_univ_supports_two_finger_pinch_without_overwriting_drag(self):
         source = (ROOT / "frontend" / "univ-space.js").read_text(encoding="utf-8")
@@ -38,7 +38,7 @@ class UnivPointerInteractionTests(unittest.TestCase):
         pointermove = source.index('frame.addEventListener("pointermove"')
         block = source[pointerdown:pointermove]
 
-        interactive_guard = block.index('event.target.closest("button, a, input, select, textarea, .life-map__core")')
+        interactive_guard = block.index('event.target.closest("button, a, input, select, textarea, .life-map__core, #detail-panel")')
         single_pointer_capture = block.rindex("frame.setPointerCapture?.(event.pointerId)")
         self.assertLess(interactive_guard, single_pointer_capture)
         self.assertIn("frame.hasPointerCapture?.(pointerId)", source)

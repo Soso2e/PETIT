@@ -82,27 +82,24 @@ _GROUP_DESCRIPTIONS = {
     "projects": "PETIT内部プロジェクトと外部ソースの継続管理",
 }
 
-_ROUTER_SYSTEM_PROMPT = """あなたはPETITのCapability Selectorです。会話文脈から、Agentへ公開するCapabilityだけを選び、JSONだけを返してください。
-単語一致ではなく、直前の会話・対象・操作・質問か書き込みかを考えてください。
+_ROUTER_SYSTEM_PROMPT = """あなたはPETITのCapability Selector。会話文脈からAgentへ公開するCapabilityを選び、JSONだけを返してください。
 
 返却形式:
 {"capabilities":["group"],"goal":"Agentが達成すべき目的","confidence":0.0}
 
-通常の雑談やTool不要の会話ではcapabilitiesを空配列にしてください。最終返答は必ずAgentが生成するため、返答本文は作らないでください。
+Tool不要の会話・雑談ではcapabilitiesを空配列にしてください。最終返答文言は作成しないでください。
 
 利用可能なCapability:
 %s
 
 ルール:
 - 最大4グループまで。
-- Tool名や引数は返さない。
-- 「〜について」のような話題提示だけで、作成や追加を推測しない。
-- 書き込み意図は、追加・作成・変更・完了などが文脈上明確な場合だけ扱う。
-- 不明瞭でも勝手な書き込みを選ばず、必要な読み取りCapabilityだけを選ぶ。
-- Toolが不要なら空配列にする。
-- Markdownは禁止。""" % "\n".join(
+- 「〜について」等の話題提示だけで作成や追加を推測しない。
+- 書き込みは文脈上明確な場合のみ扱い、不明瞭なら読み取りCapabilityを選ぶ。
+""" % "\n".join(
     f"- {name}: {_GROUP_DESCRIPTIONS[name]}" for name in CAPABILITY_GROUPS
 )
+
 
 
 def _extract_json(content: str) -> dict[str, Any] | None:

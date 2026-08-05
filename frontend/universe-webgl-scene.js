@@ -148,8 +148,12 @@
 
     state.controls = new OrbitControls(state.camera, state.renderer.domElement);
     state.controls.target.set(0, 0, 0);
-    state.controls.enableDamping = !reducedMotion.matches;
+    // Camera movement must stop with the drag. Residual damping felt like
+    // pointer-follow rotation even though OrbitControls only rotates on drag.
+    state.controls.enableDamping = false;
     state.controls.dampingFactor = 0.065;
+    state.controls.enableRotate = true;
+    state.controls.enableZoom = true;
     state.controls.enablePan = true;
     state.controls.screenSpacePanning = true;
     state.controls.minDistance = 8;
@@ -157,6 +161,12 @@
     state.controls.maxPolarAngle = Math.PI * 0.92;
     state.controls.minPolarAngle = Math.PI * 0.08;
     state.controls.zoomToCursor = true;
+    state.controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+    state.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+    state.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+    state.controls.touches.ONE = THREE.TOUCH.ROTATE;
+    state.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+    state.renderer.domElement.style.touchAction = "none";
     state.controls.update();
     state.controls.addEventListener("start", () => { state.cameraTween = null; });
 
@@ -572,22 +582,61 @@
 
   const installPointerInteraction = () => {
     const canvas = state.renderer.domElement;
+    const activePointers = new Set();
+    let suppressSelectionUntilPointersClear = false;
+
     canvas.addEventListener("pointerdown", (event) => {
-      state.pointerDown = { x: event.clientX, y: event.clientY, time: performance.now() };
+      activePointers.add(event.pointerId);
+      if (!event.isPrimary || activePointers.size > 1) {
+        state.pointerDown = null;
+        suppressSelectionUntilPointersClear = true;
+        return;
+      }
+      state.pointerDown = {
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        x: event.clientX,
+        y: event.clientY,
+        time: performance.now(),
+        moved: false,
+      };
     });
     canvas.addEventListener("pointerup", (event) => {
       const start = state.pointerDown;
       state.pointerDown = null;
-      if (!start) return;
+      activePointers.delete(event.pointerId);
+      if (activePointers.size === 0 && suppressSelectionUntilPointersClear) {
+        suppressSelectionUntilPointersClear = false;
+        return;
+      }
+      if (!start || start.pointerId !== event.pointerId || suppressSelectionUntilPointersClear) return;
       const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
-      if (distance > 6 || performance.now() - start.time > 700) return;
+      const threshold = start.pointerType === "touch" ? 10 : 5;
+      if (start.moved || distance > threshold || performance.now() - start.time > 550) return;
       const object = raycastAt(event.clientX, event.clientY);
       if (object?.userData?.entry) selectEntry(object.userData.entry);
     });
     canvas.addEventListener("pointermove", (event) => {
-      if (state.pointerDown) return;
+      if (state.pointerDown?.pointerId === event.pointerId) {
+        const distance = Math.hypot(event.clientX - state.pointerDown.x, event.clientY - state.pointerDown.y);
+        const threshold = state.pointerDown.pointerType === "touch" ? 10 : 5;
+        if (distance > threshold) state.pointerDown.moved = true;
+        return;
+      }
+      if (activePointers.size) return;
       const object = raycastAt(event.clientX, event.clientY);
       canvas.style.cursor = object ? "pointer" : "grab";
+    }, { passive: true });
+    const cancelPointer = (event) => {
+      activePointers.delete(event.pointerId);
+      if (state.pointerDown?.pointerId === event.pointerId) state.pointerDown = null;
+      if (activePointers.size === 0) suppressSelectionUntilPointersClear = false;
+    };
+    canvas.addEventListener("pointercancel", cancelPointer);
+    canvas.addEventListener("lostpointercapture", cancelPointer);
+    canvas.addEventListener("wheel", (event) => {
+      // Keep the wheel owned by OrbitControls instead of the hidden CSS camera.
+      event.stopPropagation();
     }, { passive: true });
     canvas.addEventListener("keydown", (event) => {
       if (event.key === "Escape" || event.key === "0") resetCamera();
@@ -703,10 +752,6 @@
     resize();
     requestRebuild("area-change");
   });
-  reducedMotion.addEventListener?.("change", () => {
-    if (state.controls) state.controls.enableDamping = !reducedMotion.matches;
-  });
-
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       initialize();

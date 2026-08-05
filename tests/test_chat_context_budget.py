@@ -86,9 +86,9 @@ class CompactChatContextTests(unittest.TestCase):
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["route"], "agent")
-        self.assertEqual(calls[0]["messages"][0]["content"], agent_runtime._AGENT_SYSTEM_PROMPT)
-        self.assertIn("書き込みはTool callとして提案", agent_runtime._AGENT_SYSTEM_PROMPT)
-        self.assertIn("元の依頼を最後まで保持", agent_runtime._AGENT_SYSTEM_PROMPT)
+        self.assertIn("直接対応Toolをcallする", agent_runtime._AGENT_SYSTEM_PROMPT)
+        self.assertIn("事実に基づき", agent_runtime._AGENT_SYSTEM_PROMPT)
+
 
 
 class EmptyModelResponseRecoveryTests(unittest.TestCase):

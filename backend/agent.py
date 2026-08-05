@@ -53,18 +53,13 @@ _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
 
 CHAT_SYSTEM_PROMPT = (
     "あなたはPETITのCapability Selector。最終返答は作らず、Agentへ必要なCapabilityだけを選ぶ。"
-    "Markdownは使わない。"
 )
-AGENT_SYSTEM_PROMPT = (
-    "あなたはPETIT。親しみやすく自然な日本語で、まず結論を示し、必要に応じて十分な長さで答える。"
-    "会話文脈から目的を理解し、必要なToolだけを使う。"
-    "Tool結果を踏まえて目的を満たしたか判断する。"
-    "書き込みは確認なしに実行しない。Markdownは使わない。"
-)
+AGENT_SYSTEM_PROMPT = agent_runtime._AGENT_SYSTEM_PROMPT
 SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
 _legacy.CHAT_SYSTEM_PROMPT = CHAT_SYSTEM_PROMPT
 _legacy.AGENT_SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
 _legacy.SYSTEM_PROMPT = SYSTEM_PROMPT
+
 
 _RUNTIME_AGENT_BASE_PROMPT = agent_runtime._AGENT_SYSTEM_PROMPT
 
