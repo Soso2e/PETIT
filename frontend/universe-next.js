@@ -344,23 +344,6 @@
     }, { passive: true });
   };
 
-  const installParallax = () => {
-    const card = document.querySelector(".orbit-card");
-    if (!card || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    card.addEventListener("pointermove", (event) => {
-      if (event.pointerType === "touch") return;
-      const rect = card.getBoundingClientRect();
-      const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-      const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-      card.style.setProperty("--orbit-parallax-x", `${x * 10}px`);
-      card.style.setProperty("--orbit-parallax-y", `${y * 8}px`);
-    });
-    card.addEventListener("pointerleave", () => {
-      card.style.setProperty("--orbit-parallax-x", "0px");
-      card.style.setProperty("--orbit-parallax-y", "0px");
-    });
-  };
-
   document.addEventListener("click", rememberTaskFromClick, true);
   document.addEventListener("petit:tasks-updated", (event) => {
     const tasks = event.detail?.tasks;
@@ -373,6 +356,5 @@
   document.documentElement.dataset.universeMotion = "ready";
   applyZoom(state.zoom, { persist: false });
   installZoom();
-  installParallax();
   void loadCatalog();
 })();
