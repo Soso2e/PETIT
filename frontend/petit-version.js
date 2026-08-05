@@ -1,5 +1,5 @@
-window.PETIT_VERSION = "v0.16.0";
-window.PETIT_ASSET_VERSION = "0.16.0";
+window.PETIT_VERSION = "v0.17.0";
+window.PETIT_ASSET_VERSION = "0.17.0";
 
 (() => {
   const forceCssRenderer = new URLSearchParams(window.location.search).get("renderer") === "css";
