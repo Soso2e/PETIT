@@ -643,6 +643,8 @@
   .constellation-card__counts { white-space: normal; }
   .universe-task { grid-template-columns: 1fr; gap: 4px; }
   .detail-grid--simple { grid-template-columns: 1fr; }
+  .detail-form-grid { grid-template-columns: 1fr; }
+  .settings-grid { grid-template-columns: 1fr; }
 }
 
 /* ====================================================
