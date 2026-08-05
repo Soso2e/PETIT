@@ -18,6 +18,10 @@
     lastY: 0,
   };
 
+  const touchPoints = new Map();
+  const coarsePointer = window.matchMedia("(pointer: coarse)");
+  let pinchStartDistance = 0;
+  let pinchStartZoom = 1;
   let mutationObserver = null;
   let decorateQueued = false;
 
@@ -73,6 +77,26 @@
     if (mode) mode.textContent = state.mode === "focus" ? "PLANET FOCUS" : "CORE OVERVIEW";
   };
 
+  const installTouchStyles = () => {
+    if (!coarsePointer.matches || document.querySelector("#petit-univ-touch-styles")) return;
+    const style = document.createElement("style");
+    style.id = "petit-univ-touch-styles";
+    style.textContent = `
+      @media (pointer: coarse) {
+        .univ-hud button,
+        .univ-detail-dismiss {
+          min-width: 44px;
+          min-height: 44px;
+        }
+        .univ-hud__controls button:nth-child(2),
+        .univ-hud__controls button:nth-child(3) {
+          width: 44px;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  };
+
   const ensureHud = () => {
     const root = panel();
     const graph = map();
@@ -116,6 +140,10 @@
       `;
       frame.appendChild(hud);
     }
+
+    const help = frame.querySelector(".univ-hud__help");
+    if (help && coarsePointer.matches) help.textContent = "Tap: focus · Drag: orbit · Pinch: zoom";
+    installTouchStyles();
 
     if (!document.querySelector(".univ-detail-dismiss")) {
       const dismiss = document.createElement("button");
@@ -307,6 +335,28 @@
     }, true);
   };
 
+  const touchDistance = () => {
+    const points = Array.from(touchPoints.values());
+    if (points.length !== 2) return 0;
+    return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+  };
+
+  const releasePointer = (frame, pointerId) => {
+    if (pointerId == null) return;
+    try {
+      if (frame.hasPointerCapture?.(pointerId)) frame.releasePointerCapture(pointerId);
+    } catch (_error) {
+      // Pointer may already have been released by the browser.
+    }
+  };
+
+  const stopDrag = (frame, pointerId = null) => {
+    state.dragging = false;
+    state.pointerId = null;
+    frame.classList.remove("is-dragging");
+    releasePointer(frame, pointerId);
+  };
+
   const bindInteraction = () => {
     const frame = ensureHud();
     const graph = map();
@@ -321,6 +371,19 @@
 
     frame.addEventListener("pointerdown", (event) => {
       if (!isPanelActive() || event.button !== 0) return;
+
+      if (event.pointerType === "touch") {
+        touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (touchPoints.size === 2) {
+          for (const pointerId of touchPoints.keys()) frame.setPointerCapture?.(pointerId);
+          stopDrag(frame);
+          pinchStartDistance = touchDistance();
+          pinchStartZoom = state.zoom;
+          return;
+        }
+        if (touchPoints.size > 2) return;
+      }
+
       if (event.target.closest("button, a, input, select, textarea, .life-map__core")) return;
       state.dragging = true;
       state.pointerId = event.pointerId;
@@ -331,25 +394,43 @@
     });
 
     frame.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "touch" && touchPoints.has(event.pointerId)) {
+        touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (touchPoints.size === 2) {
+          const distance = touchDistance();
+          if (distance && pinchStartDistance) {
+            state.zoom = clamp(pinchStartZoom * (distance / pinchStartDistance), 0.68, 1.72);
+            applyCamera();
+          }
+          return;
+        }
+      }
+
       if (!state.dragging || state.pointerId !== event.pointerId) return;
       const dx = event.clientX - state.lastX;
       const dy = event.clientY - state.lastY;
       state.lastX = event.clientX;
       state.lastY = event.clientY;
-      state.yaw += dx * 0.11;
-      state.pitch = clamp(state.pitch - (dy * 0.09), -24, 24);
+      const yawSensitivity = event.pointerType === "touch" ? 0.075 : 0.11;
+      const pitchSensitivity = event.pointerType === "touch" ? 0.06 : 0.09;
+      state.yaw += dx * yawSensitivity;
+      state.pitch = clamp(state.pitch - (dy * pitchSensitivity), -24, 24);
       applyCamera();
     });
 
-    const endDrag = (event) => {
-      if (state.pointerId !== event.pointerId) return;
-      state.dragging = false;
-      state.pointerId = null;
-      frame.classList.remove("is-dragging");
-      frame.releasePointerCapture?.(event.pointerId);
+    const endPointer = (event) => {
+      if (event.pointerType === "touch") {
+        touchPoints.delete(event.pointerId);
+        if (touchPoints.size < 2) {
+          pinchStartDistance = 0;
+          pinchStartZoom = state.zoom;
+        }
+      }
+      if (state.pointerId === event.pointerId) stopDrag(frame, event.pointerId);
+      else releasePointer(frame, event.pointerId);
     };
-    frame.addEventListener("pointerup", endDrag);
-    frame.addEventListener("pointercancel", endDrag);
+    frame.addEventListener("pointerup", endPointer);
+    frame.addEventListener("pointercancel", endPointer);
 
     frame.addEventListener("wheel", (event) => {
       if (!isPanelActive()) return;
