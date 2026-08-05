@@ -181,21 +181,8 @@
     const card = document.querySelector(".orbit-card");
     if (!card) return;
 
-    const reset = () => {
-      card.style.setProperty("--orbit-tilt-x", "0deg");
-      card.style.setProperty("--orbit-tilt-y", "0deg");
-    };
-
-    card.addEventListener("pointermove", (event) => {
-      if (event.pointerType === "touch" || reducedMotion.matches) return;
-      const rect = card.getBoundingClientRect();
-      const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
-      const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
-      card.style.setProperty("--orbit-tilt-x", `${(x * 2.4).toFixed(2)}deg`);
-      card.style.setProperty("--orbit-tilt-y", `${(-y * 1.8).toFixed(2)}deg`);
-    }, { passive: true });
-    card.addEventListener("pointerleave", reset, { passive: true });
-    reducedMotion.addEventListener?.("change", reset);
+    card.style.setProperty("--orbit-tilt-x", "0deg");
+    card.style.setProperty("--orbit-tilt-y", "0deg");
   };
 
   const installObservers = () => {

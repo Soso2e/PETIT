@@ -593,12 +593,78 @@
     fragment.querySelector('[data-detail="status"]').textContent = isDone(task) ? "完了" : normalizeStatus(task.status);
     fragment.querySelector('[data-detail="bucket"]').textContent = isLow(task) ? "あとで" : (isHigh(task) ? "重要" : "Mid");
     fragment.querySelector('[data-detail="due"]').textContent = text(task.due_date, "期限なし");
+    const priorityEl = fragment.querySelector('[data-detail="priority"]');
+    if (priorityEl) priorityEl.textContent = text(task.priority, "Mid");
+    const areaEl = fragment.querySelector('[data-detail="area"]');
+    if (areaEl) areaEl.textContent = text(task.area, "未設定");
     fragment.querySelector('[data-detail="project"]').textContent = taskProject(task);
     fragment.querySelector('[data-detail="reason"]').textContent = text(task.reason || task.summary, "メモはありません。");
     const sync = syncClass(task);
     const syncEl = fragment.querySelector('[data-detail="sync"]');
     syncEl.textContent = sync === "synced" ? "" : `同期状態: ${sync}`;
     syncEl.hidden = sync === "synced";
+
+    const editToggleBtn = fragment.querySelector('[data-action="toggle-edit"]');
+    const cancelEditBtn = fragment.querySelector('[data-action="cancel-edit"]');
+    const readViews = fragment.querySelectorAll('[data-detail-view="read"]');
+    const editForm = fragment.querySelector('[data-detail-form]');
+
+    if (editForm) {
+      const titleInput = editForm.querySelector('input[name="title"]');
+      const statusSelect = editForm.querySelector('select[name="status"]');
+      const dueInput = editForm.querySelector('input[name="due_date"]');
+      const prioritySelect = editForm.querySelector('select[name="priority"]');
+      const areaSelect = editForm.querySelector('select[name="area"]');
+      const reasonTextarea = editForm.querySelector('textarea[name="reason"]');
+
+      if (titleInput) titleInput.value = task.title || "";
+      if (statusSelect) statusSelect.value = normalizeStatus(task.status);
+      if (dueInput) dueInput.value = task.due_date || "";
+      if (prioritySelect) prioritySelect.value = task.priority || "Mid";
+      if (areaSelect) areaSelect.value = task.area || "";
+      if (reasonTextarea) reasonTextarea.value = task.reason || task.summary || "";
+
+      const toggleEdit = (showEdit) => {
+        readViews.forEach((el) => { el.hidden = showEdit; });
+        editForm.hidden = !showEdit;
+        if (editToggleBtn) editToggleBtn.textContent = showEdit ? "キャンセル" : "編集";
+      };
+
+      editToggleBtn?.addEventListener("click", () => toggleEdit(editForm.hidden));
+      cancelEditBtn?.addEventListener("click", () => toggleEdit(false));
+
+      editForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const numericId = taskNumericId(task);
+        if (numericId == null) return;
+        const submitBtn = editForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = "保存中…";
+        try {
+          const payload = {
+            title: titleInput.value.trim(),
+            status: statusSelect.value,
+            due_date: dueInput.value.trim(),
+            priority: prioritySelect.value,
+            area: areaSelect.value,
+            reason: reasonTextarea.value.trim(),
+          };
+          const result = await requestJson(`/api/notifications/tasks/${encodeURIComponent(numericId)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          showFeedback("タスク情報を更新しました。");
+          await loadUniverse();
+          if (result.task) renderDetail(result.task, index);
+        } catch (err) {
+          showFeedback(`更新できませんでした: ${err.message}`);
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "変更を保存";
+        }
+      });
+    }
 
     const completeButton = fragment.querySelector('[data-action="complete"]');
     const bucketButton = fragment.querySelector('[data-action="bucket"]');
@@ -1075,6 +1141,99 @@
   workPauseEl?.addEventListener("click", () => updateWorkSession(state.workSession?.status === "paused" ? "resume" : "pause"));
   workEndEl?.addEventListener("click", () => updateWorkSession("end"));
 
+  const workFrequencyEl = byId("work-frequency");
+  const workCheckNowEl = byId("work-check-now");
+  if (workFrequencyEl) {
+    const savedFreq = localStorage.getItem("petit_work_frequency");
+    if (savedFreq) workFrequencyEl.value = savedFreq;
+    workFrequencyEl.addEventListener("change", () => {
+      localStorage.setItem("petit_work_frequency", workFrequencyEl.value);
+      showFeedback(`声かけ頻度を${workFrequencyEl.options[workFrequencyEl.selectedIndex]?.text || workFrequencyEl.value}に変更しました。`);
+    });
+  }
+
+  workCheckNowEl?.addEventListener("click", async () => {
+    try {
+      await requestJson("/api/notifications/check-now", { method: "POST" });
+      showFeedback("PETITに声かけをリクエストしました。");
+    } catch (err) {
+      showFeedback(`声かけリクエスト失敗: ${err.message}`);
+    }
+  });
+
+  document.querySelectorAll(".quick-prompts button[data-chat-prompt]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const promptText = btn.dataset.chatPrompt;
+      if (promptText && chatInputEl) {
+        switchView("chat");
+        chatInputEl.value = promptText;
+        chatInputEl.focus();
+      }
+    });
+  });
+
+  const chatModelSelectEl = byId("chat-model-select");
+  const agentModelSelectEl = byId("agent-model-select");
+  const modelRoutingStateEl = byId("model-routing-state");
+  let modelRoutingSnapshot = null;
+
+  const renderRouteSelect = (route, selectEl, snapshot) => {
+    if (!selectEl || !snapshot || !snapshot.routes || !snapshot.routes[route]) return;
+    const routeState = snapshot.routes[route];
+    selectEl.replaceChildren();
+    for (const option of routeState.options || []) {
+      const element = document.createElement("option");
+      element.value = option.profile;
+      element.textContent = `${option.label || option.profile}${option.provider ? ` (${option.provider})` : ""}`;
+      element.disabled = !option.configured;
+      selectEl.appendChild(element);
+    }
+    selectEl.value = routeState.selected;
+  };
+
+  const renderModelRouting = (snapshot) => {
+    modelRoutingSnapshot = snapshot;
+    renderRouteSelect("chat", chatModelSelectEl, snapshot);
+    renderRouteSelect("agent", agentModelSelectEl, snapshot);
+  };
+
+  const loadModelRouting = async () => {
+    if (!chatModelSelectEl || !agentModelSelectEl) return;
+    try {
+      const data = await requestJson("/api/model-routing");
+      if (data) renderModelRouting(data);
+      if (modelRoutingStateEl) modelRoutingStateEl.textContent = "";
+    } catch (e) {
+      if (modelRoutingStateEl) modelRoutingStateEl.textContent = "モデル設定を取得できません";
+    }
+  };
+
+  const updateModelRouting = async (route, profile) => {
+    if (!modelRoutingStateEl) return;
+    const previous = modelRoutingSnapshot && modelRoutingSnapshot.selections
+      ? modelRoutingSnapshot.selections[route]
+      : "local";
+    modelRoutingStateEl.textContent = "切り替え中…";
+    try {
+      const data = await requestJson("/api/model-routing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [route]: profile }),
+      });
+      renderModelRouting(data);
+      const active = data.routes[route].active;
+      modelRoutingStateEl.textContent = `${route === "chat" ? "Chat" : "Agent"}を${active.label || profile}へ切替済み`;
+      void checkHealth();
+    } catch (e) {
+      const selectEl = route === "chat" ? chatModelSelectEl : agentModelSelectEl;
+      if (selectEl) selectEl.value = previous;
+      modelRoutingStateEl.textContent = "切り替え失敗: " + e.message;
+    }
+  };
+
+  chatModelSelectEl?.addEventListener("change", () => updateModelRouting("chat", chatModelSelectEl.value));
+  agentModelSelectEl?.addEventListener("change", () => updateModelRouting("agent", agentModelSelectEl.value));
+
   window.setInterval(() => {
     renderActive();
     if (Date.now() - lastWorkSessionPollAt >= 15000) {
@@ -1107,6 +1266,7 @@
 
   const initialize = async () => {
     checkHealth();
+    await loadModelRouting();
     await restoreHistory();
     await loadUniverse();
     await restoreWorkSession();
