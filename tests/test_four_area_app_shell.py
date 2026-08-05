@@ -57,10 +57,10 @@ class ThreeAreaAppShellTests(unittest.TestCase):
         self.assertIn('loadScript("/static/app_shell.js", "app-shell"', version)
         self.assertIn('loadScript("/static/petit-corner-shell.js", "corner-shell")', version)
 
-    def test_version_is_v0150(self):
+    def test_version_is_v0170(self):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.15.0"', source)
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.15.0"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.17.0"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.17.0"', source)
 
     def test_universe_assets_use_current_version_without_duplicate_app_shell_loader(self):
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
