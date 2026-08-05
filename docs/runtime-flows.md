@@ -1,6 +1,6 @@
 # PETIT Runtime Flows
 
-この文書は、PETITの会話処理・Capability選択・Tool Calling・確認付き書き込み・進捗表示の実装フローをMermaidで可視化したものです。
+この文書は、PETITの会話処理、One-pass Conversation Entry、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
 実装の根拠:
 
@@ -8,9 +8,8 @@
 - `backend/agent.py`
 - `backend/agent_runtime.py`
 - `backend/capability_router.py`
+- `backend/time_context.py`
 - `backend/tools/registry.py`
-- `backend/tools/agent_actions.py`
-- `backend/tools/task_hierarchy.py`
 - `backend/agent_state.py`
 - `backend/agent_progress.py`
 - `backend/project_router.py`
@@ -30,15 +29,16 @@ flowchart TD
 
     namedTask{名前付きタスク完了か}
     namedTaskRoute[SQLiteの tasks_cache で候補解決]
-
     projectRoute{Project Continuity系か}
     projectHandle[登録 完了 切替 復帰を決定論的に処理]
-
     exactTime{現在時刻だけの依頼か}
     timeTool[get_current_time を直接実行]
 
     runtime[Agent Runtime]
-    capability[Capability Selector]
+    entry[One-pass Conversation Entry]
+    entryResult{Tool不要か}
+    directReply[最初のLLM回答をそのまま採用]
+    capability[CapabilityをToolへ展開]
     agentLoop[Agent Tool Loop]
 
     response[ChatResponseを生成]
@@ -57,40 +57,59 @@ flowchart TD
     projectRoute -->|はい| projectHandle --> response
     projectRoute -->|いいえ| exactTime
     exactTime -->|はい| timeTool --> response
-    exactTime -->|いいえ| runtime --> capability --> agentLoop --> response
+    exactTime -->|いいえ| runtime --> entry --> entryResult
+    entryResult -->|はい| directReply --> response
+    entryResult -->|いいえ| capability --> agentLoop --> response
     response --> pending --> persist
     persist -->|はい| save --> artifacts --> output
     persist -->|いいえ| output
 ```
 
+Tool不要の雑談・相談・説明・文章作成は、Conversation Entryの1回目のLLM回答で終了します。個人データ、現在情報、外部ソース、または操作が必要な場合だけAgent Runtimeへ進みます。
+
 ---
 
-## 2. Capability Selector
+## 2. One-pass Conversation Entry
 
 ```mermaid
 flowchart TD
     start([Agent Runtime開始])
     planning[planning進捗を発行]
-    context[直近履歴 最大8件 3200文字]
-    selector[ChatモデルへCapability選択を依頼]
-    parsed{JSONを解釈できたか}
-    fallback[Capability空配列でAgentへ]
-    validate[最大4グループに正規化]
-    map[登録済みToolだけへ展開]
-    prompt[元の依頼 目的 履歴をAgentへ渡す]
+    history[直近履歴 最大8件 3200文字]
+    clock{相対日付や時刻表現があるか}
+    userClock[必要な精度の日時をuser側へ付加]
+    staticSystem[静的なConversation Entry system prompt]
+    selector[Chatモデルを1回呼ぶ]
+    routed{route_to_agentをcallしたか}
+    reply[自然文を最終回答として返す]
+    parse[Capability 最大4グループを検証]
+    valid{有効なCapabilityがあるか}
+    safeFallback[fallback_readだけを公開]
+    map[登録済みToolへ展開]
+    goal[元の依頼 目的 必要時刻をAgentへ渡す]
     agent[Agent Tool Loopへ]
 
-    start --> planning --> context --> selector --> parsed
-    parsed -->|いいえ| fallback --> prompt
-    parsed -->|はい| validate --> map --> prompt
-    prompt --> agent
+    start --> planning --> history --> clock
+    clock -->|はい| userClock --> staticSystem
+    clock -->|いいえ| staticSystem
+    staticSystem --> selector --> routed
+    routed -->|いいえ| reply
+    routed -->|はい| parse --> valid
+    valid -->|はい| map --> goal --> agent
+    valid -->|いいえ| safeFallback --> goal
 ```
+
+日時はsystem promptへ毎ターン結合せず、相対日付・相対時刻があるターンだけuser側へ注入します。
+
+- 日付だけ必要: タイムゾーン、日付、曜日
+- 時刻も必要: タイムゾーン、分単位の現在日時
+- 「今何時？」だけの依頼: LLMを使わず決定論的に処理
 
 ### Capabilityと公開Tool
 
 ```mermaid
 flowchart LR
-    selector[Capability Selector]
+    selector[route_to_agent]
 
     tasks[lists_and_tasks]
     calendar[calendar]
@@ -99,14 +118,16 @@ flowchart LR
     web[web]
     memory[memory]
     projects[projects]
+    fallback[fallback_read 内部専用]
 
-    taskTools["get_lists / get_list_items / create_list / add_list_item / get_tasks / create_task / update_task / set_task_parent / complete_task / get_task_sync_status / retry_task_sync / sync_notion_tasks"]
-    calendarTools["get_current_time / get_schedule / add_schedule / sync_calendar / create_reminder / get_reminders / manage_reminder / get_weather"]
-    knowledgeTools["search_memory / search_brain_notes / search_notion / edit_brain_note / sync_obsidian_vault"]
-    githubTools["review_github_activity / sync_github_evidence / get_github_repository_candidates / link_github_repository_candidate / ignore_github_repository_candidate / inspect_github_repository"]
-    webTools["search_news / start_background_research"]
-    memoryTools["save_memory / summarize_now / create_daily_briefing / restore_context / create_handoff_note"]
-    projectTools["get_project_status / get_tasks / get_notion_project_candidates / get_linkraft_project_candidates / get_brain_note_candidates / get_github_repository_candidates / sync_notion_tasks / sync_linkraft_projects / sync_github_evidence"]
+    taskTools["タスク リスト Notion同期"]
+    calendarTools["時刻 予定 天気 リマインダー"]
+    knowledgeTools["BRAIN Notion 記憶"]
+    githubTools["GitHub差分 PR Repository"]
+    webTools["ニュース 外部調査"]
+    memoryTools["保存 要約 復帰 引き継ぎ"]
+    projectTools["Project状態 候補 source同期"]
+    readTools["明示列挙した読取Toolだけ"]
 
     selector --> tasks --> taskTools
     selector --> calendar --> calendarTools
@@ -115,7 +136,10 @@ flowchart LR
     selector --> web --> webTools
     selector --> memory --> memoryTools
     selector --> projects --> projectTools
+    fallback --> readTools
 ```
+
+`fallback_read`はSelectorへ公開しない内部グループです。Router出力の欠落、JSON互換出力の失敗、Tool call引数の破損、モデル接続失敗時にだけ使い、書き込みToolを含めません。
 
 ---
 
@@ -131,7 +155,7 @@ flowchart TD
     fallbackAnswer[言い換えを求める固定文]
     incomplete{作業予告またはRuntime外の確認だけか}
     retryUsed{再実行済みか}
-    forceTool[このターンでTool callし Runtime確認へ進むよう再指示]
+    forceTool[このターンでTool callするよう再指示]
     deferredFail[未実行を明示した失敗回答]
     finalizing[finalizing進捗を発行]
     final[/最終回答/]
@@ -140,13 +164,12 @@ flowchart TD
     stopRound[tool_iteration_limitで停止]
     normalize[Tool callsを正規化]
     each[各Tool callを処理]
-
     totalLimit{Tool総数6回に到達か}
     stopTotal[tool_call_limitで停止]
     allowed{公開済みToolか}
     notAllowed[tool_not_allowed結果]
-    args{JSON解釈と確認対象schema検証に成功したか}
-    badArgs[理由付きinvalid_tool_arguments結果]
+    args{引数検証に成功したか}
+    badArgs[invalid_tool_arguments結果]
     duplicate{同じToolと引数を実行済みか}
     duplicateStop[duplicate_tool_call結果]
     confirmation{確認が必要か}
@@ -182,7 +205,9 @@ flowchart TD
     compact --> append --> call
 ```
 
-親子関係の変更は`set_task_parent`へ集約する。タスク名の変更も同時に必要な場合は、同じTool callの`title`へ含め、Runtimeの確認を1回だけ表示する。`update_task`へ`parent_id`や`parent_task_id`を渡した場合は、確認画面を出す前に不正引数としてAgentへ返し、正しいToolの再選択を促す。
+親子関係の変更は`set_task_parent`へ集約します。タスク名変更も同時に必要な場合は、同じTool callの`title`へ含め、Runtimeの確認を1回だけ表示します。
+
+Agentの出力は通常プレーンテキストとし、比較・手順・コードなど可読性が明確に上がる場合だけ最小限のMarkdownを許可します。
 
 ---
 
@@ -205,11 +230,11 @@ flowchart TD
     writeRisk{confirm_write または destructiveか}
     schema[properties required type enumを検証]
     valid{schemaに適合するか}
-    invalid[[error]またはinvalid_tool_argumentsとしてAgentへ返す]
+    invalid[[error]またはinvalid_tool_arguments]
     dispatch[handlerを実行]
     error{例外や実行時エラーか}
-    errorText[[error]文字列を返す]
-    result[JSONまたは文字列を返す]
+    errorText[[error]文字列]
+    result[JSONまたは文字列]
 
     decorator --> riskInput
     riskInput -->|はい| explicit --> register
@@ -229,8 +254,6 @@ flowchart TD
     error -->|いいえ| result
 ```
 
-確認対象Toolでは、未定義引数、必須不足、型不一致、enum外の値を承認前に拒否する。既存Toolが許容している数字文字列IDは、`integer`互換として維持する。
-
 ### リスク区分
 
 ```mermaid
@@ -239,7 +262,6 @@ flowchart LR
     lowWrite[low_risk_write]
     confirmWrite[confirm_write]
     destructive[destructive]
-
     direct[その場で実行]
     approval[ユーザー確認が必要]
 
@@ -258,7 +280,6 @@ flowchart TD
     proposal[Agentが確認対象Toolを提案]
     args[Tool schema検証済みの引数]
     saveState[Agent stateをSQLiteへ保存]
-    stored["original_request / messages / capabilities / selected_names / attempted / rounds / used_tools / request_id / session_id"]
     confirmation[Runtimeが確認文とexecute_agent_writeを1回だけ返す]
     register[main.pyがapproval_idを登録 10分TTL]
     decision{ユーザーが承認したか}
@@ -277,7 +298,7 @@ flowchart TD
     final[自然な最終回答]
     delete[Agent stateを削除]
 
-    proposal --> args --> saveState --> stored --> confirmation --> register --> decision
+    proposal --> args --> saveState --> confirmation --> register --> decision
     decision -->|いいえ| cancel
     decision -->|はい| wrapper --> load
     load -->|いいえ| expired
@@ -288,7 +309,7 @@ flowchart TD
     failed -->|はい| resume --> readOnly --> final --> delete
 ```
 
-Agentが自然文だけで「実行しますか？」と返した場合は承認として扱わず、確認対象Toolをcallするよう1回だけ再指示する。これにより、Agent本文とRuntimeカードの二重・三重確認を防ぐ。
+Agentが自然文だけで「実行しますか？」と返した場合は承認として扱わず、確認対象Toolをcallするよう1回だけ再指示します。
 
 ---
 
@@ -386,7 +407,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     chat([PETIT Chat])
-
+    direct[Tool不要の会話]
     tasks[タスクと任意リスト]
     cal[時刻 予定 天気 リマインダー]
     know[BRAIN Notion 記憶検索]
@@ -394,35 +415,17 @@ flowchart TD
     web[ニュースと外部調査]
     mem[長期記憶 要約 復帰 引き継ぎ]
     project[Project Continuity]
-    direct[決定論的処理]
+    deterministic[決定論的処理]
 
-    taskRead[一覧 取得 同期状態]
-    taskWrite[作成 更新 完了 親子関係 同期再試行]
-    calRead[現在時刻 予定 天気 リマインダー一覧]
-    calWrite[予定追加 リマインダー操作 同期]
-    knowRead[記憶 BRAIN Notion検索]
-    knowWrite[BRAIN編集 Vault同期]
-    gitRead[活動レビュー Repository検査 候補取得]
-    gitWrite[Repository紐付け 候補無視 同期]
-    webRead[ニュース検索]
-    webResearch[Background research開始]
-    memOps[保存 要約 Daily briefing Context復元 Handoff]
-    projectOps[状態取得 外部候補取得 source同期 開始 再開 完了]
-    directOps[名前付きTask完了 現在時刻 Project明示操作]
-
-    chat --> tasks --> taskRead
-    tasks --> taskWrite
-    chat --> cal --> calRead
-    cal --> calWrite
-    chat --> know --> knowRead
-    know --> knowWrite
-    chat --> git --> gitRead
-    git --> gitWrite
-    chat --> web --> webRead
-    web --> webResearch
-    chat --> mem --> memOps
-    chat --> project --> projectOps
-    chat --> direct --> directOps
+    chat --> direct
+    chat --> tasks
+    chat --> cal
+    chat --> know
+    chat --> git
+    chat --> web
+    chat --> mem
+    chat --> project
+    chat --> deterministic
 ```
 
 ---
@@ -431,26 +434,30 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    limits[停止条件]
+    limits[停止条件と安全境界]
+    onePass[Tool不要会話は1回のLLMで終了]
+    safeFallback[Router失敗時は読取Toolだけ]
+    staticPrefix[system promptへ動的時刻を混ぜない]
     round[Toolラウンド上限]
     calls[Tool総数6回]
     duplicate[同一Tool 同一引数の再実行禁止]
     allowed[Capability外Toolの拒否]
-    args[確認対象の未定義引数 必須 型 enumを承認前に拒否]
+    args[確認対象引数を承認前に検証]
     defer[作業予告のみの回答を1回再実行]
-    manualConfirm[Runtime外の書き込み確認をTool callへ戻す]
     confirm[confirm_write destructiveは承認必須]
     resume[Agent state 30分TTL]
     approval[approval_id 10分TTL]
     writeOnce[承認後の追加書き込みは禁止]
 
+    limits --> onePass
+    limits --> safeFallback
+    limits --> staticPrefix
     limits --> round
     limits --> calls
     limits --> duplicate
     limits --> allowed
     limits --> args
     limits --> defer
-    limits --> manualConfirm
     limits --> confirm
     limits --> resume
     limits --> approval
@@ -465,7 +472,7 @@ flowchart LR
 
 - `/api/chat`と確認API
 - 決定論的な会話ルート
-- Capabilityグループまたは公開Tool
+- Conversation EntryとCapabilityグループ
 - Agent Tool Loopと停止条件
 - Tool Registryとrisk
 - 確認付き書き込みとAgent state再開
