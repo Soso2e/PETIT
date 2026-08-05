@@ -1,12 +1,11 @@
 {
   "name": "PETIT",
-  "version": "0.14.1",
-  "release": "univ-corner-shell",
+  "version": "0.16.0",
+  "release": "universe-full-legacy-migration",
   "includes": [
-    "top-left status and sync information",
-    "top-right Univ, Tasks, and PETIT icon navigation",
-    "bottom-left reminders and settings utilities",
-    "classic UI fallback and detailed settings access",
-    "iPhone safe-area responsive layout"
+    "voice control and audio response in universe UI",
+    "model routing settings and push notification configuration in universe UI",
+    "full task editing form directly inside detail panel",
+    "work session companion frequency control and prompt shortcuts"
   ]
 }

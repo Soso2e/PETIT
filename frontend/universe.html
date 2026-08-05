@@ -39,8 +39,10 @@
         <button class="view-tab" data-view="tasks">Tasks</button>
         <button class="view-tab" data-view="reminders">Remind</button>
         <button class="view-tab" data-view="chat">Chat</button>
+        <button class="view-tab" data-view="settings">Settings</button>
       </nav>
       <div class="topbar-actions">
+        <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
         <span id="sync-pill" class="sync-pill" hidden>同期確認中</span>
         <span class="version-pill" data-petit-version></span>
         <a class="legacy-link" href="/static/legacy.html">旧UI</a>
@@ -130,8 +132,15 @@
               </div>
               <div class="work-session-controls">
                 <span id="active-elapsed">0分</span>
+                <select id="work-frequency" class="work-frequency" aria-label="PETITの声かけ頻度">
+                  <option value="10">10分ごと</option>
+                  <option value="20" selected>20分ごと</option>
+                  <option value="boundary">区切りだけ</option>
+                  <option value="quiet">静かにする</option>
+                </select>
                 <button id="work-session-continue" type="button" hidden>まだ続ける</button>
                 <button id="work-session-pause" type="button" hidden>一時停止</button>
+                <button id="work-check-now" type="button" class="work-secondary" hidden>今声かけて</button>
                 <button id="work-session-end" type="button" hidden>終了</button>
               </div>
             </div>
@@ -170,14 +179,182 @@
       </section>
 
       <section class="view" data-view-panel="chat" hidden>
-        <div class="chat-layout"><section class="chat-panel"><div class="section-head section-head--compact"><div><span class="eyebrow">PETIT CHAT</span><h1>宇宙と会話する</h1></div><span id="chat-status" class="chat-status">接続確認中</span></div><div id="messages" class="messages" aria-live="polite"><div class="message message--assistant">いま必要なことを一緒に整理しよう。</div></div><form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="1" placeholder="PETITに話しかける"></textarea><button type="submit">送信</button></form></section><aside class="chat-context"><span class="eyebrow">CURRENT CONTEXT</span><h2 id="chat-context-title">Focus未選択</h2><p id="chat-context-copy">タスクを選ぶと、その内容を意識しながら相談できます。</p></aside></div>
+        <div class="chat-layout">
+          <section class="chat-panel">
+            <div class="section-head section-head--compact">
+              <div>
+                <span class="eyebrow">PETIT CHAT</span>
+                <h1>宇宙と会話する</h1>
+              </div>
+              <div class="chat-head-actions">
+                <button id="history-toggle" type="button" class="history-toggle" aria-expanded="false" hidden>履歴を見る</button>
+                <span id="chat-status" class="chat-status">接続確認中</span>
+              </div>
+            </div>
+            <div id="voice-state" class="voice-state" role="status" aria-live="polite"></div>
+            <div id="messages" class="messages" aria-live="polite">
+              <div class="message message--assistant">いま必要なことを一緒に整理しよう。</div>
+            </div>
+            <form id="chat-form" class="chat-composer">
+              <button id="mic" type="button" class="mic" aria-label="音声入力を開始" title="押して話す">音声</button>
+              <textarea id="chat-input" rows="1" placeholder="PETITに話しかける"></textarea>
+              <button type="submit">送信</button>
+            </form>
+          </section>
+          <aside class="chat-context">
+            <span class="eyebrow">CURRENT CONTEXT</span>
+            <h2 id="chat-context-title">Focus未選択</h2>
+            <p id="chat-context-copy">タスクを選ぶと、その内容を意識しながら相談できます。</p>
+            <div class="quick-prompts" aria-label="クイック質問">
+              <button type="button" data-chat-prompt="今日やるべきことを優先順で整理して">今日を整理</button>
+              <button type="button" data-chat-prompt="次の予定と空いている時間を教えて">予定を見る</button>
+              <button type="button" data-chat-prompt="今進んでいるプロジェクトの状況をまとめて">進捗を確認</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" data-view-panel="settings" hidden>
+        <div class="section-head settings-section-head">
+          <div>
+            <span class="eyebrow">SETTINGS</span>
+            <h1>システム設定</h1>
+            <p>使用するAIモデルと通知・動作を最適化します。</p>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <section class="settings-card">
+            <div class="settings-card__head">
+              <div>
+                <h3>AIモデル</h3>
+                <p>通常会話とツール操作で使うモデルを個別設定します。</p>
+              </div>
+            </div>
+            <div class="model-routing" aria-label="使用モデルの切り替え">
+              <label class="model-routing__field" for="chat-model-select">
+                <span>Chatモデル</span>
+                <small>会話理解・Capability選択</small>
+                <select id="chat-model-select" aria-label="Chatモデル"></select>
+              </label>
+              <label class="model-routing__field" for="agent-model-select">
+                <span>Agentモデル</span>
+                <small>最終返答・Tool実行</small>
+                <select id="agent-model-select" aria-label="Agentモデル"></select>
+              </label>
+              <span id="model-routing-state" class="model-routing__state" role="status" aria-live="polite"></span>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card__head">
+              <div>
+                <h3>Push通知設定</h3>
+                <p>リマインダーや声かけをこの端末に届ける設定です。</p>
+              </div>
+              <span id="notification-unread" class="notification-panel__badge">未読なし</span>
+            </div>
+            <div class="notification-settings-body">
+              <p id="notification-state" class="notification-panel__state" role="status" aria-live="polite">通知状態を確認中…</p>
+              <div id="notification-categories" class="notification-categories"></div>
+              <div class="notification-panel__actions">
+                <button id="notification-enable" type="button">この端末で有効にする</button>
+                <button id="notification-test" type="button" disabled>テスト通知</button>
+                <button id="notification-disable" type="button" hidden>この端末の通知を解除</button>
+              </div>
+            </div>
+          </section>
+        </div>
       </section>
     </main>
   </div>
 
   <div id="task-feedback" class="task-feedback" role="status" aria-live="polite" hidden><span data-feedback-copy></span><button type="button" data-feedback-action hidden></button></div>
 
-  <template id="detail-template"><div class="detail-panel__content"><span class="eyebrow">TASK DETAIL</span><h2 data-detail="title"></h2><div class="detail-grid detail-grid--simple"><div><span>状態</span><strong data-detail="status"></strong></div><div><span>分類</span><strong data-detail="bucket"></strong></div><div><span>期限</span><strong data-detail="due"></strong></div><div><span>親Task</span><strong data-detail="project"></strong></div></div><div class="detail-parent-field"><span>親子関係</span><div class="detail-parent-field__controls"><select data-action="parent" aria-label="Taskの親を選択"></select><button type="button" data-action="parent-apply" disabled>親Taskを変更</button></div><small data-parent-help>親タスクを読み込んでいます。</small></div><p data-detail="reason" class="detail-reason"></p><p data-detail="sync" class="detail-sync"></p><div class="detail-actions detail-actions--primary"><button type="button" data-action="complete">完了にする</button><button type="button" data-action="bucket">あとでに移す</button></div><div class="detail-actions detail-actions--secondary"><button type="button" data-action="activate">作業開始</button><button type="button" data-action="chat">PETITに相談</button></div></div></template>
+  <template id="detail-template">
+    <div class="detail-panel__content">
+      <div class="detail-header-row">
+        <span class="eyebrow">TASK DETAIL</span>
+        <button type="button" class="detail-edit-toggle" data-action="toggle-edit">編集</button>
+      </div>
+      <h2 data-detail="title"></h2>
+      
+      <div class="detail-grid detail-grid--simple" data-detail-view="read">
+        <div><span>状態</span><strong data-detail="status"></strong></div>
+        <div><span>分類</span><strong data-detail="bucket"></strong></div>
+        <div><span>期限</span><strong data-detail="due"></strong></div>
+        <div><span>優先度</span><strong data-detail="priority"></strong></div>
+        <div><span>エリア</span><strong data-detail="area"></strong></div>
+        <div><span>親Task</span><strong data-detail="project"></strong></div>
+      </div>
+      <p data-detail="reason" class="detail-reason" data-detail-view="read"></p>
+
+      <form class="detail-edit-form" data-detail-form hidden>
+        <label class="detail-form-field">
+          <span>タスク名</span>
+          <input type="text" name="title" required maxlength="240" />
+        </label>
+        <div class="detail-form-grid">
+          <label class="detail-form-field">
+            <span>状態</span>
+            <select name="status">
+              <option value="Yet">Yet</option>
+              <option value="Now">Now</option>
+              <option value="Done">Done</option>
+            </select>
+          </label>
+          <label class="detail-form-field">
+            <span>期限</span>
+            <input type="date" name="due_date" />
+          </label>
+          <label class="detail-form-field">
+            <span>優先度</span>
+            <select name="priority">
+              <option value="High">High</option>
+              <option value="Mid">Mid</option>
+              <option value="Low">Low</option>
+            </select>
+          </label>
+          <label class="detail-form-field">
+            <span>エリア</span>
+            <select name="area">
+              <option value="">未設定</option>
+              <option value="personal">個人</option>
+              <option value="group">グループ</option>
+              <option value="university">大学</option>
+              <option value="work">仕事</option>
+            </select>
+          </label>
+        </div>
+        <label class="detail-form-field">
+          <span>メモ</span>
+          <textarea name="reason" rows="3" maxlength="1000"></textarea>
+        </label>
+        <div class="detail-form-actions">
+          <button type="submit" class="detail-save-btn">変更を保存</button>
+          <button type="button" data-action="cancel-edit" class="detail-cancel-btn">キャンセル</button>
+        </div>
+      </form>
+
+      <div class="detail-parent-field">
+        <span>親子関係</span>
+        <div class="detail-parent-field__controls">
+          <select data-action="parent" aria-label="Taskの親を選択"></select>
+          <button type="button" data-action="parent-apply" disabled>親Taskを変更</button>
+        </div>
+        <small data-parent-help>親タスクを読み込んでいます。</small>
+      </div>
+      <p data-detail="sync" class="detail-sync"></p>
+
+      <div class="detail-actions detail-actions--primary">
+        <button type="button" data-action="complete">完了にする</button>
+        <button type="button" data-action="bucket">あとでに移す</button>
+      </div>
+      <div class="detail-actions detail-actions--secondary">
+        <button type="button" data-action="activate">作業開始</button>
+        <button type="button" data-action="chat">PETITに相談</button>
+      </div>
+    </div>
+  </template>
 
   <script src="/static/petit-version.js?v=0.15.0"></script>
   <script src="/static/session.js?v=0.15.0"></script>
@@ -187,5 +364,6 @@
   <script src="/static/universe-next.js?v=0.15.0"></script>
   <script src="/static/today.js?v=0.15.0"></script>
   <script src="/static/reminders.js?v=0.15.0"></script>
+  <script src="/static/voice.js?v=0.15.0"></script>
 </body>
 </html>
