@@ -27,11 +27,12 @@ class VoiceTaskInteractionTests(unittest.TestCase):
     def test_recurring_prompts_are_compact_and_plain_text(self) -> None:
         _source, module = _module("backend/agent.py")
         chat_prompt = _literal_assignment(module, "CHAT_SYSTEM_PROMPT")
-        from backend.agent import AGENT_SYSTEM_PROMPT
+        agent_prompt = _literal_assignment(module, "AGENT_SYSTEM_PROMPT")
         self.assertLess(len(chat_prompt), 120)
-        self.assertLess(len(AGENT_SYSTEM_PROMPT), 450)
-        self.assertIn("Capability Selector", chat_prompt)
-        self.assertIn("PETIT", AGENT_SYSTEM_PROMPT)
+        self.assertLess(len(agent_prompt), 450)
+        self.assertIn("PETIT", chat_prompt)
+        self.assertIn("PETIT", agent_prompt)
+        self.assertIn("プレーンテキスト", agent_prompt)
 
     def test_task_management_is_exposed_as_one_contextual_capability(self) -> None:
         source, _module_ast = _module("backend/capability_router.py")
@@ -46,9 +47,9 @@ class VoiceTaskInteractionTests(unittest.TestCase):
             '"retry_task_sync"',
         ):
             self.assertIn(marker, source)
-        self.assertIn("Capability Selector", source)
+        self.assertIn("route_to_agent", source)
+        self.assertIn('"fallback_read"', source)
         self.assertNotIn("_TASK_TOOL_SIGNALS", (ROOT / "backend" / "agent.py").read_text(encoding="utf-8"))
-
 
     def test_agent_runtime_keeps_confirmation_and_bounded_loop(self) -> None:
         source = (ROOT / "backend" / "agent_runtime.py").read_text(encoding="utf-8")

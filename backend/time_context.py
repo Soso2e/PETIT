@@ -2,12 +2,23 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 _DEFAULT_TIMEZONE = "Asia/Tokyo"
 _WEEKDAYS_JA = ("月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日")
+
+_RELATIVE_DATE_PATTERN = re.compile(
+    r"(?:今日|明日|明後日|昨日|一昨日|今夜|今朝|今週|来週|先週|今月|来月|先月|"
+    r"今年|来年|去年|週末|月末|年末|期限|締切|までに|"
+    r"(?:月|火|水|木|金|土|日)曜日|\d{1,2}月\d{1,2}日)"
+)
+_PRECISE_TIME_PATTERN = re.compile(
+    r"(?:今何時|現在時刻|今から|あと\s*\d+\s*(?:分|時間)|"
+    r"\d+\s*(?:分|時間)後|\d{1,2}\s*時(?:\s*\d{1,2}\s*分)?|何時|時刻)"
+)
 
 
 def timezone_name() -> str:
@@ -45,18 +56,75 @@ def snapshot(now: datetime | None = None) -> dict[str, Any]:
 
 
 def prompt_context(now: datetime | None = None) -> str:
-    """Build the authoritative relative-date context injected into each turn."""
+    """Build the full authoritative relative-date context."""
     value = snapshot(now)
     return (
-        "現在日時コンテキスト（この情報を最優先）:\n"
+        "実行時コンテキスト:\n"
         f"- タイムゾーン: {value['timezone']}\n"
         f"- 現在日時: {value['current_datetime']}\n"
         f"- 今日: {value['current_date']}（{value['weekday']}）\n"
-        "- 『今日』『明日』『昨日』『今週』『今日まで』などの相対日付は、上記の現在日時を基準に解釈する。\n"
-        "- モデルの学習時点や知識カットオフの日付を、現在日付として扱わない。"
+        "- 相対日付はこの日時を基準に解釈する。\n"
+        "- モデルの知識カットオフを現在日時として扱わない。"
+    )
+
+
+def _combined_text(
+    text: str,
+    history: list[dict[str, str]] | None = None,
+) -> str:
+    parts = [str(text or "")]
+    for item in (history or [])[-2:]:
+        if item.get("role") == "user":
+            parts.append(str(item.get("content") or ""))
+    return "\n".join(parts)
+
+
+def needs_prompt_context(
+    text: str,
+    history: list[dict[str, str]] | None = None,
+) -> bool:
+    """Return whether the turn contains date or time expressions needing a clock."""
+    combined = _combined_text(text, history)
+    return bool(
+        _RELATIVE_DATE_PATTERN.search(combined)
+        or _PRECISE_TIME_PATTERN.search(combined)
+    )
+
+
+def prompt_context_for(
+    text: str,
+    *,
+    history: list[dict[str, str]] | None = None,
+    now: datetime | None = None,
+) -> str:
+    """Return only the clock precision needed by this turn.
+
+    Date-only requests receive a day-stable context. Precise time expressions
+    receive minute-level current time. The context is intended for a user turn,
+    keeping the system prompt static for prefix reuse.
+    """
+    combined = _combined_text(text, history)
+    if not needs_prompt_context(text, history):
+        return ""
+
+    value = current_datetime(now)
+    timezone = getattr(value.tzinfo, "key", timezone_name())
+    if _PRECISE_TIME_PATTERN.search(combined):
+        return (
+            "実行時コンテキスト:\n"
+            f"- タイムゾーン: {timezone}\n"
+            f"- 現在日時: {value.isoformat(timespec='minutes')}\n"
+            "- 相対日時はこの時刻を基準に解釈する。"
+        )
+
+    return (
+        "実行時コンテキスト:\n"
+        f"- タイムゾーン: {timezone}\n"
+        f"- 今日: {value.date().isoformat()}（{_WEEKDAYS_JA[value.weekday()]}）\n"
+        "- 相対日付はこの日付を基準に解釈する。"
     )
 
 
 def with_current_context(base_prompt: str, now: datetime | None = None) -> str:
-    """Append a fresh runtime clock to a stable system prompt."""
+    """Compatibility helper for callers that still need full prompt injection."""
     return f"{str(base_prompt or '').rstrip()}\n\n{prompt_context(now)}"

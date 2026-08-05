@@ -44,12 +44,14 @@ class CurrentTimeContextTests(unittest.TestCase):
 
 
 class RuntimePromptWiringTests(unittest.TestCase):
-    def test_agent_and_router_inject_fresh_time_context(self) -> None:
+    def test_router_injects_context_user_side_and_keeps_agent_prefix_static(self) -> None:
         agent = (BACKEND / "agent.py").read_text(encoding="utf-8")
         router = (BACKEND / "capability_router.py").read_text(encoding="utf-8")
         self.assertIn("_refresh_runtime_time_context", agent)
-        self.assertIn("time_context.with_current_context", agent)
-        self.assertIn("time_context.with_current_context(_ROUTER_SYSTEM_PROMPT)", router)
+        self.assertIn("_RUNTIME_AGENT_BASE_PROMPT", agent)
+        self.assertNotIn("time_context.with_current_context", agent)
+        self.assertIn("time_context.prompt_context_for", router)
+        self.assertIn('f"{text}\\n\\n{runtime_context}"', router)
 
 
 class ResponsiveUniverseLayoutTests(unittest.TestCase):
@@ -76,8 +78,8 @@ class ResponsiveUniverseLayoutTests(unittest.TestCase):
 
     def test_mobile_content_panels_use_compact_spacing_and_cards(self) -> None:
         css = self._responsive_css()
-        self.assertIn(".section-head,.orbit-card__header { padding:16px 14px 0; }", css)
-        self.assertIn(".detail-panel { padding:16px; }", css)
+        self.assertIn("padding: 18px 16px 0;", css)
+        self.assertIn("padding: 18px;", css)
         self.assertIn("grid-template-areas:", css)
         self.assertIn(".chat-composer", css)
         self.assertIn("bottom: calc(72px + env(safe-area-inset-bottom))", css)

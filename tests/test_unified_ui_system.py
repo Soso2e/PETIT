@@ -76,10 +76,10 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertRegex(source, re.compile(r"event\.isComposing|keyCode\s*===\s*229"))
         self.assertIn("form.requestSubmit()", source)
 
-    def test_version_is_v0160(self) -> None:
+    def test_version_is_v0170(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.16.0"', source)
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.16.0"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.17.0"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.17.0"', source)
 
 
 if __name__ == "__main__":

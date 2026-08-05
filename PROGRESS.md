@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.16.0**
+**Current Version: v0.17.0**
 
 **Last Updated: 2026-08-05**
 
@@ -9,7 +9,7 @@
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。FastAPIとPWAを基盤に、タスク・予定・会話・知識・開発状況を継続支援する個人用アシスタントとして開発中。
-- バージョン管理: v0.15.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
+- バージョン管理: v0.17.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
 - Univ UI 刷新: 大きなカード矩形を全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: WebGL依存を追加せず、CSS 3D・radial-gradient・既存SVG接続線で軽量な球体表現を実装。レイヤーは前面HUD、選択対象の説明、惑星・衛星、接続線、背景の順で固定する。
 - Univ Focus: 親タスク惑星または子タスク衛星を選ぶと、同じUniv内でカメラが対象系へ寄り、所属する衛星を見やすくする。他の惑星と接続線は暗くし、旧Focusパネルへ自動遷移しない。
@@ -18,14 +18,15 @@
 - ナビゲーション: 対象パネルの`hidden`・ARIA・active状態を直接同期する。`home`、`focus`、`universe`、`projects`の旧URL／内部呼び出しはUnivへ互換転送する。
 - モーション: View間は既存の短いフェードを維持し、Univ内部だけCSS 3Dカメラを利用する。`prefers-reduced-motion`では空間アニメーションとパネル遷移を停止する。
 - 制作伴走 / Today: 作業セッションをSQLiteで永続化し、20分ごとの継続確認と無応答時の自動停止をバックグラウンドWorkerで実行する。Today機能自体は残し、トップレベルタブからは外す。
-- 会話 / Agent Runtime: Project Continuity・Capability Router・Tool制限・書き込み承認・進捗表示を実装済み。実装準拠フローは`docs/runtime-flows.md`を正とする。
+- 会話 / Agent Runtime: Tool不要の会話はOne-pass Conversation Entryの最初のLLM回答で終了し、個人データ・現在情報・外部ソース・操作が必要な場合だけAgent Tool Loopへ進む。Router失敗時は内部`fallback_read`で明示した読取Toolだけを公開する。
+- Prompt / 時刻: Agentの中核ルールを短く肯定形へ整理し、Markdown全面禁止を撤廃。動的日時はsystem promptへ常時結合せず、相対日付・時刻を含むターンだけuser側へ必要な精度で注入する。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
 - Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in、通知履歴を実装。cache名をv0.14.1へ更新し、Univ空間と四隅App Shellの資産をprecacheへ追加。
 - タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。作成・完了・親子変更は確認付きでNotion同期する。
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
-- 今回の検証: 全画面共通の応答停止調査で、同一HTML内の優先スクリプト重複は確認できなかった。notifications／companionの再初期化、Service Workerの起動時自動登録、LegacyのJobポーリング重複、Corner Shell Observerの自己誘発DOM監視を抑止し、Node構文と関連回帰37件に成功。実ブラウザは初期化後のCDP応答が停止し、Service Worker削除後／有効時のUniverse・Legacy確認は未完了。
-- 次にやること: FastAPIを実行中のPCブラウザで旧Service Worker cache削除後と有効時を分け、Universe／Legacy双方の操作、Long Task、Observer loop、CPU、Networkの初期化回数を確認する。残る高負荷があればPriority JSを1本ずつ無効化して二分探索する。
+- 今回の検証: One-pass Router、内部read-only fallback、user側日時注入、静的Agent promptの回帰テストを追加。Python構文確認済み。実LM Studioでの応答品質、1ターンの呼び出し回数、レイテンシ、Tool選択精度は未確認。
+- 次にやること: 実LM Studioで雑談・相談・文章作成・予定取得・タスク操作・BRAIN検索を比較し、`llm_calls`、応答時間、誤route、Tool取りこぼし、Markdown表示、音声読み上げを確認する。
 
 ## 履歴
 
@@ -69,3 +70,4 @@
 | 2026-08-05 | 11:35 | #35 | `petit-ui-system.css` および `universe-actions.css` を修正し、スマホ画面でのヘッダー埋もれ・トップバーアクション見切れ・吸着オフセットを改善（テスト49件成功） |
 | 2026-08-05 | 12:12 | #36 | `petit-ui-system.js` の `installSpatialMotion` 内のマウス移動による常時チルト・視点追尾 (`pointermove`) を削除し、ドラッグなしの追尾現象を解消（テスト49件成功） |
 | 2026-08-05 | 13:45 | #37 | Univ WebGLの入力をOrbitControlsへ明示統合し、PCホイール、1本指回転、2本指ピンチ、複数ポインター時のraycast誤選択、ドラッグ後の慣性回転を修正（関連テスト確認済み、実iPhone未確認） |
+| 2026-08-05 | 14:14 | #38 | v0.17.0としてTool不要会話を1回のLLMで完了するOne-pass Conversation Entry、安全な読取fallback、動的時刻のuser側注入、Agent prompt圧縮とMarkdown緩和を実装（Python構文確認・回帰テスト追加、実LM Studio比較未確認） |
