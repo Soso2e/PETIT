@@ -1,7 +1,9 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v0.14.1";
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-v0.14.1`;
+const CACHE_NAME = "petit-shell-v0.15.0-webgl1";
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell`;
+const THREE_CDN_ORIGIN = "https://esm.sh";
+const THREE_CDN_PREFIX = "/three@0.185.1";
 const SHELL = [
   "/",
   "/static/universe.html",
@@ -18,6 +20,8 @@ const SHELL = [
   "/static/petit-galaxy.css",
   "/static/petit-four-area-shell.css",
   "/static/univ-space.css",
+  "/static/universe-3d-foundation.css",
+  "/static/universe-webgl-scene.css",
   "/static/petit-corner-shell.css",
   "/static/universe-app.js",
   "/static/universe-next.js",
@@ -26,6 +30,11 @@ const SHELL = [
   "/static/today.js",
   "/static/app_shell.js",
   "/static/univ-space.js",
+  "/static/universe-render-scheduler.js",
+  "/static/univ-detail-children.js",
+  "/static/universe-webgl-hierarchy.js",
+  "/static/universe-webgl-scene.js",
+  "/static/universe-webgl-bridge.js",
   "/static/petit-corner-shell.js",
   "/static/chat_input.js",
   "/static/petit-ui-system.js",
@@ -83,18 +92,24 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  const isLocal = url.origin === self.location.origin;
+  const isThreeModule = url.origin === THREE_CDN_ORIGIN && url.pathname.startsWith(THREE_CDN_PREFIX);
+  if ((!isLocal && !isThreeModule) || (isLocal && url.pathname.startsWith("/api/"))) return;
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.status === 200) {
+        if (response.status === 200 || response.type === "opaque") {
           const copy = response.clone();
           caches.open(ACTIVE_CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
         }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+      .catch(() => caches.match(request).then((cached) => {
+        if (cached) return cached;
+        if (isLocal) return caches.match("/");
+        return Response.error();
+      }))
   );
 });
 

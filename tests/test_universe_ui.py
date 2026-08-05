@@ -24,6 +24,9 @@ class UniverseUiTests(unittest.TestCase):
             "universe-next.css",
             "universe-app.js",
             "universe-next.js",
+            "universe-webgl-scene.js",
+            "universe-webgl-scene.css",
+            "universe-webgl-bridge.js",
             "legacy.html",
         ):
             self.assertTrue((FRONTEND / name).is_file(), name)
@@ -44,14 +47,17 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('/static/universe-next.js', html)
         self.assertIn('/static/universe-next.css', html)
 
-    def test_life_contains_parent_tasks_and_child_tasks_directly(self) -> None:
+    def test_core_contains_parent_tasks_and_child_tasks_directly(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
-        script = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
-        self.assertIn("Life → Task → Child Task", html)
+        hierarchy = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
+        webgl = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        self.assertIn("Core → Task → Child Task", html)
         self.assertIn("LIFE / TASK / CHILD", html)
         self.assertIn("Life直下", html)
         self.assertIn("親Task", html)
-        self.assertIn("Child Task", script)
+        self.assertIn("Child Task", hierarchy)
+        self.assertIn("createPlanet", webgl)
+        self.assertIn("createConnection", webgl)
         self.assertNotIn("Life → Project → Task", html)
 
     def test_task_views_separate_high_and_low_without_mid_or_all_filter(self) -> None:
@@ -102,15 +108,18 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('localStorage.removeItem("petit_universe_active_started_at")', script)
         self.assertNotIn('localStorage.setItem("petit_universe_active_started_at"', script)
 
-    def test_overview_requires_select_then_focus(self) -> None:
-        script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
-        html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
-        self.assertIn("overviewSelectionId", script)
-        self.assertIn("const selectOverviewTask", script)
-        self.assertIn("state.overviewSelectionId === key", script)
-        self.assertIn("もう一度押すとFocus", script)
-        self.assertIn("1回押して選択", html)
-        self.assertIn('setAttribute("aria-pressed"', script)
+    def test_overview_selection_focuses_and_opens_detail_in_webgl(self) -> None:
+        app = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        webgl = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        self.assertIn("overviewSelectionId", app)
+        self.assertIn("const selectOverviewTask", app)
+        self.assertIn("state.overviewSelectionId === key", app)
+        self.assertIn('setAttribute("aria-pressed"', app)
+        self.assertIn("const selectEntry", webgl)
+        self.assertIn("domNode?.click?.()", webgl)
+        self.assertIn("focusEntry(entry)", webgl)
+        self.assertIn("openDetail()", webgl)
+        self.assertIn('document.body.classList.add("petit-univ-manage-open")', webgl)
 
     def test_parent_assignment_requires_explicit_apply(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
@@ -212,6 +221,7 @@ class UniverseUiTests(unittest.TestCase):
         css = (FRONTEND / "universe.css").read_text(encoding="utf-8")
         actions_css = (FRONTEND / "universe-actions.css").read_text(encoding="utf-8")
         next_css = (FRONTEND / "universe-next.css").read_text(encoding="utf-8")
+        webgl_css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
         self.assertIn("@media (max-width: 640px)", css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", css)
         self.assertIn("space-node--active", css)
@@ -223,6 +233,8 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn(".work-session-controls", actions_css)
         self.assertIn("@media (max-width: 640px)", next_css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", next_css)
+        self.assertIn("@media (max-width: 640px)", webgl_css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", webgl_css)
 
 
 class _Rows:

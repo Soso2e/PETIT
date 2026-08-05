@@ -13,18 +13,19 @@ class MotionContinuityTests(unittest.TestCase):
         self.life_map = (FRONTEND / "life-map.js").read_text(encoding="utf-8")
         self.life_transition = (FRONTEND / "life-transition.css").read_text(encoding="utf-8")
         self.chat_input = (FRONTEND / "chat_input.js").read_text(encoding="utf-8")
-        self.app_shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
         self.version = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
         self.univ = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
+        self.webgl = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
 
-    def test_motion_layer_uses_v0140_assets(self) -> None:
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.1"', self.version)
-        self.assertIn('window.PETIT_VERSION = "v0.14.1"', self.version)
-        self.assertIn('window.PETIT_ASSET_VERSION || "0.14.1"', self.app_shell)
+    def test_motion_layer_uses_v0150_assets(self) -> None:
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.15.0"', self.version)
+        self.assertIn('window.PETIT_VERSION = "v0.15.0"', self.version)
+        self.assertIn('/static/universe-webgl-scene.js', self.version)
+        self.assertIn('/static/universe-webgl-scene.css', self.version)
         self.assertIn('loadStylesheet("/static/petit-motion.css"', self.chat_input)
         self.assertIn('loadSharedModule("/static/petit-motion.js"', self.chat_input)
 
-    def test_univ_keeps_short_view_fades_and_adds_camera_motion(self) -> None:
+    def test_univ_keeps_short_view_fades_and_adds_real_camera_motion(self) -> None:
         self.assertNotIn("petit-shared-ghost", self.motion_js)
         self.assertNotIn("performTransition", self.motion_js)
         self.assertNotIn("animateGhost", self.motion_js)
@@ -33,6 +34,10 @@ class MotionContinuityTests(unittest.TestCase):
         self.assertIn("replayViewFade", self.motion_js)
         self.assertIn("applyCamera", self.univ)
         self.assertIn("pointermove", self.univ)
+        self.assertIn("new THREE.PerspectiveCamera", self.webgl)
+        self.assertIn("new OrbitControls", self.webgl)
+        self.assertIn("startCameraTween", self.webgl)
+        self.assertIn("updateCameraTween", self.webgl)
 
     def test_view_change_is_an_ordinary_short_fade(self) -> None:
         self.assertIn("replayViewFade", self.motion_js)
@@ -58,6 +63,7 @@ class MotionContinuityTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion: reduce", self.motion_css)
         self.assertIn("reducedMotion.matches", self.motion_js)
         self.assertIn("animation: none !important", self.motion_css)
+        self.assertIn("reducedMotion.matches", self.webgl)
 
 
 if __name__ == "__main__":

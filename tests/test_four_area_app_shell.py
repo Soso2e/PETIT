@@ -45,18 +45,22 @@ class ThreeAreaAppShellTests(unittest.TestCase):
     def test_univ_assets_are_versioned_loaded_and_bootstrapped(self):
         shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
         version = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_ASSET_VERSION || "0.14.1"', shell)
+        self.assertIn("window.PETIT_ASSET_VERSION", shell)
         self.assertIn('/static/univ-space.css', shell)
         self.assertIn('/static/univ-space.js', shell)
         self.assertIn('/static/app_shell.js', version)
         self.assertIn('/static/petit-corner-shell.js', version)
-        self.assertIn('data-petit-bootstrap="app-shell"', version)
-        self.assertIn('data-petit-bootstrap="corner-shell"', version)
+        self.assertIn('/static/universe-webgl-hierarchy.js', version)
+        self.assertIn('/static/universe-webgl-scene.js', version)
+        self.assertIn('/static/universe-webgl-bridge.js', version)
+        self.assertIn('script.dataset.petitBootstrap = key', version)
+        self.assertIn('loadScript("/static/app_shell.js", "app-shell"', version)
+        self.assertIn('loadScript("/static/petit-corner-shell.js", "corner-shell")', version)
 
-    def test_version_is_v0140(self):
+    def test_version_is_v0150(self):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.14.1"', source)
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.14.1"', source)
+        self.assertIn('window.PETIT_VERSION = "v0.15.0"', source)
+        self.assertIn('window.PETIT_ASSET_VERSION = "0.15.0"', source)
 
     def test_universe_assets_use_current_version_without_duplicate_app_shell_loader(self):
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
