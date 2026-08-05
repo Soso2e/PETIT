@@ -25,7 +25,7 @@
     workSessionId: localStorage.getItem(STORAGE.workSession),
     workSession: null,
     filter: "high",
-    sessionId: localStorage.getItem("petit_session_id") || randomId(),
+    sessionId: window.PETIT_SESSION?.id || localStorage.getItem("petit_session_id") || randomId(),
     history: [],
     busyTaskIds: new Set(),
     workSessionBusy: false,
@@ -35,7 +35,7 @@
   let orbitFrame = null;
   let orbitClock = 0;
   let orbitLastFrame = 0;
-  localStorage.setItem("petit_session_id", state.sessionId);
+  if (state.sessionId) localStorage.setItem("petit_session_id", state.sessionId);
 
   const byId = (id) => document.getElementById(id);
   const panels = Array.from(document.querySelectorAll("[data-view-panel]"));
@@ -1083,8 +1083,31 @@
     }
   }, 1000);
 
+  const restoreHistory = async () => {
+    try {
+      const data = await requestJson(`/api/conversations?limit=10&session_id=${encodeURIComponent(state.sessionId)}`);
+      const rows = data.conversations || [];
+      if (!rows.length) return false;
+      state.history = [];
+      for (const row of rows) {
+        if (row.user_text) {
+          appendMessage("user", row.user_text);
+          state.history.push({ role: "user", content: row.user_text });
+        }
+        if (row.assistant_text) {
+          appendMessage("assistant", row.assistant_text);
+          state.history.push({ role: "assistant", content: row.assistant_text });
+        }
+      }
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  };
+
   const initialize = async () => {
     checkHealth();
+    await restoreHistory();
     await loadUniverse();
     await restoreWorkSession();
   };

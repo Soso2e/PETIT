@@ -62,3 +62,6 @@
 | 2026-08-05 | 09:26 | #28 | `origin/main`を先に取り込み、`refactor/universe-render-scheduler`を競合解消付きでmainへ統合。関連66テスト、Node/Python構文、差分検査に成功（実ブラウザ・実サービスE2E未確認） |
 | 2026-08-05 | 10:50 | #29 | `app.js` と `universe-app.js` のチャット入力キーハンドラーを修正し、Enterキー単体での即時送信を防止、Ctrl/Cmd+Enterのみ送信に統一（関連テスト全件通過） |
 | 2026-08-05 | 10:54 | #30 | `chat_input.js`, `chat_keyboard.js`, `app.js`, `universe-app.js` を更新し、IME変換確定のEnter保護・タイマーガード、変換終了後のEnter送信、Shift+Enter改行を実装（関連テスト全件通過） |
+| 2026-08-05 | 10:59 | #31 | `univ-space.js`, `univ-space.css`, `universe-webgl-scene.js` を更新し、スマホでのタッチドラッグ宇宙操作対応および2段階タスククリック（1回目フォーカス、2回目詳細表示）を実装（関連テスト全件通過） |
+| 2026-08-05 | 11:09 | #32 | `universe-app.js` を更新し、初期化時の過去会話履歴の自動取得・復元機能（restoreHistory）を追加（関連テスト全件通過） |
+| 2026-08-05 | 11:18 | #33 | `universe.html` および `universe-app.js` を更新し、2時間アイドル時の自動セッション分割モジュール（session.js）を統合（関連テスト全件通過） |

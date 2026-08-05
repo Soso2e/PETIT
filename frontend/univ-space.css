@@ -84,6 +84,9 @@
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   transform-style: preserve-3d;
   transform:
     translate3d(var(--univ-pan-x), var(--univ-pan-y), 0)

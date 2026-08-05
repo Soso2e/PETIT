@@ -536,6 +536,7 @@
     }
     if (!entry.taskId) return false;
 
+    const isAlreadySelected = String(state.selectedTaskId) === String(entry.taskId);
     state.selectedTaskId = entry.taskId;
     updateSelection();
 
@@ -544,7 +545,9 @@
       : state.map?.querySelector(`[data-task-id="${escapeSelector(entry.taskId)}"]`);
     domNode?.click?.();
     focusEntry(entry);
-    openDetail();
+    if (isAlreadySelected) {
+      openDetail();
+    }
     return true;
   };
 

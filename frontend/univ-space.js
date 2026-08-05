@@ -326,9 +326,13 @@
       const satellite = target.closest(".univ-satellite[data-task-id]");
       if (satellite) {
         const requestedTaskId = satellite.dataset.taskId;
+        const isAlreadySelected = String(state.selectedTaskId) === String(requestedTaskId) && state.mode === "focus";
         state.selectedTaskId = requestedTaskId;
         state.selectedSystemKey = systemNode(satellite)?.dataset.rootTaskId || systemNode(satellite)?.dataset.univProject || null;
         focusByTaskId(requestedTaskId, { satellite: true });
+        if (isAlreadySelected) {
+          openManagement();
+        }
         return;
       }
 
@@ -337,9 +341,13 @@
         const system = systemNode(planet);
         const requestedTaskId = planet.dataset.taskId;
         const project = system?.dataset.univProject || "";
+        const isAlreadySelected = String(state.selectedTaskId) === String(requestedTaskId) && state.mode === "focus";
         state.selectedTaskId = requestedTaskId;
         state.selectedSystemKey = system?.dataset.rootTaskId || project;
         focusByTaskId(requestedTaskId, { project });
+        if (isAlreadySelected) {
+          openManagement();
+        }
       }
     }, true);
   };
@@ -379,7 +387,8 @@
     });
 
     frame.addEventListener("pointerdown", (event) => {
-      if (!isPanelActive() || event.button !== 0) return;
+      if (!isPanelActive()) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
 
       if (event.pointerType === "touch") {
         touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -393,12 +402,14 @@
         if (touchPoints.size > 2) return;
       }
 
-      if (event.target.closest("button, a, input, select, textarea, .life-map__core")) return;
+      if (event.target.closest("button, a, input, select, textarea, .life-map__core, #detail-panel")) return;
       state.dragging = true;
       state.pointerId = event.pointerId;
       state.lastX = event.clientX;
       state.lastY = event.clientY;
-      frame.setPointerCapture?.(event.pointerId);
+      try {
+        frame.setPointerCapture?.(event.pointerId);
+      } catch (_e) {}
       frame.classList.add("is-dragging");
     });
 
@@ -420,8 +431,8 @@
       const dy = event.clientY - state.lastY;
       state.lastX = event.clientX;
       state.lastY = event.clientY;
-      const yawSensitivity = event.pointerType === "touch" ? 0.075 : 0.11;
-      const pitchSensitivity = event.pointerType === "touch" ? 0.06 : 0.09;
+      const yawSensitivity = event.pointerType === "touch" ? 0.14 : 0.11;
+      const pitchSensitivity = event.pointerType === "touch" ? 0.11 : 0.09;
       state.yaw += dx * yawSensitivity;
       state.pitch = clamp(state.pitch - (dy * pitchSensitivity), -24, 24);
       applyCamera();
