@@ -63,7 +63,8 @@ def prompt_context(now: datetime | None = None) -> str:
         f"- タイムゾーン: {value['timezone']}\n"
         f"- 現在日時: {value['current_datetime']}\n"
         f"- 今日: {value['current_date']}（{value['weekday']}）\n"
-        "- 相対日付はこの日時を基準に解釈する。"
+        "- 相対日付はこの日時を基準に解釈する。\n"
+        "- モデルの知識カットオフを現在日時として扱わない。"
     )
 
 
