@@ -341,11 +341,20 @@
     return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
   };
 
+  const releasePointer = (frame, pointerId) => {
+    if (pointerId == null) return;
+    try {
+      if (frame.hasPointerCapture?.(pointerId)) frame.releasePointerCapture(pointerId);
+    } catch (_error) {
+      // Pointer may already have been released by the browser.
+    }
+  };
+
   const stopDrag = (frame, pointerId = null) => {
     state.dragging = false;
     state.pointerId = null;
     frame.classList.remove("is-dragging");
-    if (pointerId != null) frame.releasePointerCapture?.(pointerId);
+    releasePointer(frame, pointerId);
   };
 
   const bindInteraction = () => {
@@ -365,8 +374,8 @@
 
       if (event.pointerType === "touch") {
         touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
-        frame.setPointerCapture?.(event.pointerId);
         if (touchPoints.size === 2) {
+          for (const pointerId of touchPoints.keys()) frame.setPointerCapture?.(pointerId);
           stopDrag(frame);
           pinchStartDistance = touchDistance();
           pinchStartZoom = state.zoom;
@@ -418,7 +427,7 @@
         }
       }
       if (state.pointerId === event.pointerId) stopDrag(frame, event.pointerId);
-      else frame.releasePointerCapture?.(event.pointerId);
+      else releasePointer(frame, event.pointerId);
     };
     frame.addEventListener("pointerup", endPointer);
     frame.addEventListener("pointercancel", endPointer);
