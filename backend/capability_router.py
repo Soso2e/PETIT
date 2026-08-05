@@ -70,8 +70,6 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "sync_linkraft_projects",
         "sync_github_evidence",
     ),
-    # Internal-only fallback. It is never advertised to the selector and exposes
-    # explicit read operations only, so a routing failure cannot propose writes.
     "fallback_read": (
         "get_lists",
         "get_list_items",
@@ -106,15 +104,20 @@ _GROUP_DESCRIPTIONS = {
 }
 
 _ROUTABLE_GROUPS = tuple(_GROUP_DESCRIPTIONS)
+_ONE_PASS_MAX_TOKENS = max(config.LIGHT_MAX_TOKENS, 1024)
 
-_ROUTER_SYSTEM_PROMPT = """あなたはPETITの会話入口です。
+_ROUTER_SYSTEM_PROMPT = """あなたはPETIT。ユーザーの生活・制作・開発を支える、親しみやすく実務的な相棒です。
+親しい大学の同級生のような自然な距離感で、過度にテンションを上げたり媚びたりせず、必要なときは率直な意見を伝えてください。
+結論から分かりやすく答え、通常は読み上げやすいプレーンテキストを使います。比較・手順・コードなど、可読性が明確に上がる場合だけ最小限のMarkdownを使ってください。
+事実に基づいて回答し、個人データ・現在情報・外部情報を推測で作らないでください。
+
 会話文脈と依頼から、次のどちらかを選んでください。
 
-- PETITのToolが不要なら、この場でユーザーへの最終回答を自然な日本語で返す。
+- PETITのToolが不要なら、この場でユーザーへの最終回答を返す。
 - 個人データ、現在情報、外部ソースの参照、または操作が必要なら route_to_agent をcallする。
 
 判断基準:
-- 雑談、相談、説明、文章作成など、手元の会話だけで完結する依頼は直接回答する。
+- 雑談、相談、一般的な説明、文章作成など、手元の会話だけで完結する依頼は直接回答する。
 - タスク、予定、BRAIN、Notion、GitHub、記憶、ニュースなどの実データが必要なら推測で答えずrouteする。
 - 話題提示だけから作成・追加・変更を推測しない。
 - 書き込み意図は、追加・作成・変更・完了などが文脈上明確な場合だけ扱う。
@@ -153,6 +156,52 @@ _ROUTE_TOOL_SCHEMA: dict[str, Any] = {
         },
     },
 }
+
+_ACTION_WORDS = r"(?:教えて|見せて|確認|調べ|検索|取得|一覧|追加|作成|登録|変更|更新|編集|完了|削除|同期|実行|開始|停止|保存|直して|レビュー)"
+_TOOL_GUARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "lists_and_tasks",
+        re.compile(
+            rf"(?:タスク|todo|TODO|リスト|Notionタスク).{{0,24}}{_ACTION_WORDS}|"
+            rf"{_ACTION_WORDS}.{{0,24}}(?:タスク|todo|TODO|リスト|Notionタスク)"
+        ),
+    ),
+    (
+        "calendar",
+        re.compile(
+            rf"(?:予定|スケジュール|カレンダー|リマインダー|天気|現在時刻|今何時).{{0,24}}{_ACTION_WORDS}|"
+            rf"{_ACTION_WORDS}.{{0,24}}(?:予定|スケジュール|カレンダー|リマインダー|天気|現在時刻|今何時)"
+        ),
+    ),
+    (
+        "knowledge",
+        re.compile(
+            rf"(?:BRAIN|Obsidian|Notion|ノーション|記憶|メモ).{{0,24}}{_ACTION_WORDS}|"
+            rf"{_ACTION_WORDS}.{{0,24}}(?:BRAIN|Obsidian|Notion|ノーション|記憶|メモ)"
+        ),
+    ),
+    (
+        "github",
+        re.compile(
+            rf"(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI).{{0,24}}{_ACTION_WORDS}|"
+            rf"{_ACTION_WORDS}.{{0,24}}(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI)"
+        ),
+    ),
+    (
+        "web",
+        re.compile(
+            r"(?:最新|現在|今日).{0,16}(?:ニュース|情報|状況|価格|仕様)|"
+            r"(?:ニュース|外部情報|ウェブ|Web).{0,24}(?:検索|調べ|確認)"
+        ),
+    ),
+    (
+        "projects",
+        re.compile(
+            rf"(?:プロジェクト|PJ|開発状況).{{0,24}}{_ACTION_WORDS}|"
+            rf"{_ACTION_WORDS}.{{0,24}}(?:プロジェクト|PJ|開発状況)"
+        ),
+    ),
+)
 
 
 def _extract_json(content: str) -> dict[str, Any] | None:
@@ -227,13 +276,65 @@ def _route_arguments(message: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def _required_capabilities(
+    text: str,
+    history: list[dict[str, str]] | None = None,
+) -> list[str]:
+    """Conservative guard against answering real-data requests without Tool use."""
+    combined_parts = [str(text or "")]
+    for item in (history or [])[-2:]:
+        if item.get("role") == "user":
+            combined_parts.append(str(item.get("content") or ""))
+    combined = "\n".join(combined_parts)
+    result: list[str] = []
+    for capability, pattern in _TOOL_GUARD_PATTERNS:
+        if pattern.search(combined) and capability not in result:
+            result.append(capability)
+        if len(result) >= 4:
+            break
+    return result
+
+
+def _continue_truncated_reply(
+    messages: list[dict[str, Any]],
+    first: dict[str, Any],
+) -> str:
+    content = str(first.get("content") or "").strip()
+    if first.get("_finish_reason") != "length" or not content:
+        return content
+    continuation_messages = list(messages)
+    continuation_messages.append({"role": "assistant", "content": content})
+    continuation_messages.append(
+        {
+            "role": "user",
+            "content": (
+                "直前の回答が出力上限で途中終了しました。"
+                "内容を繰り返さず、途切れた箇所から続きを完結させてください。"
+            ),
+        }
+    )
+    try:
+        continuation = chat_completion(
+            continuation_messages,
+            tools=None,
+            temperature=0.2,
+            model=config.CHAT_MODEL,
+            max_tokens=_ONE_PASS_MAX_TOKENS,
+            route="chat",
+        )
+    except LMStudioError:
+        return content
+    suffix = str(continuation.get("content") or "").strip()
+    return f"{content}\n{suffix}".strip() if suffix else content
+
+
 def choose(user_message: str, history: list[dict[str, str]] | None = None) -> dict[str, Any]:
     """Answer tool-free turns once, or route tool-dependent turns to Agent."""
     text = str(user_message or "").strip()
     recent = history or []
     runtime_context = time_context.prompt_context_for(text, history=recent)
 
-    messages: list[dict[str, str]] = [
+    messages: list[dict[str, Any]] = [
         {"role": "system", "content": _ROUTER_SYSTEM_PROMPT}
     ]
     for item in recent[-6:]:
@@ -253,7 +354,7 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             tools=[_ROUTE_TOOL_SCHEMA],
             temperature=0.2,
             model=config.CHAT_MODEL,
-            max_tokens=config.LIGHT_MAX_TOKENS,
+            max_tokens=_ONE_PASS_MAX_TOKENS,
             route="chat",
         )
     except LMStudioError:
@@ -275,8 +376,8 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             "source": "one_pass_tool_route",
         }
 
-    content = str(response.get("content") or "").strip()
-    legacy = _extract_json(content)
+    raw_content = str(response.get("content") or "").strip()
+    legacy = _extract_json(raw_content)
     if legacy and (
         legacy.get("type") == "agent" or legacy.get("capabilities")
     ):
@@ -294,6 +395,20 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             "source": "legacy_json_route",
         }
 
+    required = _required_capabilities(text, recent)
+    if required:
+        goal = text
+        if runtime_context:
+            goal = f"{goal}\n\n{runtime_context}"
+        return {
+            "type": "agent",
+            "capabilities": required,
+            "goal": goal,
+            "confidence": None,
+            "source": "forced_tool_guard",
+        }
+
+    content = _continue_truncated_reply(messages, response)
     if content:
         return {
             "type": "reply",
