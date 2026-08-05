@@ -1,18 +1,18 @@
-/* Life overview: connected celestial planets and satellites. */
+/* Life overview fallback surface. 3D connection styles live in universe-3d-foundation.css. */
 .constellation-grid.life-cosmos-map {
   position: relative;
   display: block;
   min-height: 720px;
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid rgba(157, 180, 255, .16);
-  border-radius: 30px;
+  border: 1px solid var(--univ-surface-border, rgba(157, 180, 255, .16));
+  border-radius: var(--univ-surface-radius, 30px);
   background:
     radial-gradient(circle at 50% 50%, rgba(105, 131, 255, .16), transparent 22%),
     radial-gradient(circle at 20% 15%, rgba(127, 227, 193, .07), transparent 30%),
     radial-gradient(circle at 78% 75%, rgba(166, 102, 255, .08), transparent 32%),
     linear-gradient(155deg, rgba(10, 14, 32, .88), rgba(4, 7, 18, .76));
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow, 0 20px 60px rgba(0, 0, 0, .4));
   backdrop-filter: blur(24px);
 }
 
@@ -23,6 +23,7 @@
   inset: 0;
   pointer-events: none;
 }
+
 .constellation-grid.life-cosmos-map::before {
   z-index: 0;
   background-image:
@@ -34,6 +35,7 @@
   opacity: .52;
   animation: lifeStarField 7s ease-in-out infinite alternate;
 }
+
 .constellation-grid.life-cosmos-map::after {
   z-index: 0;
   inset: 12% 18%;
@@ -45,37 +47,10 @@
     inset 0 0 80px rgba(74, 103, 221, .04);
 }
 
-.life-map__lines {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  overflow: visible;
+@keyframes lifeStarField {
+  from { opacity: .34; }
+  to { opacity: .68; }
 }
-.life-map__connection {
-  stroke: rgba(157, 180, 255, .23);
-  stroke-width: 1.2;
-  stroke-linecap: round;
-  stroke-dasharray: 1.5 2.4;
-  filter: drop-shadow(0 0 4px rgba(157, 180, 255, .25));
-  animation: lifeSignal 10s linear infinite;
-}
-.life-map__connection.is-secondary {
-  stroke: rgba(127, 227, 193, .09);
-  stroke-width: .75;
-  stroke-dasharray: .7 3.8;
-}
-.life-map__connection.is-active {
-  stroke: rgba(225, 233, 255, .74);
-  stroke-width: 2;
-  stroke-dasharray: 3 1.6;
-  filter: drop-shadow(0 0 8px rgba(157, 180, 255, .75));
-}
-
-@keyframes lifeStarField { from { opacity: .34; } to { opacity: .68; } }
-@keyframes lifeSignal { to { stroke-dashoffset: -24; } }
 
 @media (max-width: 900px) {
   .constellation-grid.life-cosmos-map { min-height: 780px; }
@@ -86,15 +61,16 @@
   .constellation-grid.life-cosmos-map {
     min-height: 820px;
     overflow: hidden;
-    border-radius: 24px;
+    border-radius: var(--univ-surface-radius-mobile, 24px);
   }
-  .constellation-grid.life-cosmos-map::after { inset: 6% 16%; border-radius: 46%; }
-  .life-map__connection.is-secondary { display: none; }
+  .constellation-grid.life-cosmos-map::after {
+    inset: 6% 16%;
+    border-radius: 46%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .constellation-grid.life-cosmos-map::before,
-  .life-map__connection {
+  .constellation-grid.life-cosmos-map::before {
     animation: none !important;
     transition-duration: .01ms !important;
   }

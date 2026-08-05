@@ -9,22 +9,28 @@ FRONTEND = ROOT / "frontend"
 class Univ3dHierarchyTests(unittest.TestCase):
     def test_renderer_uses_xyz_layout_and_css_3d_connections(self) -> None:
         source = (FRONTEND / "life-map.js").read_text(encoding="utf-8")
+        foundation = (FRONTEND / "universe-3d-foundation.css").read_text(encoding="utf-8")
         self.assertIn("depthBand", source)
         self.assertIn("--life-z", source)
         self.assertIn("--satellite-z", source)
         self.assertIn("univ-connection-layer", source)
         self.assertIn("univ-connection-3d", source)
         self.assertIn("add3dConnection", source)
-        self.assertIn("rotateY", source)
-        self.assertIn("translate3d", source)
+        self.assertIn("--connection-yaw", source)
+        self.assertIn("--connection-pitch", source)
+        self.assertIn("rotateY", foundation)
+        self.assertIn("translate3d", foundation)
         self.assertNotIn("createElementNS", source)
         self.assertNotIn("life-map__lines", source)
 
     def test_core_task_and_child_connections_are_separate(self) -> None:
         source = (FRONTEND / "life-map.js").read_text(encoding="utf-8")
+        foundation = (FRONTEND / "universe-3d-foundation.css").read_text(encoding="utf-8")
         self.assertIn('child ? "is-child" : "is-core"', source)
         self.assertIn("arrangeSatellites", source)
         self.assertIn("systemPosition.z + 82 + 30 + satelliteZ", source)
+        self.assertIn(".univ-connection-3d.is-child", foundation)
+        self.assertIn(".univ-connection-3d.is-active", foundation)
 
     def test_focus_automatically_opens_existing_detail_panel(self) -> None:
         source = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
@@ -53,11 +59,14 @@ class Univ3dHierarchyTests(unittest.TestCase):
         self.assertIn("meaningful", source)
         self.assertIn("existing.replaceWith(next)", source)
 
-    def test_detail_children_extension_is_loaded_by_version_bootstrap(self) -> None:
+    def test_detail_children_extension_and_foundation_are_loaded(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
         self.assertIn("/static/univ-detail-children.js", source)
         self.assertIn('"univ-detail-children"', source)
+        self.assertIn("/static/universe-3d-foundation.css", source)
+        self.assertIn('"universe-3d-foundation"', source)
         self.assertIn("loadScript", source)
+        self.assertIn("loadStylesheet", source)
 
 
 if __name__ == "__main__":

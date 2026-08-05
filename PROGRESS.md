@@ -59,3 +59,4 @@
 | 2026-08-04 | 08:34 | #25 | Service WorkerをPush有効化操作まで遅延登録し、通常のUniverse／Legacy起動時の登録・precache待ちを除去（Node構文・関連回帰37件成功、実ブラウザ未完了） |
 | 2026-08-04 | 08:54 | #26 | universe-next.jsの更新中Observer一時切断と重複軽減・petit-ui-system/app_shellの監視責務分離および差分DOM更新を実装（関連回帰34件全件成功） |
 | 2026-08-04 | 09:10 | #27 | v0.15.0としてUniverse UIを根本刷新。カード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、軌道・接続線からなる純粋な天体システムを実装 |
+| 2026-08-05 | 09:26 | #28 | `origin/main`を先に取り込み、`refactor/universe-render-scheduler`を競合解消付きでmainへ統合。関連66テスト、Node/Python構文、差分検査に成功（実ブラウザ・実サービスE2E未確認） |

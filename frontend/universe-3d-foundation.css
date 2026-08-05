@@ -1,0 +1,122 @@
+/* Shared visual foundation for PETIT Univ 3D surfaces and connections. */
+:root {
+  --univ-surface-border: rgba(157, 180, 255, .14);
+  --univ-surface-border-strong: rgba(211, 223, 255, .18);
+  --univ-surface-radius: 30px;
+  --univ-surface-radius-mobile: 23px;
+  --univ-space-background:
+    radial-gradient(circle at 50% 48%, rgba(96, 123, 255, .16), transparent 20%),
+    radial-gradient(circle at 18% 20%, rgba(82, 227, 205, .07), transparent 28%),
+    radial-gradient(circle at 84% 76%, rgba(190, 102, 255, .08), transparent 30%),
+    linear-gradient(160deg, #070a1a 0%, #02040d 72%, #010208 100%);
+  --univ-space-shadow: 0 28px 90px rgba(0, 0, 0, .38), inset 0 0 120px rgba(80, 105, 220, .06);
+  --univ-glass-background: rgba(7, 11, 29, .68);
+  --univ-glass-background-strong: rgba(8, 12, 30, .94);
+  --univ-glass-shadow: 0 16px 46px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255,255,255,.05);
+  --univ-glass-blur: blur(22px) saturate(1.15);
+  --univ-core-line: linear-gradient(90deg, rgba(157,180,255,.5), rgba(157,180,255,.12));
+  --univ-child-line: linear-gradient(90deg, rgba(127,227,193,.42), rgba(157,180,255,.15));
+  --univ-active-line: linear-gradient(90deg, rgba(236,242,255,.82), rgba(157,180,255,.5));
+}
+
+/* Shared 3D scene surfaces. */
+.univ-viewport,
+.constellation-grid.life-cosmos-map {
+  border-color: var(--univ-surface-border);
+  border-radius: var(--univ-surface-radius);
+}
+
+.univ-viewport {
+  background: var(--univ-space-background);
+  box-shadow: var(--univ-space-shadow);
+}
+
+.univ-hud__brand,
+.univ-hud__selection,
+.univ-hud__controls {
+  border-color: var(--univ-surface-border);
+  background: var(--univ-glass-background);
+  box-shadow: var(--univ-glass-shadow);
+  backdrop-filter: var(--univ-glass-blur);
+}
+
+.petit-univ-active #detail-panel {
+  border-color: var(--univ-surface-border-strong);
+  background: var(--univ-glass-background-strong);
+}
+
+/* CSS 3D connection layer. Geometry is supplied through custom properties by life-map.js. */
+.univ-connection-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+  transform-style: preserve-3d;
+  transition: opacity .34s ease, filter .34s ease;
+}
+
+.univ-connection-3d {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--connection-length, 0px);
+  height: 1.5px;
+  border-radius: 999px;
+  background: var(--univ-core-line);
+  box-shadow: 0 0 5px rgba(120,150,255,.26);
+  opacity: .72;
+  backface-visibility: visible;
+  transform-origin: 0 50%;
+  transform-style: preserve-3d;
+  transform:
+    translate3d(
+      var(--connection-x, 0px),
+      var(--connection-y, 0px),
+      var(--connection-z, 0px)
+    )
+    rotateY(var(--connection-yaw, 0deg))
+    rotateZ(var(--connection-pitch, 0deg));
+}
+
+.univ-connection-3d.is-child {
+  height: 1px;
+  background: var(--univ-child-line);
+  opacity: .8;
+}
+
+.univ-connection-3d.is-active {
+  background: var(--univ-active-line);
+  box-shadow: 0 0 9px rgba(157,180,255,.72);
+  opacity: 1;
+}
+
+.univ-space[data-univ-mode="focus"] .univ-connection-layer {
+  opacity: .1;
+  filter: none;
+}
+
+.univ-space[data-univ-mode="focus"] .univ-task-system.is-univ-focus-family ~ .univ-connection-layer,
+.univ-space[data-univ-mode="focus"] .univ-connection-3d.is-active {
+  opacity: 1;
+}
+
+@media (max-width: 959px) {
+  .univ-viewport,
+  .constellation-grid.life-cosmos-map {
+    border-radius: var(--univ-surface-radius-mobile);
+  }
+}
+
+@media (max-width: 640px) {
+  .univ-viewport {
+    border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .univ-connection-layer,
+  .univ-connection-3d {
+    transition: none !important;
+  }
+}
