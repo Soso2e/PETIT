@@ -2,7 +2,7 @@
 (() => {
   if (window.PetitUnivWebGLBridge?.initialized) return;
 
-  let boundCanvas = null;
+  let boundInput = null;
   let observer = null;
   let detailPlaceholder = null;
 
@@ -55,21 +55,22 @@
     });
   };
 
-  const stopLegacyCameraInput = (canvas) => {
-    if (!canvas || canvas === boundCanvas) return false;
-    boundCanvas = canvas;
+  const stopLegacyCameraInput = (input) => {
+    if (!input || input === boundInput) return false;
+    boundInput = input;
     const stop = (event) => {
       if (active()) event.stopPropagation();
     };
     ["pointerdown", "pointermove", "pointerup", "pointercancel", "wheel", "keydown"].forEach((type) => {
-      canvas.addEventListener(type, stop);
+      input.addEventListener(type, stop);
     });
-    installContextRecovery(canvas);
     return true;
   };
 
   const bindCanvas = () => {
-    const connected = stopLegacyCameraInput(document.querySelector(".univ-webgl-stage canvas"));
+    const canvas = document.querySelector(".univ-webgl-stage canvas");
+    const connected = stopLegacyCameraInput(document.querySelector(".univ-webgl-input"));
+    installContextRecovery(canvas);
     if (connected) {
       ensureDetailPortal();
       observer?.disconnect();
@@ -118,7 +119,7 @@
   const initialize = () => {
     document.addEventListener("click", handleHudAction, true);
     bindCanvas();
-    if (!boundCanvas) {
+    if (!boundInput) {
       observer = new MutationObserver(bindCanvas);
       observer.observe(document.documentElement, { childList: true, subtree: true });
     }

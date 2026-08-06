@@ -6,7 +6,7 @@
 }
 
 .univ-webgl-stage {
-  z-index: 2;
+  z-index: 1;
   overflow: hidden;
   border-radius: inherit;
   pointer-events: auto;

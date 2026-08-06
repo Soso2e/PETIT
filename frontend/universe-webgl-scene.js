@@ -122,6 +122,7 @@
       state.labelLayer.setAttribute("aria-label", "3Dタスクラベル");
       state.viewport.appendChild(state.labelLayer);
     }
+
     return true;
   };
 
@@ -142,11 +143,15 @@
     state.renderer.outputColorSpace = THREE.SRGBColorSpace;
     state.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     state.renderer.toneMappingExposure = 1.08;
-    state.renderer.domElement.tabIndex = 0;
+    state.renderer.domElement.tabIndex = -1;
     state.renderer.domElement.setAttribute("aria-label", "PETIT Univ 3Dビュー");
+    state.renderer.domElement.classList.add("univ-webgl-canvas");
     state.stage.replaceChildren(state.renderer.domElement);
 
-    state.controls = new OrbitControls(state.camera, state.renderer.domElement);
+    // The single Canvas is the background scene and owns camera input. DOM
+    // labels/UI remain overlays with pointer-events disabled where appropriate.
+    state.inputSurface = state.renderer.domElement;
+    state.controls = new OrbitControls(state.camera, state.inputSurface);
     state.controls.target.set(0, 0, 0);
     // Camera movement must stop with the drag. Residual damping felt like
     // pointer-follow rotation even though OrbitControls only rotates on drag.
@@ -166,7 +171,7 @@
     state.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
     state.controls.touches.ONE = THREE.TOUCH.ROTATE;
     state.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
-    state.renderer.domElement.style.touchAction = "none";
+    state.inputSurface.style.touchAction = "none";
     state.controls.update();
     state.controls.addEventListener("start", () => { state.cameraTween = null; });
 
@@ -581,11 +586,11 @@
   };
 
   const installPointerInteraction = () => {
-    const canvas = state.renderer.domElement;
+    const input = state.inputSurface;
     const activePointers = new Set();
     let suppressSelectionUntilPointersClear = false;
 
-    canvas.addEventListener("pointerdown", (event) => {
+    input.addEventListener("pointerdown", (event) => {
       activePointers.add(event.pointerId);
       if (!event.isPrimary || activePointers.size > 1) {
         state.pointerDown = null;
@@ -601,7 +606,7 @@
         moved: false,
       };
     });
-    canvas.addEventListener("pointerup", (event) => {
+    input.addEventListener("pointerup", (event) => {
       const start = state.pointerDown;
       state.pointerDown = null;
       activePointers.delete(event.pointerId);
@@ -616,7 +621,7 @@
       const object = raycastAt(event.clientX, event.clientY);
       if (object?.userData?.entry) selectEntry(object.userData.entry);
     });
-    canvas.addEventListener("pointermove", (event) => {
+    input.addEventListener("pointermove", (event) => {
       if (state.pointerDown?.pointerId === event.pointerId) {
         const distance = Math.hypot(event.clientX - state.pointerDown.x, event.clientY - state.pointerDown.y);
         const threshold = state.pointerDown.pointerType === "touch" ? 10 : 5;
@@ -625,20 +630,20 @@
       }
       if (activePointers.size) return;
       const object = raycastAt(event.clientX, event.clientY);
-      canvas.style.cursor = object ? "pointer" : "grab";
+      input.style.cursor = object ? "pointer" : "grab";
     }, { passive: true });
     const cancelPointer = (event) => {
       activePointers.delete(event.pointerId);
       if (state.pointerDown?.pointerId === event.pointerId) state.pointerDown = null;
       if (activePointers.size === 0) suppressSelectionUntilPointersClear = false;
     };
-    canvas.addEventListener("pointercancel", cancelPointer);
-    canvas.addEventListener("lostpointercapture", cancelPointer);
-    canvas.addEventListener("wheel", (event) => {
+    input.addEventListener("pointercancel", cancelPointer);
+    input.addEventListener("lostpointercapture", cancelPointer);
+    input.addEventListener("wheel", (event) => {
       // Keep the wheel owned by OrbitControls instead of the hidden CSS camera.
       event.stopPropagation();
     }, { passive: true });
-    canvas.addEventListener("keydown", (event) => {
+    input.addEventListener("keydown", (event) => {
       if (event.key === "Escape" || event.key === "0") resetCamera();
       if (event.key === "+" || event.key === "=") zoomBy(0.84);
       if (event.key === "-") zoomBy(1.18);

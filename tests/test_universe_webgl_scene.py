@@ -61,12 +61,16 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn("state.controls.enableDamping = false", source)
         self.assertIn("state.controls.touches.ONE = THREE.TOUCH.ROTATE", source)
         self.assertIn("state.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN", source)
+        self.assertIn("new OrbitControls(state.camera, state.inputSurface)", source)
+        self.assertIn('state.renderer.domElement.classList.add("univ-webgl-canvas")', source)
+        self.assertIn("state.inputSurface = state.renderer.domElement", source)
         self.assertIn("const activePointers = new Set()", source)
         self.assertIn("suppressSelectionUntilPointersClear", source)
         self.assertIn("start.pointerId !== event.pointerId", source)
         self.assertIn("if (start.moved || distance > threshold", source)
-        self.assertIn('canvas.addEventListener("pointercancel", cancelPointer)', source)
-        self.assertIn('canvas.addEventListener("wheel"', source)
+        self.assertIn('input.addEventListener("pointercancel", cancelPointer)', source)
+        self.assertIn('input.addEventListener("wheel"', source)
+        self.assertNotIn(".univ-webgl-input", css)
         self.assertIn("overscroll-behavior: contain", css)
 
     def test_labels_remain_dom_text_instead_of_canvas_textures(self) -> None:
