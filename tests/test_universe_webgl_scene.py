@@ -83,6 +83,14 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertNotIn("CanvasTexture", source)
         self.assertNotIn("SpriteMaterial", source)
 
+    def test_task_name_labels_are_clickable_selection_targets(self) -> None:
+        source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
+        self.assertIn('element.addEventListener("click"', source)
+        self.assertIn("selectEntry(entry)", source)
+        self.assertIn("pointer-events: auto", css)
+        self.assertIn("cursor: pointer", css)
+
     def test_css_scene_is_only_hidden_after_webgl_is_ready(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")

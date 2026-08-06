@@ -57,8 +57,10 @@
   transform: translate3d(-50%, calc(-50% + 34px), 0);
   transform-origin: 50% 50%;
   transition: opacity .18s ease, border-color .18s ease, background .18s ease;
-  pointer-events: none;
-  cursor: default;
+  /* Keep the canvas as the camera surface while allowing name-based
+     selection through the DOM label itself. */
+  pointer-events: auto;
+  cursor: pointer;
   will-change: left, top, opacity;
 }
 
