@@ -1005,6 +1005,16 @@
 
   window.PetitUniverse = {
     focusTask: (id) => focusTaskById(id),
+    selectTask: (id) => {
+      const key = String(id || "");
+      const index = state.tasks.findIndex((candidate, candidateIndex) => taskKey(candidate, candidateIndex) === key);
+      const task = index >= 0 ? state.tasks[index] : null;
+      if (!task) return false;
+      selectTask(task, index);
+      state.overviewSelectionId = key;
+      updateOverviewSelectionUI(key);
+      return true;
+    },
     refreshAndFocusTask: (id) => focusTaskById(id, { refresh: true }),
     tasks: () => [...state.tasks],
   };

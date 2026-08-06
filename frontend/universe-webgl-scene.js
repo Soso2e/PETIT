@@ -555,11 +555,14 @@
     state.selectedTaskId = entry.taskId;
     updateSelection();
 
-    const domNode = entry.domNode?.isConnected
-      ? entry.domNode
-      : state.map?.querySelector(`[data-task-id="${escapeSelector(entry.taskId)}"]`);
-    domNode?.click?.();
-    focusEntry(entry);
+    const selectedByUniverse = window.PetitUniverse?.selectTask?.(entry.taskId);
+    if (!selectedByUniverse) {
+      const domNode = entry.domNode?.isConnected
+        ? entry.domNode
+        : state.map?.querySelector(`[data-task-id="${escapeSelector(entry.taskId)}"]`);
+      domNode?.click?.();
+    }
+    if (!isAlreadySelected) focusEntry(entry);
     if (isAlreadySelected) {
       openDetail();
     }
