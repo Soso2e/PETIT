@@ -17,6 +17,11 @@
     return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   };
 
+  const themePreference = () => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+  };
+
   const updateThemeColor = (theme) => {
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = theme === "light" ? "#f3f5f8" : "#07090f";
@@ -30,10 +35,12 @@
 
     const toggle = byId("petit-theme-toggle");
     if (!toggle) return;
-    const next = normalized === "light" ? "dark" : "light";
-    toggle.textContent = normalized === "light" ? "Dark" : "Light";
-    toggle.setAttribute("aria-label", `${next === "light" ? "ライト" : "ダーク"}テーマに切り替え`);
-    toggle.setAttribute("aria-pressed", String(normalized === "light"));
+    const preference = themePreference();
+    const next = preference === "system" ? "light" : preference === "light" ? "dark" : "system";
+    const labels = { light: "ライト", dark: "ダーク", system: "システム" };
+    toggle.textContent = `テーマ: ${labels[preference]}`;
+    toggle.setAttribute("aria-label", `${labels[next]}テーマに切り替え`);
+    toggle.setAttribute("aria-pressed", String(preference === "light"));
   };
 
   const installThemeToggle = () => {
@@ -45,7 +52,10 @@
     button.className = "petit-theme-toggle";
     button.type = "button";
     button.addEventListener("click", () => {
-      applyTheme(root.dataset.theme === "light" ? "dark" : "light");
+      const preference = themePreference();
+      const next = preference === "system" ? "light" : preference === "light" ? "dark" : "system";
+      applyTheme(next === "system" ? currentTheme() : next);
+      if (next === "system") localStorage.setItem(STORAGE_KEY, "system");
     });
     actions.prepend(button);
     applyTheme(currentTheme(), { persist: false });
@@ -260,6 +270,10 @@
 
   const initialize = () => {
     applyTheme(currentTheme(), { persist: false });
+    const systemTheme = window.matchMedia("(prefers-color-scheme: light)");
+    systemTheme.addEventListener?.("change", () => {
+      if (themePreference() === "system") applyTheme(currentTheme(), { persist: false });
+    });
     installThemeToggle();
     installContextBar();
     installTabsA11y();

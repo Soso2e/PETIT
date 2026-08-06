@@ -45,6 +45,14 @@
   background: var(--univ-glass-background-strong);
 }
 
+/* Three.js viewport stays dark; the detail UI outside it follows the app theme. */
+html[data-theme="light"] .petit-univ-active #detail-panel {
+  border-color: var(--ui-line-strong);
+  background: var(--ui-surface-solid);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-lg);
+}
+
 /* CSS 3D connection layer. Geometry is supplied through custom properties by life-map.js. */
 .univ-connection-layer {
   position: absolute;

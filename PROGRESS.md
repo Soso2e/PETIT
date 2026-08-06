@@ -71,3 +71,4 @@
 | 2026-08-05 | 12:12 | #36 | `petit-ui-system.js` の `installSpatialMotion` 内のマウス移動による常時チルト・視点追尾 (`pointermove`) を削除し、ドラッグなしの追尾現象を解消（テスト49件成功） |
 | 2026-08-05 | 13:45 | #37 | Univ WebGLの入力をOrbitControlsへ明示統合し、PCホイール、1本指回転、2本指ピンチ、複数ポインター時のraycast誤選択、ドラッグ後の慣性回転を修正（関連テスト確認済み、実iPhone未確認） |
 | 2026-08-05 | 14:14 | #38 | v0.17.0としてTool不要会話を1回のLLMで完了するOne-pass Conversation Entry、安全な読取fallback、動的時刻のuser側注入、Agent prompt圧縮とMarkdown緩和を実装（Python構文確認・回帰テスト追加、実LM Studio比較未確認） |
+| 2026-08-07 | 00:00 | #39 | UIテーマをライト／ダーク／システム選択に対応し、OSのカラースキーム変更へ追従。Three.js Univ空間は暗色を維持し、外側の詳細UIだけライトテーマへ切替 |
