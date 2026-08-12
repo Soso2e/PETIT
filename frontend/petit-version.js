@@ -1,8 +1,36 @@
 window.PETIT_VERSION = "v0.17.0";
 window.PETIT_ASSET_VERSION = "0.17.0";
 
+globalThis.PETIT_VERSION = window.PETIT_VERSION;
+globalThis.PETIT_ASSET_VERSION = window.PETIT_ASSET_VERSION;
+
 (() => {
+  const assetUrl = (href) => {
+    const url = new URL(href, window.location.origin);
+    url.searchParams.set("v", window.PETIT_ASSET_VERSION);
+    return `${url.pathname}${url.search}${url.hash}`;
+  };
+
+  const writeStylesheets = (hrefs) => {
+    for (const href of hrefs) {
+      document.write(`<link rel="stylesheet" href="${assetUrl(href)}" />`);
+    }
+  };
+
+  const writeScripts = (srcs) => {
+    for (const src of srcs) {
+      document.write(`<script src="${assetUrl(src)}"><\\/script>`);
+    }
+  };
+
+  window.PetitAssetVersion = {
+    url: assetUrl,
+    writeStylesheets,
+    writeScripts,
+  };
+
   const forceCssRenderer = new URLSearchParams(window.location.search).get("renderer") === "css";
+  let runtimeStarted = false;
 
   const loadStylesheet = (href, key) => {
     const selector = `link[data-petit-bootstrap="${key}"]`;
@@ -10,7 +38,7 @@ window.PETIT_ASSET_VERSION = "0.17.0";
     if (existing) return existing;
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = `${href}?v=${window.PETIT_ASSET_VERSION}`;
+    link.href = assetUrl(href);
     link.dataset.petitBootstrap = key;
     document.head.appendChild(link);
     return link;
@@ -28,7 +56,7 @@ window.PETIT_ASSET_VERSION = "0.17.0";
     }
 
     const script = document.createElement("script");
-    script.src = `${src}?v=${window.PETIT_ASSET_VERSION}`;
+    script.src = assetUrl(src);
     script.async = false;
     if (module) script.type = "module";
     script.dataset.petitBootstrap = key;
@@ -63,13 +91,45 @@ window.PETIT_ASSET_VERSION = "0.17.0";
     loadScript("/static/app_shell.js", "app-shell", loadPostShellAssets);
   };
 
-  loadScript("/static/univ-detail-children.js", "univ-detail-children");
+  const startRuntime = () => {
+    if (runtimeStarted) return;
+    runtimeStarted = true;
+    loadScript("/static/univ-detail-children.js", "univ-detail-children");
+    if (window.PetitUniverseRenderScheduler?.initialized) {
+      loadAppShell();
+    } else {
+      loadScript("/static/universe-render-scheduler.js", "universe-render-scheduler", loadAppShell);
+    }
+  };
 
-  if (window.PetitUniverseRenderScheduler?.initialized) {
-    loadAppShell();
-  } else {
-    loadScript("/static/universe-render-scheduler.js", "universe-render-scheduler", loadAppShell);
-  }
+  window.PetitVersionBootstrap = { start: startRuntime };
+
+  const refreshServiceWorker = async () => {
+    if (!("serviceWorker" in navigator)) return;
+    try {
+      const registration = await navigator.serviceWorker.register("/service-worker.js", {
+        scope: "/",
+        updateViaCache: "none",
+      });
+      window.__PETIT_SERVICE_WORKER_PROMISE = Promise.resolve(registration);
+
+      let reloading = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloading) return;
+        const key = `petit-sw-refresh-${window.PETIT_ASSET_VERSION}`;
+        if (sessionStorage.getItem(key) === "1") return;
+        reloading = true;
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+      });
+
+      await registration.update();
+    } catch (error) {
+      console.debug("PETIT Service Worker update skipped", error);
+    }
+  };
+
+  window.addEventListener("load", refreshServiceWorker, { once: true });
 })();
 
 document.addEventListener("DOMContentLoaded", () => {
