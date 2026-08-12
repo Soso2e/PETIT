@@ -45,7 +45,6 @@
         <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
         <span id="sync-pill" class="sync-pill" hidden>同期確認中</span>
         <span class="version-pill" data-petit-version></span>
-        <a class="legacy-link" href="/static/legacy.html">旧UI</a>
       </div>
     </header>
 
@@ -245,13 +244,31 @@
             </div>
           </section>
 
+          <section class="settings-card settings-card--notifications" aria-labelledby="notification-center-title">
+            <div class="settings-card__head">
+              <div>
+                <h3 id="notification-center-title">通知センター</h3>
+                <p>未解決の通知や、PETITからの確認をここで確認します。</p>
+              </div>
+              <span id="notification-unread" class="notification-panel__badge">未読なし</span>
+            </div>
+            <div class="notification-inbox" aria-live="polite">
+              <div class="notification-filters" role="group" aria-label="通知の表示切り替え">
+                <button type="button" class="notification-filter notification-filter--active" data-notification-state="open">未解決</button>
+                <button type="button" class="notification-filter" data-notification-state="resolved">解決済み</button>
+                <button id="notification-refresh" type="button" class="notification-panel__refresh">更新</button>
+              </div>
+              <p id="notification-empty" class="notification-empty">通知はまだありません。</p>
+              <div id="notification-list" class="notification-list"></div>
+            </div>
+          </section>
+
           <section class="settings-card">
             <div class="settings-card__head">
               <div>
                 <h3>Push通知設定</h3>
                 <p>リマインダーや声かけをこの端末に届ける設定です。</p>
               </div>
-              <span id="notification-unread" class="notification-panel__badge">未読なし</span>
             </div>
             <div class="notification-settings-body">
               <p id="notification-state" class="notification-panel__state" role="status" aria-live="polite">通知状態を確認中…</p>

@@ -147,14 +147,10 @@
           ${iconMarkup("bell")}
           <span><strong>リマインダー</strong><small>登録内容と履歴を確認</small></span>
         </button>
-        <a href="/static/legacy.html?view=settings">
+        <button type="button" data-corner-menu-settings>
           ${iconMarkup("settings")}
-          <span><strong>詳細設定</strong><small>機能が揃った設定画面を開く</small></span>
-        </a>
-        <a href="/static/legacy.html">
-          <span class="petit-corner-icon petit-corner-icon--legacy" aria-hidden="true">UI</span>
-          <span><strong>クラシックUI</strong><small>従来機能へ戻る</small></span>
-        </a>
+          <span><strong>詳細設定</strong><small>モデル・通知・動作を管理</small></span>
+        </button>
       </section>
     `;
     document.body.appendChild(dock);
@@ -172,6 +168,10 @@
     dock.querySelector("[data-corner-menu-reminders]")?.addEventListener("click", () => {
       setOpen(false);
       activate("reminders");
+    });
+    dock.querySelector("[data-corner-menu-settings]")?.addEventListener("click", () => {
+      setOpen(false);
+      activate("settings");
     });
     settings?.addEventListener("click", () => setOpen(menu.hidden));
     dock.querySelector("[data-corner-close]")?.addEventListener("click", () => setOpen(false));

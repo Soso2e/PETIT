@@ -1,8 +1,9 @@
 "use strict";
 
 (() => {
+  const isUniverse = Boolean(document.querySelector(".universe-shell"));
   const toggleButton = document.getElementById("notification-toggle");
-  const panel = document.getElementById("notification-panel");
+  const panel = document.getElementById("notification-panel") || document.querySelector("[data-view-panel=\"settings\"]");
   const state = document.getElementById("notification-state");
   const enableButton = document.getElementById("notification-enable");
   const testButton = document.getElementById("notification-test");
@@ -18,9 +19,9 @@
   const taskState = document.getElementById("task-state");
   const taskComplete = document.getElementById("task-complete");
   if (
-    !toggleButton || !panel || !state || !enableButton || !testButton || !disableButton ||
+    (!isUniverse && !toggleButton) || !panel || !state || !enableButton || !testButton || !disableButton ||
     !categories || !refreshButton || !unreadBadge || !eventList || !eventEmpty ||
-    !taskPanel || !taskClose || !taskForm || !taskState || !taskComplete
+    (!isUniverse && (!taskPanel || !taskClose || !taskForm || !taskState || !taskComplete))
   ) return;
   if (window.__PETIT_NOTIFICATIONS_INITIALIZED) return;
   window.__PETIT_NOTIFICATIONS_INITIALIZED = true;
@@ -104,9 +105,11 @@
   function renderStatus() {
     const supported = isSupported();
     const subscribed = Boolean(subscription);
-    toggleButton.textContent = unreadCount > 0 ? `通知 ${unreadCount}` : (subscribed ? "通知 ON" : "通知");
-    toggleButton.classList.toggle("notification-toggle--on", subscribed || unreadCount > 0);
-    toggleButton.setAttribute("aria-pressed", String(subscribed));
+    if (toggleButton) {
+      toggleButton.textContent = unreadCount > 0 ? `通知 ${unreadCount}` : (subscribed ? "通知 ON" : "通知");
+      toggleButton.classList.toggle("notification-toggle--on", subscribed || unreadCount > 0);
+      toggleButton.setAttribute("aria-pressed", String(subscribed));
+    }
     unreadBadge.textContent = unreadCount > 0 ? `${unreadCount}件未読` : "未読なし";
     unreadBadge.classList.toggle("notification-panel__badge--active", unreadCount > 0);
     enableButton.hidden = subscribed;
@@ -217,6 +220,11 @@
       await patchEvent(item.id, { read: true }).catch(() => undefined);
     }
     if (item.entity_type === "task" && /^\d+$/.test(String(item.entity_id || ""))) {
+      if (isUniverse) {
+        window.dispatchEvent(new CustomEvent("petit:navigate", { detail: { view: "tasks", taskId: Number(item.entity_id) } }));
+        await loadEvents();
+        return;
+      }
       await openTask(Number(item.entity_id), item.id);
       await loadEvents();
       return;
@@ -499,7 +507,7 @@
     }
   }
 
-  toggleButton.addEventListener("click", () => {
+  toggleButton?.addEventListener("click", () => {
     panel.hidden = !panel.hidden;
     toggleButton.setAttribute("aria-expanded", String(!panel.hidden));
     if (!panel.hidden) loadEvents().catch((error) => setState(error.message, true));
@@ -517,14 +525,17 @@
       loadEvents().catch((error) => setState(error.message, true));
     });
   }
-  taskClose.addEventListener("click", closeTask);
-  taskPanel.querySelector("[data-task-close]")?.addEventListener("click", closeTask);
-  taskForm.addEventListener("submit", saveTask);
-  taskComplete.addEventListener("click", completeTask);
+  taskClose?.addEventListener("click", closeTask);
+  taskPanel?.querySelector("[data-task-close]")?.addEventListener("click", closeTask);
+  taskForm?.addEventListener("submit", saveTask);
+  taskComplete?.addEventListener("click", completeTask);
 
   loadStatus().then(async () => {
     const params = new URLSearchParams(window.location.search);
     const notificationId = params.get("notification");
+    if (isUniverse && (notificationId || params.get("view") === "notifications")) {
+      window.dispatchEvent(new CustomEvent("petit:navigate", { detail: { view: "settings" } }));
+    }
     if (notificationId && /^\d+$/.test(notificationId)) {
       await patchEvent(Number(notificationId), { read: true }).catch(() => undefined);
     }
