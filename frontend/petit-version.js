@@ -22,7 +22,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
 
     const writeScripts = (srcs) => {
       for (const src of srcs) {
-        document.write(`<script src="${assetUrl(src)}"><\\/script>`);
+        document.write(`<script src="${assetUrl(src)}"></script>`);
       }
     };
 
