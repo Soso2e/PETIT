@@ -636,7 +636,7 @@ html[data-universe-motion="ready"] .view.is-entering {
 @media (max-width: 900px) {
   .universe-topbar {
     grid-template-columns: 1fr auto;
-    padding: 12px 16px;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
   }
   .view-tabs {
     grid-column: 1 / -1;
@@ -652,7 +652,11 @@ html[data-universe-motion="ready"] .view.is-entering {
 }
 
 @media (max-width: 640px) {
-  .universe-main { padding: 14px 16px; }
+  .universe-main { padding: 14px 16px calc(24px + env(safe-area-inset-bottom)); }
+  /* Mobile uses the orbit as the task overview; the desktop detail pane
+     otherwise appears below every Focus view and is easily hidden by the notch. */
+  .focus-layout { display: block; }
+  .focus-layout > #detail-panel { display: none; }
   .orbit-card__header { padding: 14px 16px 0; }
   .space-node--objective { width: 108px; height: 108px; font-size: 12px; }
 }
