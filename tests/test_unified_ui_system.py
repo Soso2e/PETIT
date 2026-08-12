@@ -52,16 +52,20 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertIn('check:', source)
         self.assertIn('chat:', source)
         self.assertIn('data-corner-reminders', source)
-        self.assertIn('/static/legacy.html?view=settings', source)
+        self.assertIn('data-corner-menu-settings', source)
+        self.assertNotIn('/static/legacy.html?view=settings', source)
         self.assertIn('.petit-corner-status', style)
         self.assertIn('.petit-corner-nav', style)
         self.assertIn('.petit-utility-dock', style)
         self.assertIn('env(safe-area-inset-top)', style)
         self.assertIn('env(safe-area-inset-bottom)', style)
 
-    def test_service_worker_precaches_current_univ_shell(self) -> None:
+    def test_service_worker_uses_asset_version_for_cache_generation(self) -> None:
         source = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('petit-shell-v0.15.0-webgl1', source)
+        self.assertIn('importScripts("/static/petit-version.js")', source)
+        self.assertIn('self.PETIT_ASSET_VERSION', source)
+        self.assertIn('url.searchParams.set("v", self.PETIT_ASSET_VERSION)', source)
+        self.assertNotIn('petit-shell-v0.15.0-webgl1', source)
         self.assertIn('/static/univ-space.js', source)
         self.assertIn('/static/univ-space.css', source)
         self.assertIn('/static/universe-render-scheduler.js', source)
@@ -71,6 +75,14 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertIn('/static/petit-corner-shell.js', source)
         self.assertIn('/static/petit-corner-shell.css', source)
 
+    def test_universe_static_assets_use_shared_asset_version(self) -> None:
+        source = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        self.assertIn('<script src="/static/petit-version.js"></script>', source)
+        self.assertIn('PetitAssetVersion.writeStylesheets', source)
+        self.assertIn('PetitAssetVersion.writeScripts', source)
+        self.assertIn('PetitVersionBootstrap.start()', source)
+        self.assertNotRegex(source, re.compile(r'/static/[^"\']+\.(?:css|js)\?v=\d'))
+
     def test_chat_input_keeps_ime_guard(self) -> None:
         source = (FRONTEND / "chat_input.js").read_text(encoding="utf-8")
         self.assertRegex(source, re.compile(r"event\.isComposing|keyCode\s*===\s*229"))
@@ -78,8 +90,10 @@ class UnifiedUiSystemTests(unittest.TestCase):
 
     def test_version_is_v0170(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('window.PETIT_VERSION = "v0.17.0"', source)
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.17.0"', source)
+        self.assertIn('globalThis.PETIT_VERSION = "v0.17.0"', source)
+        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.17.0"', source)
+        self.assertIn('window.PETIT_VERSION = globalThis.PETIT_VERSION', source)
+        self.assertIn('updateViaCache: "none"', source)
 
 
 if __name__ == "__main__":
