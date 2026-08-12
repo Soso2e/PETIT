@@ -12,12 +12,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon-64.png" />
   <link rel="manifest" href="/static/manifest.webmanifest" />
-  <link rel="stylesheet" href="/static/universe.css?v=0.15.0" />
-  <link rel="stylesheet" href="/static/universe-actions.css?v=0.15.0" />
-  <link rel="stylesheet" href="/static/universe-next.css?v=0.15.0" />
-  <link rel="stylesheet" href="/static/notifications.css?v=0.15.0" />
-  <link rel="stylesheet" href="/static/today.css?v=0.15.0" />
-  <link rel="stylesheet" href="/static/reminders.css?v=0.15.0" />
+  <script src="/static/petit-version.js"></script>
+  <script>
+    window.PetitAssetVersion.writeStylesheets([
+      "/static/universe.css",
+      "/static/universe-actions.css",
+      "/static/universe-next.css",
+      "/static/notifications.css",
+      "/static/today.css",
+      "/static/reminders.css",
+    ]);
+  </script>
 </head>
 <body>
   <div class="space" aria-hidden="true">
@@ -373,14 +378,18 @@
     </div>
   </template>
 
-  <script src="/static/petit-version.js?v=0.15.0"></script>
-  <script src="/static/session.js?v=0.15.0"></script>
-  <script src="/static/chat_input.js?v=0.15.0"></script>
-  <script src="/static/notifications.js?v=0.15.0"></script>
-  <script src="/static/universe-app.js?v=0.15.0"></script>
-  <script src="/static/universe-next.js?v=0.15.0"></script>
-  <script src="/static/today.js?v=0.15.0"></script>
-  <script src="/static/reminders.js?v=0.15.0"></script>
-  <script src="/static/voice.js?v=0.15.0"></script>
+  <script>
+    window.PetitVersionBootstrap.start();
+    window.PetitAssetVersion.writeScripts([
+      "/static/session.js",
+      "/static/chat_input.js",
+      "/static/notifications.js",
+      "/static/universe-app.js",
+      "/static/universe-next.js",
+      "/static/today.js",
+      "/static/reminders.js",
+      "/static/voice.js",
+    ]);
+  </script>
 </body>
 </html>
