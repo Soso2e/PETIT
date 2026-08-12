@@ -1,9 +1,19 @@
 "use strict";
 
-const CACHE_NAME = "petit-shell-v0.15.0-webgl1";
+importScripts("/static/petit-version.js");
+
+const CACHE_NAME = `petit-shell-v${self.PETIT_ASSET_VERSION}-webgl1`;
 const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell`;
 const THREE_CDN_ORIGIN = "https://esm.sh";
 const THREE_CDN_PREFIX = "/three@0.185.1";
+
+const assetUrl = (path) => {
+  if (!/^\/static\/.*\.(?:css|js)$/.test(path) || path === "/static/petit-version.js") return path;
+  const url = new URL(path, self.location.origin);
+  url.searchParams.set("v", self.PETIT_ASSET_VERSION);
+  return `${url.pathname}${url.search}`;
+};
+
 const SHELL = [
   "/",
   "/static/universe.html",
@@ -65,7 +75,7 @@ const SHELL = [
   "/static/icon-maskable-512.png",
   "/static/branding/icon_logo.png",
   "/static/branding/name_logo.png",
-];
+].map(assetUrl);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

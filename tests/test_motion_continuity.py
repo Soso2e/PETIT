@@ -18,8 +18,9 @@ class MotionContinuityTests(unittest.TestCase):
         self.webgl = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
 
     def test_motion_layer_uses_current_assets(self) -> None:
-        self.assertIn('window.PETIT_ASSET_VERSION = "0.17.0"', self.version)
-        self.assertIn('window.PETIT_VERSION = "v0.17.0"', self.version)
+        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.17.0"', self.version)
+        self.assertIn('globalThis.PETIT_VERSION = "v0.17.0"', self.version)
+        self.assertIn('window.PETIT_ASSET_VERSION = globalThis.PETIT_ASSET_VERSION', self.version)
         self.assertIn('/static/universe-webgl-scene.js', self.version)
         self.assertIn('/static/universe-webgl-scene.css', self.version)
         self.assertIn('loadStylesheet("/static/petit-motion.css"', self.chat_input)
