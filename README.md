@@ -73,6 +73,14 @@ Invoke-RestMethod http://127.0.0.1:8000/api/health
 
 ブラウザでも <http://127.0.0.1:8000> を開きます。
 
+Windowsでは、`scripts/start-petit-tailscale.ps1` をPowerShellから実行すると、起動モード選択、Tailscale接続、PETIT起動、ヘルスチェック、Tailscale Serve設定、ブラウザ起動まで連続実行できます。LM Studioは先に起動し、モデルをロードしておいてください。Tailscale Serve開始時には管理者権限の確認が表示されます。
+
+```powershell
+cd "C:\#Project\Server\PersonalAssistant_PETIT"
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\start-petit-tailscale.ps1
+```
+
 ### 2. Tailscale Serveで公開する
 
 別の管理者権限PowerShellを開きます。

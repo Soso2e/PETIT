@@ -25,6 +25,7 @@
 - タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。作成・完了・親子変更は確認付きでNotion同期する。
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
+- Windows起動導線: `scripts/start-petit-tailscale.ps1` で起動モード選択、Tailscale接続、`.venv` のPETIT起動、`/api/health`確認、管理者権限付きTailscale Serve、ブラウザ起動まで実行する。LM Studioは事前起動が必要。
 - 今回の検証: One-pass Router、内部read-only fallback、user側日時注入、静的Agent promptの回帰テストを追加。Python構文確認済み。実LM Studioでの応答品質、1ターンの呼び出し回数、レイテンシ、Tool選択精度は未確認。
 - 次にやること: 実LM Studioで雑談・相談・文章作成・予定取得・タスク操作・BRAIN検索を比較し、`llm_calls`、応答時間、誤route、Tool取りこぼし、Markdown表示、音声読み上げを確認する。
 
@@ -76,3 +77,6 @@
 | 2026-08-06 | 17:15 | #41 | Univのラベル選択で元DOMクリックによる全体再描画を避け、Universe選択APIへ統合。再選択時のフォーカス再実行も抑止 |
 | 2026-08-12 | 00:00 | #42 | スマホ版でFocusのタスク詳細パネルを非表示化し、ノッチ用safe-areaとチャット入力欄の縦位置を修正（静的確認済み、実iPhone未確認） |
 | 2026-08-12 | 00:00 | #43 | 新UIのSettingsへ通知センターを統合し、モデル・Push通知設定を集約。新UIから旧UIへ戻る導線を削除（静的確認済み） |
+| 2026-08-13 | 00:00 | #44 | `start-petit-tailscale.bat` と `scripts/start-petit-tailscale.ps1` を追加し、PETIT起動・ヘルスチェック・管理者権限付きTailscale Serve起動を自動化（初版BATはcmdの文字コード・記号解釈問題があり修正、実機UAC・外部Tailnet接続は未確認） |
+| 2026-08-13 | 00:00 | #45 | BATを廃止し、`scripts/start-petit-tailscale.ps1` に起動モード選択、Tailscale接続、PETIT起動、ブラウザ起動を統合（PowerShell構文確認済み、実機UAC・外部Tailnet接続は未確認） |
+| 2026-08-13 | 00:00 | #46 | デスクトップに `PETIT Launcher.lnk` を作成し、ダブルクリックでPowerShellランチャーを起動できるように設定（ショートカット設定確認済み、実機UAC・外部Tailnet接続は未確認） |
