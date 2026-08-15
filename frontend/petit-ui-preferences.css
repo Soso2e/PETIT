@@ -1,0 +1,160 @@
+/* PETIT UI preferences: explicit theme, mobile chat viewport, and lightweight rendering. */
+
+:root[data-petit-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-petit-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f6fb;
+  --bg-mid: #eef1f7;
+  --bg-surface: #ffffff;
+  --line: rgba(31, 38, 54, 0.10);
+  --line-mid: rgba(31, 38, 54, 0.16);
+  --line-strong: rgba(31, 38, 54, 0.24);
+  --text: #171b27;
+  --text-sub: #5f687c;
+  --text-dim: #8a93a6;
+  --accent: #566785;
+  --accent-warm: #946f49;
+  --accent-cool: #6f7f9d;
+  --ok: #367c60;
+  --warn: #8c6a28;
+  --danger: #aa4050;
+  --shadow-sm: 0 4px 18px rgba(39, 48, 68, 0.08);
+  --shadow-md: 0 10px 34px rgba(39, 48, 68, 0.10);
+  --shadow-lg: 0 20px 60px rgba(39, 48, 68, 0.12);
+}
+
+:root[data-petit-theme="light"] body,
+:root[data-petit-theme="light"] .universe-shell {
+  background: var(--bg);
+  color: var(--text);
+}
+
+:root[data-petit-theme="light"] .universe-topbar {
+  background: rgba(244, 246, 251, 0.94);
+}
+
+:root[data-petit-theme="light"] .view-tabs,
+:root[data-petit-theme="light"] .chat-composer,
+:root[data-petit-theme="light"] textarea,
+:root[data-petit-theme="light"] input,
+:root[data-petit-theme="light"] select,
+:root[data-petit-theme="light"] button {
+  color-scheme: light;
+}
+
+.petit-preference-card {
+  grid-column: 1 / -1;
+}
+
+.petit-preference-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.petit-preference-group {
+  display: grid;
+  gap: 8px;
+}
+
+.petit-preference-group > span {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+
+.petit-segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-mid);
+}
+
+.petit-segmented-control button {
+  min-height: 38px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  color: var(--text-sub);
+}
+
+.petit-segmented-control button[aria-pressed="true"] {
+  color: var(--text);
+  border-color: var(--line-mid);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.petit-preference-note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* Keep the chat input anchored to the usable viewport on iPhone/PWA. */
+@media (max-width: 760px) {
+  .chat-panel {
+    min-height: calc(100dvh - var(--petit-mobile-top, 110px));
+    padding-bottom: 0;
+  }
+
+  .messages {
+    padding-bottom: 12px;
+  }
+
+  .chat-composer {
+    position: sticky;
+    z-index: 25;
+    bottom: 0;
+    margin: 0 -1px -1px;
+    padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg-surface) 94%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .chat-composer textarea {
+    min-width: 0;
+    font-size: 16px;
+    max-height: 30dvh;
+  }
+
+  .petit-preference-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Lite mode preserves layout while removing effects that are expensive on mobile GPUs. */
+:root[data-petit-performance="lite"] .space::before,
+:root[data-petit-performance="lite"] .space::after,
+:root[data-petit-performance="lite"] .space__nebula,
+:root[data-petit-performance="lite"] .orbit-card::before,
+:root[data-petit-performance="lite"] .orbit__ring {
+  animation: none !important;
+  will-change: auto !important;
+}
+
+:root[data-petit-performance="lite"] .space__nebula {
+  filter: blur(72px);
+  opacity: 0.035;
+}
+
+:root[data-petit-performance="lite"] .universe-topbar,
+:root[data-petit-performance="lite"] .chat-composer {
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .space::before,
+  .space::after,
+  .space__nebula,
+  .orbit-card::before,
+  .orbit__ring {
+    animation: none !important;
+  }
+}

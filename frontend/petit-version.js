@@ -1,5 +1,5 @@
-globalThis.PETIT_VERSION = "v0.17.0";
-globalThis.PETIT_ASSET_VERSION = "0.17.0";
+globalThis.PETIT_VERSION = "v0.17.1";
+globalThis.PETIT_ASSET_VERSION = "0.17.1";
 
 if (typeof window !== "undefined") {
   window.PETIT_VERSION = globalThis.PETIT_VERSION;
@@ -34,6 +34,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
 
     const forceCssRenderer = new URLSearchParams(window.location.search).get("renderer") === "css";
     let runtimeStarted = false;
+    let webglRequested = false;
 
     const loadStylesheet = (href, key) => {
       const selector = `link[data-petit-bootstrap="${key}"]`;
@@ -76,12 +77,28 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
       loadScript("/static/universe-webgl-bridge.js", "universe-webgl-bridge");
     };
 
+    const ensureWebGLAssets = () => {
+      if (forceCssRenderer || webglRequested) return;
+      webglRequested = true;
+      loadStylesheet("/static/universe-webgl-scene.css", "universe-webgl-scene-style");
+      loadScript("/static/universe-webgl-hierarchy.js", "universe-webgl-hierarchy", loadWebGLScene);
+    };
+
+    const installDeferredWebGL = () => {
+      if (forceCssRenderer) return;
+      const universePanel = document.querySelector('[data-view-panel="universe"]');
+      if (universePanel && !universePanel.hidden) ensureWebGLAssets();
+
+      document.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target.closest('[data-view="universe"]') : null;
+        if (target) ensureWebGLAssets();
+      }, true);
+    };
+
     const loadPostShellAssets = () => {
       loadStylesheet("/static/universe-3d-foundation.css", "universe-3d-foundation");
       loadScript("/static/petit-corner-shell.js", "corner-shell");
-      if (forceCssRenderer) return;
-      loadStylesheet("/static/universe-webgl-scene.css", "universe-webgl-scene-style");
-      loadScript("/static/universe-webgl-hierarchy.js", "universe-webgl-hierarchy", loadWebGLScene);
+      installDeferredWebGL();
     };
 
     const loadAppShell = () => {
@@ -97,6 +114,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
     const startRuntime = () => {
       if (runtimeStarted) return;
       runtimeStarted = true;
+      loadStylesheet("/static/petit-ui-preferences.css", "ui-preferences-style");
+      loadScript("/static/petit-ui-preferences.js", "ui-preferences");
       loadScript("/static/univ-detail-children.js", "univ-detail-children");
       if (window.PetitUniverseRenderScheduler?.initialized) {
         loadAppShell();
