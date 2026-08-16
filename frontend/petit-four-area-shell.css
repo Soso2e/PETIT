@@ -12,8 +12,8 @@
   flex-direction: column;
   gap: 28px;
   padding: 24px 18px;
-  border-right: 1px solid rgb(255 255 255 / 10%);
-  background: rgb(5 7 17 / 88%);
+  border-right: 1px solid var(--petit-shell-border, var(--line));
+  background: var(--petit-shell-bg, color-mix(in srgb, var(--bg) 88%, transparent));
   backdrop-filter: blur(24px);
 }
 
@@ -37,7 +37,7 @@
 }
 
 .petit-area-rail__brand small {
-  color: var(--muted, #8e98b5);
+  color: var(--text-sub);
   font-family: "DM Mono", monospace;
   font-size: 11px;
 }
@@ -64,22 +64,22 @@
 .petit-area-rail__nav button:hover,
 .petit-area-rail__nav button.is-active,
 .petit-area-rail__shortcuts button:hover {
-  border-color: rgb(255 255 255 / 12%);
-  background: rgb(255 255 255 / 7%);
+  border-color: var(--petit-shell-border-strong, var(--line-mid));
+  background: var(--petit-shell-soft, var(--bg-mid));
 }
 
 .petit-area-rail__nav button.is-active {
-  box-shadow: inset 3px 0 0 rgb(151 195 255 / 92%);
+  box-shadow: inset 3px 0 0 var(--petit-shell-accent, var(--accent));
 }
 
 .petit-area-rail__shortcuts {
   margin-top: auto;
   padding-top: 16px;
-  border-top: 1px solid rgb(255 255 255 / 9%);
+  border-top: 1px solid var(--petit-shell-border, var(--line));
 }
 
 .petit-area-rail__shortcuts button {
-  color: var(--muted, #9aa4bd);
+  color: var(--text-sub);
   font-size: 13px;
 }
 
@@ -96,16 +96,16 @@
   align-content: center;
   gap: 8px;
   padding: 16px;
-  border: 1px solid rgb(255 255 255 / 10%);
+  border: 1px solid var(--petit-shell-border, var(--line));
   border-radius: 18px;
-  background: rgb(255 255 255 / 4%);
+  background: var(--petit-shell-soft, var(--bg-mid));
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
 
 .home-area-shortcuts span {
-  color: var(--muted, #8e98b5);
+  color: var(--text-sub);
   font-family: "DM Mono", monospace;
   font-size: 10px;
   letter-spacing: .12em;
@@ -127,15 +127,15 @@
   min-height: 40px;
   flex: 0 0 auto;
   padding: 0 14px;
-  border: 1px solid rgb(255 255 255 / 10%);
+  border: 1px solid var(--petit-shell-border, var(--line));
   border-radius: 999px;
-  background: rgb(255 255 255 / 4%);
+  background: var(--petit-shell-soft, var(--bg-mid));
   color: inherit;
   font: inherit;
 }
 
 .petit-subnav button.is-active {
-  background: rgb(255 255 255 / 12%);
+  background: var(--petit-shell-soft-strong, var(--bg-surface));
 }
 
 .petit-subnav button:disabled {
@@ -175,8 +175,8 @@
     gap: 4px;
     min-height: var(--petit-bottom-nav-height);
     padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-    border-top: 1px solid rgb(255 255 255 / 12%);
-    background: rgb(5 7 17 / 92%);
+    border-top: 1px solid var(--petit-shell-border-strong, var(--line-mid));
+    background: var(--petit-shell-bg-strong, color-mix(in srgb, var(--bg) 94%, transparent));
     backdrop-filter: blur(24px);
   }
 
