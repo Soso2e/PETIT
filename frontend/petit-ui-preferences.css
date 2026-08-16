@@ -1,7 +1,20 @@
-/* PETIT UI preferences: explicit theme, mobile chat viewport, and lightweight rendering. */
+/* PETIT UI preferences: explicit theme, shared shell tokens, mobile chat viewport, and lightweight rendering. */
 
 :root[data-petit-theme="dark"] {
   color-scheme: dark;
+  --petit-shell-bg: rgb(5 7 17 / 88%);
+  --petit-shell-bg-strong: rgb(5 7 17 / 94%);
+  --petit-shell-border: rgb(255 255 255 / 10%);
+  --petit-shell-border-strong: rgb(255 255 255 / 14%);
+  --petit-shell-soft: rgb(255 255 255 / 5%);
+  --petit-shell-soft-strong: rgb(255 255 255 / 11%);
+  --petit-shell-accent: rgb(151 195 255 / 92%);
+  --petit-univ-bg:
+    radial-gradient(circle at 50% 48%, rgba(96, 123, 255, .16), transparent 20%),
+    radial-gradient(circle at 18% 20%, rgba(82, 227, 205, .07), transparent 28%),
+    radial-gradient(circle at 84% 76%, rgba(190, 102, 255, .08), transparent 30%),
+    linear-gradient(160deg, #070a1a 0%, #02040d 72%, #010208 100%);
+  --petit-univ-border: rgba(157, 180, 255, .14);
 }
 
 :root[data-petit-theme="light"] {
@@ -24,6 +37,19 @@
   --shadow-sm: 0 4px 18px rgba(39, 48, 68, 0.08);
   --shadow-md: 0 10px 34px rgba(39, 48, 68, 0.10);
   --shadow-lg: 0 20px 60px rgba(39, 48, 68, 0.12);
+  --petit-shell-bg: rgb(248 250 255 / 90%);
+  --petit-shell-bg-strong: rgb(248 250 255 / 96%);
+  --petit-shell-border: rgb(31 38 54 / 10%);
+  --petit-shell-border-strong: rgb(31 38 54 / 16%);
+  --petit-shell-soft: rgb(31 38 54 / 4%);
+  --petit-shell-soft-strong: rgb(48 70 111 / 10%);
+  --petit-shell-accent: rgb(65 105 168 / 88%);
+  --petit-univ-bg:
+    radial-gradient(circle at 50% 48%, rgba(96, 123, 255, .10), transparent 22%),
+    radial-gradient(circle at 18% 20%, rgba(82, 187, 175, .07), transparent 30%),
+    radial-gradient(circle at 84% 76%, rgba(151, 104, 190, .07), transparent 32%),
+    linear-gradient(160deg, #f8faff 0%, #edf2fa 72%, #e8eef7 100%);
+  --petit-univ-border: rgba(63, 82, 123, .14);
 }
 
 :root[data-petit-theme="light"] body,
@@ -36,6 +62,12 @@
   background: rgba(244, 246, 251, 0.94);
 }
 
+:root[data-petit-theme="light"] .space::before,
+:root[data-petit-theme="light"] .space::after {
+  filter: invert(1);
+  opacity: .08;
+}
+
 :root[data-petit-theme="light"] .view-tabs,
 :root[data-petit-theme="light"] .chat-composer,
 :root[data-petit-theme="light"] textarea,
@@ -43,6 +75,22 @@
 :root[data-petit-theme="light"] select,
 :root[data-petit-theme="light"] button {
   color-scheme: light;
+}
+
+:root[data-petit-theme="light"] .univ-viewport {
+  border-color: var(--petit-univ-border);
+  background: var(--petit-univ-bg);
+  box-shadow: 0 24px 70px rgba(52, 69, 101, .12), inset 0 0 100px rgba(80, 105, 220, .05);
+}
+
+:root[data-petit-theme="light"] .constellation-grid.life-cosmos-map {
+  border-color: var(--petit-univ-border);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(105, 131, 255, .10), transparent 22%),
+    radial-gradient(circle at 20% 15%, rgba(80, 177, 153, .06), transparent 30%),
+    radial-gradient(circle at 78% 75%, rgba(134, 91, 176, .06), transparent 32%),
+    linear-gradient(155deg, rgba(250, 252, 255, .96), rgba(235, 241, 249, .92));
+  box-shadow: 0 18px 50px rgba(52, 69, 101, .10);
 }
 
 .petit-preference-card {
