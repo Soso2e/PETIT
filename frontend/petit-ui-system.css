@@ -15,7 +15,6 @@
   --ui-focus-ring:0 0 0 3px rgba(157,180,232,.18);
   --ui-fast:140ms; --ui-normal:220ms; --ui-slow:360ms;
   --ui-ease:cubic-bezier(.2,.8,.2,1); --ui-header:66px; --ui-mobile-nav:70px;
-
   --bg:var(--ui-bg); --bg-mid:var(--ui-bg-2); --bg-surface:var(--ui-surface-solid);
   --line:var(--ui-line); --line-mid:rgba(220,226,240,.14); --line-strong:var(--ui-line-strong);
   --text:var(--ui-text); --text-sub:var(--ui-muted); --text-dim:var(--ui-dim);
@@ -23,7 +22,7 @@
   --shadow-sm:var(--ui-shadow); --shadow-md:var(--ui-shadow-lg); --shadow-lg:0 28px 80px rgba(0,0,0,.42);
 }
 
-html[data-theme="light"] {
+html[data-petit-theme="light"] {
   color-scheme: light;
   --ui-bg:#f3f5f8; --ui-bg-2:#e9edf3; --ui-surface:rgba(255,255,255,.91);
   --ui-surface-solid:#fff; --ui-soft:rgba(23,31,46,.035);
@@ -33,6 +32,11 @@ html[data-theme="light"] {
   --ui-ok:#267a5b; --ui-warn:#8f641d; --ui-danger:#a63d4c;
   --ui-shadow:0 8px 24px rgba(39,49,65,.08); --ui-shadow-lg:0 18px 50px rgba(39,49,65,.12);
   --ui-focus-ring:0 0 0 3px rgba(65,105,168,.15);
+  --bg:var(--ui-bg); --bg-mid:var(--ui-bg-2); --bg-surface:var(--ui-surface-solid);
+  --line:var(--ui-line); --line-mid:rgba(29,39,57,.14); --line-strong:var(--ui-line-strong);
+  --text:var(--ui-text); --text-sub:var(--ui-muted); --text-dim:var(--ui-dim);
+  --accent:var(--ui-accent); --ok:var(--ui-ok); --warn:var(--ui-warn); --danger:var(--ui-danger);
+  --shadow-sm:var(--ui-shadow); --shadow-md:var(--ui-shadow-lg); --shadow-lg:0 28px 80px rgba(39,49,65,.16);
 }
 
 html { background:var(--ui-bg); text-rendering:optimizeLegibility; }
@@ -41,7 +45,7 @@ body {
              radial-gradient(circle at 100% 100%,rgba(110,86,145,.08),transparent 32rem),var(--ui-bg);
   color:var(--ui-text);
 }
-html[data-theme="light"] body {
+html[data-petit-theme="light"] body {
   background:radial-gradient(circle at 15% 0%,rgba(104,132,181,.11),transparent 34rem),
              radial-gradient(circle at 100% 100%,rgba(133,112,166,.08),transparent 32rem),var(--ui-bg);
 }
@@ -53,12 +57,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 }
 button:disabled,[aria-disabled="true"] { cursor:not-allowed!important; }
 
-/* Background stays atmospheric instead of becoming the subject. */
 .space::before,.space::after { opacity:.22; animation-duration:220s; }
 .space__nebula { opacity:.045; filter:blur(150px); }
-html[data-theme="light"] .space::before,html[data-theme="light"] .space::after { filter:invert(1); opacity:.08; }
+html[data-petit-theme="light"] .space::before,html[data-petit-theme="light"] .space::after { filter:invert(1); opacity:.08; }
 
-/* Shell and navigation */
 .universe-shell { min-height:100dvh; }
 .universe-topbar {
   min-height:var(--ui-header); grid-template-columns:minmax(170px,1fr) auto minmax(170px,1fr);
@@ -87,7 +89,6 @@ html[data-theme="light"] .space::before,html[data-theme="light"] .space::after {
 }
 .petit-theme-toggle:hover,.legacy-link:hover { color:var(--ui-text); border-color:var(--ui-line-strong); background:var(--ui-surface); }
 
-/* Always-visible current context */
 .petit-context-bar {
   position:sticky; top:var(--ui-header); z-index:24; display:grid;
   grid-template-columns:.8fr 1.35fr 1.35fr .8fr; gap:1px; max-width:1540px; margin:0 auto;
@@ -110,14 +111,12 @@ html[data-theme="light"] .space::before,html[data-theme="light"] .space::after {
 h1 { color:var(--ui-text); font-size:clamp(20px,2vw,27px); font-weight:640; letter-spacing:-.035em; }
 .section-head p,.section-copy { color:var(--ui-muted); }
 
-/* One surface language across every screen. */
 .orbit-card,.detail-panel,.chat-panel,.chat-context,.task-table-wrap,.constellation-card,.today-card,.reminder-list,.notification-panel {
   border:1px solid var(--ui-line); border-radius:var(--ui-r-md); background:var(--ui-surface);
   box-shadow:var(--ui-shadow); backdrop-filter:blur(18px) saturate(110%);
 }
 .orbit-card,.chat-panel { min-height:calc(100dvh - 190px); }
 
-/* Focus: current task remains primary; 3D is supportive, not decorative. */
 .focus-layout { grid-template-columns:minmax(0,1fr) minmax(290px,340px); gap:16px; }
 .orbit-card { perspective:1200px; transform-style:preserve-3d; }
 .orbit-card::before { opacity:.22; animation:none; }
@@ -127,7 +126,7 @@ h1 { color:var(--ui-text); font-size:clamp(20px,2vw,27px); font-weight:640; lett
   background:radial-gradient(ellipse,rgba(5,8,16,.42),transparent 70%); filter:blur(18px);
   transform:translateX(-50%) rotateX(72deg); pointer-events:none; z-index:0;
 }
-html[data-theme="light"] .orbit::after { background:radial-gradient(ellipse,rgba(41,55,80,.14),transparent 70%); }
+html[data-petit-theme="light"] .orbit::after { background:radial-gradient(ellipse,rgba(41,55,80,.14),transparent 70%); }
 .orbit__ring { border-color:color-mix(in srgb,var(--ui-line-strong) 72%,transparent); opacity:.55; animation-duration:80s; }
 .orbit__ring--two { animation-duration:110s; }
 .orbit__ring--three { animation-duration:145s; }
@@ -161,7 +160,6 @@ html[data-theme="light"] .orbit::after { background:radial-gradient(ellipse,rgba
 .focus-footer { min-height:72px; padding:13px 20px; border-top-color:var(--ui-line); background:color-mix(in srgb,var(--ui-bg-2) 78%,transparent); }
 #active-elapsed { color:var(--ui-text); font-size:14px; font-variant-numeric:tabular-nums; }
 
-/* Life */
 .constellation-grid--list { gap:12px; margin-top:16px; }
 .constellation-card--list { overflow:clip; }
 .constellation-card__header { min-height:68px; padding:15px 18px; background:transparent; }
@@ -171,7 +169,6 @@ html[data-theme="light"] .orbit::after { background:radial-gradient(ellipse,rgba
 .universe-task { min-height:46px; border-color:var(--ui-line); border-radius:9px; background:var(--ui-soft); }
 .universe-task:hover,.universe-task.is-selected { border-color:var(--ui-focus); background:var(--ui-accent-soft); }
 
-/* Tasks */
 .task-table-wrap { margin-top:16px; overflow:auto; }
 .task-table { min-width:680px; }
 .task-table th { position:sticky; top:0; z-index:2; background:var(--ui-surface-solid); }
@@ -181,7 +178,6 @@ html[data-theme="light"] .orbit::after { background:radial-gradient(ellipse,rgba
 .task-filters { border-radius:9px; background:var(--ui-soft); }
 .filter-chip.is-active { background:var(--ui-surface-solid); box-shadow:var(--ui-shadow); }
 
-/* Today and reminders */
 .today-grid { gap:14px; margin-top:16px; }
 .today-card { min-height:132px; padding:18px; }
 .today-card--summary strong,#today-total { color:var(--ui-text); font-variant-numeric:tabular-nums; }
@@ -192,7 +188,6 @@ html[data-theme="light"] .orbit::after { background:radial-gradient(ellipse,rgba
 .reminder-item,.reminder-card { border:1px solid var(--ui-line)!important; border-radius:var(--ui-r-sm)!important; background:var(--ui-soft)!important; box-shadow:none!important; }
 .reminder-filter.is-active { color:var(--ui-text); background:var(--ui-surface-solid); }
 
-/* Chat */
 .chat-layout { gap:16px; grid-template-columns:minmax(0,1fr) minmax(250px,300px); }
 .chat-panel { overflow:clip; }
 .chat-context { position:sticky; top:calc(var(--ui-header) + 76px); }
@@ -204,7 +199,6 @@ html[data-theme="light"] .orbit::after { background:radial-gradient(ellipse,rgba
 .chat-composer textarea:focus { border-color:var(--ui-focus); box-shadow:var(--ui-focus-ring); }
 .chat-composer button[type="submit"] { min-width:72px; min-height:44px; border-radius:11px; border-color:var(--ui-line-strong); background:var(--ui-accent-soft); }
 
-/* Feedback and status */
 .notification-panel { background:color-mix(in srgb,var(--ui-surface-solid) 95%,transparent); }
 .notification-item { border-color:var(--ui-line); background:var(--ui-soft); }
 .task-feedback { border-color:var(--ui-line-strong); border-radius:12px; background:color-mix(in srgb,var(--ui-surface-solid) 96%,transparent); box-shadow:var(--ui-shadow-lg); animation:petitToastEnter var(--ui-normal) var(--ui-ease) both; }
@@ -239,24 +233,17 @@ html[data-page-hidden="true"] *,html[data-page-hidden="true"] *::before,html[dat
     position:fixed; left:8px; right:8px; bottom:max(8px,env(safe-area-inset-bottom)); z-index:70;
     grid-column:auto; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:2px; padding:4px;
     border-color:var(--ui-line-strong); border-radius:16px;
-    background:color-mix(in srgb,var(--ui-surface-solid) 94%,transparent); box-shadow:var(--ui-shadow-lg); backdrop-filter:blur(22px) saturate(130%); overflow:visible;
+    background:color-mix(in srgb,var(--ui-surface-solid) 94%,transparent); box-shadow:var(--ui-shadow-lg); backdrop-filter:blur(22px) saturate(115%);
   }
-  .view-tab { min-width:0; min-height:44px; padding:6px 2px; border-radius:10px; font-size:9px; letter-spacing:0; }
-  .petit-context-bar { position:static; grid-template-columns:repeat(2,minmax(0,1fr)); margin:0 10px; border-top:1px solid var(--ui-line); border-radius:var(--ui-r-sm); }
+  .view-tab { min-width:0; min-height:46px; padding:5px 3px; font-size:9px; line-height:1.15; }
+  .petit-context-bar { position:static; margin:0 8px 10px; grid-template-columns:repeat(2,minmax(0,1fr)); border-radius:var(--ui-r-sm); }
   .petit-context-item { padding:8px 10px; }
-  .petit-context-item:nth-child(4) { display:none; }
-  .universe-main { padding:12px 10px 24px; }
-  .section-head,.orbit-card__header,.settings-section-head,.today-section-head,.reminder-section-head,.task-section-head { padding:12px 12px 0; scroll-margin-top:calc(var(--ui-header) + 12px); }
-  h1 { font-size:20px; }
+  .universe-main { padding:8px 10px 22px; }
+  .section-head,.orbit-card__header { padding:15px 14px 0; }
+  .focus-layout { gap:10px; }
   .orbit-card,.chat-panel { min-height:auto; }
-  .orbit { min-height:430px; }
-  .space-node--objective { width:112px; height:112px; }
-  .space-node[data-orbit-index] { min-width:96px; max-width:136px; min-height:40px; padding:8px 10px; font-size:11px; }
-  .focus-zoom-controls { width:100%; margin-left:0; }
-  .work-session-controls { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
-  #active-elapsed { grid-column:1/-1; text-align:left; }
-  .focus-layout > #detail-panel { display:none; }
-  .universe-task-list { grid-template-columns:1fr; }
+  .orbit { min-height:440px; }
+  .detail-panel { padding:14px; }
   .task-table-wrap { margin-inline:-2px; border-radius:12px; overscroll-behavior-x:contain; }
   .today-grid { grid-template-columns:1fr!important; }
   .chat-context { display:none; }
