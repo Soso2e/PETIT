@@ -123,8 +123,17 @@
   user-select: none;
 }
 
-.petit-univ-webgl-ready .univ-viewport::before { opacity: .24; }
-.petit-univ-webgl-ready .univ-viewport::after { opacity: .35; }
+/* WebGL owns the scene backdrop after it is ready. Leaving the CSS stars or
+   gradient visible here makes a second universe show through the canvas. */
+.petit-univ-webgl-ready .univ-viewport {
+  background: #02040d;
+  box-shadow: none;
+}
+
+.petit-univ-webgl-ready .univ-viewport::before,
+.petit-univ-webgl-ready .univ-viewport::after {
+  display: none;
+}
 
 .petit-univ-webgl-ready .univ-hud { z-index: 80; }
 .petit-univ-webgl-ready.petit-univ-manage-open #detail-panel { z-index: 180; }

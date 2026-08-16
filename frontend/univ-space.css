@@ -1,4 +1,44 @@
 /* Univ: Core planet, task planets, child-task satellites, lines, background, HUD. */
+
+/* Issue #215: the active Univ view owns the visible viewport. The shell keeps
+   every other view in normal document flow, while Univ cannot create page
+   scroll from a mobile safe-area or an oversized detail panel. */
+html:has(body.petit-univ-screen),
+body.petit-univ-screen {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.petit-univ-screen {
+  padding-bottom: 0;
+}
+
+body.petit-univ-screen .universe-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body.petit-univ-screen .universe-main {
+  position: fixed;
+  inset: var(--ui-header, 66px) 0 0;
+  z-index: 2;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+body.petit-univ-screen [data-view-panel="universe"].is-active {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  overflow: hidden;
+}
+
+body.petit-univ-screen [data-view-panel="universe"].univ-panel {
+  height: 100%;
+}
+
 [data-view-panel="universe"].univ-panel {
   position: relative;
   padding: 0;
@@ -35,6 +75,16 @@
   perspective-origin: 50% 48%;
   touch-action: none;
   cursor: grab;
+}
+
+body.petit-univ-screen .univ-viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
 }
 
 .univ-viewport::before,
@@ -696,6 +746,16 @@
 }
 
 .petit-univ-active.petit-univ-manage-open .univ-detail-dismiss { display: block; }
+
+@media (max-width: 720px) {
+  body.petit-univ-screen .universe-main {
+    inset: var(--ui-header, 58px) 0 calc(var(--ui-mobile-nav, 70px) + env(safe-area-inset-bottom)) 0;
+  }
+
+  body.petit-univ-screen .univ-viewport {
+    height: 100%;
+  }
+}
 
 @keyframes univStarDrift {
   from { transform: translate3d(0, 0, 0); }

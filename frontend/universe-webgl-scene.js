@@ -135,10 +135,11 @@
 
     state.renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: true,
+      // The renderer is the single source of truth for the Univ backdrop.
+      alpha: false,
       powerPreference: "high-performance",
     });
-    state.renderer.setClearColor(0x000000, 0);
+    state.renderer.setClearColor(0x02040d, 1);
     state.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     state.renderer.outputColorSpace = THREE.SRGBColorSpace;
     state.renderer.toneMapping = THREE.ACESFilmicToneMapping;

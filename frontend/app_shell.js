@@ -25,6 +25,11 @@
     const panels = Array.from(document.querySelectorAll("[data-view-panel]"));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+    // Univ is a viewport, not a document section. Keep the page lock in the
+    // shell so every navigation path (tab, URL alias, and task deep link)
+    // receives the same fixed-space contract.
+    document.body.classList.toggle("petit-univ-screen", panelView === "universe");
+
     tabs.forEach((tab) => {
       const active = tab.dataset.view === panelView;
       tab.classList.toggle("is-active", active);

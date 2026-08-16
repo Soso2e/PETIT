@@ -12,6 +12,7 @@
 - バージョン管理: v0.17.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
 - Univ UI 刷新: 大きなカード矩形を全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: WebGL依存を追加せず、CSS 3D・radial-gradient・既存SVG接続線で軽量な球体表現を実装。レイヤーは前面HUD、選択対象の説明、惑星・衛星、接続線、背景の順で固定する。
+- Issue #215対応: Univ表示時だけページを固定し、100dvhとsafe-area内のThree.js viewportへ切り替える。WebGL成功時はCSS宇宙背景を隠し、Canvasを単一の背景描画面として扱う（実ブラウザ・実iPhone未確認）。
 - Univ Focus: 親タスク惑星または子タスク衛星を選ぶと、同じUniv内でカメラが対象系へ寄り、所属する衛星を見やすくする。他の惑星と接続線は暗くし、旧Focusパネルへ自動遷移しない。
 - Front UI: 左上に現在領域・同期状態・バージョン、右上にUniv／Tasks／PETITの3アイコン、左下にReminders／Settingsを置く四隅型App Shellへ更新。スマホでは主要タブをアイコンだけにし、safe-areaを考慮する。
 - 補助導線: Settingsから詳細設定を備えた旧UIへ直接移動できる。旧UIは廃止せず、移行中の保険・全機能への導線として残す。
@@ -80,3 +81,6 @@
 | 2026-08-13 | 00:00 | #44 | `start-petit-tailscale.bat` と `scripts/start-petit-tailscale.ps1` を追加し、PETIT起動・ヘルスチェック・管理者権限付きTailscale Serve起動を自動化（初版BATはcmdの文字コード・記号解釈問題があり修正、実機UAC・外部Tailnet接続は未確認） |
 | 2026-08-13 | 00:00 | #45 | BATを廃止し、`scripts/start-petit-tailscale.ps1` に起動モード選択、Tailscale接続、PETIT起動、ブラウザ起動を統合（PowerShell構文確認済み、実機UAC・外部Tailnet接続は未確認） |
 | 2026-08-13 | 00:00 | #46 | デスクトップに `PETIT Launcher.lnk` を作成し、ダブルクリックでPowerShellランチャーを起動できるように設定（ショートカット設定確認済み、実機UAC・外部Tailnet接続は未確認） |
+| 2026-08-17 | 00:00 | #47 | Git整理の中間対応として、`c26db2b` から `feat/chat-work-session` を作成し、整理前の `agent/univ-three-work-chat` を `backup-before-branch-cleanup-20260817` タグへ保存（リモート削除・履歴書き換えは未実施） |
+| 2026-08-17 | 00:00 | #48 | GitHub上のリモートブランチを `main` と `feat/chat-work-session` に整理し、重複リモート `PETIT` と旧ローカルブランチ `agent/univ-three-work-chat` を削除（作業ブランチはPush済み、PROGRESS変更は未コミット） |
+| 2026-08-17 | 00:00 | #49 | Issue #215: Univ表示時のhtml/body・メイン領域を固定し、safe-area対応の100dvh viewportとWebGL単一背景を実装（関連回帰26件成功、実ブラウザ・実iPhone未確認） |
