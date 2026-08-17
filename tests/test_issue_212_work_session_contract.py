@@ -39,11 +39,9 @@ class Issue212WorkSessionContractTests(unittest.TestCase):
         source = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
         self.assertIn('workSessionRequest("/start", "POST"', source)
         self.assertIn('const pollWorkSession = async () => {', source)
+        self.assertIn('localStorage.removeItem("petit_universe_active_started_at")', source)
         for action in ("pause", "resume", "end"):
             self.assertIn(action, source)
-        self.assertNotIn("petit_universe_active_started_at", source.split(
-            "// Remove the old client-only timer.", 1
-        )[1].split("const state =", 1)[0])
 
     def test_today_and_companion_share_work_session_endpoints(self) -> None:
         today = (FRONTEND / "today.js").read_text(encoding="utf-8")
