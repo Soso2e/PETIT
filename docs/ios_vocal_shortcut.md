@@ -1,4 +1,4 @@
-# 「プティ」iOS Vocal Shortcut 仮導線
+# 「へいプティ」iOS Vocal Shortcut 仮導線
 
 Issue #218 の仮実装手順です。
 
@@ -7,7 +7,7 @@ PETITのPWA自身で常時マイク監視は行わず、呼びかけの検出と
 ## 構成
 
 ```text
-「プティ」
+「へいプティ」
   ↓
 iOS Vocal Shortcuts
   ↓
@@ -86,7 +86,7 @@ Content-Type: application/json
 
 Apple ショートカットで、概ね次の順にアクションを作ります。iOSのバージョンによって表示名は多少異なります。
 
-1. 新しいショートカットを作り、分かりやすい名前を付ける（例: `プティに聞く`）
+1. 新しいショートカットを作り、分かりやすい名前を付ける（例: `へいプティに聞く`）
 2. 音声入力・音声テキスト化のアクションを追加する
 3. PETITのTailscale Serve URLに `/api/voice` を付ける
 4. `URLの内容を取得` を追加する
@@ -105,7 +105,7 @@ https://<PC名>.<tailnet名>.ts.net/api/voice
 
 PETITは従来どおりTailnet内だけで利用し、Tailscale Funnelによるインターネット公開は前提にしません。
 
-次にiOSのVocal Shortcutsで、このショートカットを呼び出すアクションを設定し、発話として `プティ` を登録します。
+次にiOSのVocal Shortcutsで、このショートカットを呼び出すアクションを設定し、発話として `へいプティ` を登録します。
 
 ## PowerShellで先に確認する
 
@@ -145,12 +145,12 @@ python -m compileall backend tests
 - [ ] 書き込み候補が勝手に承認されない
 - [ ] PETITの会話履歴へ同じターンが保存される
 - [ ] PWA通常チャットが回帰していない
-- [ ] 「プティ」からショートカットを起動できる
+- [ ] 「へいプティ」からショートカットを起動できる
 
 ## 現時点の制約
 
-- 「プティ、今日なにする？」を一息で自由文まで取り込む独自Wake Word処理は実装しない
-- `プティ` で起動したあと、ショートカット側の音声入力で依頼を話す2段階を前提にする
+- 「へいプティ、今日なにする？」を一息で自由文まで取り込む独自Wake Word処理は実装しない
+- `へいプティ` で起動したあと、ショートカット側の音声入力で依頼を話す2段階を前提にする
 - PWAでバックグラウンド常時録音はしない
 - PETIT / LM Studio / Tailscaleが停止中なら会話は成立しない
 - `/api/voice`専用の追加認証はまだ設けず、既存のTailnet内利用を前提とする
@@ -158,6 +158,6 @@ python -m compileall backend tests
 
 ## 関連
 
-- Issue #218: 「プティ」Vocal ShortcutからPWAへ話しかける仮導線
+- Issue #218: 「へいプティ」Vocal ShortcutからPWAへ話しかける仮導線
 - Issue #93: 音声会話を待たせないリアルタイム体験
 - `docs/runtime-flows.md`: `/api/chat` 以降の会話処理フロー

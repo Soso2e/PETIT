@@ -20,7 +20,7 @@ import threading
 import time
 from uuid import uuid4
 
-from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, model_routing, notion_task_sync, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, work_sessions, worker
+from . import agent, aivis_speech, briefing, calendar_providers, calendar_sync, chroma_client, config, db, lmstudio_client, markdown_export, model_routing, notion_task_sync, notifications, proactive, request_context, scheduler, tools, vault_indexer, work_sessions, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -29,7 +29,6 @@ log = logging.getLogger(__name__)
 app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
 app.include_router(notifications.router)
 app.include_router(work_sessions.router)
-app.include_router(shortcut_voice.router)
 _artifact_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="petit-artifacts")
 
 
