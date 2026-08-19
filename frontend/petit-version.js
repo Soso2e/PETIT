@@ -86,13 +86,30 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
 
     const installDeferredWebGL = () => {
       if (forceCssRenderer) return;
+      const loadForUniverse = (event) => {
+        const panel = event?.detail?.panel;
+        const area = event?.detail?.area;
+        if (panel === "universe" || area === "univ") ensureWebGLAssets();
+      };
       const universePanel = document.querySelector('[data-view-panel="universe"]');
-      if (universePanel && !universePanel.hidden) ensureWebGLAssets();
+      const loadVisibleUniverse = () => {
+        if (universePanel && !universePanel.hidden) ensureWebGLAssets();
+      };
+      loadVisibleUniverse();
+      if (universePanel) {
+        const panelObserver = new MutationObserver(() => {
+          loadVisibleUniverse();
+          if (webglRequested) panelObserver.disconnect();
+        });
+        panelObserver.observe(universePanel, { attributes: true, attributeFilter: ["hidden"] });
+      }
 
       document.addEventListener("click", (event) => {
         const target = event.target instanceof Element ? event.target.closest('[data-view="universe"]') : null;
         if (target) ensureWebGLAssets();
       }, true);
+      window.addEventListener("petit:panel-change", loadForUniverse);
+      window.addEventListener("petit:area-change", loadForUniverse);
     };
 
     const loadPostShellAssets = () => {

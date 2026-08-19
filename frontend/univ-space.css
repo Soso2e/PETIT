@@ -21,10 +21,10 @@ body.petit-univ-screen .universe-shell {
 
 body.petit-univ-screen .universe-main {
   position: fixed;
-  inset: var(--ui-header, 66px) 0 0;
+  inset: 0;
   z-index: 2;
   max-width: none;
-  padding: 0;
+  padding: 0 !important;
   overflow: hidden;
 }
 
@@ -37,6 +37,10 @@ body.petit-univ-screen [data-view-panel="universe"].is-active {
 
 body.petit-univ-screen [data-view-panel="universe"].univ-panel {
   height: 100%;
+}
+
+body.petit-univ-screen .petit-context-bar {
+  display: none;
 }
 
 [data-view-panel="universe"].univ-panel {
@@ -579,6 +583,33 @@ body.petit-univ-screen .univ-viewport {
   pointer-events: none;
 }
 
+body.petit-univ-screen .univ-hud {
+  inset:
+    calc(80px + env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+body.petit-univ-screen .univ-hud__selection {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: min(620px, calc(100% - 180px));
+  margin: 0;
+}
+
+body.petit-univ-screen .univ-hud__controls {
+  grid-column: 2;
+  grid-row: 3;
+  align-self: end;
+  justify-self: end;
+}
+
+body.petit-univ-screen .univ-hud__help {
+  display: none;
+}
+
 .univ-hud__brand,
 .univ-hud__selection,
 .univ-hud__controls {
@@ -729,6 +760,11 @@ body.petit-univ-screen .univ-viewport {
   pointer-events: auto;
 }
 
+.petit-univ-manage-open .univ-hud__controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .univ-detail-dismiss {
   position: fixed;
   inset: 98px 38px auto auto;
@@ -748,12 +784,20 @@ body.petit-univ-screen .univ-viewport {
 .petit-univ-active.petit-univ-manage-open .univ-detail-dismiss { display: block; }
 
 @media (max-width: 720px) {
-  body.petit-univ-screen .universe-main {
-    inset: var(--ui-header, 58px) 0 calc(var(--ui-mobile-nav, 70px) + env(safe-area-inset-bottom)) 0;
-  }
-
   body.petit-univ-screen .univ-viewport {
     height: 100%;
+  }
+
+  body.petit-univ-screen .univ-hud {
+    inset:
+      calc(70px + env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(66px, calc(10px + env(safe-area-inset-bottom)))
+      max(10px, env(safe-area-inset-left));
+  }
+
+  body.petit-univ-screen .univ-hud__selection {
+    width: 100%;
   }
 }
 
@@ -820,6 +864,10 @@ body.petit-univ-screen .univ-viewport {
 
   .petit-univ-active.petit-univ-manage-open #detail-panel { transform: translateY(0); }
   .univ-detail-dismiss { inset: auto 22px calc(var(--petit-bottom-nav-height, 60px) + min(68dvh, 640px) - 4px) auto; }
+  .petit-univ-manage-open .petit-utility-dock {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 @media (max-width: 640px) {
