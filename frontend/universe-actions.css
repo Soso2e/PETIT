@@ -196,6 +196,20 @@
   font-size: 11px;
 }
 
+.detail-sync-action,
+.task-sync-retry {
+  margin-inline-start: 8px;
+  border: 1px solid rgba(255, 186, 92, .45);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(255, 186, 92, .12);
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.task-sync-hint { margin-inline-start: 8px; color: var(--text-sub); font-size: 11px; }
+
 .detail-actions--primary { grid-template-columns: 1fr 1fr; }
 .detail-actions--primary button:first-child {
   border-color: rgba(109, 191, 154, 0.3);

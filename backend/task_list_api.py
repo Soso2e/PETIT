@@ -12,7 +12,7 @@ from typing import Any
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from . import config, db, notifications, task_hierarchy
+from . import config, db, notion_task_sync, notifications, task_hierarchy, task_sync_queue
 
 _INSTALLED = False
 _OPEN_STATUS_SQL = "lower(status) NOT IN ('done', 'canceled', 'cancelled', 'chancel', '完了')"
@@ -129,6 +129,21 @@ def list_ui_tasks(priority: str = "high", limit: int = 100) -> JSONResponse:
             "hierarchy": "life-task-child",
         }
     )
+
+
+def sync_ui_tasks(mode: str = "incremental") -> JSONResponse:
+    """Explicitly refresh the local task cache from Notion for the UI."""
+    normalized = "full" if str(mode).strip().casefold() == "full" else "incremental"
+    result = notion_task_sync.sync_now(mode=normalized)
+    if result.get("skipped") and result.get("reason") == "notion_not_configured":
+        return JSONResponse(result, status_code=503)
+    return JSONResponse(result, status_code=200 if result.get("ok") else 502)
+
+
+def retry_ui_task_sync(task_id: int) -> JSONResponse:
+    """Put a failed task write back into the outbox immediately."""
+    result = task_sync_queue.retry_task(int(task_id))
+    return JSONResponse(result, status_code=200 if result.get("queued") else 409)
 
 
 def patch_task_parent(task_id: int, payload: TaskParentUpdate) -> JSONResponse:
@@ -255,6 +270,18 @@ def install() -> None:
         "/tasks",
         list_ui_tasks,
         methods=["GET"],
+        tags=["task-ui"],
+    )
+    notifications.router.add_api_route(
+        "/tasks/sync",
+        sync_ui_tasks,
+        methods=["POST"],
+        tags=["task-ui"],
+    )
+    notifications.router.add_api_route(
+        "/tasks/{task_id}/sync/retry",
+        retry_ui_task_sync,
+        methods=["POST"],
         tags=["task-ui"],
     )
     notifications.router.add_api_route(
