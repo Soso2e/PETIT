@@ -780,7 +780,7 @@
 
     const completeBtn = fragment.querySelector('[data-action="complete"]');
     const bucketBtn = fragment.querySelector('[data-action="bucket"]');
-    const startBtn = fragment.querySelector('[data-action="start"]');
+    const startBtn = fragment.querySelector('[data-action="activate"]');
     const numericId = taskNumericId(task);
     const isBusy = numericId != null && state.busyTaskIds.has(numericId);
     completeBtn.disabled = numericId == null || isBusy;
