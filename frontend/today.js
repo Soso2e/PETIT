@@ -86,6 +86,7 @@
   const render = (data) => {
     ensureDashboard();
     const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+    const tasksData = Array.isArray(data.tasks) ? data.tasks : [];
     const projectsData = Array.isArray(data.projects) ? data.projects : [];
     const total = Number(data.total_seconds || 0);
     const longest = sessions.reduce(
@@ -129,6 +130,21 @@
       timeline.appendChild(row);
     });
     if (!timeline.children.length) timeline.appendChild(empty("今日の作業はまだありません。"));
+
+    const tasks = byId("today-tasks");
+    tasks.replaceChildren();
+    tasksData.forEach((task) => {
+      const row = document.createElement("article");
+      row.className = "today-projects__row";
+      const ratio = total ? Math.max(4, Math.round(task.elapsed_seconds / total * 100)) : 0;
+      row.innerHTML = `
+        <div><strong></strong><span>${formatDuration(task.elapsed_seconds)} · ${ratio}%</span></div>
+        <i style="--today-progress:${ratio}%"></i>
+      `;
+      row.querySelector("strong").textContent = task.task;
+      tasks.appendChild(row);
+    });
+    if (!tasks.children.length) tasks.appendChild(empty("タスク別の記録はまだありません。"));
 
     const projects = byId("today-projects");
     projects.replaceChildren();

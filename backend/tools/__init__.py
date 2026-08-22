@@ -26,6 +26,7 @@ from . import (
     task_hierarchy,
     task_reads,
     task_defaults,
+    work_sessions,
 )  # noqa: F401  (import for side-effect registration)
 from .. import web_tools  # noqa: F401  (register web/news/weather tools)
 from . import registry

@@ -130,7 +130,16 @@ SQLiteへ即時反映し、Notion Taskは既存Outboxへ`parent_external_ids`を
   └─ 20分無応答 → 自動停止
 ```
 
-セッションIDとactive task IDだけをlocalStorageへ保存し、開始時刻・一時停止時間・自動停止判定はSQLite上のサーバー状態を正とする。
+SQLiteのactiveセッションを正本とし、Universeは`GET /api/work-sessions/active`を定期取得する。セッションにはPETIT内部`task_id`を保存するため、チャットで開始した作業も同じTaskへ結びつき、再読み込み・別端末でも復元できる。localStorageのセッションIDとactive task IDは表示補助であり、開始時刻・状態遷移・経過時間・自動停止判定には使わない。
+
+開始・一時停止・再開・終了は`work_session_events`へ記録する。Todayは今日の合計、セッション履歴、タスク別、プロジェクト別を表示し、`GET /api/work-sessions/summary?days=N`は直近1〜90日の暦日別・タスク別・プロジェクト別集計を返す。
+
+チャットでは次のToolを公開する。
+
+- `get_work_status`: 作業中状態、継続時間、今日の実績
+- `get_work_report`: 直近1〜90日の実績
+- `start_work_session`: 既存の未完了Taskを一意に解決して開始
+- `update_work_session`: 一時停止、再開、続行確認、終了（Task自体は完了しない）
 
 ## モーション設計
 
@@ -153,6 +162,9 @@ SQLiteへ即時反映し、Notion Taskは既存Outboxへ`parent_external_ids`を
 GET   /api/notifications/tasks?priority=all&limit=500
 PATCH /api/notifications/tasks/{task_id}/parent
 POST  /api/work-sessions/start
+GET   /api/work-sessions/active
+GET   /api/work-sessions/today
+GET   /api/work-sessions/summary?days=7
 GET   /api/work-sessions/{session_id}
 POST  /api/work-sessions/{session_id}/respond
 POST  /api/work-sessions/{session_id}/pause
