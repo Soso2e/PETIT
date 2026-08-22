@@ -23,6 +23,13 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "retry_task_sync",
         "sync_notion_tasks",
     ),
+    "work_sessions": (
+        "get_work_status",
+        "get_work_report",
+        "start_work_session",
+        "update_work_session",
+        "get_tasks",
+    ),
     "calendar": (
         "get_current_time",
         "get_schedule",
@@ -90,11 +97,14 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "get_linkraft_project_candidates",
         "get_brain_note_candidates",
         "get_github_repository_candidates",
+        "get_work_status",
+        "get_work_report",
     ),
 }
 
 _GROUP_DESCRIPTIONS = {
     "lists_and_tasks": "タスク、Notionタスク、親子関係、任意リストの取得・追加・変更",
+    "work_sessions": "作業中の状態、作業時間の開始・停止・再開、今日や期間別の作業記録",
     "calendar": "時刻、天気、予定、リマインダー、カレンダーの取得・追加・変更・同期",
     "knowledge": "BRAIN、Notion、記憶の検索と確認付き編集",
     "github": "GitHubのリポジトリ、差分、PR、開発状況",
@@ -159,6 +169,14 @@ _ROUTE_TOOL_SCHEMA: dict[str, Any] = {
 
 _ACTION_WORDS = r"(?:教えて|見せて|確認|調べ|検索|取得|一覧|追加|作成|登録|変更|更新|編集|完了|削除|同期|実行|開始|停止|保存|直して|レビュー)"
 _TOOL_GUARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "work_sessions",
+        re.compile(
+            r"(?:作業|集中|タイマー|計測).{0,24}(?:開始|始め|ストップ|停止|終了|中断|休憩|一時停止|再開|続け|何分|何時間|履歴|記録|集計|状況|作業中)|"
+            r"(?:今日|今週|最近).{0,16}(?:何分|何時間).{0,12}(?:作業|集中)|"
+            r"(?:何分|何時間).{0,16}(?:作業|集中)"
+        ),
+    ),
     (
         "lists_and_tasks",
         re.compile(
