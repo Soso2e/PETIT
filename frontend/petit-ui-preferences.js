@@ -51,6 +51,9 @@
     state.performance = normalizePerformance(performance);
     localStorage.setItem(STORAGE.performance, state.performance);
     apply();
+    window.dispatchEvent(new CustomEvent("petit:performance-change", {
+      detail: { performance: state.performance },
+    }));
   };
 
   const preferenceGroup = ({ label, kind, values }) => {

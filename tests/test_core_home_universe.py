@@ -81,7 +81,7 @@ class UnivSpaceTests(unittest.TestCase):
         self.assertIn("new THREE.SphereGeometry", scene)
         self.assertIn("new THREE.MeshStandardMaterial", scene)
         self.assertIn("new THREE.Line", scene)
-        self.assertIn("world.clone().project(state.camera)", scene)
+        self.assertIn("labelProjected.copy(labelWorld).project(state.camera)", scene)
         self.assertIn(".univ-webgl-label", css)
         self.assertIn("@media (max-width: 640px)", css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", css)

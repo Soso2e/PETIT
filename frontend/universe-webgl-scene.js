@@ -58,6 +58,9 @@
     selectedTaskId: null,
     pointerDown: null,
     cameraTween: null,
+    renderFrame: null,
+    labelsNeedUpdate: true,
+    lastRenderTime: 0,
     rebuildFrame: null,
     resizeObserver: null,
     unregisterRenderJob: null,
@@ -174,7 +177,12 @@
     state.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
     state.inputSurface.style.touchAction = "none";
     state.controls.update();
-    state.controls.addEventListener("start", () => { state.cameraTween = null; });
+    state.controls.addEventListener("start", () => {
+      state.cameraTween = null;
+      requestRender();
+    });
+    state.controls.addEventListener("change", () => requestRender());
+    state.controls.addEventListener("end", () => requestRender());
 
     state.scene.add(new THREE.HemisphereLight(0x9db5ff, 0x07091a, 1.15));
     const coreLight = new THREE.PointLight(0x9fb6ff, 120, 72, 1.7);
@@ -193,7 +201,6 @@
     state.resizeObserver.observe(state.viewport);
     resize();
     installPointerInteraction();
-    state.renderer.setAnimationLoop(animate);
   };
 
   const seededRandom = (() => {
@@ -244,6 +251,7 @@
     state.renderer.setSize(width, height, false);
     state.camera.aspect = width / height;
     state.camera.updateProjectionMatrix();
+    requestRender();
   };
 
   const disposeObject = (root) => {
@@ -466,6 +474,7 @@
     window.dispatchEvent(new CustomEvent("petit:univ-webgl-rendered", {
       detail: { systems: models.length, tasks: state.entries.size },
     }));
+    requestRender();
   };
 
   const requestRebuild = (reason = "unspecified") => {
@@ -502,6 +511,7 @@
     state.labels.forEach(({ element, entry }) => {
       element.classList.toggle("is-selected", Boolean(entry.taskId && entry.taskId === state.selectedTaskId));
     });
+    requestRender({ updateLabels: false });
   };
 
   const startCameraTween = (position, target, duration = 720) => {
@@ -513,6 +523,7 @@
       fromTarget: state.controls.target.clone(),
       toTarget: target.clone(),
     };
+    requestRender();
   };
 
   const focusEntry = (entry) => {
@@ -556,16 +567,15 @@
     state.selectedTaskId = entry.taskId;
     updateSelection();
 
-    // Reuse the hidden DOM action bridge so detail state and the visible HUD
-    // stay synchronized with the WebGL selection. The direct API is only a
-    // fallback when the source node was replaced during a render.
-    const domNode = entry.domNode?.isConnected
-      ? entry.domNode
-      : state.map?.querySelector(`[data-task-id="${escapeSelector(entry.taskId)}"]`);
-    if (domNode) domNode?.click?.();
-    else window.PetitUniverse?.selectTask?.(entry.taskId);
-    // Selection may already be restored after a scene rebuild. A physical
-    // click must still move the camera close to the star on that first click.
+    // Keep selection/detail state synchronized without re-entering the hidden
+    // DOM click path, which rebuilds the Universe and WebGL scene.
+    const selectedByUniverse = window.PetitUniverse?.selectTask?.(entry.taskId);
+    if (!selectedByUniverse) {
+      const domNode = entry.domNode?.isConnected
+        ? entry.domNode
+        : state.map?.querySelector(`[data-task-id="${escapeSelector(entry.taskId)}"]`);
+      domNode?.click?.();
+    }
     focusEntry(entry);
     if (isAlreadySelected) {
       openDetail();
@@ -581,6 +591,7 @@
     offset.setLength(nextDistance);
     state.camera.position.copy(state.controls.target).add(offset);
     state.controls.update();
+    requestRender();
   };
 
   const raycastAt = (clientX, clientY) => {
@@ -659,7 +670,7 @@
 
   const updateCameraTween = (time) => {
     const tween = state.cameraTween;
-    if (!tween) return;
+    if (!tween) return false;
     const progress = clamp((time - tween.startedAt) / tween.duration, 0, 1);
     const eased = progress < 0.5
       ? 4 * progress * progress * progress
@@ -667,56 +678,74 @@
     state.camera.position.lerpVectors(tween.fromPosition, tween.toPosition, eased);
     state.controls.target.lerpVectors(tween.fromTarget, tween.toTarget, eased);
     if (progress >= 1) state.cameraTween = null;
+    return state.cameraTween != null;
   };
+
+  const labelForward = new THREE.Vector3();
+  const labelWorld = new THREE.Vector3();
+  const labelToObject = new THREE.Vector3();
+  const labelProjected = new THREE.Vector3();
 
   const updateLabels = () => {
     if (!state.camera || !state.viewport) return;
     const width = state.viewport.clientWidth;
     const height = state.viewport.clientHeight;
-    const forward = new THREE.Vector3();
-    state.camera.getWorldDirection(forward);
+    state.camera.getWorldDirection(labelForward);
 
     state.labels.forEach(({ element, object, entry, type }) => {
       if (!object?.visible) {
         element.hidden = true;
         return;
       }
-      const world = new THREE.Vector3();
-      object.getWorldPosition(world);
-      const toObject = world.clone().sub(state.camera.position);
-      const inFront = forward.dot(toObject) > 0;
-      const projected = world.clone().project(state.camera);
-      const withinFrustum = projected.z > -1 && projected.z < 1
-        && projected.x > -1.18 && projected.x < 1.18
-        && projected.y > -1.18 && projected.y < 1.18;
-      const distance = state.camera.position.distanceTo(world);
+      object.getWorldPosition(labelWorld);
+      labelToObject.copy(labelWorld).sub(state.camera.position);
+      const inFront = labelForward.dot(labelToObject) > 0;
+      labelProjected.copy(labelWorld).project(state.camera);
+      const withinFrustum = labelProjected.z > -1 && labelProjected.z < 1
+        && labelProjected.x > -1.18 && labelProjected.x < 1.18
+        && labelProjected.y > -1.18 && labelProjected.y < 1.18;
+      const distance = state.camera.position.distanceTo(labelWorld);
       const maxDistance = type === "child" ? 38 : 82;
       const selected = Boolean(entry.taskId && entry.taskId === state.selectedTaskId);
       const visible = inFront && withinFrustum && (selected || distance < maxDistance);
       element.hidden = !visible;
       if (!visible) return;
-      element.style.left = `${((projected.x * 0.5) + 0.5) * width}px`;
-      element.style.top = `${((-projected.y * 0.5) + 0.5) * height}px`;
+      element.style.left = `${((labelProjected.x * 0.5) + 0.5) * width}px`;
+      element.style.top = `${((-labelProjected.y * 0.5) + 0.5) * height}px`;
       const fadeStart = maxDistance * 0.6;
       const opacity = selected ? 1 : clamp(1 - ((distance - fadeStart) / (maxDistance - fadeStart)), 0.22, 1);
       element.style.opacity = opacity.toFixed(3);
-      element.style.zIndex = String(Math.round((1 - projected.z) * 500));
+      element.style.zIndex = String(Math.round((1 - labelProjected.z) * 500));
     });
   };
 
-  const animate = (time) => {
+  function requestRender({ updateLabels: shouldUpdateLabels = true } = {}) {
+    if (shouldUpdateLabels) state.labelsNeedUpdate = true;
+    if (state.renderFrame != null) return;
+    state.renderFrame = window.requestAnimationFrame(render);
+  }
+
+  function render(time) {
+    state.renderFrame = null;
     if (!state.ready || !isPanelActive()) return;
-    updateCameraTween(time);
+    const tweening = updateCameraTween(time);
     state.controls.update();
-    if (!reducedMotion.matches) {
+    const liteMode = document.documentElement.dataset.petitPerformance === "lite";
+    if (!liteMode && !reducedMotion.matches) {
+      const delta = state.lastRenderTime ? Math.min(32, time - state.lastRenderTime) : 0;
       state.animatedMeshes.forEach(({ mesh, speed, type }) => {
-        mesh.rotation.y = time * speed;
-        if (type === "child") mesh.rotation.x = Math.sin(time * speed * 0.7) * 0.08;
+        mesh.rotation.y += delta * speed;
+        if (type === "child") mesh.rotation.x = Math.sin(mesh.rotation.y * 0.7) * 0.08;
       });
     }
-    updateLabels();
+    state.lastRenderTime = time;
+    if (state.labelsNeedUpdate) {
+      state.labelsNeedUpdate = false;
+      updateLabels();
+    }
     state.renderer.render(state.scene, state.camera);
-  };
+    if (tweening) requestRender();
+  }
 
   const initialize = () => {
     if (state.ready) return true;
@@ -759,6 +788,10 @@
   window.addEventListener("petit:panel-change", () => {
     resize();
     requestRebuild("panel-change");
+  });
+  window.addEventListener("petit:performance-change", () => requestRender({ updateLabels: false }));
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) requestRender();
   });
   window.addEventListener("petit:area-change", () => {
     resize();
