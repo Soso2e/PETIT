@@ -386,6 +386,116 @@
     }
   };
 
+  const startFreeformWork = async (taskTitle) => {
+    if (state.workSessionBusy) return false;
+    const title = text(taskTitle, "").replace(/[。！!]+$/g, "").trim();
+    if (!title) return false;
+    state.workSessionBusy = true;
+    renderAll();
+    try {
+      if (state.workSessionId && state.workSession && !["ended", "auto_stopped"].includes(state.workSession.status)) {
+        await workSessionRequest(`/${encodeURIComponent(state.workSessionId)}/end`).catch(() => null);
+      }
+      const sessionId = randomId();
+      const session = await workSessionRequest("/start", "POST", { session_id: sessionId, task: title });
+      state.activeTaskId = null;
+      state.workSessionId = sessionId;
+      state.autoStopReported = false;
+      localStorage.removeItem(STORAGE.activeTask);
+      localStorage.setItem(STORAGE.workSession, sessionId);
+      applyWorkSession(session, { notifyAutoStop: false });
+      renderAll();
+      return true;
+    } catch (error) {
+      appendMessage("assistant", `作業を開始できませんでした: ${error.message}`);
+      return false;
+    } finally {
+      state.workSessionBusy = false;
+      renderAll();
+    }
+  };
+
+  const normalizeWorkCommandTitle = (value) => String(value || "")
+    .trim()
+    .replace(/^「|」$/g, "")
+    .replace(/(?:の)?作業$/u, "")
+    .trim();
+
+  const classifyWorkCommand = (message) => {
+    const normalized = String(message || "").trim();
+    if (!normalized) return null;
+    if (/^(?:作業)?(?:再開|を再開|再開して|続き(?:から)?(?:やる|やろう|始める)|戻ろう)(?:[。！!\s]|$)/u.test(normalized)) return { kind: "resume" };
+    if (/(?:今日は|きょうは)?(?:ここまで|この辺で)(?:にする|終わり|終了)?(?:[。！!\s]|$)|^(?:作業を)?(?:終了|終わり|終わる)(?:[。！!\s]|$)/u.test(normalized)) return { kind: "end" };
+    if (/(?:一旦|いったん|少し|ちょっと).*(?:止める|止めよう|停止|休憩)|(?:作業を|作業は).*(?:止める|停止|休憩)|^(?:止める|停止して|休憩する)(?:[。！!\s]|$)/u.test(normalized)) return { kind: "pause" };
+
+    const patterns = [
+      /^(.{1,120}?)(?:の)?作業(?:を)?(?:始める|開始する|開始して|始めて|する|やる|やろう|中にして)(?:[。！!\s]|$)/u,
+      /^(.{1,120}?)(?:を|から)(?:やる|やろう|始める|開始する|開始して)(?:[。！!\s]|$)/u,
+      /^(.{1,120}?)作業中にして(?:[。！!\s]|$)/u,
+    ];
+    for (const pattern of patterns) {
+      const match = normalized.match(pattern);
+      if (!match) continue;
+      const title = normalizeWorkCommandTitle(match[1]);
+      if (title) return { kind: "start", title };
+    }
+    return null;
+  };
+
+  const resolveTaskFromWorkTitle = (title) => {
+    const needle = String(title || "").trim().toLocaleLowerCase("ja");
+    if (!needle) return null;
+    const exact = openTasks().find((task) => text(task.title, "").toLocaleLowerCase("ja") === needle);
+    if (exact) return exact;
+    const partial = openTasks().filter((task) => {
+      const candidate = text(task.title, "").toLocaleLowerCase("ja");
+      return candidate.includes(needle) || needle.includes(candidate);
+    });
+    return partial.length === 1 ? partial[0] : null;
+  };
+
+  const handleWorkCommand = async (command) => {
+    if (!command) return false;
+    if (command.kind === "start") {
+      const matchedTask = resolveTaskFromWorkTitle(command.title);
+      if (matchedTask) {
+        await startTask(matchedTask, state.tasks.indexOf(matchedTask));
+        appendMessage("assistant", `了解！「${text(matchedTask.title, command.title)}」を作業中にしたよ。`);
+      } else if (await startFreeformWork(command.title)) {
+        appendMessage("assistant", `了解！「${command.title}」を作業中にしたよ。`);
+      }
+      return true;
+    }
+    if (!state.workSessionId || !state.workSession) {
+      appendMessage("assistant", "いま進行中の作業はないよ。作業名を入れて「○○作業する」と送ってね。");
+      return true;
+    }
+    if (command.kind === "pause") {
+      if (state.workSession.status === "paused") appendMessage("assistant", "いまの作業はすでに一時停止中だよ。");
+      else {
+        await updateWorkSession("pause");
+        appendMessage("assistant", "作業を一時停止したよ。");
+      }
+      return true;
+    }
+    if (command.kind === "resume") {
+      if (state.workSession.status !== "paused") appendMessage("assistant", "いまの作業はすでに進行中だよ。");
+      else {
+        await updateWorkSession("resume");
+        appendMessage("assistant", "同じ作業を再開したよ。");
+      }
+      return true;
+    }
+    if (command.kind === "end") {
+      const taskTitle = state.workSession.task || activeTask()?.title || "作業";
+      const elapsed = formatElapsed(sessionElapsedMs());
+      await updateWorkSession("end");
+      appendMessage("assistant", `「${taskTitle}」を終了したよ。${elapsed}おつかれ！`);
+      return true;
+    }
+    return false;
+  };
+
   const updateWorkSession = async (action) => {
     if (!state.workSessionId || state.workSessionBusy) return;
     state.workSessionBusy = true;
@@ -637,69 +747,64 @@
       if (areaSelect) areaSelect.value = task.area || "";
       if (reasonTextarea) reasonTextarea.value = task.reason || task.summary || "";
 
-      const toggleEdit = (showEdit) => {
-        readViews.forEach((el) => { el.hidden = showEdit; });
-        editForm.hidden = !showEdit;
-        if (editToggleBtn) editToggleBtn.textContent = showEdit ? "キャンセル" : "編集";
+      const setEditMode = (editing) => {
+        readViews.forEach((node) => { node.hidden = editing; });
+        editForm.hidden = !editing;
+        if (editToggleBtn) editToggleBtn.hidden = editing;
+        if (editing) titleInput?.focus();
       };
 
-      editToggleBtn?.addEventListener("click", () => toggleEdit(editForm.hidden));
-      cancelEditBtn?.addEventListener("click", () => toggleEdit(false));
-
-      editForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const numericId = taskNumericId(task);
-        if (numericId == null) return;
-        const submitBtn = editForm.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = "保存中…";
+      editToggleBtn?.addEventListener("click", () => setEditMode(true));
+      cancelEditBtn?.addEventListener("click", () => setEditMode(false));
+      editForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const id = taskNumericId(task);
+        if (id == null || state.busyTaskIds.has(id)) return;
+        const body = {
+          title: String(titleInput?.value || "").trim(),
+          status: String(statusSelect?.value || "").trim(),
+          due_date: String(dueInput?.value || "").trim() || null,
+          priority: String(prioritySelect?.value || "").trim(),
+          area: String(areaSelect?.value || "").trim() || null,
+          reason: String(reasonTextarea?.value || "").trim() || null,
+          resolve_notification: false,
+        };
+        if (!body.title) {
+          showFeedback("タスク名を入力してください。");
+          return;
+        }
+        state.busyTaskIds.add(id);
+        editForm.querySelectorAll("button, input, select, textarea").forEach((node) => { node.disabled = true; });
         try {
-          const payload = {
-            title: titleInput.value.trim(),
-            status: statusSelect.value,
-            due_date: dueInput.value.trim(),
-            priority: prioritySelect.value,
-            area: areaSelect.value,
-            reason: reasonTextarea.value.trim(),
-          };
-          const result = await requestJson(`/api/notifications/tasks/${encodeURIComponent(numericId)}`, {
+          await requestJson(`/api/notifications/tasks/${encodeURIComponent(id)}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(body),
           });
-          showFeedback("タスク情報を更新しました。");
+          showFeedback(`「${body.title}」を更新しました。`);
           await loadUniverse();
-          if (result.task) renderDetail(result.task, index);
-        } catch (err) {
-          showFeedback(`更新できませんでした: ${err.message}`);
+        } catch (error) {
+          showFeedback(`更新できませんでした: ${error.message}`);
         } finally {
-          submitBtn.disabled = false;
-          submitBtn.textContent = "変更を保存";
+          state.busyTaskIds.delete(id);
         }
       });
     }
 
-    const completeButton = fragment.querySelector('[data-action="complete"]');
-    const bucketButton = fragment.querySelector('[data-action="bucket"]');
-    const activateButton = fragment.querySelector('[data-action="activate"]');
+    const completeBtn = fragment.querySelector('[data-action="complete"]');
+    const bucketBtn = fragment.querySelector('[data-action="bucket"]');
+    const startBtn = fragment.querySelector('[data-action="activate"]');
     const numericId = taskNumericId(task);
-    const busy = numericId != null && state.busyTaskIds.has(numericId);
-    const key = taskKey(task, index);
-    const active = key === state.activeTaskId && Boolean(state.workSession);
-    completeButton.disabled = busy || isDone(task) || numericId == null;
-    completeButton.textContent = busy ? "処理中…" : (isDone(task) ? "完了済み" : "完了にする");
-    bucketButton.disabled = busy || numericId == null;
-    bucketButton.textContent = isLow(task) ? "重要に戻す" : "あとでに移す";
-    activateButton.disabled = state.workSessionBusy || active;
-    activateButton.textContent = active ? "作業中" : "作業開始";
-    completeButton.addEventListener("click", () => completeTask(task));
-    bucketButton.addEventListener("click", () => toggleTaskBucket(task));
-    activateButton.addEventListener("click", () => startTask(task, index));
-    fragment.querySelector('[data-action="chat"]').addEventListener("click", () => {
-      switchView("chat");
-      chatInputEl.value = `「${text(task.title, "このタスク")}」について、次の一手を整理して`;
-      chatInputEl.focus();
-    });
+    const isBusy = numericId != null && state.busyTaskIds.has(numericId);
+    completeBtn.disabled = numericId == null || isBusy;
+    bucketBtn.disabled = numericId == null || isBusy;
+    bucketBtn.textContent = isLow(task) ? "重要へ戻す" : "あとでに移す";
+    startBtn.disabled = state.workSessionBusy;
+    startBtn.textContent = taskKey(task, index) === state.activeTaskId && state.workSession ? "作業中" : "作業開始";
+    completeBtn.addEventListener("click", () => completeTask(task));
+    bucketBtn.addEventListener("click", () => toggleTaskBucket(task));
+    startBtn.addEventListener("click", () => startTask(task, index));
+
     detailPanelEl.appendChild(fragment);
   };
 
@@ -707,8 +812,8 @@
 
   const appendCell = (row, value, className = "") => {
     const cell = document.createElement("td");
+    cell.className = className;
     cell.textContent = text(value);
-    if (className) cell.className = className;
     row.appendChild(cell);
     return cell;
   };
@@ -1092,6 +1197,11 @@
   const sendChat = async (message) => {
     const requestId = randomId();
     appendMessage("user", message);
+    const workCommand = classifyWorkCommand(message);
+    if (workCommand) {
+      await handleWorkCommand(workCommand);
+      return;
+    }
     const pending = appendMessage("assistant", "考え中…");
     try {
       if (state.workSession?.awaiting_response_since && state.workSessionId) {

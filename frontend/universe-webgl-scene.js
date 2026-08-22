@@ -135,10 +135,11 @@
 
     state.renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: true,
+      // The renderer is the single source of truth for the Univ backdrop.
+      alpha: false,
       powerPreference: "high-performance",
     });
-    state.renderer.setClearColor(0x000000, 0);
+    state.renderer.setClearColor(0x02040d, 1);
     state.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     state.renderer.outputColorSpace = THREE.SRGBColorSpace;
     state.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -555,14 +556,17 @@
     state.selectedTaskId = entry.taskId;
     updateSelection();
 
-    const selectedByUniverse = window.PetitUniverse?.selectTask?.(entry.taskId);
-    if (!selectedByUniverse) {
-      const domNode = entry.domNode?.isConnected
-        ? entry.domNode
-        : state.map?.querySelector(`[data-task-id="${escapeSelector(entry.taskId)}"]`);
-      domNode?.click?.();
-    }
-    if (!isAlreadySelected) focusEntry(entry);
+    // Reuse the hidden DOM action bridge so detail state and the visible HUD
+    // stay synchronized with the WebGL selection. The direct API is only a
+    // fallback when the source node was replaced during a render.
+    const domNode = entry.domNode?.isConnected
+      ? entry.domNode
+      : state.map?.querySelector(`[data-task-id="${escapeSelector(entry.taskId)}"]`);
+    if (domNode) domNode?.click?.();
+    else window.PetitUniverse?.selectTask?.(entry.taskId);
+    // Selection may already be restored after a scene rebuild. A physical
+    // click must still move the camera close to the star on that first click.
+    focusEntry(entry);
     if (isAlreadySelected) {
       openDetail();
     }

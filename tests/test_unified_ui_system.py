@@ -30,7 +30,7 @@ class UnifiedUiSystemTests(unittest.TestCase):
         univ = (FRONTEND / "univ-space.css").read_text(encoding="utf-8")
         webgl = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
         corner = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
-        self.assertIn('html[data-theme="light"]', source)
+        self.assertIn('html[data-petit-theme="light"]', source)
         self.assertIn('@media (prefers-reduced-motion: reduce)', galaxy)
         self.assertIn('@media (prefers-reduced-motion: reduce)', univ)
         self.assertIn('@media (prefers-reduced-motion: reduce)', webgl)
@@ -88,10 +88,10 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertRegex(source, re.compile(r"event\.isComposing|keyCode\s*===\s*229"))
         self.assertIn("form.requestSubmit()", source)
 
-    def test_version_is_v0170(self) -> None:
+    def test_version_is_v0180(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('globalThis.PETIT_VERSION = "v0.17.0"', source)
-        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.17.0"', source)
+        self.assertIn('globalThis.PETIT_VERSION = "v0.18.0"', source)
+        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.18.0"', source)
         self.assertIn('window.PETIT_VERSION = globalThis.PETIT_VERSION', source)
         self.assertIn('updateViaCache: "none"', source)
 
