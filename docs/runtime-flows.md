@@ -9,6 +9,8 @@
 - `backend/agent_runtime.py`
 - `backend/capability_router.py`
 - `backend/time_context.py`
+- `backend/work_sessions.py`
+- `backend/tools/work_sessions.py`
 - `backend/tools/registry.py`
 - `backend/agent_state.py`
 - `backend/agent_progress.py`
@@ -112,6 +114,7 @@ flowchart LR
     selector[route_to_agent]
 
     tasks[lists_and_tasks]
+    work[work_sessions]
     calendar[calendar]
     knowledge[knowledge]
     github[github]
@@ -121,6 +124,7 @@ flowchart LR
     fallback[fallback_read 内部専用]
 
     taskTools["タスク リスト Notion同期"]
+    workTools["作業開始 状態更新 今日 期間集計"]
     calendarTools["時刻 予定 天気 リマインダー"]
     knowledgeTools["BRAIN Notion 記憶"]
     githubTools["GitHub差分 PR Repository"]
@@ -130,6 +134,7 @@ flowchart LR
     readTools["明示列挙した読取Toolだけ"]
 
     selector --> tasks --> taskTools
+    selector --> work --> workTools
     selector --> calendar --> calendarTools
     selector --> knowledge --> knowledgeTools
     selector --> github --> githubTools
@@ -140,6 +145,30 @@ flowchart LR
 ```
 
 `fallback_read`はSelectorへ公開しない内部グループです。Router出力の欠落、JSON互換出力の失敗、Tool call引数の破損、モデル接続失敗時にだけ使い、書き込みToolを含めません。
+
+### 作業記録
+
+```mermaid
+flowchart LR
+    request[UniverseまたはChat]
+    resolve{既存未完了Taskを1件に解決}
+    ambiguous[0件または複数候補を返す]
+    start[start_work_session]
+    sqlite[(work_sessions と work_session_events)]
+    active[GET active 経過秒を計算]
+    update[一時停止 再開 続行 終了]
+    report[今日または1から90日集計]
+    ui[Universe Today Chat]
+
+    request --> resolve
+    resolve -->|失敗| ambiguous
+    resolve -->|成功| start --> sqlite
+    update --> sqlite
+    sqlite --> active --> ui
+    sqlite --> report --> ui
+```
+
+Notion Task DBへ作業時間プロパティは追加しません。SQLiteのセッションへPETIT内部`task_id`を保存し、Notionを含むタスク正本と参照で結びます。開始・一時停止・再開・終了はイベントとして残すため、日付をまたぐ休憩も暦日単位で集計できます。`start_work_session`と`update_work_session`は明示依頼時の低リスク書き込み、`get_work_status`と`get_work_report`は読み取りです。
 
 ---
 
