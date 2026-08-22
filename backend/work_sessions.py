@@ -130,13 +130,13 @@ def _row(session_id: str) -> dict[str, Any] | None:
     return dict(row) if row else None
 
 
-def active_session() -> dict[str, Any] | None:
+def active_session(*, now: datetime | None = None) -> dict[str, Any] | None:
     ensure_schema()
     with db.get_connection() as conn:
         row = conn.execute(
             "SELECT * FROM work_sessions WHERE status IN ('active', 'paused') ORDER BY updated_at DESC LIMIT 1"
         ).fetchone()
-    return session_snapshot(dict(row)) if row else None
+    return session_snapshot(dict(row), now=now) if row else None
 
 
 def start_session(
@@ -379,7 +379,7 @@ def today_summary(*, now: datetime | None = None) -> dict[str, Any]:
             for project, seconds in sorted(project_totals.items(), key=lambda item: item[1], reverse=True)
         ],
         "tasks": sorted(task_totals.values(), key=lambda item: item["elapsed_seconds"], reverse=True),
-        "active": active_session(),
+        "active": active_session(now=current),
     }
 
 
@@ -456,7 +456,7 @@ def period_summary(days: int = 7, *, now: datetime | None = None) -> dict[str, A
             {"project": project, "elapsed_seconds": seconds}
             for project, seconds in sorted(project_totals.items(), key=lambda item: item[1], reverse=True)
         ],
-        "active": active_session(),
+        "active": active_session(now=current),
     }
 
 
