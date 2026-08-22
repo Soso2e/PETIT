@@ -101,14 +101,26 @@ def _record_event(
 
 
 def _events(session_id: str) -> list[dict[str, Any]]:
+    return _events_for_sessions([session_id]).get(session_id, [])
+
+
+def _events_for_sessions(session_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+    identifiers = list(dict.fromkeys(str(value) for value in session_ids if str(value)))
+    if not identifiers:
+        return {}
     ensure_schema()
+    placeholders = ",".join("?" for _ in identifiers)
     with db.get_connection() as conn:
         rows = conn.execute(
-            "SELECT event_type, occurred_at, metadata_json FROM work_session_events "
-            "WHERE session_id=? ORDER BY occurred_at, event_id",
-            (session_id,),
+            f"SELECT session_id, event_type, occurred_at, metadata_json FROM work_session_events "
+            f"WHERE session_id IN ({placeholders}) ORDER BY session_id, occurred_at, event_id",
+            identifiers,
         ).fetchall()
-    return [dict(row) for row in rows]
+    grouped = {session_id: [] for session_id in identifiers}
+    for row in rows:
+        event = dict(row)
+        grouped[str(event.pop("session_id"))].append(event)
+    return grouped
 
 
 def _row(session_id: str) -> dict[str, Any] | None:
@@ -269,8 +281,16 @@ def _event_overlap_seconds(
     return total
 
 
-def _overlap_seconds(row: dict[str, Any], start: datetime, end: datetime, now: datetime) -> int:
-    event_total = _event_overlap_seconds(_events(str(row["session_id"])), start, end, now)
+def _overlap_seconds(
+    row: dict[str, Any],
+    start: datetime,
+    end: datetime,
+    now: datetime,
+    *,
+    events: list[dict[str, Any]] | None = None,
+) -> int:
+    session_events = _events(str(row["session_id"])) if events is None else events
+    event_total = _event_overlap_seconds(session_events, start, end, now)
     if event_total is not None:
         return event_total
     session_start = _parse(row.get("started_at"))
@@ -313,13 +333,16 @@ def today_summary(*, now: datetime | None = None) -> dict[str, Any]:
             "SELECT * FROM work_sessions WHERE started_at < ? AND COALESCE(ended_at, ?) > ? ORDER BY started_at ASC",
             (_iso(day_end), _iso(current), _iso(day_start)),
         ).fetchall()]
+    events_by_session = _events_for_sessions([str(row["session_id"]) for row in rows])
 
     sessions: list[dict[str, Any]] = []
     project_totals: dict[str, int] = {}
     task_totals: dict[str, dict[str, Any]] = {}
     total_seconds = 0
     for row in rows:
-        seconds = _overlap_seconds(row, day_start, day_end, current)
+        seconds = _overlap_seconds(
+            row, day_start, day_end, current, events=events_by_session.get(str(row["session_id"]), [])
+        )
         if seconds <= 0:
             continue
         project = str(row.get("project_id") or row.get("task") or "未分類")
@@ -375,6 +398,7 @@ def period_summary(days: int = 7, *, now: datetime | None = None) -> dict[str, A
             "SELECT * FROM work_sessions WHERE started_at < ? AND COALESCE(ended_at, ?) > ? ORDER BY started_at ASC",
             (_iso(end), _iso(current), _iso(start)),
         ).fetchall()]
+    events_by_session = _events_for_sessions([str(row["session_id"]) for row in rows])
 
     task_totals: dict[str, dict[str, Any]] = {}
     project_totals: dict[str, int] = {}
@@ -385,11 +409,22 @@ def period_summary(days: int = 7, *, now: datetime | None = None) -> dict[str, A
         day_end_local = day_start_local + timedelta(days=1)
         day_start = day_start_local.astimezone(timezone.utc)
         day_end = day_end_local.astimezone(timezone.utc)
-        seconds = sum(_overlap_seconds(row, day_start, day_end, current) for row in rows)
+        seconds = sum(
+            _overlap_seconds(
+                row,
+                day_start,
+                day_end,
+                current,
+                events=events_by_session.get(str(row["session_id"]), []),
+            )
+            for row in rows
+        )
         daily.append({"date": day_start_local.date().isoformat(), "elapsed_seconds": seconds})
 
     for row in rows:
-        seconds = _overlap_seconds(row, start, end, current)
+        seconds = _overlap_seconds(
+            row, start, end, current, events=events_by_session.get(str(row["session_id"]), [])
+        )
         if seconds <= 0:
             continue
         total_seconds += seconds
