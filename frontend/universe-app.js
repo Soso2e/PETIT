@@ -307,6 +307,16 @@
     state.workSession = session;
     state.workSessionId = session.session_id;
     localStorage.setItem(STORAGE.workSession, session.session_id);
+    if (session.task_id) {
+      const matchingIndex = state.tasks.findIndex((task, index) => (
+        taskKey(task, index) === String(session.task_id)
+        || String(task.external_id || "") === String(session.task_id)
+      ));
+      if (matchingIndex >= 0) {
+        state.activeTaskId = taskKey(state.tasks[matchingIndex], matchingIndex);
+        localStorage.setItem(STORAGE.activeTask, state.activeTaskId);
+      }
+    }
     if (["ended", "auto_stopped"].includes(session.status)) {
       const autoStopped = session.status === "auto_stopped";
       clearWorkSession();
@@ -337,10 +347,10 @@
   };
 
   const restoreWorkSession = async () => {
-    if (!state.workSessionId) return;
     try {
-      const session = await workSessionRequest(`/${encodeURIComponent(state.workSessionId)}`, "GET");
-      applyWorkSession(session);
+      const session = await workSessionRequest("/active", "GET");
+      if (session) applyWorkSession(session);
+      else clearWorkSession();
     } catch (_error) {
       clearWorkSession();
     }
@@ -356,7 +366,9 @@
       const sessionId = randomId();
       const session = await workSessionRequest("/start", "POST", {
         session_id: sessionId,
+        task_id: key,
         task: text(task.title, "名称未設定タスク"),
+        project_id: text(task.project_id, "") || null,
       });
       state.activeTaskId = key;
       state.workSessionId = sessionId;
@@ -398,10 +410,11 @@
   };
 
   const pollWorkSession = async () => {
-    if (!state.workSessionId || state.workSessionBusy) return;
+    if (state.workSessionBusy) return;
     try {
-      const session = await workSessionRequest(`/${encodeURIComponent(state.workSessionId)}`, "GET");
-      applyWorkSession(session);
+      const session = await workSessionRequest("/active", "GET");
+      if (session) applyWorkSession(session);
+      else clearWorkSession();
       renderActive();
     } catch (_error) {
       clearWorkSession();
@@ -878,7 +891,7 @@
   const renderActive = () => {
     const task = activeTask();
     const session = state.workSession;
-    if (!task || !session) {
+    if (!session) {
       activeLabelEl.textContent = "作業は開始されていません";
       activeElapsedEl.textContent = "0分";
       workSessionStateEl.textContent = "タスクを選択しただけでは時間は増えません。";
@@ -888,7 +901,7 @@
       return;
     }
 
-    activeLabelEl.textContent = task.title || session.task || "作業中";
+    activeLabelEl.textContent = task?.title || session.task || "作業中";
     activeElapsedEl.textContent = formatElapsed(sessionElapsedMs());
     const awaiting = Boolean(session.awaiting_response_since);
     const paused = session.status === "paused";
