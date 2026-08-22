@@ -184,12 +184,6 @@ body.petit-univ-active .universe-topbar .view-tabs {
   opacity: 1;
 }
 
-@media (min-width: 960px) {
-  body.petit-univ-active .universe-main {
-    left: var(--petit-rail-width, 228px);
-  }
-}
-
 @media (max-width: 959px) {
   .univ-viewport,
   .constellation-grid.life-cosmos-map {

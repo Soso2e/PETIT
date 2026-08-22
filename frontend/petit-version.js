@@ -1,5 +1,5 @@
-globalThis.PETIT_VERSION = "v0.18.1";
-globalThis.PETIT_ASSET_VERSION = "0.18.1";
+globalThis.PETIT_VERSION = "v0.18.2";
+globalThis.PETIT_ASSET_VERSION = "0.18.2";
 
 if (typeof window !== "undefined") {
   window.PETIT_VERSION = globalThis.PETIT_VERSION;
