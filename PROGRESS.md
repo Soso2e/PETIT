@@ -1,8 +1,8 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.18.0**
+**Current Version: v0.18.2**
 
-**Last Updated: 2026-08-21**
+**Last Updated: 2026-08-23**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
@@ -13,7 +13,8 @@
 - Univ UI 刷新: 大きなカード矩形を全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: WebGL依存を追加せず、CSS 3D・radial-gradient・既存SVG接続線で軽量な球体表現を実装。レイヤーは前面HUD、選択対象の説明、惑星・衛星、接続線、背景の順で固定する。
 - Issue #215対応: Univ表示時だけページを固定し、100dvhとsafe-area内のThree.js viewportへ切り替える。WebGL成功時はCSS宇宙背景を隠し、Canvasを単一の背景描画面として扱う。星の初回クリックでカメラFocusとHUD選択を同期し、2回目で詳細を開く（PC・390x844ブラウザ確認済み、実iPhone未確認）。
-- バージョン管理: v0.18.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
+- バージョン管理: v0.18.1。Univの常時WebGL描画を必要時描画へ変更し、PWA全体のメインスレッド負荷を軽減。
+- バージョン管理: v0.18.2。四隅型App Shellで非表示になった旧左レールの予約幅を解除し、デスクトップUnivを全幅表示へ復旧。
 - Univ UI 刷新: 大きなカード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: Three.js WebGLを主描画としてCore・親Task・子Task・接続線・星背景を描画し、DOMはラベル・HUD・詳細・操作UIに限定。WebGL利用不可時のみ既存CSS 3D表示へフォールバックする。
 - Univ表示領域: Univ表示中はページスクロールを止め、Canvasを100dvhの固定空間として表示。WebGL準備後は外側のCSS宇宙背景を無効化し、スマホHUDはsafe-areaと下部ナビを避ける。
@@ -21,8 +22,8 @@
 - Front UI: 左上に現在領域・同期状態・バージョン、右上にUniv／Tasks／PETITの3アイコン、左下にReminders／Settingsを置く四隅型App Shellへ更新。スマホでは主要タブをアイコンだけにし、safe-areaを考慮する。
 - 補助導線: Settingsから詳細設定を備えた旧UIへ直接移動できる。旧UIは廃止せず、移行中の保険・全機能への導線として残す。
 - ナビゲーション: 対象パネルの`hidden`・ARIA・active状態を直接同期する。`home`、`focus`、`universe`、`projects`の旧URL／内部呼び出しはUnivへ互換転送する。
-- モーション: View間は既存の短いフェードを維持し、Univ内部はThree.jsカメラ操作を利用する。`prefers-reduced-motion`では空間アニメーションとパネル遷移を停止する。
-- 制作伴走 / Today: 作業セッションをSQLiteで永続化し、20分ごとの継続確認と無応答時の自動停止をバックグラウンドWorkerで実行する。Today機能自体は残し、トップレベルタブからは外す。
+- モーション: View間は既存の短いフェードを維持し、Univ内部だけCSS 3Dカメラを利用する。`prefers-reduced-motion`では空間アニメーションとパネル遷移を停止する。
+- 制作伴走 / Today: 作業セッションをNotion Task DBの変更なしでPETIT内部Task IDへ紐づけ、状態遷移イベントをSQLiteへ永続化する。20分ごとの継続確認と無応答時の自動停止、タスク別・プロジェクト別・直近1〜90日集計、チャットからの開始・一時停止・再開・終了・実績参照に対応。Today機能自体は残し、トップレベルタブからは外す。
 - 会話 / Agent Runtime: Tool不要の会話はOne-pass Conversation Entryの最初のLLM回答で終了し、個人データ・現在情報・外部ソース・操作が必要な場合だけAgent Tool Loopへ進む。Router失敗時は内部`fallback_read`で明示した読取Toolだけを公開する。
 - Prompt / 時刻: Agentの中核ルールを短く肯定形へ整理し、Markdown全面禁止を撤廃。動的日時はsystem promptへ常時結合せず、相対日付・時刻を含むターンだけuser側へ必要な精度で注入する。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
@@ -87,10 +88,13 @@
 | 2026-08-13 | 00:00 | #44 | `start-petit-tailscale.bat` と `scripts/start-petit-tailscale.ps1` を追加し、PETIT起動・ヘルスチェック・管理者権限付きTailscale Serve起動を自動化（初版BATはcmdの文字コード・記号解釈問題があり修正、実機UAC・外部Tailnet接続は未確認） |
 | 2026-08-13 | 00:00 | #45 | BATを廃止し、`scripts/start-petit-tailscale.ps1` に起動モード選択、Tailscale接続、PETIT起動、ブラウザ起動を統合（PowerShell構文確認済み、実機UAC・外部Tailnet接続は未確認） |
 | 2026-08-13 | 00:00 | #46 | デスクトップに `PETIT Launcher.lnk` を作成し、ダブルクリックでPowerShellランチャーを起動できるように設定（ショートカット設定確認済み、実機UAC・外部Tailnet接続は未確認） |
+| 2026-08-22 | 16:43 | #47 | Issue #168: Task ID付き作業履歴、状態遷移イベント、今日・期間集計、チャットTool、Universeのサーバーactive同期を実装（関連自動テスト・構文確認済み、実LM Studio・PC／iPhone E2E未確認） |
 | 2026-08-17 | 00:00 | #47 | Git整理の中間対応として、`c26db2b` から `feat/chat-work-session` を作成し、整理前の `agent/univ-three-work-chat` を `backup-before-branch-cleanup-20260817` タグへ保存（リモート削除・履歴書き換えは未実施） |
 | 2026-08-17 | 00:00 | #48 | GitHub上のリモートブランチを `main` と `feat/chat-work-session` に整理し、重複リモート `PETIT` と旧ローカルブランチ `agent/univ-three-work-chat` を削除（作業ブランチはPush済み、PROGRESS変更は未コミット） |
 | 2026-08-17 | 00:00 | #49 | Issue #215: Univ表示時のhtml/body・メイン領域を固定し、safe-area対応の100dvh viewportとWebGL単一背景を実装（関連回帰26件成功、実ブラウザ・実iPhone未確認） |
 | 2026-08-16 | 16:36 | #50 | Issue #215: URL直開き時のWebGL未読込と詳細初期化例外を修正し、星の1クリックFocus・HUD同期、全画面Canvas、PC／390x844のHUD・詳細配置を再調整（関連57件・実ブラウザ成功、実iPhone未確認） |
 | 2026-08-16 | 23:04 | #47 | Issue #215: v0.18.0としてUnivを100dvh固定Three.js空間へ統一し、WebGL時のCSS背景重複を廃止、mobile safe-area内へHUDを固定（静的回帰テスト追加、実PC／iPhone操作感は未確認） |
 | 2026-08-18 | 11:53 | #48 | Issue #218: 「へいプティ」Vocal Shortcut向け `POST /api/voice` を追加し、既存 `/api/chat` へ委譲。最新mainへ競合解消し、確認付き書き込み・回帰テスト・iPhone設定手順を維持（実iPhone E2E未確認） |
-| 2026-08-21 | 00:00 | #49 | `fix/notion-task-reload-sync-recovery` を発行し、Tasks画面へNotion明示同期・失敗同期の再試行・競合時の再編集案内を追加。関連20テスト・構文・差分検査成功、実Notion・実ブラウザ未確認（別テスト群でWindows SQLiteロック1件） |
+| 2026-08-22 | 17:07 | #49 | v0.18.1としてUniv WebGLを必要時描画へ変更し、ラベルDOMの毎フレーム更新・選択時の重複再描画・軽量設定のWebGL無視を修正 |
+| 2026-08-22 | 17:21 | #50 | v0.18.2として旧左レールの228px予約幅を解除し、デスクトップUnivの左余白を修正 |
+| 2026-08-23 | 05:11 | #51 | PR #222: Tasks画面へNotion明示同期・失敗同期の再試行・競合時の再編集案内を追加。mainのv0.18.2更新を維持して競合解消（実Notion・実ブラウザ未確認） |
