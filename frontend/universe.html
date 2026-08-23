@@ -79,6 +79,10 @@
             <div id="today-timeline" class="today-timeline"></div>
           </section>
           <section class="today-card today-card--wide">
+            <div class="today-card__head"><span class="eyebrow">BY TASK</span><strong>タスク別</strong></div>
+            <div id="today-tasks" class="today-projects"></div>
+          </section>
+          <section class="today-card today-card--wide">
             <div class="today-card__head"><span class="eyebrow">BY PROJECT</span><strong>プロジェクト別</strong></div>
             <div id="today-projects" class="today-projects"></div>
           </section>
@@ -171,7 +175,7 @@
       <section class="view" data-view-panel="tasks" hidden>
         <div class="section-head task-section-head">
           <div><span class="eyebrow">TASKS</span><h1 id="task-view-title">重要なタスク</h1><p id="task-view-copy">今やる必要があるHighタスクだけを表示します。</p></div>
-          <div class="task-filter-wrap"><span id="task-view-count" class="task-count">0件</span><div class="task-filters" role="group" aria-label="タスク表示切り替え"><button class="filter-chip is-active" data-filter="high">重要</button><button class="filter-chip" data-filter="low">あとで</button></div><button id="refresh-tasks" class="reminder-refresh" type="button" aria-label="Notionタスクを更新">Notion同期</button></div>
+          <div class="task-filter-wrap"><span id="task-view-count" class="task-count">0件</span><div class="task-filters" role="group" aria-label="タスク表示切り替え"><button class="filter-chip is-active" data-filter="high">重要</button><button class="filter-chip" data-filter="low">あとで</button></div></div>
         </div>
         <div class="task-table-wrap"><table class="task-table"><thead><tr><th>完了</th><th>名前</th><th>期限</th><th>親Task</th><th>同期</th></tr></thead><tbody id="task-table-body"></tbody></table></div>
       </section>

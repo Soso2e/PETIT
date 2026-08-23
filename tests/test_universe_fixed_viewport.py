@@ -17,6 +17,7 @@ class UniverseFixedViewportTests(unittest.TestCase):
         self.assertIn('body.petit-univ-active [data-view-panel="universe"].univ-panel', css)
         self.assertIn("body.petit-univ-active .univ-viewport", css)
         self.assertIn("min-height: 0", css)
+        self.assertNotIn("left: var(--petit-rail-width", css)
 
     def test_webgl_ready_state_removes_legacy_css_sky(self) -> None:
         css = (FRONTEND / "universe-3d-foundation.css").read_text(encoding="utf-8")

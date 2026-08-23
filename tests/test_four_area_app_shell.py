@@ -59,8 +59,8 @@ class ThreeAreaAppShellTests(unittest.TestCase):
 
     def test_version_is_v0180(self):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('globalThis.PETIT_VERSION = "v0.18.0"', source)
-        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.18.0"', source)
+        self.assertIn('globalThis.PETIT_VERSION = "v0.18.2"', source)
+        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.18.2"', source)
         self.assertIn('window.PETIT_VERSION = globalThis.PETIT_VERSION', source)
 
     def test_universe_assets_use_current_version_without_duplicate_app_shell_loader(self):

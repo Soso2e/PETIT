@@ -319,6 +319,8 @@ Service Worker、Push API、VAPIDを使い、ブラウザを閉じている場�
 
 通知カテゴリはすべて初期OFFです。ヘッダーの通知設定から端末を購読すると、無限計測を防ぐ作業セッション通知だけ同時にONになります。ほかは必要な種類だけ有効にしてください。作業開始後は20分ごとに継続を確認し、確認から20分返事がなければサーバー側で時間の加算を止めます。通知生成側は`dispatch_notification()`を呼び、配信先は`NotificationProvider`境界へ分離しているため、将来は同じ通知判断ロジックへAPNs Providerを追加できます。
 
+作業時間はNotion Task DBのプロパティではなく、Notionを含むTaskのPETIT内部IDへ紐づけたSQLiteセッションとして保存します。Universeの「作業開始」に加え、チャットから「このタスクを開始」「一時停止」「再開」「今日はここまで」を操作でき、「いま何分？」「今日どれに何分？」「最近7日の作業時間」のように現在・今日・直近1〜90日を集計できます。Task名が0件または複数件に一致する場合は勝手に作成・開始せず、候補を返します。
+
 VAPID未設定・依存未導入・通知無効時も既存チャットは動作します。設定、API、実iPhone PWA確認手順は[`docs/web_push_notifications.md`](docs/web_push_notifications.md)を参照してください。
 
 ## Calendar
@@ -370,6 +372,7 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
 - Notion会話検索テスト: `python -m unittest tests.test_notion_search -v`
 - Web Push通知テスト: `python -m unittest tests.test_notifications -v`
 - 作業セッション停止テスト: `python -m unittest tests.test_work_sessions -v`
+- 作業記録Tool・UIテスト: `python -m unittest tests.test_work_session_tools tests.test_work_session_ui -v`
 - AivisSpeech診断CLI確認: `python scripts/diagnose_aivis_speech.py --help`
 - AivisSpeechテスト: `python -m unittest tests.test_aivis_speech -v`
 - 全Python構文確認: `python -m compileall backend tests scripts`

@@ -39,12 +39,13 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn("original?.click?.()", source)
         self.assertIn('get("renderer") === "css"', source)
 
-    def test_task_selection_uses_raycast_and_existing_action_bridge(self) -> None:
+    def test_task_selection_uses_raycast_and_lightweight_selection_api(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         bridge = (FRONTEND / "universe-webgl-bridge.js").read_text(encoding="utf-8")
         self.assertIn("new THREE.Raycaster", source)
         self.assertIn("intersectObjects", source)
-        self.assertIn("domNode?.click?.()", source)
+        self.assertIn("window.PetitUniverse?.selectTask?.(entry.taskId)", source)
+        self.assertIn("if (!selectedByUniverse)", source)
         self.assertIn('document.body.classList.add("petit-univ-manage-open")', source)
         self.assertIn("selectEntry", source)
         self.assertIn("focusEntry", source)
@@ -77,11 +78,21 @@ class UniverseWebglSceneTests(unittest.TestCase):
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
         self.assertIn('document.createElement("button")', source)
-        self.assertIn("world.clone().project(state.camera)", source)
+        self.assertIn("labelProjected.copy(labelWorld).project(state.camera)", source)
         self.assertIn("univ-webgl-label-layer", source)
         self.assertIn(".univ-webgl-label", css)
         self.assertNotIn("CanvasTexture", source)
         self.assertNotIn("SpriteMaterial", source)
+
+    def test_webgl_renders_on_demand_without_permanent_animation_loop(self) -> None:
+        source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        preferences = (FRONTEND / "petit-ui-preferences.js").read_text(encoding="utf-8")
+
+        self.assertNotIn("setAnimationLoop(animate)", source)
+        self.assertIn("function requestRender", source)
+        self.assertIn("if (tweening) requestRender()", source)
+        self.assertIn('dataset.petitPerformance === "lite"', source)
+        self.assertIn('new CustomEvent("petit:performance-change"', preferences)
 
     def test_task_name_labels_are_clickable_selection_targets(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")

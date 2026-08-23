@@ -40,7 +40,8 @@ class Issue215FixedUniverseTests(unittest.TestCase):
         block = source[start:end]
         self.assertIn("focusEntry(entry);", block)
         self.assertNotIn("if (!isAlreadySelected) focusEntry(entry);", block)
-        self.assertIn("if (domNode) domNode?.click?.();", block)
+        self.assertIn("window.PetitUniverse?.selectTask?.(entry.taskId)", block)
+        self.assertIn("if (!selectedByUniverse)", block)
 
     def test_webgl_removes_duplicate_css_scene_background(self) -> None:
         css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
