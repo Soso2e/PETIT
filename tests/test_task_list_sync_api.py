@@ -10,9 +10,8 @@ from backend import task_list_api
 class TaskListSyncApiTests(unittest.TestCase):
     def test_universe_tasks_view_exposes_refresh_and_recovery_actions(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        html = (root / "frontend" / "universe.html").read_text(encoding="utf-8")
         recovery_script = (root / "frontend" / "task-sync-recovery.js").read_text(encoding="utf-8")
-        self.assertIn('id="refresh-tasks"', html)
+        self.assertIn('button.id = "refresh-tasks"', recovery_script)
         self.assertIn("/api/notifications/tasks/sync", recovery_script)
         self.assertIn("/sync/retry", recovery_script)
         self.assertIn("競合を確認して再編集", recovery_script)
