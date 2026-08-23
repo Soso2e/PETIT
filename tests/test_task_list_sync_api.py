@@ -11,11 +11,11 @@ class TaskListSyncApiTests(unittest.TestCase):
     def test_universe_tasks_view_exposes_refresh_and_recovery_actions(self) -> None:
         root = Path(__file__).resolve().parents[1]
         html = (root / "frontend" / "universe.html").read_text(encoding="utf-8")
-        script = (root / "frontend" / "universe-app.js").read_text(encoding="utf-8")
+        recovery_script = (root / "frontend" / "task-sync-recovery.js").read_text(encoding="utf-8")
         self.assertIn('id="refresh-tasks"', html)
-        self.assertIn("/api/notifications/tasks/sync", script)
-        self.assertIn("/sync/retry", script)
-        self.assertIn("競合を確認して再編集", script)
+        self.assertIn("/api/notifications/tasks/sync", recovery_script)
+        self.assertIn("/sync/retry", recovery_script)
+        self.assertIn("競合を確認して再編集", recovery_script)
 
     def test_explicit_ui_sync_uses_incremental_mode(self) -> None:
         with patch.object(task_list_api.notion_task_sync, "sync_now", return_value={"ok": True, "synced_count": 3}) as sync:
