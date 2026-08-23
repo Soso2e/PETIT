@@ -5,7 +5,7 @@ import json
 import re
 from typing import Any
 
-from . import config, time_context, tools
+from . import config, situation, time_context, tools
 from .lmstudio_client import LMStudioError, chat_completion
 
 CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
@@ -351,6 +351,9 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
     text = str(user_message or "").strip()
     recent = history or []
     runtime_context = time_context.prompt_context_for(text, history=recent)
+    active_work_context = situation.build_active_work_context()
+    contextual_blocks = [block for block in (runtime_context, active_work_context) if block]
+    situational_context = "\n\n".join(contextual_blocks)
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": _ROUTER_SYSTEM_PROMPT}
@@ -362,8 +365,8 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             messages.append({"role": role, "content": content[:1200]})
 
     user_content = text
-    if runtime_context:
-        user_content = f"{text}\n\n{runtime_context}"
+    if situational_context:
+        user_content = f"{text}\n\n{situational_context}"
     messages.append({"role": "user", "content": user_content})
 
     try:
@@ -376,16 +379,16 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             route="chat",
         )
     except LMStudioError:
-        return _fallback(text, runtime_context)
+        return _fallback(text, situational_context)
 
     routed = _route_arguments(response)
     if routed is not None:
         capabilities = validate_capabilities(routed.get("capabilities"))
         if not capabilities:
-            return _fallback(text, runtime_context)
+            return _fallback(text, situational_context)
         goal = str(routed.get("goal") or text).strip()[:500]
-        if runtime_context:
-            goal = f"{goal}\n\n{runtime_context}"
+        if situational_context:
+            goal = f"{goal}\n\n{situational_context}"
         return {
             "type": "agent",
             "capabilities": capabilities,
@@ -401,10 +404,10 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
     ):
         capabilities = validate_capabilities(legacy.get("capabilities"))
         if not capabilities:
-            return _fallback(text, runtime_context)
+            return _fallback(text, situational_context)
         goal = str(legacy.get("goal") or text).strip()[:500]
-        if runtime_context:
-            goal = f"{goal}\n\n{runtime_context}"
+        if situational_context:
+            goal = f"{goal}\n\n{situational_context}"
         return {
             "type": "agent",
             "capabilities": capabilities,
@@ -416,8 +419,8 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
     required = _required_capabilities(text, recent)
     if required:
         goal = text
-        if runtime_context:
-            goal = f"{goal}\n\n{runtime_context}"
+        if situational_context:
+            goal = f"{goal}\n\n{situational_context}"
         return {
             "type": "agent",
             "capabilities": required,
@@ -437,4 +440,4 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             "source": "one_pass_reply",
         }
 
-    return _fallback(text, runtime_context)
+    return _fallback(text, situational_context)

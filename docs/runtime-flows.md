@@ -8,6 +8,7 @@
 - `backend/agent.py`
 - `backend/agent_runtime.py`
 - `backend/capability_router.py`
+- `backend/situation.py`
 - `backend/time_context.py`
 - `backend/work_sessions.py`
 - `backend/tools/work_sessions.py`
@@ -78,6 +79,8 @@ flowchart TD
     start([Agent Runtime開始])
     planning[planning進捗を発行]
     history[直近履歴 最大8件 3200文字]
+    activeWork{active または paused の作業があるか}
+    workContext[Task 状態 経過時間をcompact contextとして付加]
     clock{相対日付や時刻表現があるか}
     userClock[必要な精度の日時をuser側へ付加]
     staticSystem[静的なConversation Entry system prompt]
@@ -91,7 +94,9 @@ flowchart TD
     goal[元の依頼 目的 必要時刻をAgentへ渡す]
     agent[Agent Tool Loopへ]
 
-    start --> planning --> history --> clock
+    start --> planning --> history --> activeWork
+    activeWork -->|はい| workContext --> clock
+    activeWork -->|いいえ| clock
     clock -->|はい| userClock --> staticSystem
     clock -->|いいえ| staticSystem
     staticSystem --> selector --> routed
@@ -102,6 +107,8 @@ flowchart TD
 ```
 
 日時はsystem promptへ毎ターン結合せず、相対日付・相対時刻があるターンだけuser側へ注入します。
+
+active / pausedのWork Sessionがある場合だけ、Task名・状態・経過時間・関連IDを小さいuser contextとしてConversation Entryへ付加します。作業がない場合は追加せず、通常質問をWork Session Toolへ強制routeしません。pausedは休憩中として扱います。
 
 - 日付だけ必要: タイムゾーン、日付、曜日
 - 時刻も必要: タイムゾーン、分単位の現在日時

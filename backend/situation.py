@@ -1,15 +1,48 @@
 """Read-only situational context collection for proactive assistant turns."""
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 from typing import Any
 
-from . import calendar_sync, config, db
+from . import calendar_sync, config, db, work_sessions
+
+log = logging.getLogger(__name__)
 
 _PLANNING_WORDS = (
     "今日", "明日", "今週", "予定", "タスク", "やること", "何すれば", "優先", "期限",
     "締切", "進捗", "次に", "計画", "忙しい", "空いて", "朝", "おはよう",
 )
+
+
+def build_active_work_context() -> str:
+    """Return compact current-work context without changing Tool routing."""
+    try:
+        active = work_sessions.active_session()
+    except Exception as exc:  # noqa: BLE001
+        log.debug("active work context unavailable: %s", exc)
+        return ""
+    if not active:
+        return ""
+
+    status = str(active.get("status") or "").strip().lower()
+    if status not in {"active", "paused"}:
+        return ""
+    elapsed_minutes = max(0, int(active.get("elapsed_seconds") or 0) // 60)
+    lines = [
+        "【現在の作業】",
+        "一般質問への回答を優先し、必要なときだけこの作業との関係や戻り方に触れる。",
+        f"- task: {active.get('task') or '名称未設定'}",
+        f"- status: {status}",
+        f"- elapsed_minutes: {elapsed_minutes}",
+    ]
+    if active.get("task_id"):
+        lines.append(f"- task_id: {active['task_id']}")
+    if active.get("project_id"):
+        lines.append(f"- project_id: {active['project_id']}")
+    if status == "paused":
+        lines.append("- note: 現在は休憩中。作業中とは断定しない。")
+    return "\n".join(lines)
 
 
 def build_context_block(user_message: str) -> str:
