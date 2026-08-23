@@ -307,6 +307,16 @@
     state.workSession = session;
     state.workSessionId = session.session_id;
     localStorage.setItem(STORAGE.workSession, session.session_id);
+    if (session.task_id) {
+      const matchingIndex = state.tasks.findIndex((task, index) => (
+        taskKey(task, index) === String(session.task_id)
+        || String(task.external_id || "") === String(session.task_id)
+      ));
+      if (matchingIndex >= 0) {
+        state.activeTaskId = taskKey(state.tasks[matchingIndex], matchingIndex);
+        localStorage.setItem(STORAGE.activeTask, state.activeTaskId);
+      }
+    }
     if (["ended", "auto_stopped"].includes(session.status)) {
       const autoStopped = session.status === "auto_stopped";
       clearWorkSession();
@@ -337,10 +347,10 @@
   };
 
   const restoreWorkSession = async () => {
-    if (!state.workSessionId) return;
     try {
-      const session = await workSessionRequest(`/${encodeURIComponent(state.workSessionId)}`, "GET");
-      applyWorkSession(session);
+      const session = await workSessionRequest("/active", "GET");
+      if (session) applyWorkSession(session);
+      else clearWorkSession();
     } catch (_error) {
       clearWorkSession();
     }
@@ -356,7 +366,9 @@
       const sessionId = randomId();
       const session = await workSessionRequest("/start", "POST", {
         session_id: sessionId,
+        task_id: key,
         task: text(task.title, "名称未設定タスク"),
+        project_id: text(task.project_id, "") || null,
       });
       state.activeTaskId = key;
       state.workSessionId = sessionId;
@@ -508,10 +520,11 @@
   };
 
   const pollWorkSession = async () => {
-    if (!state.workSessionId || state.workSessionBusy) return;
+    if (state.workSessionBusy) return;
     try {
-      const session = await workSessionRequest(`/${encodeURIComponent(state.workSessionId)}`, "GET");
-      applyWorkSession(session);
+      const session = await workSessionRequest("/active", "GET");
+      if (session) applyWorkSession(session);
+      else clearWorkSession();
       renderActive();
     } catch (_error) {
       clearWorkSession();
@@ -711,36 +724,8 @@
     fragment.querySelector('[data-detail="reason"]').textContent = text(task.reason || task.summary, "メモはありません。");
     const sync = syncClass(task);
     const syncEl = fragment.querySelector('[data-detail="sync"]');
-    syncEl.textContent = sync === "synced" ? "" : `同期状態: ${sync}${task.sync_error ? ` · ${task.sync_error}` : ""}`;
+    syncEl.textContent = sync === "synced" ? "" : `同期状態: ${sync}`;
     syncEl.hidden = sync === "synced";
-
-    if (sync === "failed" || sync === "conflict") {
-      const action = document.createElement("button");
-      action.type = "button";
-      action.className = "detail-sync-action";
-      action.textContent = sync === "failed" ? "同期を再試行" : "競合を確認して再編集";
-      action.title = sync === "failed"
-        ? "失敗したNotion書き込みをキューへ戻します"
-        : "Notion側の変更を確認してから編集すると競合を解消できます";
-      action.addEventListener("click", async () => {
-        const id = taskNumericId(task);
-        if (id == null) return;
-        if (sync === "conflict") {
-          showFeedback("Notion側の変更を確認し、編集して保存すると競合を解消できます。");
-          return;
-        }
-        action.disabled = true;
-        try {
-          await requestJson(`/api/notifications/tasks/${encodeURIComponent(id)}/sync/retry`, { method: "POST" });
-          showFeedback("同期を再試行キューへ戻しました。");
-          await loadUniverse();
-        } catch (error) {
-          showFeedback(`同期を再試行できませんでした: ${error.message}`);
-          action.disabled = false;
-        }
-      });
-      syncEl.insertAdjacentElement("afterend", action);
-    }
 
     const editToggleBtn = fragment.querySelector('[data-action="toggle-edit"]');
     const cancelEditBtn = fragment.querySelector('[data-action="cancel-edit"]');
@@ -878,33 +863,6 @@
       syncLabel.className = `status-dot status-dot--${sync}`;
       syncLabel.textContent = sync === "synced" ? "済" : sync;
       syncCell.appendChild(syncLabel);
-      if (sync === "failed") {
-        const retry = document.createElement("button");
-        retry.type = "button";
-        retry.className = "task-sync-retry";
-        retry.textContent = "再試行";
-        retry.setAttribute("aria-label", `${text(task.title, "タスク")}のNotion同期を再試行`);
-        retry.addEventListener("click", async (event) => {
-          event.stopPropagation();
-          const id = taskNumericId(task);
-          if (id == null) return;
-          retry.disabled = true;
-          try {
-            await requestJson(`/api/notifications/tasks/${encodeURIComponent(id)}/sync/retry`, { method: "POST" });
-            showFeedback("同期を再試行キューへ戻しました。");
-            await loadUniverse();
-          } catch (error) {
-            showFeedback(`同期を再試行できませんでした: ${error.message}`);
-            retry.disabled = false;
-          }
-        });
-        syncCell.appendChild(retry);
-      } else if (sync === "conflict") {
-        const hint = document.createElement("small");
-        hint.className = "task-sync-hint";
-        hint.textContent = "再編集";
-        syncCell.appendChild(hint);
-      }
       row.appendChild(syncCell);
       row.addEventListener("click", () => {
         selectOverviewTask(task, state.tasks.indexOf(task));
@@ -1306,25 +1264,6 @@
   byId("refresh-universe")?.addEventListener("click", async () => {
     await loadUniverse();
     await pollWorkSession();
-  });
-  byId("refresh-tasks")?.addEventListener("click", async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    button.setAttribute("aria-busy", "true");
-    try {
-      const result = await requestJson("/api/notifications/tasks/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "incremental" }),
-      });
-      showFeedback(result.ok ? `Notionタスクを更新しました（${result.synced_count ?? 0}件）。` : `Notion同期を確認できませんでした: ${result.error || "失敗"}`);
-      await loadUniverse();
-    } catch (error) {
-      showFeedback(`Notionタスクを更新できませんでした: ${error.message}`);
-    } finally {
-      button.disabled = false;
-      button.removeAttribute("aria-busy");
-    }
   });
   objectiveNodeEl?.addEventListener("click", () => switchView("universe"));
   document.querySelector("[data-life-root]")?.addEventListener("click", () => switchView("universe"));
