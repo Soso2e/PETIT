@@ -23,6 +23,9 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
     const writeScripts = (srcs) => {
       for (const src of srcs) {
         document.write(`<script src="${assetUrl(src)}"></script>`);
+        if (src === "/static/universe-app.js") {
+          document.write(`<script src="${assetUrl("/static/task-sync-recovery.js")}"></script>`);
+        }
       }
     };
 
