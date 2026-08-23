@@ -38,6 +38,21 @@
 
   const refreshUniverse = () => byId("refresh-universe")?.click();
 
+  const ensureRefreshButton = () => {
+    const existing = byId("refresh-tasks");
+    if (existing) return existing;
+    const wrap = document.querySelector(".task-filter-wrap");
+    if (!wrap) return null;
+    const button = document.createElement("button");
+    button.id = "refresh-tasks";
+    button.className = "reminder-refresh";
+    button.type = "button";
+    button.setAttribute("aria-label", "Notionタスクを更新");
+    button.textContent = "Notion同期";
+    wrap.appendChild(button);
+    return button;
+  };
+
   const retryTask = async (task, button) => {
     const id = taskNumericId(task);
     if (id == null) return;
@@ -152,7 +167,8 @@
     queueMicrotask(enhance);
   };
 
-  byId("refresh-tasks")?.addEventListener("click", async (event) => {
+  const refreshTasksButton = ensureRefreshButton();
+  refreshTasksButton?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
