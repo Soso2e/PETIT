@@ -14,7 +14,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from . import briefing, db
+from . import briefing, db, work_sessions
 from .lmstudio_client import LMStudioError, chat_completion
 
 log = logging.getLogger(__name__)
@@ -40,8 +40,8 @@ def _time_of_day(now: datetime | None = None) -> str:
     return "深夜"
 
 
-def _context_block() -> tuple[str, list[str]]:
-    """Returns (recent episode text, work_in_progress list) from memory."""
+def _context_block() -> tuple[str, list[str], dict[str, Any] | None]:
+    """Return recent memory plus the server-backed current work session."""
     episodes = db.recent_episodes(limit=2)
     if episodes:
         latest = str(episodes[-1].get("summary") or "")
@@ -49,7 +49,12 @@ def _context_block() -> tuple[str, list[str]]:
         summaries = db.recent_summaries(limit=2)
         latest = str(summaries[-1].get("summary") or "") if summaries else ""
     wip = [m["content"] for m in db.all_memory() if m.get("type") == "project"][-3:]
-    return latest, wip
+    try:
+        active_work = work_sessions.active_session()
+    except Exception as exc:  # noqa: BLE001
+        log.debug("active work session unavailable for opener: %s", exc)
+        active_work = None
+    return latest, wip, active_work
 
 
 def generate_opener() -> dict[str, Any]:
@@ -74,12 +79,15 @@ def generate_opener() -> dict[str, Any]:
                 },
             },
         }
-    latest, wip = _context_block()
+    latest, wip, active_work = _context_block()
 
     context_lines = [f"今は{tod}。"]
     if latest:
         context_lines.append(f"最近の流れ: {latest}")
-    if wip:
+    if active_work:
+        state = "休憩中" if active_work.get("status") == "paused" else "作業中"
+        context_lines.append(f"現在の作業（{state}）: {active_work.get('task') or '名称未設定'}")
+    elif wip:
         context_lines.append("作業中: " + " / ".join(wip))
     context = "\n".join(context_lines)
 
@@ -98,11 +106,25 @@ def generate_opener() -> dict[str, Any]:
     except LMStudioError as exc:
         log.debug("proactive opener via LLM failed: %s", exc)
 
-    return {"message": _fallback(tod, latest, wip), "kind": "template", "time_of_day": tod}
+    return {
+        "message": _fallback(tod, latest, wip, active_work),
+        "kind": "template",
+        "time_of_day": tod,
+    }
 
 
-def _fallback(tod: str, latest: str, wip: list[str]) -> str:
+def _fallback(
+    tod: str,
+    latest: str,
+    wip: list[str],
+    active_work: dict[str, Any] | None = None,
+) -> str:
     greet = {"朝": "おはよう。", "昼": "やっほー。", "夜": "おつかれさま。", "深夜": "まだ起きてるんだね。"}[tod]
+    if active_work:
+        task = active_work.get("task") or "いまの作業"
+        if active_work.get("status") == "paused":
+            return f"{greet}{task}は休憩中だよ。そろそろ戻る？"
+        return f"{greet}{task}の続き、やる？"
     if wip:
         return f"{greet}{wip[-1]}の続き、やる？"
     if latest:
