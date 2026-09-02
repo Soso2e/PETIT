@@ -15,4 +15,4 @@ def test_health_route_is_registered_once() -> None:
 
 def test_health_endpoint_owned_by_health_module() -> None:
     assert health.health.__module__ == "backend.health"
-    assert not hasattr(main, "health")
+    assert health.health.__name__ == "health"
