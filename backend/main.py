@@ -20,7 +20,7 @@ import threading
 import time
 from uuid import uuid4
 
-from . import agent, briefing, calendar_sync, chroma_client, config, db, health, lmstudio_client, markdown_export, model_routing, notion_task_sync, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, voice, work_sessions, worker
+from . import agent, briefing, calendar_sync, chroma_client, config, db, health, lmstudio_client, markdown_export, model_routing_api, notion_task_sync, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, voice, work_sessions, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 
 app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
 app.include_router(health.router)
+app.include_router(model_routing_api.router)
 app.include_router(notifications.router)
 app.include_router(work_sessions.router)
 app.include_router(shortcut_voice.router)
@@ -97,34 +98,9 @@ class JobAck(BaseModel):
     session_id: str
 
 
-class ModelRoutingUpdate(BaseModel):
-    chat: str | None = None
-    agent: str | None = None
-
-
 _pending_actions: dict[str, dict[str, Any]] = {}
 _pending_actions_lock = threading.Lock()
 _PENDING_ACTION_TTL_SECONDS = 600
-
-
-@app.get("/api/model-routing")
-def get_model_routing() -> dict[str, Any]:
-    return model_routing.public_status()
-
-
-@app.post("/api/model-routing")
-def update_model_routing(payload: ModelRoutingUpdate) -> Any:
-    updates = {
-        route: value
-        for route, value in (("chat", payload.chat), ("agent", payload.agent))
-        if value is not None
-    }
-    try:
-        result = model_routing.update_selection(updates)
-    except model_routing.ModelRoutingError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    lmstudio_client.clear_health_cache()
-    return result
 
 
 @app.post("/api/notion/webhook")
