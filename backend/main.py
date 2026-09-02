@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ import threading
 import time
 from uuid import uuid4
 
-from . import agent, aivis_speech, briefing, calendar_sync, chroma_client, config, db, health, lmstudio_client, markdown_export, model_routing, notion_task_sync, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, work_sessions, worker
+from . import agent, briefing, calendar_sync, chroma_client, config, db, health, lmstudio_client, markdown_export, model_routing, notion_task_sync, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, voice, work_sessions, worker
 from .lmstudio_client import LMStudioError
 from .notion_client import NotionError
 
@@ -31,6 +31,7 @@ app.include_router(health.router)
 app.include_router(notifications.router)
 app.include_router(work_sessions.router)
 app.include_router(shortcut_voice.router)
+app.include_router(voice.router)
 _artifact_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="petit-artifacts")
 
 
@@ -96,10 +97,6 @@ class JobAck(BaseModel):
     session_id: str
 
 
-class TTSRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=config.TTS_MAX_CHARS)
-
-
 class ModelRoutingUpdate(BaseModel):
     chat: str | None = None
     agent: str | None = None
@@ -155,36 +152,6 @@ async def notion_webhook(request: Request) -> JSONResponse:
         return JSONResponse({"accepted": False, "error": "Invalid Notion webhook signature"}, status_code=401)
     result = notion_task_sync.enqueue_webhook_event(payload)
     return JSONResponse(result, status_code=200 if result.get("accepted") else 400)
-
-
-@app.get("/api/tts/status")
-def tts_status() -> dict[str, Any]:
-    return aivis_speech.status(check_engine=True)
-
-
-@app.post("/api/tts")
-def synthesize_speech(payload: TTSRequest) -> Response:
-    try:
-        audio, style_id = aivis_speech.synthesize(payload.text)
-    except aivis_speech.AivisSpeechError as exc:
-        error_payload: dict[str, Any] = {
-            "error": str(exc),
-            "error_code": exc.code,
-            "retryable": exc.retryable,
-            "upstream_status": exc.status_code,
-        }
-        if exc.retry_after_seconds is not None:
-            error_payload["retry_after_seconds"] = exc.retry_after_seconds
-        return JSONResponse(error_payload, status_code=503)
-    return Response(
-        content=audio,
-        media_type="audio/wav",
-        headers={
-            "Cache-Control": "no-store",
-            "X-PETIT-TTS-Provider": "aivis",
-            "X-PETIT-TTS-Style-ID": str(style_id),
-        },
-    )
 
 
 @app.post("/api/chat", response_model=ChatResponse)
