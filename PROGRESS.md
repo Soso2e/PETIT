@@ -24,7 +24,7 @@
 - ナビゲーション: 対象パネルの`hidden`・ARIA・active状態を直接同期する。`home`、`focus`、`universe`、`projects`の旧URL／内部呼び出しはUnivへ互換転送する。
 - モーション: View間は既存の短いフェードを維持し、Univ内部だけCSS 3Dカメラを利用する。`prefers-reduced-motion`では空間アニメーションとパネル遷移を停止する。
 - 制作伴走 / Today: 作業セッションをNotion Task DBの変更なしでPETIT内部Task IDへ紐づけ、状態遷移イベントをSQLiteへ永続化する。20分ごとの継続確認と無応答時の自動停止、タスク別・プロジェクト別・直近1〜90日集計、チャットからの開始・一時停止・再開・終了・実績参照に対応。Today機能自体は残し、トップレベルタブからは外す。
-- Issue #223対応: active / paused Work Sessionを通常会話の小さい状況文脈へ追加し、Tool routeを増やさず脱線後も現在作業を認識可能にする。proactive openerは古いproject memoryより実セッションを優先（関連自動テスト済み、実LM Studio会話未確認）。
+- Issue #223対応: active / paused Work Sessionを通常会話の小さい状況文脈へ追加し、Tool routeを増やさず脱線後も現在作業を認識可能にする。proactive openerは古いproject memoryより実セッションを優先（関連自動テスト済み、実LM Studio未確認）。
 - 会話 / Agent Runtime: Tool不要の会話はOne-pass Conversation Entryの最初のLLM回答で終了し、個人データ・現在情報・外部ソース・操作が必要な場合だけAgent Tool Loopへ進む。Router失敗時は内部`fallback_read`で明示した読取Toolだけを公開する。
 - Prompt / 時刻: Agentの中核ルールを短く肯定形へ整理し、Markdown全面禁止を撤廃。動的日時はsystem promptへ常時結合せず、相対日付・時刻を含むターンだけuser側へ必要な精度で注入する。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
@@ -102,3 +102,4 @@
 | 2026-08-23 | 14:12 | #52 | Issue #223: active / paused Work SessionをOne-pass Conversation Entryへcompact注入し、proactive openerで実セッションを優先（関連48テスト・Python構文確認済み、実LM Studio未確認。旧`test_assistant_context.py`の既存失敗はorigin/mainでも再現） |
 | 2026-09-02 | 06:49 | #53 | Issue #227 Phase 2: `/api/health` の実装を `backend/health.py` のAPIRouterへ分離し、`backend/main.py` はRouter登録だけを担当。path/response契約は維持し、Router所有権の回帰テストを追加（実サービスE2E未確認） |
 | 2026-09-02 | 07:18 | #54 | Issue #227 Phase 2: `/api/tts` と `/api/tts/status` を `backend/voice.py` のAPIRouterへ分離し、`backend/main.py` はRouter登録だけを担当。path/response契約を維持し、Router所有権の回帰テストを追加（実AivisSpeech E2E未確認） |
+| 2026-09-02 | 07:32 | #55 | Issue #227 Phase 2: `GET/POST /api/model-routing` を `backend/model_routing_api.py` のAPIRouterへ分離し、`backend/main.py` はRouter登録だけを担当。更新schema・health cacheクリアも専用Routerへ移動し、Router所有権の回帰テストを追加（実モデル切替E2E未確認） |
