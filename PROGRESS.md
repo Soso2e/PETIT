@@ -2,7 +2,7 @@
 
 **Current Version: v0.18.2**
 
-**Last Updated: 2026-08-23**
+**Last Updated: 2026-09-02**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
@@ -100,3 +100,4 @@
 | 2026-08-22 | 17:21 | #50 | v0.18.2として旧左レールの228px予約幅を解除し、デスクトップUnivの左余白を修正 |
 | 2026-08-23 | 05:11 | #51 | PR #222: Tasks画面へNotion明示同期・失敗同期の再試行・競合時の再編集案内を追加。mainのv0.18.2更新を維持して競合解消（実Notion・実ブラウザ未確認） |
 | 2026-08-23 | 14:12 | #52 | Issue #223: active / paused Work SessionをOne-pass Conversation Entryへcompact注入し、proactive openerで実セッションを優先（関連48テスト・Python構文確認済み、実LM Studio未確認。旧`test_assistant_context.py`の既存失敗はorigin/mainでも再現） |
+| 2026-09-02 | 06:49 | #53 | Issue #227 Phase 2: `/api/health` の実装を `backend/health.py` のAPIRouterへ分離し、`backend/main.py` はRouter登録だけを担当。path/response契約は維持し、Router所有権の回帰テストを追加（実サービスE2E未確認） |
