@@ -1,39 +1,30 @@
-"""PETIT conversation entrypoint backed by the contextual bounded Agent runtime.
+"""PETIT conversation entrypoint backed by one PETIT Brain and bounded runtimes.
 
-The legacy module remains re-exported for compatibility with existing tests and
-callers. Project continuity and exact current-time reads stay deterministic;
-ordinary conversation reaches the one-pass conversation entry first.
+Project continuity, named task completion and exact current-time reads stay
+deterministic. Ordinary conversation enters the PETIT Brain, which can answer in
+one call, request bounded read context, or delegate complex/action work to the
+existing Agent runtime.
 """
 from __future__ import annotations
 
 from typing import Any
 
 from . import agent_legacy as _legacy
-from . import agent_runtime, capability_router, config, project_router, task_completion_intent
+from . import agent_runtime, brain_runtime, capability_router, config, project_router, task_completion_intent
+from .petit_prompt import CORE_SYSTEM_PROMPT
 
-# Re-export the historical module surface while the runtime migration stabilizes.
 for _export_name in dir(_legacy):
     if not _export_name.startswith("__"):
         globals()[_export_name] = getattr(_legacy, _export_name)
 
-# Tests and older callers patch agent.model_router.choose. Point that compatibility
-# surface at the Capability Selector used by the Agent runtime.
 model_router = capability_router
 
-# Legacy route introspection remains available for old tests and extension hooks,
-# but the live run() path does not use these keyword signals for intent selection.
 _COMPAT_TASK_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
     (
         "update_task",
         (
-            "タスクを編集",
-            "タスクを変更",
-            "タスク名を変更",
-            "期限を変更",
-            "優先度を変更",
-            "締切を延ば",
-            "日付を変",
-            "未完了に戻",
+            "タスクを編集", "タスクを変更", "タスク名を変更", "期限を変更",
+            "優先度を変更", "締切を延ば", "日付を変", "未完了に戻",
         ),
     ),
     (
@@ -51,68 +42,37 @@ _TOOL_SIGNALS = tuple(_TOOL_SIGNALS) + tuple(
 )
 _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
 
-CHAT_SYSTEM_PROMPT = (
-    "あなたはPETITの会話入口。Tool不要ならその場で回答し、"
-    "個人データ・現在情報・外部ソース・操作が必要ならAgentへrouteする。"
-)
-AGENT_SYSTEM_PROMPT = """あなたはPETIT。ユーザーの生活・制作・開発を支える実務的な相棒です。
-会話文脈と今回の目的を理解し、必要なToolを選んで結果まで返してください。
-
-原則:
-- 結論から自然な日本語で答える。
-- 既に得た情報で答えられるなら追加Toolを使わない。
-- 事実に基づき、Tool結果にない外部事実を作らない。
-- 話題提示と、作成・追加・変更などの操作依頼を区別する。
-- 読み取りや調査はこのターン内で実行し、作業予告だけで終わらせない。
-- 明確な書き込み依頼は直接対応Toolをcallする。確認表示と実行はRuntimeに任せる。
-- 対象を特定できない場合だけ、必要な確認を短く返す。
-
-出力:
-- 通常は読み上げやすいプレーンテキストを使う。
-- 比較、手順、コードなど可読性が明確に上がる場合だけ最小限のMarkdownを使う。
-"""
-SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
+CHAT_SYSTEM_PROMPT = CORE_SYSTEM_PROMPT
+AGENT_SYSTEM_PROMPT = CORE_SYSTEM_PROMPT
+SYSTEM_PROMPT = CORE_SYSTEM_PROMPT
 _legacy.CHAT_SYSTEM_PROMPT = CHAT_SYSTEM_PROMPT
 _legacy.AGENT_SYSTEM_PROMPT = AGENT_SYSTEM_PROMPT
 _legacy.SYSTEM_PROMPT = SYSTEM_PROMPT
 
-_RUNTIME_AGENT_BASE_PROMPT = AGENT_SYSTEM_PROMPT
+_RUNTIME_AGENT_BASE_PROMPT = CORE_SYSTEM_PROMPT
 agent_runtime._AGENT_SYSTEM_PROMPT = _RUNTIME_AGENT_BASE_PROMPT
 
 
 def _refresh_runtime_time_context() -> None:
-    """Keep the Agent system prefix static.
-
-    Date and time context is selected by capability_router and appended to the
-    user-side goal only when the turn contains relative date/time expressions.
-    """
+    """Keep the shared PETIT system prefix static."""
     agent_runtime._AGENT_SYSTEM_PROMPT = _RUNTIME_AGENT_BASE_PROMPT
 
 
 def _sync_legacy_globals() -> None:
     """Propagate monkey-patched dependencies used by compatibility tests."""
     for name in (
-        "config",
-        "db",
-        "project_router",
-        "recall",
-        "situation",
-        "tools",
-        "chat_completion",
-        "parse_schedule_date",
-        "has_schedule_date_expression",
-        "_TOOL_SIGNALS",
+        "config", "db", "project_router", "recall", "situation", "tools",
+        "chat_completion", "parse_schedule_date", "has_schedule_date_expression", "_TOOL_SIGNALS",
     ):
         if name in globals():
             setattr(_legacy, name, globals()[name])
-    # The live runtime must use the same patched objects exposed from agent.py.
     agent_runtime.chat_completion = globals()["chat_completion"]
+    brain_runtime.chat_completion = globals()["chat_completion"]
     capability_router.chat_completion = globals()["chat_completion"]
     agent_runtime.tools = globals()["tools"]
     agent_runtime.capability_router = model_router
 
 
-# Compatibility helpers retained for callers that inspect the old routing layer.
 def _notion_read_requested(message: str) -> bool:
     text = str(message or "").casefold()
     return any(marker in text for marker in ("notion", "ノーション"))
@@ -124,19 +84,19 @@ def _github_review_requested(message: str) -> bool:
 
 
 def _related_tool_names(message: str) -> list[str]:
-    """Legacy introspection only; the live route uses Capability Selector."""
+    """Legacy introspection only; the live route uses the PETIT Brain."""
     _legacy._TOOL_SIGNALS = _TOOL_SIGNALS
     return list(_legacy._related_tool_names(message))
 
 
 def _run_notion_read(user_message: str, history: list[dict[str, str]] | None) -> dict[str, Any]:
     _refresh_runtime_time_context()
-    return agent_runtime.run(user_message, history=history)
+    return brain_runtime.run(user_message, history=history)
 
 
 def _run_github_review(user_message: str) -> dict[str, Any]:
     _refresh_runtime_time_context()
-    return agent_runtime.run(user_message, history=None)
+    return brain_runtime.run(user_message, history=None)
 
 
 def run(
@@ -145,16 +105,12 @@ def run(
     *,
     allow_defer: bool = True,
 ) -> dict[str, Any]:
-    """Handle one turn through narrow safety gates, then Agent by default."""
+    """Handle one turn through deterministic safety gates, then the PETIT Brain."""
     del allow_defer
     _refresh_runtime_time_context()
     _sync_legacy_globals()
     recent_history = _legacy._recent_history(history)
 
-    # A named task completion is resolved from SQLite exactly once before the
-    # broader Project Continuity route. This prevents an ordinary task report
-    # from being mistaken for a project checkpoint and avoids repeated LLM
-    # get_tasks calls when one candidate is already available locally.
     task_completion_turn = task_completion_intent.try_handle(user_message)
     if task_completion_turn:
         return task_completion_turn
@@ -167,7 +123,6 @@ def run(
     if project_turn:
         return project_turn
 
-    # Exact current-time reads are stable, local, and do not benefit from an LLM.
     if _legacy._related_tool_names(user_message) == ["get_current_time"]:
         raw = tools.dispatch("get_current_time", {})
         direct = _legacy._format_direct_time(raw)
@@ -182,16 +137,13 @@ def run(
                     "model": None,
                     "tools": ["get_current_time"],
                     "reasons": ["deterministic_current_time"],
+                    "llm_call_count": 0,
                 },
             }
 
-    return agent_runtime.run(user_message, history=recent_history)
+    return brain_runtime.run(user_message, history=recent_history)
 
 
 __all__ = [
-    "run",
-    "CHAT_SYSTEM_PROMPT",
-    "AGENT_SYSTEM_PROMPT",
-    "SYSTEM_PROMPT",
-    "capability_router",
+    "run", "CHAT_SYSTEM_PROMPT", "AGENT_SYSTEM_PROMPT", "SYSTEM_PROMPT", "capability_router",
 ]
