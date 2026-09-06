@@ -1,8 +1,8 @@
 """iOS Vocal Shortcuts / Shortcuts entrypoint for PETIT.
 
 Wake-word detection and speech-to-text stay on iOS. This module only accepts
-recognized text and delegates it to the existing ``/api/chat`` implementation so
-routing, confirmation, persistence, and observability remain identical to the PWA.
+recognized text and delegates it to the shared chat implementation so routing,
+confirmation, persistence, and observability remain identical to the PWA.
 """
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+from . import chat
 
 log = logging.getLogger(__name__)
 
@@ -61,12 +63,8 @@ def voice_shortcut(payload: VoiceShortcutRequest) -> VoiceShortcutResponse:
     session_id = (payload.session_id or "").strip() or DEFAULT_SESSION_ID
     request_id = f"ios_{uuid4().hex}"
 
-    # Late import avoids a circular import while keeping /api/chat as the single
-    # implementation of agent routing, persistence, and confirmation handling.
-    from . import main as app_main  # noqa: PLC0415
-
-    chat_result = app_main.chat(
-        app_main.ChatRequest(
+    chat_result = chat.chat(
+        chat.ChatRequest(
             message=message,
             request_id=request_id,
             session_id=session_id,
