@@ -5,6 +5,8 @@
 実装の根拠:
 
 - `backend/main.py`
+- `backend/chat_models.py`
+- `backend/pending_actions.py`
 - `backend/agent.py`
 - `backend/agent_runtime.py`
 - `backend/capability_router.py`
@@ -45,7 +47,7 @@ flowchart TD
     agentLoop[Agent Tool Loop]
 
     response[ChatResponseを生成]
-    pending[確認待ち操作を登録]
+    pending[pending_actions.registerで確認待ち操作を登録]
     persist{persist が true か}
     save[会話をSQLiteへ保存]
     artifacts[要約や索引などを非同期保存]
@@ -317,7 +319,8 @@ flowchart TD
     args[Tool schema検証済みの引数]
     saveState[Agent stateをSQLiteへ保存]
     confirmation[Runtimeが確認文とexecute_agent_writeを1回だけ返す]
-    register[main.pyがapproval_idを登録 10分TTL]
+    register[pending_actions.pyがapproval_idを登録 10分TTL]
+    api[POST /api/actions/{approval_id}]
     decision{ユーザーが承認したか}
     cancel[書き込みをキャンセル]
     wrapper[execute_agent_write]
@@ -334,7 +337,7 @@ flowchart TD
     final[自然な最終回答]
     delete[Agent stateを削除]
 
-    proposal --> args --> saveState --> confirmation --> register --> decision
+    proposal --> args --> saveState --> confirmation --> register --> api --> decision
     decision -->|いいえ| cancel
     decision -->|はい| wrapper --> load
     load -->|いいえ| expired
@@ -344,6 +347,8 @@ flowchart TD
     failed -->|いいえ| failure
     failed -->|はい| resume --> readOnly --> final --> delete
 ```
+
+`pending_actions.py` が短期のapproval状態、10分TTL、承認API、Sona Core互換分岐、承認後のTool dispatchを所有します。Chat側はAgent Runtimeが返した`pending_actions`を`pending_actions.register(...)`へ渡し、返された`approval_id`を`ChatResponse`へ載せるだけです。APIモデルは`chat_models.py`で共有し、確認Routerから`main.py`を参照しません。
 
 Agentが自然文だけで「実行しますか？」と返した場合は承認として扱わず、確認対象Toolをcallするよう1回だけ再指示します。
 
