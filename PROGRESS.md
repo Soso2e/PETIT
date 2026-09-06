@@ -1,8 +1,8 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.18.5**
+**Current Version: v0.18.6**
 
-**Last Updated: 2026-09-06**
+**Last Updated: 2026-09-07**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
@@ -18,6 +18,7 @@
 - バージョン管理: v0.18.3。FastAPIのstartup/shutdownとChroma初期同期を `backend/lifecycle.py` へ分離し、`main.py` はlifecycle登録のみを担当。
 - バージョン管理: v0.18.4。Pending Actionの状態管理・確認API・Sona Core分岐・Tool dispatchを `backend/pending_actions.py` へ分離し、Chat/確認APIモデルを `backend/chat_models.py` へ共通化。
 - バージョン管理: v0.18.5。`POST /api/chat`、Agent実行、observability、会話保存・artifact保存を `backend/chat.py` へ分離し、`main.py` はChat Router登録のみを担当。iOS Vocal ShortcutもChat moduleへ直接接続。
+- バージョン管理: v0.18.6。Issue #227 Phase 2を完了。補助API群とStatic Frontend配線まで `main.py` から分離し、`main.py` はFastAPI生成・Router登録・lifecycle/frontend登録・起動のみを担当するComposition Rootになった。
 - Univ UI 刷新: 大きなカード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: Three.js WebGLを主描画としてCore・親Task・子Task・接続線・星背景を描画し、DOMはラベル・HUD・詳細・操作UIに限定。WebGL利用不可時のみ既存CSS 3D表示へフォールバックする。
 - Univ表示領域: Univ表示中はページスクロールを止め、Canvasを100dvhの固定空間として表示。WebGL準備後は外側のCSS宇宙背景を無効化し、スマホHUDはsafe-areaと下部ナビを避ける。
@@ -39,7 +40,7 @@
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
 - Windows起動導線: `scripts/start-petit-tailscale.ps1` で起動モード選択、Tailscale接続、`.venv` のPETIT起動、`/api/health`確認、管理者権限付きTailscale Serve、ブラウザ起動まで実行する。LM Studioは事前起動が必要。
 - 今回の検証: Univ固定viewport・WebGL時のCSS背景除去・mobile safe-area・Three.jsの既存選択／Focus契約を静的回帰テストで検証。実PC／実iPhoneでのカメラ操作感は未確認。
-- 次にやること: 実PC／iPhone PWAでUnivを開き、スクロール不能、ドラッグ・ピンチ・ホイール、星選択、Focus、詳細表示、safe-areaを確認する。
+- 次にやること: Issue #227 Phase 3として、既存Tool Registryのimport副作用を減らしながら最小Module Registryと明示的registrationを導入する。
 
 ## 履歴
 
@@ -110,3 +111,4 @@
 | 2026-09-06 | 04:14 | #57 | v0.18.3 / Issue #227 Phase 2: startup/shutdown・Chroma初期同期を `backend/lifecycle.py` へ分離し、`backend/main.py` は `lifecycle.register(app)` のみ担当。lifecycle登録回帰テストを追加（実サービス起動E2E未確認） |
 | 2026-09-06 | 12:13 | #58 | v0.18.4 / Issue #227 Phase 2: Pending Actionの10分TTL状態管理・`POST /api/actions/{approval_id}`・Sona Core互換分岐・承認後Tool dispatchを `backend/pending_actions.py` へ分離し、`backend/chat_models.py` に確認APIモデルを共通化。Runtime FlowとRouter所有権テストを更新（実承認E2E未確認） |
 | 2026-09-06 | 13:16 | #59 | v0.18.5 / Issue #227 Phase 2: `POST /api/chat`・Agent実行・observability・SQLite会話保存・Chroma/Markdown artifact保存を `backend/chat.py` へ分離。`main.py` はRouter登録のみ担当し、Vocal ShortcutもChat moduleへ直接接続。Router所有権・空入力契約の回帰テストを追加（実LM Studio・実iPhone E2E未確認） |
+| 2026-09-06 | 18:03 | #60 | v0.18.6 / Issue #227 Phase 2完了: 補助API群とStatic Frontend配線まで専用モジュールへ分離し、`backend/main.py` をFastAPI生成・Router登録・lifecycle/frontend登録・起動のみのComposition Rootへ縮小。次フェーズはModule Registry（pytest / 実サービスE2E未確認） |
