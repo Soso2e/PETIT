@@ -19,7 +19,7 @@ import threading
 import time
 from uuid import uuid4
 
-from . import agent, briefing, calendar_sync, chroma_client, config, db, health, lmstudio_client, markdown_export, model_routing_api, notion_task_sync, notion_webhook, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, voice, work_sessions, worker
+from . import agent, briefing, calendar_sync, chroma_client, config, db, health, lifecycle, lmstudio_client, markdown_export, model_routing_api, notion_task_sync, notion_webhook, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, voice, work_sessions
 from .lmstudio_client import LMStudioError
 
 log = logging.getLogger(__name__)
@@ -32,38 +32,8 @@ app.include_router(notifications.router)
 app.include_router(work_sessions.router)
 app.include_router(shortcut_voice.router)
 app.include_router(voice.router)
+lifecycle.register(app)
 _artifact_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="petit-artifacts")
-
-
-@app.on_event("startup")
-def _startup() -> None:
-    db.init_db()
-    notifications.init_db()
-    # Sync existing SQLite data into Chroma in background (best-effort)
-    threading.Thread(target=_chroma_sync, daemon=True).start()
-    # Autonomous summarizer: fold conversations into memory every N hours
-    if config.AUTO_SUMMARY_ENABLED:
-        scheduler.get_scheduler().start()
-    worker.get_worker().start()
-
-
-@app.on_event("shutdown")
-def _shutdown() -> None:
-    if config.AUTO_SUMMARY_ENABLED:
-        scheduler.get_scheduler().stop()
-    worker.get_worker().stop()
-
-
-def _chroma_sync() -> None:
-    """Incrementally index SQLite memory/episodes and configured vaults."""
-    try:
-        mem_rows = db.all_memory()
-        counts = chroma_client.sync_structured_data(mem_rows, db.all_episodes())
-        vault_counts = vault_indexer.index_configured_vaults()
-        if any(counts.values()) or vault_counts.get("chunks"):
-            log.info("Chroma sync: %s vault=%s", counts, vault_counts)
-    except Exception as exc:  # noqa: BLE001
-        log.debug("Chroma startup sync skipped: %s", exc)
 
 
 class ChatRequest(BaseModel):
