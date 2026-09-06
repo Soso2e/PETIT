@@ -8,27 +8,26 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-import hmac
 import json
 import logging
 import threading
 import time
 from uuid import uuid4
 
-from . import agent, briefing, calendar_sync, chroma_client, config, db, health, lmstudio_client, markdown_export, model_routing_api, notion_task_sync, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, voice, work_sessions, worker
+from . import agent, briefing, calendar_sync, chroma_client, config, db, health, lmstudio_client, markdown_export, model_routing_api, notion_task_sync, notion_webhook, notifications, proactive, request_context, scheduler, shortcut_voice, tools, vault_indexer, voice, work_sessions, worker
 from .lmstudio_client import LMStudioError
-from .notion_client import NotionError
 
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
 app.include_router(health.router)
 app.include_router(model_routing_api.router)
+app.include_router(notion_webhook.router)
 app.include_router(notifications.router)
 app.include_router(work_sessions.router)
 app.include_router(shortcut_voice.router)
@@ -101,33 +100,6 @@ class JobAck(BaseModel):
 _pending_actions: dict[str, dict[str, Any]] = {}
 _pending_actions_lock = threading.Lock()
 _PENDING_ACTION_TTL_SECONDS = 600
-
-
-@app.post("/api/notion/webhook")
-async def notion_webhook(request: Request) -> JSONResponse:
-    """Receive Notion webhook verification and signed task change events."""
-    endpoint_secret = str(config.NOTION_WEBHOOK_ENDPOINT_SECRET or "").strip()
-    supplied_secret = str(request.query_params.get("key") or "").strip()
-    if endpoint_secret and not hmac.compare_digest(endpoint_secret, supplied_secret):
-        return JSONResponse({"accepted": False, "error": "Invalid webhook endpoint key"}, status_code=404)
-    raw_body = await request.body()
-    try:
-        payload = json.loads(raw_body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return JSONResponse({"accepted": False, "error": "Invalid JSON payload"}, status_code=400)
-    if not isinstance(payload, dict):
-        return JSONResponse({"accepted": False, "error": "JSON object is required"}, status_code=400)
-
-    verification_token = str(payload.get("verification_token") or "").strip()
-    if verification_token:
-        result = notion_task_sync.accept_verification_token(verification_token)
-        return JSONResponse(result, status_code=200 if result.get("accepted") else 409)
-
-    signature = request.headers.get("x-notion-signature")
-    if not notion_task_sync.verify_webhook_signature(raw_body, signature):
-        return JSONResponse({"accepted": False, "error": "Invalid Notion webhook signature"}, status_code=401)
-    result = notion_task_sync.enqueue_webhook_event(payload)
-    return JSONResponse(result, status_code=200 if result.get("accepted") else 400)
 
 
 @app.post("/api/chat", response_model=ChatResponse)
