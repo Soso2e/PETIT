@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.18.3**
+**Current Version: v0.18.4**
 
 **Last Updated: 2026-09-06**
 
@@ -16,6 +16,7 @@
 - バージョン管理: v0.18.1。Univの常時WebGL描画を必要時描画へ変更し、PWA全体のメインスレッド負荷を軽減。
 - バージョン管理: v0.18.2。四隅型App Shellで非表示になった旧左レールの予約幅を解除し、デスクトップUnivを全幅表示へ復旧。
 - バージョン管理: v0.18.3。FastAPIのstartup/shutdownとChroma初期同期を `backend/lifecycle.py` へ分離し、`main.py` はlifecycle登録のみを担当。
+- バージョン管理: v0.18.4。Pending Actionの状態管理・確認API・Sona Core分岐・Tool dispatchを `backend/pending_actions.py` へ分離し、Chat/確認APIモデルを `backend/chat_models.py` へ共通化。
 - Univ UI 刷新: 大きなカード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: Three.js WebGLを主描画としてCore・親Task・子Task・接続線・星背景を描画し、DOMはラベル・HUD・詳細・操作UIに限定。WebGL利用不可時のみ既存CSS 3D表示へフォールバックする。
 - Univ表示領域: Univ表示中はページスクロールを止め、Canvasを100dvhの固定空間として表示。WebGL準備後は外側のCSS宇宙背景を無効化し、スマホHUDはsafe-areaと下部ナビを避ける。
@@ -106,3 +107,4 @@
 | 2026-09-02 | 07:32 | #55 | Issue #227 Phase 2: `GET/POST /api/model-routing` を `backend/model_routing_api.py` のAPIRouterへ分離し、`backend/main.py` はRouter登録だけを担当。更新schema・health cacheクリアも専用Routerへ移動し、Router所有権の回帰テストを追加（実モデル切替E2E未確認） |
 | 2026-09-06 | 04:09 | #56 | Issue #227 Phase 2: `POST /api/notion/webhook` を `backend/notion_webhook.py` のAPIRouterへ分離し、endpoint key・JSON・verification token・signature検証を移動。`backend/main.py` はRouter登録だけを担当し、Router所有権の回帰テストを追加（実Notion Webhook E2E未確認） |
 | 2026-09-06 | 04:14 | #57 | v0.18.3 / Issue #227 Phase 2: startup/shutdown・Chroma初期同期を `backend/lifecycle.py` へ分離し、`backend/main.py` は `lifecycle.register(app)` のみ担当。lifecycle登録回帰テストを追加（実サービス起動E2E未確認） |
+| 2026-09-06 | 12:13 | #58 | v0.18.4 / Issue #227 Phase 2: Pending Actionの10分TTL状態管理・`POST /api/actions/{approval_id}`・Sona Core互換分岐・承認後Tool dispatchを `backend/pending_actions.py` へ分離し、`backend/chat_models.py` に確認APIモデルを共通化。Runtime FlowとRouter所有権テストを更新（実承認E2E未確認） |
