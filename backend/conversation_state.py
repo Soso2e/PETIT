@@ -115,6 +115,18 @@ def _active_project() -> dict[str, Any] | None:
     }
 
 
+def _active_task_context() -> str | None:
+    """Return current work-session context without creating a hard dependency."""
+    try:
+        from . import situation  # noqa: PLC0415
+
+        context = situation.build_active_work_context()
+    except Exception:  # best effort only
+        return None
+    context = " ".join(str(context or "").split())
+    return context[:_MAX_ITEM] or None
+
+
 def update_after_turn(
     session_id: str | None,
     *,
@@ -143,7 +155,6 @@ def update_after_turn(
     if _UNRESOLVED.search(assistant_text):
         unresolved = _append_unique(unresolved, assistant_text)
     elif unresolved and not _UNRESOLVED.search(assistant_text):
-        # Keep history compact: resolved turns gradually evict old uncertainty.
         unresolved = unresolved[-(_MAX_LIST_ITEMS - 1):]
 
     entities = list(previous.get("recent_entities") or [])
@@ -151,6 +162,7 @@ def update_after_turn(
         entities = _append_unique(entities, entity)
 
     project = _active_project()
+    active_task = active_task or _active_task_context() or previous.get("active_task")
     now = db.now_iso()
     project_json = json.dumps(project, ensure_ascii=False) if project else None
     with db.get_connection() as conn:
@@ -169,7 +181,7 @@ def update_after_turn(
                 json.dumps(decisions, ensure_ascii=False),
                 json.dumps(unresolved, ensure_ascii=False),
                 project_json,
-                str(active_task or previous.get("active_task") or "").strip()[:_MAX_ITEM] or None,
+                str(active_task or "").strip()[:_MAX_ITEM] or None,
                 json.dumps(entities, ensure_ascii=False),
                 user_text[:_MAX_LAST_TEXT],
                 assistant_text[:_MAX_LAST_TEXT],
