@@ -2,7 +2,7 @@
 
 **Current Version: v0.18.2**
 
-**Last Updated: 2026-09-02**
+**Last Updated: 2026-09-06**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
@@ -103,3 +103,4 @@
 | 2026-09-02 | 06:49 | #53 | Issue #227 Phase 2: `/api/health` の実装を `backend/health.py` のAPIRouterへ分離し、`backend/main.py` はRouter登録だけを担当。path/response契約は維持し、Router所有権の回帰テストを追加（実サービスE2E未確認） |
 | 2026-09-02 | 07:18 | #54 | Issue #227 Phase 2: `/api/tts` と `/api/tts/status` を `backend/voice.py` のAPIRouterへ分離し、`backend/main.py` はRouter登録だけを担当。path/response契約を維持し、Router所有権の回帰テストを追加（実AivisSpeech E2E未確認） |
 | 2026-09-02 | 07:32 | #55 | Issue #227 Phase 2: `GET/POST /api/model-routing` を `backend/model_routing_api.py` のAPIRouterへ分離し、`backend/main.py` はRouter登録だけを担当。更新schema・health cacheクリアも専用Routerへ移動し、Router所有権の回帰テストを追加（実モデル切替E2E未確認） |
+| 2026-09-06 | 04:09 | #56 | Issue #227 Phase 2: `POST /api/notion/webhook` を `backend/notion_webhook.py` のAPIRouterへ分離し、endpoint key・JSON・verification token・signature検証を移動。`backend/main.py` はRouter登録だけを担当し、Router所有権の回帰テストを追加（実Notion Webhook E2E未確認） |
