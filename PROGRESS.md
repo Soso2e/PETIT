@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.19.0**
+**Current Version: v0.19.1**
 
 **Last Updated: 2026-09-07**
 
@@ -19,7 +19,8 @@
 - バージョン管理: v0.18.4。Pending Actionの状態管理・確認API・Sona Core分岐・Tool dispatchを `backend/pending_actions.py` へ分離し、Chat/確認APIモデルを `backend/chat_models.py` へ共通化。
 - バージョン管理: v0.18.5。`POST /api/chat`、Agent実行、observability、会話保存・artifact保存を `backend/chat.py` へ分離し、`main.py` はChat Router登録のみを担当。iOS Vocal ShortcutもChat moduleへ直接接続。
 - バージョン管理: v0.18.6。Issue #227 Phase 2を完了。補助API群とStatic Frontend配線まで `main.py` から分離し、`main.py` はFastAPI生成・Router登録・lifecycle/frontend登録・起動のみを担当するComposition Rootになった。
-- バージョン管理: v0.19.0。Issue #227 Phase 3を開始。`ModuleDefinition` / `ModuleRegistry` と `create_app()` を追加し、Router・registrar・依存関係を明示的に組み立てる土台へ移行。`main.py` は `create_app()` を呼ぶ起動shimへ縮小。Toolのimport副作用登録は互換維持のため次PR以降で段階移行する。
+- バージョン管理: v0.19.0。Issue #227 Phase 3を開始。`ModuleDefinition` / `ModuleRegistry` と `create_app()` を追加し、Router・registrar・依存関係を明示的に組み立てる土台へ移行。`main.py` は `create_app()` を呼ぶ起動shimへ縮小。
+- バージョン管理: v0.19.1。Issue #227 Phase 3を完了。`backend.tools` のimport副作用登録を廃止し、built-in Tool catalogを `builtin-tools` Moduleとして明示登録。Chat / Pending ActionはTool bootstrapへの依存を宣言し、Module Registryが起動順を保証する。
 - Univ UI 刷新: 大きなカード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: Three.js WebGLを主描画としてCore・親Task・子Task・接続線・星背景を描画し、DOMはラベル・HUD・詳細・操作UIに限定。WebGL利用不可時のみ既存CSS 3D表示へフォールバックする。
 - Univ表示領域: Univ表示中はページスクロールを止め、Canvasを100dvhの固定空間として表示。WebGL準備後は外側のCSS宇宙背景を無効化し、スマホHUDはsafe-areaと下部ナビを避ける。
@@ -40,8 +41,8 @@
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
 - Windows起動導線: `scripts/start-petit-tailscale.ps1` で起動モード選択、Tailscale接続、`.venv` のPETIT起動、`/api/health`確認、管理者権限付きTailscale Serve、ブラウザ起動まで実行する。LM Studioは事前起動が必要。
-- 今回の検証: Univ固定viewport・WebGL時のCSS背景除去・mobile safe-area・Three.jsの既存選択／Focus契約を静的回帰テストで検証。実PC／実iPhoneでのカメラ操作感は未確認。
-- 次にやること: Issue #227 Phase 3として、`backend/tools/__init__.py` のimport副作用登録を明示的なbuilt-in Tool registrationへ段階移行し、Module定義からTool登録を扱えるようにする。
+- 今回の検証: Tool package単体importではbuilt-in Toolが登録されず、`create_app()` 時だけ明示登録されることをsubprocess回帰テストで固定。Module依存により `builtin-tools` がChat / Pending Actionより先に登録されることを確認対象とする。pytest / 実LM Studio E2Eは未確認。
+- 次にやること: Issue #227 Phase 4として、機能単位のbackend package化とIntegration境界の分離を、実利用で価値が高い領域から段階的に進める。
 
 ## 履歴
 
@@ -114,3 +115,4 @@
 | 2026-09-06 | 13:16 | #59 | v0.18.5 / Issue #227 Phase 2: `POST /api/chat`・Agent実行・observability・SQLite会話保存・Chroma/Markdown artifact保存を `backend/chat.py` へ分離。`main.py` はRouter登録のみ担当し、Vocal ShortcutもChat moduleへ直接接続。Router所有権・空入力契約の回帰テストを追加（実LM Studio・実iPhone E2E未確認） |
 | 2026-09-06 | 18:03 | #60 | v0.18.6 / Issue #227 Phase 2完了: 補助API群とStatic Frontend配線まで専用モジュールへ分離し、`backend/main.py` をFastAPI生成・Router登録・lifecycle/frontend登録・起動のみのComposition Rootへ縮小。次フェーズはModule Registry（pytest / 実サービスE2E未確認） |
 | 2026-09-06 | 18:10 | #61 | v0.19.0 / Issue #227 Phase 3開始: `backend/kernel/modules.py` に `ModuleDefinition` / `ModuleRegistry` を追加し、Router・registrar・依存関係を明示登録。`backend/app.py` の `create_app()` がModule RegistryからFastAPIを構築し、`backend/main.py` は起動shimへ縮小。依存順・重複ID・未知依存・循環依存の回帰テストを追加（pytest / 実サービスE2E未確認） |
+| 2026-09-06 | 18:16 | #62 | v0.19.1 / Issue #227 Phase 3完了: `backend.tools` package import時の全built-in Tool副作用登録を廃止し、`backend/tools/builtins.py` の明示catalogを `builtin-tools` Moduleとして登録。Pending Action / ChatのTool依存をModule Registryへ宣言し、単体import時0件・`create_app()`後登録のsubprocess回帰テストを追加（pytest / 実LM Studio E2E未確認） |
