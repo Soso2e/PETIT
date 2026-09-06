@@ -32,7 +32,7 @@
 - 会話 / Agent Runtime: Tool不要の会話はOne-pass Conversation Entryの最初のLLM回答で終了し、個人データ・現在情報・外部ソース・操作が必要な場合だけAgent Tool Loopへ進む。Router失敗時は内部`fallback_read`で明示した読取Toolだけを公開する。
 - Prompt / 時刻: Agentの中核ルールを短く肯定形へ整理し、Markdown全面禁止を撤廃。動的日時はsystem promptへ常時結合せず、相対日付・時刻を含むターンだけuser側へ必要な精度で注入する。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
-- Notionタスク復旧: Tasks画面の明示Notion同期、失敗同期の再試行、競合時の再編集案内を追加。実Notion接続・実ブラウザ操作は未確認。
+- Notionタスク復旧: Tasks画面の明示Notion同期、失敗キューの再試行、競合時の再編集案内を追加。実Notion接続・実ブラウザ操作は未確認。
 - へいプティ音声入口（仮実装）: Issue #218 / `feat/petit-vocal-shortcut-prototype` で、iOS Vocal Shortcuts + Appleショートカットから `POST /api/voice` へ音声認識済みテキストを渡し、既存 `/api/chat` へ委譲する導線を追加。PWA自身では常時マイク監視せず、書き込み確認は既存フローを維持する。実iPhone E2Eは未確認。
 - Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in、通知履歴を実装。cache名をv0.14.1へ更新し、Univ空間と四隅App Shellの資産をprecacheへ追加。
 - タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。作成・完了・親子変更は確認付きでNotion同期する。
@@ -51,7 +51,7 @@
 | 2026-08-02 | 08:54 | #1 | v0.1.0としてバージョン管理ルール、PROGRESS表記、Web UI表示を追加 |
 | 2026-08-02 | 09:12 | #2 | v0.1.1としてAgent Runtimeと会話ToolフローのMermaid図、AGENTS同期ルールを追加 |
 | 2026-08-02 | 09:40 | #3 | v0.2.0としてToday画面、今日の作業時間集計、作業セッション復元APIを追加 |
-| 2026-08-02 | 13:22 | #4 | v0.3.0としてLifeホーム化、Focusズーム遷移、Today改善、親Task内の小タスク追加を実装 |
+| 2026-08-02 | 13:22 | #4 | v0.3.0としてLife星座マップとFocusへのProject・Task導線を追加 |
 | 2026-08-02 | 14:25 | #5 | v0.3.1として親子タスク変更のTool選択、承認前引数検証、重複確認防止を追加 |
 | 2026-08-02 | 14:29 | #6 | v0.4.0としてLifeホーム化、Focusズーム遷移、Today改善、親Task内の小タスク追加を実装 |
 | 2026-08-02 | 16:07 | #7 | v0.5.0として全子タスク周回Focus、CSS球体、親移動処理一本化と冪等化を実装（PC・390x844ブラウザ動作確認済み、実Notion書込・実iPhone PWA未確認） |
