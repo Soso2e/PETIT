@@ -31,8 +31,9 @@
 - モーション: View間は既存の短いフェードを維持し、Univ内部だけCSS 3Dカメラを利用する。`prefers-reduced-motion`では空間アニメーションとパネル遷移を停止する。
 - 制作伴走 / Today: 作業セッションをNotion Task DBの変更なしでPETIT内部Task IDへ紐づけ、状態遷移イベントをSQLiteへ永続化する。20分ごとの継続確認と無応答時の自動停止、タスク別・プロジェクト別・直近1〜90日集計、チャットからの開始・一時停止・再開・終了・実績参照に対応。Today機能自体は残し、トップレベルタブからは外す。
 - Issue #223対応: active / paused Work Sessionを通常会話の小さい状況文脈へ追加し、Tool routeを増やさず脱線後も現在作業を認識可能にする。proactive openerは古いproject memoryより実セッションを優先（関連自動テスト済み、実LM Studio未確認）。
-- 会話 / Agent Runtime: Tool不要の会話はOne-pass Conversation Entryの最初のLLM回答で終了し、個人データ・現在情報・外部ソース・操作が必要な場合だけAgent Tool Loopへ進む。Router失敗時は内部`fallback_read`で明示した読取Toolだけを公開する。
-- Prompt / 時刻: Agentの中核ルールを短く肯定形へ整理し、Markdown全面禁止を撤廃。動的日時はsystem promptへ常時結合せず、相対日付・時刻を含むターンだけuser側へ必要な精度で注入する。
+- Issue #235対応中: PETIT人格をCore Promptへ一本化し、通常会話1 Call、Tasks / CalendarのReadを `Brain -> Context Broker -> Brain` の原則2 Callで処理する最小縦切りを実装。Read sourceは並列取得し、AI向けfactsへ正規化する。実LM Studio・実Notion/Calendar・latency/token比較は未確認。
+- 会話 / Agent Runtime: Tool不要の会話はPETIT Brainの最初のLLM回答で終了し、Tasks / CalendarのReadだけ不足する場合はContext Brokerへ進む。書き込み・複雑処理は既存Agent Tool Loopを維持する。
+- Prompt / 時刻: PETITの人格・会話原則を共通Core Promptへ統合。動的日時はsystem promptへ常時結合せず、相対日付・時刻を含むターンだけuser側へ必要な精度で注入する。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
 - Notionタスク復旧: Tasks画面の明示Notion同期、失敗同期の再試行、競合時の再編集案内を追加。実Notion接続・実ブラウザ操作は未確認。
 - へいプティ音声入口（仮実装）: Issue #218 / `feat/petit-vocal-shortcut-prototype` で、iOS Vocal Shortcuts + Appleショートカットから `POST /api/voice` へ音声認識済みテキストを渡し、既存 `/api/chat` へ委譲する導線を追加。PWA自身では常時マイク監視せず、書き込み確認は既存フローを維持する。実iPhone E2Eは未確認。
@@ -41,8 +42,8 @@
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
 - Windows起動導線: `scripts/start-petit-tailscale.ps1` で起動モード選択、Tailscale接続、`.venv` のPETIT起動、`/api/health`確認、管理者権限付きTailscale Serve、ブラウザ起動まで実行する。LM Studioは事前起動が必要。
-- 今回の検証: Tool package単体importではbuilt-in Toolが登録されず、`create_app()` 時だけ明示登録されることをsubprocess回帰テストで固定。Module依存により `builtin-tools` がChat / Pending Actionより先に登録されることを確認対象とする。pytest / 実LM Studio E2Eは未確認。
-- 次にやること: Issue #227 Phase 4として、機能単位のbackend package化とIntegration境界の分離を、実利用で価値が高い領域から段階的に進める。
+- 今回の検証: Context Broker単体・Brain routeの回帰テストを追加。GitHub Actions / pytest / 実LM Studio E2Eは未確認。
+- 次にやること: Issue #235の最小縦切りを実LM Studioで検証し、`今日何やる？` / `明日大丈夫？` のCall数・応答時間・Context量を現行と比較する。その後にIssue #227 Phase 4を再開する。
 
 ## 履歴
 
@@ -116,3 +117,4 @@
 | 2026-09-06 | 18:03 | #60 | v0.18.6 / Issue #227 Phase 2完了: 補助API群とStatic Frontend配線まで専用モジュールへ分離し、`backend/main.py` をFastAPI生成・Router登録・lifecycle/frontend登録・起動のみのComposition Rootへ縮小。次フェーズはModule Registry（pytest / 実サービスE2E未確認） |
 | 2026-09-06 | 18:10 | #61 | v0.19.0 / Issue #227 Phase 3開始: `backend/kernel/modules.py` に `ModuleDefinition` / `ModuleRegistry` を追加し、Router・registrar・依存関係を明示登録。`backend/app.py` の `create_app()` がModule RegistryからFastAPIを構築し、`backend/main.py` は起動shimへ縮小。依存順・重複ID・未知依存・循環依存の回帰テストを追加（pytest / 実サービスE2E未確認） |
 | 2026-09-06 | 18:16 | #62 | v0.19.1 / Issue #227 Phase 3完了: `backend.tools` package import時の全built-in Tool副作用登録を廃止し、`backend/tools/builtins.py` の明示catalogを `builtin-tools` Moduleとして登録。Pending Action / ChatのTool依存をModule Registryへ宣言し、単体import時0件・`create_app()`後登録のsubprocess回帰テストを追加（pytest / 実LM Studio E2E未確認） |
+| 2026-09-06 | 18:30 | #63 | Issue #235: PETIT Core Promptを共通化し、Tasks / Calendar限定Context Broker、Read並列取得、`Brain -> Broker -> Brain` 2 Call経路、Call数/Context量observability、関連回帰テストとRuntime Mermaidを追加（pytest / 実LM Studio・外部サービスE2E未確認） |
