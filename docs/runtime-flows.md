@@ -1,6 +1,6 @@
 # PETIT Runtime Flows
 
-この文書は、PETITの会話処理、One-pass Conversation Entry、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
+この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
 実装の根拠:
 
@@ -9,6 +9,9 @@
 - `backend/chat_models.py`
 - `backend/pending_actions.py`
 - `backend/agent.py`
+- `backend/brain_runtime.py`
+- `backend/context_broker.py`
+- `backend/petit_prompt.py`
 - `backend/agent_runtime.py`
 - `backend/capability_router.py`
 - `backend/situation.py`
@@ -40,12 +43,16 @@ flowchart TD
     exactTime{現在時刻だけの依頼か}
     timeTool[get_current_time を直接実行]
 
-    runtime[Agent Runtime]
-    entry[One-pass Conversation Entry]
-    entryResult{Tool不要か}
-    directReply[最初のLLM回答をそのまま採用]
+    brain[PETIT Brain]
+    selector[最初のChatモデルCall]
+    route{結果}
+    directReply[自然文をそのまま返す]
+    context[Context Broker]
+    parallel[Tasks Calendarを独立Readとして並列取得]
+    packet[正規化Context Packet]
+    second[同じPETIT Core Promptで2回目のChatモデルCall]
     capability[CapabilityをToolへ展開]
-    agentLoop[Agent Tool Loop]
+    agentLoop[既存Deep Agent Tool Loop]
 
     response[ChatResponseを生成]
     pending[pending_actions.registerで確認待ち操作を登録]
@@ -63,9 +70,10 @@ flowchart TD
     projectRoute -->|はい| projectHandle --> response
     projectRoute -->|いいえ| exactTime
     exactTime -->|はい| timeTool --> response
-    exactTime -->|いいえ| runtime --> entry --> entryResult
-    entryResult -->|はい| directReply --> response
-    entryResult -->|いいえ| capability --> agentLoop --> response
+    exactTime -->|いいえ| brain --> selector --> route
+    route -->|reply| directReply --> response
+    route -->|request_context| context --> parallel --> packet --> second --> response
+    route -->|route_to_agent| capability --> agentLoop --> response
     response --> pending --> persist
     persist -->|はい| save --> artifacts --> output
     persist -->|いいえ| output
@@ -73,51 +81,66 @@ flowchart TD
 
 `backend/chat.py` が `/api/chat`、Agent実行、observability、Pending Action登録、SQLite会話保存、Chroma/Markdown artifact保存を所有します。`backend/main.py` はChat Routerを登録するだけで、会話実装の詳細を持ちません。
 
-Tool不要の雑談・相談・説明・文章作成は、Conversation Entryの1回目のLLM回答で終了します。個人データ、現在情報、外部ソース、または操作が必要な場合だけAgent Runtimeへ進みます。
+PETITの人格と会話原則は `petit_prompt.py` のCore Promptを正とします。Tool不要の雑談・相談・説明・文章作成は最初の1 LLM Callで終了します。Tasks / CalendarのReadだけ不足する会話は `Brain -> Context Broker -> Brain` の原則2 Callで完了し、書き込みや複雑処理だけ既存Deep Agentへ進みます。
 
 ---
 
-## 2. One-pass Conversation Entry
+## 2. PETIT Brain / Context Broker
 
 ```mermaid
 flowchart TD
-    start([Agent Runtime開始])
+    start([PETIT Brain開始])
     planning[planning進捗を発行]
     history[直近履歴 最大8件 3200文字]
     activeWork{active または paused の作業があるか}
     workContext[Task 状態 経過時間をcompact contextとして付加]
     clock{相対日付や時刻表現があるか}
     userClock[必要な精度の日時をuser側へ付加]
-    staticSystem[静的なConversation Entry system prompt]
+    core[共通PETIT Core Prompt]
     selector[Chatモデルを1回呼ぶ]
-    routed{route_to_agentをcallしたか}
+    result{結果}
     reply[自然文を最終回答として返す]
+    request[request_context]
+    normalize[ContextRequestをtasks calendarだけに正規化]
+    parallel[独立Readを並列実行]
+    task[get_tasks]
+    calendar[get_schedule]
+    packet[raw JSONをAI向けfactsへ正規化]
+    partial[provider失敗はpartialとして保持]
+    second[Core Prompt + Context Packetで2回目Call]
+    final[自然な最終回答]
+    route[route_to_agent]
     parse[Capability 最大4グループを検証]
-    valid{有効なCapabilityがあるか}
-    safeFallback[fallback_readだけを公開]
     map[登録済みToolへ展開]
-    goal[元の依頼 目的 必要時刻をAgentへ渡す]
-    agent[Agent Tool Loopへ]
+    agent[Deep Agent Tool Loopへ]
 
     start --> planning --> history --> activeWork
     activeWork -->|はい| workContext --> clock
     activeWork -->|いいえ| clock
-    clock -->|はい| userClock --> staticSystem
-    clock -->|いいえ| staticSystem
-    staticSystem --> selector --> routed
-    routed -->|いいえ| reply
-    routed -->|はい| parse --> valid
-    valid -->|はい| map --> goal --> agent
-    valid -->|いいえ| safeFallback --> goal
+    clock -->|はい| userClock --> core
+    clock -->|いいえ| core
+    core --> selector --> result
+    result -->|reply| reply
+    result -->|request_context| request --> normalize --> parallel
+    parallel --> task --> packet
+    parallel --> calendar --> packet
+    packet --> partial --> second --> final
+    result -->|route_to_agent| route --> parse --> map --> agent
 ```
 
-日時はsystem promptへ毎ターン結合せず、相対日付・相対時刻があるターンだけuser側へ注入します。
+日時はsystem promptへ毎ターン結合せず、相対日付・相対時刻があるターンだけuser側へ注入します。active / pausedのWork Sessionがある場合だけ、小さいuser contextをConversation Entryへ付加します。
 
-active / pausedのWork Sessionがある場合だけ、Task名・状態・経過時間・関連IDを小さいuser contextとしてConversation Entryへ付加します。作業がない場合は追加せず、通常質問をWork Session Toolへ強制routeしません。pausedは休憩中として扱います。
+Context Brokerの初期スコープは読み取り専用の `tasks` と `calendar` です。Brokerは具体Tool名をLLMへ大量公開せず、`ContextRequest`を既存Toolへ変換します。独立sourceは並列取得し、providerのraw payloadではなく回答に必要なfactsだけを `ContextPacket` に残します。片方のprovider失敗で他方の結果を捨てません。
 
-- 日付だけ必要: タイムゾーン、日付、曜日
-- 時刻も必要: タイムゾーン、分単位の現在日時
-- 「今何時？」だけの依頼: LLMを使わず決定論的に処理
+### Call数の基準
+
+```mermaid
+flowchart LR
+    direct[雑談 相談 一般知識] --> one[1 LLM Call]
+    time[今何時] --> zero[0 LLM Call]
+    read[Tasks Calendar Read] --> two[原則2 LLM Calls]
+    complex[Write 複雑調査] --> deep[Deep Agent 必要回数]
+```
 
 ### Capabilityと公開Tool
 
@@ -156,7 +179,7 @@ flowchart LR
     fallback --> readTools
 ```
 
-`fallback_read`はSelectorへ公開しない内部グループです。Router出力の欠落、JSON互換出力の失敗、Tool call引数の破損、モデル接続失敗時にだけ使い、書き込みToolを含めません。
+`fallback_read`はSelectorへ公開しない内部グループです。Context Broker対象外の安全なfallbackまたはDeep Agentでだけ使用し、書き込みToolを含めません。
 
 ### 作業記録
 
@@ -248,7 +271,7 @@ flowchart TD
 
 親子関係の変更は`set_task_parent`へ集約します。タスク名変更も同時に必要な場合は、同じTool callの`title`へ含め、Runtimeの確認を1回だけ表示します。
 
-Agentの出力は通常プレーンテキストとし、比較・手順・コードなど可読性が明確に上がる場合だけ最小限のMarkdownを許可します。
+Agentの出力もPETIT Core Promptを共有し、Toolあり/なしで人格を切り替えません。
 
 ---
 
@@ -361,8 +384,8 @@ Agentが自然文だけで「実行しますか？」と返した場合は承認
 
 ```mermaid
 flowchart LR
-    runtime[Agent Runtime]
-    events["planning / tool_started / tool_finished / finalizing"]
+    runtime[Brain / Agent Runtime]
+    events["planning / gathering_context / tool_started / tool_finished / finalizing"]
     emit[agent_progress.emit]
     jobs[(SQLite jobs)]
     api[既存Jobs API]
@@ -419,7 +442,7 @@ flowchart TD
     explicitCompletion{Project完了表現か}
     explicitHandle[Project完了フロー]
     action{明示的な開始 再開 切替か}
-    none[通常Agentへ]
+    none[通常Brainへ]
     resolve[aliasとactive projectから解決]
     kind{解決結果}
     ambiguous[候補確認]
@@ -452,6 +475,7 @@ flowchart TD
 flowchart TD
     chat([PETIT Chat])
     direct[Tool不要の会話]
+    context[Tasks Calendar Context Broker]
     tasks[タスクと任意リスト]
     cal[時刻 予定 天気 リマインダー]
     know[BRAIN Notion 記憶検索]
@@ -462,6 +486,7 @@ flowchart TD
     deterministic[決定論的処理]
 
     chat --> direct
+    chat --> context
     chat --> tasks
     chat --> cal
     chat --> know
@@ -480,6 +505,9 @@ flowchart TD
 flowchart LR
     limits[停止条件と安全境界]
     onePass[Tool不要会話は1回のLLMで終了]
+    twoPass[Tasks Calendar Readは原則2回]
+    brokerRead[Context BrokerはReadのみ]
+    partial[provider片方失敗でも部分結果を維持]
     safeFallback[Router失敗時は読取Toolだけ]
     staticPrefix[system promptへ動的時刻を混ぜない]
     round[Toolラウンド上限]
@@ -494,6 +522,9 @@ flowchart LR
     writeOnce[承認後の追加書き込みは禁止]
 
     limits --> onePass
+    limits --> twoPass
+    limits --> brokerRead
+    limits --> partial
     limits --> safeFallback
     limits --> staticPrefix
     limits --> round
@@ -516,7 +547,7 @@ flowchart LR
 
 - `/api/chat`と確認API
 - 決定論的な会話ルート
-- Conversation EntryとCapabilityグループ
+- PETIT Brain / Context Broker / Capabilityグループ
 - Agent Tool Loopと停止条件
 - Tool Registryとrisk
 - 確認付き書き込みとAgent state再開
