@@ -9,7 +9,18 @@ from uuid import uuid4
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from . import agent, calendar_sync, chroma_client, db, lmstudio_client, markdown_export, notion_task_sync, pending_actions, request_context
+from . import (
+    agent,
+    calendar_sync,
+    chroma_client,
+    conversation_state,
+    db,
+    lmstudio_client,
+    markdown_export,
+    notion_task_sync,
+    pending_actions,
+    request_context,
+)
 from .chat_models import ChatResponse
 from .lmstudio_client import LMStudioError
 
@@ -81,12 +92,15 @@ def chat(req: ChatRequest) -> ChatResponse:
         "calendar_sync": calendar_sync.status(),
         "brain_references": int("search_brain_notes" in tool_names),
         "memory_references": int("search_memory" in tool_names),
+        "conversation_state_chars": int(model_route.get("conversation_state_chars") or 0),
+        "history_chars": int(model_route.get("history_chars") or 0),
+        "history_messages": int(model_route.get("history_messages") or 0),
         "fallback": model_route.get("actual_route") == "chat_fallback",
         "elapsed_ms": elapsed_ms,
         "error_type": None,
     }
     log.info(
-        "chat request_id=%s requested=%s actual=%s model=%s endpoint=%s tools=%s llm_calls=%s embedding_calls=0 fallback=%s elapsed_ms=%s error_type=%s",
+        "chat request_id=%s requested=%s actual=%s model=%s endpoint=%s tools=%s llm_calls=%s state_chars=%s history_chars=%s fallback=%s elapsed_ms=%s error_type=%s",
         request_id,
         model_route["observability"]["requested_route"],
         model_route["observability"]["actual_route"],
@@ -94,6 +108,8 @@ def chat(req: ChatRequest) -> ChatResponse:
         model_route["observability"]["base_url_id"],
         tool_names,
         turn_metrics["llm_calls"],
+        model_route["observability"]["conversation_state_chars"],
+        model_route["observability"]["history_chars"],
         model_route["observability"]["fallback"],
         elapsed_ms,
         None,
@@ -107,6 +123,16 @@ def chat(req: ChatRequest) -> ChatResponse:
             used_tools=used_tools_str,
             session_id=session_id,
         )
+        if session_id:
+            try:
+                conversation_state.update_after_turn(
+                    session_id,
+                    user_text=message,
+                    assistant_text=reply,
+                )
+            except Exception:  # noqa: BLE001
+                # State is an optimization. It must never make a successful chat fail.
+                log.exception("conversation state update failed session_id=%s", session_id)
         _artifact_executor.submit(_persist_chat_artifacts, conv_id, message, reply, used_tools_str)
 
     return ChatResponse(
