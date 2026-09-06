@@ -5,6 +5,7 @@
 実装の根拠:
 
 - `backend/main.py`
+- `backend/chat.py`
 - `backend/chat_models.py`
 - `backend/pending_actions.py`
 - `backend/agent.py`
@@ -27,7 +28,7 @@
 ```mermaid
 flowchart TD
     input[/ユーザー入力/]
-    api[POST /api/chat]
+    api[chat.py: POST /api/chat]
     validate{空メッセージか}
     bind[request_id と session_id を束縛]
     agentEntry[agent.run]
@@ -69,6 +70,8 @@ flowchart TD
     persist -->|はい| save --> artifacts --> output
     persist -->|いいえ| output
 ```
+
+`backend/chat.py` が `/api/chat`、Agent実行、observability、Pending Action登録、SQLite会話保存、Chroma/Markdown artifact保存を所有します。`backend/main.py` はChat Routerを登録するだけで、会話実装の詳細を持ちません。
 
 Tool不要の雑談・相談・説明・文章作成は、Conversation Entryの1回目のLLM回答で終了します。個人データ、現在情報、外部ソース、または操作が必要な場合だけAgent Runtimeへ進みます。
 
@@ -348,7 +351,7 @@ flowchart TD
     failed -->|はい| resume --> readOnly --> final --> delete
 ```
 
-`pending_actions.py` が短期のapproval状態、10分TTL、承認API、Sona Core互換分岐、承認後のTool dispatchを所有します。Chat側はAgent Runtimeが返した`pending_actions`を`pending_actions.register(...)`へ渡し、返された`approval_id`を`ChatResponse`へ載せるだけです。APIモデルは`chat_models.py`で共有し、確認Routerから`main.py`を参照しません。
+`pending_actions.py` が短期のapproval状態、10分TTL、承認API、Sona Core互換分岐、承認後のTool dispatchを所有します。`chat.py` はAgent Runtimeが返した`pending_actions`を`pending_actions.register(...)`へ渡し、返された`approval_id`を`ChatResponse`へ載せるだけです。APIモデルは`chat_models.py`で共有し、確認Routerから`main.py`を参照しません。
 
 Agentが自然文だけで「実行しますか？」と返した場合は承認として扱わず、確認対象Toolをcallするよう1回だけ再指示します。
 

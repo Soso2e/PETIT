@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.18.4**
+**Current Version: v0.18.5**
 
 **Last Updated: 2026-09-06**
 
@@ -17,6 +17,7 @@
 - バージョン管理: v0.18.2。四隅型App Shellで非表示になった旧左レールの予約幅を解除し、デスクトップUnivを全幅表示へ復旧。
 - バージョン管理: v0.18.3。FastAPIのstartup/shutdownとChroma初期同期を `backend/lifecycle.py` へ分離し、`main.py` はlifecycle登録のみを担当。
 - バージョン管理: v0.18.4。Pending Actionの状態管理・確認API・Sona Core分岐・Tool dispatchを `backend/pending_actions.py` へ分離し、Chat/確認APIモデルを `backend/chat_models.py` へ共通化。
+- バージョン管理: v0.18.5。`POST /api/chat`、Agent実行、observability、会話保存・artifact保存を `backend/chat.py` へ分離し、`main.py` はChat Router登録のみを担当。iOS Vocal ShortcutもChat moduleへ直接接続。
 - Univ UI 刷新: 大きなカード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: Three.js WebGLを主描画としてCore・親Task・子Task・接続線・星背景を描画し、DOMはラベル・HUD・詳細・操作UIに限定。WebGL利用不可時のみ既存CSS 3D表示へフォールバックする。
 - Univ表示領域: Univ表示中はページスクロールを止め、Canvasを100dvhの固定空間として表示。WebGL準備後は外側のCSS宇宙背景を無効化し、スマホHUDはsafe-areaと下部ナビを避ける。
@@ -54,7 +55,7 @@
 | 2026-08-02 | 14:29 | #6 | v0.4.0としてLifeホーム化、Focusズーム遷移、Today改善、親Task内の小タスク追加を実装 |
 | 2026-08-02 | 16:07 | #7 | v0.5.0として全子タスク周回Focus、CSS球体、親移動処理一本化と冪等化を実装（PC・390x844ブラウザ動作確認済み、実Notion書込・実iPhone PWA未確認） |
 | 2026-08-02 | 16:32 | #8 | 詳細表示と親子移動のタスクIDを同期し、別タスク操作時に「LiTのデザイン実装」が移動する取り違えを修正（実Notion書込未確認） |
-| 2026-08-02 | 18:41 | #9 | v0.5.1としてTaskの2段階Focus、親変更の明示適用、モバイルLife間隔を改善（PC・390x844ブラウザ動作確認済み、実Notion書込・実iPhone PWA未確認） |
+| 2026-08-02 | 18:41 | #9 | v0.5.1としてTaskの2段階Focus、親変更の明示適用、モバイルLife間隔を改善（PC・390x844ブラウザ動作確認済み、実Notion書込未確認） |
 | 2026-08-02 | 18:45 | #10 | 関連72テストは成功。全体394テストは既存Backend・旧UI・外部依存範囲で30失敗・8エラーのため未解決として記録 |
 | 2026-08-02 | 19:29 | #11 | Issue #174: Focusノード再利用と継続軌道更新で演出の都度再生・移動停止を修正（動作確認済み） |
 | 2026-08-02 | 19:51 | #12 | v0.6.0として大改造を完了。PWAスマホ通知のタップ同頭権限要求・SW一本化、Focus OrbitのGPUトランスフォーム化、Cosmic Glass UI全面刷新を実装 |
@@ -108,3 +109,4 @@
 | 2026-09-06 | 04:09 | #56 | Issue #227 Phase 2: `POST /api/notion/webhook` を `backend/notion_webhook.py` のAPIRouterへ分離し、endpoint key・JSON・verification token・signature検証を移動。`backend/main.py` はRouter登録だけを担当し、Router所有権の回帰テストを追加（実Notion Webhook E2E未確認） |
 | 2026-09-06 | 04:14 | #57 | v0.18.3 / Issue #227 Phase 2: startup/shutdown・Chroma初期同期を `backend/lifecycle.py` へ分離し、`backend/main.py` は `lifecycle.register(app)` のみ担当。lifecycle登録回帰テストを追加（実サービス起動E2E未確認） |
 | 2026-09-06 | 12:13 | #58 | v0.18.4 / Issue #227 Phase 2: Pending Actionの10分TTL状態管理・`POST /api/actions/{approval_id}`・Sona Core互換分岐・承認後Tool dispatchを `backend/pending_actions.py` へ分離し、`backend/chat_models.py` に確認APIモデルを共通化。Runtime FlowとRouter所有権テストを更新（実承認E2E未確認） |
+| 2026-09-06 | 13:16 | #59 | v0.18.5 / Issue #227 Phase 2: `POST /api/chat`・Agent実行・observability・SQLite会話保存・Chroma/Markdown artifact保存を `backend/chat.py` へ分離。`main.py` はRouter登録のみ担当し、Vocal ShortcutもChat moduleへ直接接続。Router所有権・空入力契約の回帰テストを追加（実LM Studio・実iPhone E2E未確認） |
