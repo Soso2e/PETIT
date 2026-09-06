@@ -1,27 +1,14 @@
-"""FastAPI application composition root.
+"""PETIT application entrypoint.
 
 Run with:  uvicorn backend.main:app --reload
 or:        python -m backend.main
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from . import config
+from .app import create_app
 
-from . import chat, config, frontend_api, health, lifecycle, model_routing_api, notion_webhook, notifications, pending_actions, shortcut_voice, support_api, voice, work_sessions
-
-app = FastAPI(title="PETIT", description="Personal AI Assistant (MVP)")
-app.include_router(health.router)
-app.include_router(model_routing_api.router)
-app.include_router(notion_webhook.router)
-app.include_router(notifications.router)
-app.include_router(pending_actions.router)
-app.include_router(work_sessions.router)
-app.include_router(chat.router)
-app.include_router(shortcut_voice.router)
-app.include_router(voice.router)
-app.include_router(support_api.router)
-lifecycle.register(app)
-frontend_api.register(app)
+app = create_app()
 
 
 def main() -> None:
