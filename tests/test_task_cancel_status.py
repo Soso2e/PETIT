@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import tempfile
 import unittest
@@ -12,6 +13,9 @@ from backend.tools import task_reads
 
 class TaskCancelStatusTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Keep the status-aware get_tasks override deterministic even when this
+        # suite shares a process with legacy task-tool tests.
+        importlib.reload(task_reads)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_patch = patch.object(config, "DB_PATH", Path(self.temp_dir.name) / "app.db")
         self.db_patch.start()
