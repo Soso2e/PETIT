@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import tempfile
 import time
 import unittest
@@ -18,6 +19,9 @@ class TaskPhase2WiringTests(unittest.TestCase):
         db.init_db()
         task_sync_queue.ensure_task_sync_schema()
         tools.register_builtin_tools()
+        # Re-apply the intentional read override after any legacy task imports
+        # performed by neighboring suites in the same unittest process.
+        importlib.reload(task_reads)
 
     def tearDown(self) -> None:
         self.db_patch.stop()
