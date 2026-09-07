@@ -88,10 +88,13 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertRegex(source, re.compile(r"event\.isComposing|keyCode\s*===\s*229"))
         self.assertIn("form.requestSubmit()", source)
 
-    def test_version_is_v0180(self) -> None:
+    def test_version_and_asset_version_stay_in_sync(self) -> None:
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('globalThis.PETIT_VERSION = "v0.18.2"', source)
-        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.18.2"', source)
+        version_match = re.search(r'globalThis\.PETIT_VERSION = "v(\d+\.\d+\.\d+)"', source)
+        asset_match = re.search(r'globalThis\.PETIT_ASSET_VERSION = "(\d+\.\d+\.\d+)"', source)
+        self.assertIsNotNone(version_match)
+        self.assertIsNotNone(asset_match)
+        self.assertEqual(version_match.group(1), asset_match.group(1))
         self.assertIn('window.PETIT_VERSION = globalThis.PETIT_VERSION', source)
         self.assertIn('updateViaCache: "none"', source)
 
