@@ -41,12 +41,15 @@ def test_module_registry_rejects_dependency_cycle() -> None:
 
 def test_create_app_registers_existing_api_once() -> None:
     app = app_module.create_app()
-    paths = [getattr(route, "path", None) for route in app.routes]
+    # FastAPI may retain included routers instead of flattening app.routes.
+    paths = [getattr(route, "path", None) for module in app_module.build_modules()
+             for router in module.routers for route in router.routes]
 
     assert paths.count("/api/health") == 1
     assert paths.count("/api/chat") == 1
     assert paths.count("/api/actions/{approval_id}") == 1
     assert paths.count("/api/voice") == 1
+    assert {"/api/health", "/api/chat", "/api/actions/{approval_id}", "/api/voice"} <= set(app.openapi()["paths"])
 
 
 def test_main_exposes_registry_built_app() -> None:

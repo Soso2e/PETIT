@@ -17,6 +17,7 @@ from . import (
     tools,
     voice,
     work_sessions,
+    workspace_context,
 )
 from .kernel.modules import ModuleDefinition, ModuleRegistry
 
@@ -35,6 +36,7 @@ def build_modules() -> tuple[ModuleDefinition, ...]:
             dependencies=("builtin-tools",),
         ),
         ModuleDefinition(id="work-sessions", routers=(work_sessions.router,)),
+        ModuleDefinition(id="workspace-context", routers=(workspace_context.router,), registrars=(workspace_context.register,)),
         ModuleDefinition(
             id="chat",
             routers=(chat.router,),

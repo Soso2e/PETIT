@@ -13,8 +13,8 @@ log = logging.getLogger(__name__)
 
 def register(app: FastAPI) -> None:
     """Register PETIT startup and shutdown handlers on the FastAPI app."""
-    app.add_event_handler("startup", startup)
-    app.add_event_handler("shutdown", shutdown)
+    app.router.add_event_handler("startup", startup)
+    app.router.add_event_handler("shutdown", shutdown)
 
 
 def startup() -> None:
