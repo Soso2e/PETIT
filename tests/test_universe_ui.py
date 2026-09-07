@@ -148,7 +148,7 @@ class UniverseUiTests(unittest.TestCase):
         decorator = (FRONTEND / "universe-next.js").read_text(encoding="utf-8")
         tool = (BACKEND / "tools" / "task_hierarchy.py").read_text(encoding="utf-8")
         service = (BACKEND / "task_hierarchy.py").read_text(encoding="utf-8")
-        tools_init = (BACKEND / "tools" / "__init__.py").read_text(encoding="utf-8")
+        builtin_catalog = (BACKEND / "tools" / "builtins.py").read_text(encoding="utf-8")
         capability = (BACKEND / "capability_router.py").read_text(encoding="utf-8")
         self.assertIn('data-action="parent"', html)
         self.assertIn('/parent', script)
@@ -158,7 +158,7 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('name="set_task_parent"', tool)
         self.assertIn("requires_confirmation=True", tool)
         self.assertIn("parent_external_ids", service)
-        self.assertIn("task_hierarchy", tools_init)
+        self.assertIn('"backend.tools.task_hierarchy"', builtin_catalog)
         self.assertIn('"set_task_parent"', capability)
         self.assertNotIn("classify_task_project", capability)
 
@@ -309,24 +309,17 @@ class UniverseTaskListApiTests(unittest.TestCase):
         connection = _Connection(self._rows())
         with (
             patch.object(task_list_api.db, "get_connection", return_value=connection),
-            patch.object(task_list_api, "_ensure_universe_schema"),
+            patch.object(task_list_api, "_last_task_sync", return_value=None),
         ):
-            response = task_list_api.list_ui_tasks(priority="all", limit=500)
+            result = task_list_api.get_task_list(priority="all", limit=500)
 
-        payload = json.loads(response.body)
-        self.assertEqual(payload["hierarchy"], "life-task-child")
-        self.assertEqual(payload["count"], 3)
-        self.assertEqual(payload["root_count"], 2)
-        child = next(task for task in payload["tasks"] if task["id"] == 2)
-        self.assertEqual(child["parent_task_id"], 1)
-        self.assertEqual(child["parent_title"], "PETIT開発")
-        self.assertEqual(child["root_title"], "PETIT開発")
-        self.assertEqual(child["project_title"], "PETIT開発")
-        self.assertEqual(child["hierarchy_role"], "child")
-        root = next(task for task in payload["tasks"] if task["id"] == 1)
-        self.assertTrue(root["has_children"])
-        self.assertEqual(root["child_count"], 1)
-        self.assertEqual(connection.params, ())
+        self.assertEqual(result["count"], 3)
+        self.assertEqual(result["requested_priority"], "all")
+        self.assertEqual(result["tasks"][0]["hierarchy_role"], "root")
+        self.assertEqual(result["tasks"][1]["hierarchy_role"], "child")
+        self.assertEqual(result["tasks"][1]["parent_task_id"], 1)
+        self.assertEqual(result["tasks"][1]["root_task_id"], 1)
+        self.assertEqual(result["tasks"][2]["root_task_id"], 3)
 
     def test_high_mode_keeps_priority_filter_after_hierarchy_resolution(self) -> None:
         from backend import task_list_api
@@ -334,32 +327,27 @@ class UniverseTaskListApiTests(unittest.TestCase):
         connection = _Connection(self._rows())
         with (
             patch.object(task_list_api.db, "get_connection", return_value=connection),
-            patch.object(task_list_api, "_ensure_universe_schema"),
+            patch.object(task_list_api, "_last_task_sync", return_value=None),
         ):
-            response = task_list_api.list_ui_tasks(priority="high", limit=200)
+            result = task_list_api.get_task_list(priority="high", limit=100)
 
-        payload = json.loads(response.body)
-        self.assertEqual(payload["priority"], "high")
-        self.assertEqual(payload["count"], 2)
-        self.assertTrue(all(task["priority"] == "High" for task in payload["tasks"]))
-
-    def test_parent_endpoint_routes_to_hierarchy_service(self) -> None:
-        from backend import task_list_api
-
-        with patch.object(task_list_api.task_hierarchy, "set_task_parent", return_value={"updated": True}) as setter:
-            response = task_list_api.patch_task_parent(
-                2,
-                task_list_api.TaskParentUpdate(parent_task_id=1),
-            )
-        self.assertEqual(response.status_code, 200)
-        setter.assert_called_once_with(task_id=2, parent_task_id=1, move_to_life=False)
+        self.assertEqual([task["id"] for task in result["tasks"]], [1, 2])
+        self.assertTrue(all(task["priority"] == "High" for task in result["tasks"]))
 
     def test_invalid_priority_is_rejected(self) -> None:
         from backend import task_list_api
 
-        response = task_list_api.list_ui_tasks(priority="mid")
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("high、low、all", json.loads(response.body)["error"])
+        with self.assertRaises(ValueError):
+            task_list_api.get_task_list(priority="urgent", limit=10)
+
+    def test_parent_endpoint_routes_to_hierarchy_service(self) -> None:
+        from backend import task_list_api
+
+        with patch.object(task_list_api.task_hierarchy, "set_task_parent", return_value={"ok": True}) as mocked:
+            result = task_list_api.update_task_parent(11, task_list_api.ParentUpdateRequest(parent_task_id=22))
+
+        self.assertEqual(result, {"ok": True})
+        mocked.assert_called_once_with(11, 22)
 
 
 if __name__ == "__main__":
