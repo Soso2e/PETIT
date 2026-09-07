@@ -582,3 +582,33 @@ flowchart TD
 - Project Continuity
 
 Mermaid図と実装が一致しない状態でmainへ反映しないでください。
+
+## 10. Desktop音声入口（Issue #253）
+
+Desktopは既存の会話・承認・TTSを使用する。iPhone PWA / Vocal Shortcutは従来経路を維持する。
+詳細と未確認事項は [desktop.md](desktop.md) を参照。
+
+```mermaid
+flowchart TD
+    Tray[トレイ / グローバルショートカット] --> Main[Electron Main]
+    Mic[任意のローカル待機音声] --> Wake[Porcupine utility process]
+    Wake -->|検出のみ・PCMは送信しない| Main
+    Main --> Stop[待機マイク停止]
+    Stop --> Overlay[小型UI表示]
+    Overlay -->|STT設定済み・音声開始| Capture[AudioWorklet録音 / 発話終了判定]
+    Capture --> Validate[IPC送信元・WAV・同時実行上限検証]
+    Validate --> STT[明示設定されたWhisper互換STT]
+    STT -->|確定文字列| Voice[共有 voice.js]
+    Overlay -->|文字入力| ChatUI[共有 app.js]
+    Voice -->|通常発話| ChatUI
+    Voice -->|確認への返事| Approval[既存確認ボタン]
+    ChatUI --> ChatAPI[既存 /api/chat / PETIT Brain]
+    ChatAPI -->|pending_actions| Approval
+    Approval --> ConfirmAPI[既存 /api/actions / Agent state再開]
+    ConfirmAPI --> Reply[共有返答UI]
+    ChatAPI --> Reply
+    Reply --> TTS[共有 /api/tts / 端末TTS]
+    Hide[閉じる / ロック / スリープ] --> Cancel[録音・STT取消 / 遅延結果を破棄]
+    Cancel --> Resume{非ロック・非スリープ・画面非表示・opt-in?}
+    Resume -->|はい| Wake
+```

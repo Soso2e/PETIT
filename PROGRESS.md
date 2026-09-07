@@ -1,12 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.19.1**
+**Current Version: v0.20.0**
 
 **Last Updated: 2026-09-07**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
+
+- Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、任意Porcupineウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。既存Core CI相当はTool Registry未初期化と旧Prompt前提の失敗が別途残るため、PRはDraftで提出する。
 
 - Issue #249 / #245: Web中心のJARVIS設計を `docs/jarvis-agent.md` に整理。BrokerへMemory/BRAIN/Work/Reminders/Handoff、待ち時間・同時実行・Context量の上限、2回目Brainへの状況継続を追加。PC観測は既定無効の任意Module。作業ブランチで関連58テスト・Python構文・diff確認済み。実LLM・外部サービス・PWA E2E、Conversation State統合、永続提案・自律実行は未完了。
 
@@ -121,3 +123,4 @@
 | 2026-09-06 | 18:16 | #62 | v0.19.1 / Issue #227 Phase 3完了: `backend.tools` package import時の全built-in Tool副作用登録を廃止し、`backend/tools/builtins.py` の明示catalogを `builtin-tools` Moduleとして登録。Pending Action / ChatのTool依存をModule Registryへ宣言し、単体import時0件・`create_app()`後登録のsubprocess回帰テストを追加（pytest / 実LM Studio E2E未確認） |
 | 2026-09-06 | 18:30 | #63 | Issue #235: PETIT Core Promptを共通化し、Tasks / Calendar限定Context Broker、Read並列取得、`Brain -> Broker -> Brain` 2 Call経路、Call数/Context量observability、関連回帰テストとRuntime Mermaidを追加（pytest / 実LM Studio・外部サービスE2E未確認） |
 | 2026-09-07 | 06:38 | #64 | Issue #249 / Refs #245: Web中心のJARVIS全体設計、個人Contextの横断Read・期限/最大4枠/サイズ上限・部分失敗、2回目Brainへの状況継続と生成失敗の非保存、任意PC観測Module、FastAPI lifecycle登録互換性を実装。Runtime Mermaid・関連回帰テストを更新（実LLM・外部サービス・PWA/Windows前面アプリE2E未確認） |
+| 2026-09-07 | 11:10 | #65 | Issue #253: v0.20.0としてDesktop設計、Electron常駐シェル、小型共有UI、取消可能な音声入力、任意ウェイク、更新通知・手動配布workflowを追加。Desktop境界12テスト・既存関連19テストと31 subtest・macOS実Electronの仮サーバー/生成音声操作を確認。古いPrompt/Router回帰テストを現行構成へ追従（実マイク・Windows・署名済み配布は未確認） |

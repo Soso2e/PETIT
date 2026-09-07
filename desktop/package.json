@@ -1,0 +1,65 @@
+{
+  "name": "petit-desktop",
+  "version": "0.20.0",
+  "private": true,
+  "description": "PETIT desktop companion",
+  "author": "Soso2e",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "build": "electron-builder --publish never",
+    "pack": "electron-builder --dir --publish never",
+    "test:smoke": "node test/smoke.cjs"
+  },
+  "dependencies": {
+    "@picovoice/porcupine-node": "4.0.2",
+    "@picovoice/pvrecorder-node": "1.2.9"
+  },
+  "devDependencies": {
+    "electron": "44.2.0",
+    "electron-builder": "26.15.3",
+    "playwright": "1.63.0"
+  },
+  "build": {
+    "appId": "jp.soso2e.petit",
+    "productName": "PETIT",
+    "files": [
+      "*.cjs",
+      "setup.html",
+      "setup.js",
+      "setup.css"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/icon-512.png",
+        "to": "icon.png"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/@picovoice/**/*"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "呼びかけの検出と、PETITへの音声入力にマイクを使用します。"
+      },
+      "entitlements": "entitlements.mac.plist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "artifactName": "PETIT-${version}-${os}-${arch}.${ext}",
+    "icon": "../frontend/icon-512.png"
+  }
+}

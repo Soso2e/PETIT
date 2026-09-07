@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PETIT</title>
+  <link rel="stylesheet" href="/static/desktop/overlay.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="spark">✦</span> PETIT <span id="desktop-version"></span></div>
+    <nav aria-label="ウィンドウ操作"><button id="open-web" title="Web版を開く" aria-label="Web版を開く">↗</button><button id="desktop-settings" title="設定" aria-label="設定">⚙</button><button id="hide" title="閉じて待機（Escape）" aria-label="閉じて待機">×</button></nav>
+  </header>
+  <main>
+    <div class="presence" aria-hidden="true"><div class="orbit"></div><div class="orb"></div></div>
+    <div class="intro"><p>ここにいるよ。</p><span id="status" role="status">接続確認中…</span></div>
+    <section id="messages" aria-label="PETITとの会話" aria-live="polite"><div id="greeting" class="msg msg--assistant"><div class="bubble">何から始めよう？</div></div></section>
+    <form id="chat-form"><label for="input" class="sr-only">メッセージ</label><textarea id="input" rows="1" placeholder="話しかける、または入力…"></textarea><button id="mic" type="button" aria-label="音声入力を開始">🎤</button><button id="send" type="submit" aria-label="送信">↑</button></form>
+    <div class="voice-footer"><span id="voice-state" role="status"></span><button id="voice-toggle" type="button" aria-pressed="false">音声応答 OFF</button></div>
+  </main>
+  <script src="/static/session.js"></script>
+  <script src="/static/desktop/audio.js"></script>
+  <script src="/static/desktop/bridge.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/voice.js"></script>
+  <script src="/static/desktop/overlay.js"></script>
+</body>
+</html>

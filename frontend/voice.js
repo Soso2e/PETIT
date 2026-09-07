@@ -10,7 +10,7 @@
 
   if (!messagesEl || !formEl || !inputEl || !sendEl || !micEl || !voiceToggleEl || !voiceStateEl) return;
 
-  const SpeechRecognitionApi = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognitionApi = window.PetitDesktopSpeechRecognition || window.SpeechRecognition || window.webkitSpeechRecognition;
   const speechRecognitionSupported = Boolean(SpeechRecognitionApi);
   const browserSpeechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
   const audioPlaybackSupported = typeof Audio !== "undefined" && typeof fetch === "function";
@@ -327,6 +327,7 @@
   }
 
   async function speakText(text, { force = false } = {}) {
+    if (window.PetitDesktopSpeechRecognition && document.hidden) return;
     if (!voiceReplyEnabled && !force) return;
     const spoken = normalizeSpeechText(text);
     if (!spoken) return;
@@ -455,7 +456,7 @@
     };
 
     recognition.onerror = (event) => {
-      const friendly = {
+      const friendly = (window.PetitDesktopSpeechRecognition && event.message) || {
         "audio-capture": "マイクを利用できません。",
         "not-allowed": "マイクの使用が許可されていません。ブラウザ設定を確認してください。",
         "no-speech": "音声を聞き取れませんでした。もう一度試してください。",
@@ -517,6 +518,14 @@
   });
 
   micEl.addEventListener("click", toggleListening);
+
+  if (window.PetitDesktopSpeechRecognition) {
+    document.addEventListener("petit:desktop-deactivate", () => {
+      finalTranscript = "";
+      recognition?.abort();
+      stopSpeaking();
+    });
+  }
 
   updateVoiceToggle();
   updateMicAvailability();
