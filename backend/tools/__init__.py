@@ -4,16 +4,20 @@ Built-in tool implementations are registered explicitly by application
 composition via ``backend.tools.builtins.register_builtin_tools``.
 
 For standalone callers (tests, scripts, diagnostics), public operations lazily
-bootstrap built-ins on first real use. Importing ``backend.tools`` itself keeps
-zero registration side effects, so application composition remains explicit.
+bootstrap the complete built-in catalog on first real use. Importing
+``backend.tools`` itself keeps zero registration side effects, so application
+composition remains explicit.
 """
 from .builtins import builtin_module_names, register_builtin_tools
 from . import registry as _registry
 
 
 def _ensure_builtin_tools() -> None:
-    if not _registry.registered_names():
-        register_builtin_tools()
+    # Some standalone callers import one implementation module before touching
+    # this public API, leaving the registry non-empty but incomplete. The
+    # centralized registrar is idempotent under Python's module cache, so always
+    # apply the full catalog on real use instead of checking only for emptiness.
+    register_builtin_tools()
 
 
 def dispatch(name, arguments):
