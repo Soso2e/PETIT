@@ -6,12 +6,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MAIN = ROOT / "backend" / "main.py"
+VOICE = ROOT / "backend" / "voice.py"
 
 
 class TtsApiContractTests(unittest.TestCase):
     def test_tts_503_exposes_machine_readable_error_metadata(self) -> None:
-        tree = ast.parse(MAIN.read_text(encoding="utf-8"))
+        source = VOICE.read_text(encoding="utf-8")
+        tree = ast.parse(source)
         target = next(
             node
             for node in tree.body
@@ -35,7 +36,6 @@ class TtsApiContractTests(unittest.TestCase):
         self.assertIsInstance(status_keyword.value, ast.Constant)
         self.assertEqual(status_keyword.value.value, 503)
 
-        source = MAIN.read_text(encoding="utf-8")
         for field in (
             '"error"',
             '"error_code"',
