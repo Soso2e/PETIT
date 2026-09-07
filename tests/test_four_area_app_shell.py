@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -57,10 +58,13 @@ class ThreeAreaAppShellTests(unittest.TestCase):
         self.assertIn('loadScript("/static/app_shell.js", "app-shell"', version)
         self.assertIn('loadScript("/static/petit-corner-shell.js", "corner-shell")', version)
 
-    def test_version_is_v0180(self):
+    def test_version_and_asset_version_stay_in_sync(self):
         source = (FRONTEND / "petit-version.js").read_text(encoding="utf-8")
-        self.assertIn('globalThis.PETIT_VERSION = "v0.18.2"', source)
-        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.18.2"', source)
+        version_match = re.search(r'globalThis\.PETIT_VERSION = "v(\d+\.\d+\.\d+)"', source)
+        asset_match = re.search(r'globalThis\.PETIT_ASSET_VERSION = "(\d+\.\d+\.\d+)"', source)
+        self.assertIsNotNone(version_match)
+        self.assertIsNotNone(asset_match)
+        self.assertEqual(version_match.group(1), asset_match.group(1))
         self.assertIn('window.PETIT_VERSION = globalThis.PETIT_VERSION', source)
 
     def test_universe_assets_use_current_version_without_duplicate_app_shell_loader(self):
