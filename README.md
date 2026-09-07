@@ -18,6 +18,12 @@ frontend/  チャット UI（静的ファイル）
 storage/   SQLite などの実行時データ（git 管理外）
 ```
 
+## Windows / macOS Desktop（段階導入）
+
+既存PETITへ接続するElectron常駐クライアントを追加しています。小型会話UI、トレイ、グローバルショートカット、更新通知、任意の日本語ウェイク検出に対応する初期実装です。
+`desktop`で`npm ci && npm start`を実行し、接続先を設定してください。音声認識にはWhisper互換サーバー、ウェイク検出にはPorcupineのAccessKeyと対象OS用モデルが必要です。
+設計比較、権限、ビルド、検証範囲は [docs/desktop.md](docs/desktop.md) を参照。iPhoneは既存PWAを継続します。
+
 ## セットアップ
 
 1. 依存をインストール:
