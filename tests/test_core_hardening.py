@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import agent, briefing, config, db, main, notion_project_sync, request_context, summarizer
+from backend import agent, briefing, config, db, notion_project_sync, request_context, summarizer, support_api
 
 
 class RoutingAndMemoryHardeningTests(unittest.TestCase):
@@ -178,7 +178,6 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         self.assertIn("結論", agent.AGENT_SYSTEM_PROMPT)
         self.assertNotIn("1〜2文", agent.AGENT_SYSTEM_PROMPT)
 
-
     def test_episode_summarizer_calls_agent_endpoint(self) -> None:
         rows = [
             {
@@ -261,14 +260,14 @@ class PersistenceHardeningTests(unittest.TestCase):
         db.finish_job(first, "one")
         db.finish_job(second, "two")
 
-        rows = main.jobs(limit=10, session_id="s1")["jobs"]
+        rows = support_api.jobs(limit=10, session_id="s1")["jobs"]
         self.assertEqual([row["id"] for row in rows], [first])
-        self.assertEqual([row["id"] for row in main.jobs(limit=10, session_id="s1")["jobs"]], [first])
+        self.assertEqual([row["id"] for row in support_api.jobs(limit=10, session_id="s1")["jobs"]], [first])
 
-        acknowledged = main.acknowledge_jobs(main.JobAck(job_ids=[first], session_id="s1"))
+        acknowledged = support_api.acknowledge_jobs(support_api.JobAck(job_ids=[first], session_id="s1"))
         self.assertEqual(acknowledged["acknowledged"], 1)
-        self.assertEqual(main.jobs(limit=10, session_id="s1")["jobs"], [])
-        self.assertEqual([row["id"] for row in main.jobs(limit=10, session_id="s2")["jobs"]], [second])
+        self.assertEqual(support_api.jobs(limit=10, session_id="s1")["jobs"], [])
+        self.assertEqual([row["id"] for row in support_api.jobs(limit=10, session_id="s2")["jobs"]], [second])
 
     def test_successful_notion_task_sync_replaces_removed_rows(self) -> None:
         first = [
