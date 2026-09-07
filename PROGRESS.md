@@ -8,6 +8,8 @@
 
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
+- Issue #249 / #245: Web中心のJARVIS設計を `docs/jarvis-agent.md` に整理。BrokerへMemory/BRAIN/Work/Reminders/Handoff、待ち時間・同時実行・Context量の上限、2回目Brainへの状況継続を追加。PC観測は既定無効の任意Module。作業ブランチで関連58テスト・Python構文・diff確認済み。実LLM・外部サービス・PWA E2E、Conversation State統合、永続提案・自律実行は未完了。
+
 - プロダクトの軸は `PETIT_AS_JARVIS`。FastAPIとPWAを基盤に、タスク・予定・会話・知識・開発状況を継続支援する個人用アシスタントとして開発中。
 - バージョン管理: v0.17.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
 - Univ UI 刷新: 大きなカード矩形を全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
@@ -118,3 +120,4 @@
 | 2026-09-06 | 18:10 | #61 | v0.19.0 / Issue #227 Phase 3開始: `backend/kernel/modules.py` に `ModuleDefinition` / `ModuleRegistry` を追加し、Router・registrar・依存関係を明示登録。`backend/app.py` の `create_app()` がModule RegistryからFastAPIを構築し、`backend/main.py` は起動shimへ縮小。依存順・重複ID・未知依存・循環依存の回帰テストを追加（pytest / 実サービスE2E未確認） |
 | 2026-09-06 | 18:16 | #62 | v0.19.1 / Issue #227 Phase 3完了: `backend.tools` package import時の全built-in Tool副作用登録を廃止し、`backend/tools/builtins.py` の明示catalogを `builtin-tools` Moduleとして登録。Pending Action / ChatのTool依存をModule Registryへ宣言し、単体import時0件・`create_app()`後登録のsubprocess回帰テストを追加（pytest / 実LM Studio E2E未確認） |
 | 2026-09-06 | 18:30 | #63 | Issue #235: PETIT Core Promptを共通化し、Tasks / Calendar限定Context Broker、Read並列取得、`Brain -> Broker -> Brain` 2 Call経路、Call数/Context量observability、関連回帰テストとRuntime Mermaidを追加（pytest / 実LM Studio・外部サービスE2E未確認） |
+| 2026-09-07 | 06:38 | #64 | Issue #249 / Refs #245: Web中心のJARVIS全体設計、個人Contextの横断Read・期限/最大4枠/サイズ上限・部分失敗、2回目Brainへの状況継続と生成失敗の非保存、任意PC観測Module、FastAPI lifecycle登録互換性を実装。Runtime Mermaid・関連回帰テストを更新（実LLM・外部サービス・PWA/Windows前面アプリE2E未確認） |

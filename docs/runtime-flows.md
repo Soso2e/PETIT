@@ -11,6 +11,7 @@
 - `backend/agent.py`
 - `backend/brain_runtime.py`
 - `backend/context_broker.py`
+- `backend/workspace_context.py`
 - `backend/petit_prompt.py`
 - `backend/agent_runtime.py`
 - `backend/capability_router.py`
@@ -48,7 +49,7 @@ flowchart TD
     route{結果}
     directReply[自然文をそのまま返す]
     context[Context Broker]
-    parallel[Tasks Calendarを独立Readとして並列取得]
+    parallel[必要な個人Contextを独立Readとして並列取得]
     packet[正規化Context Packet]
     second[同じPETIT Core Promptで2回目のChatモデルCall]
     capability[CapabilityをToolへ展開]
@@ -81,7 +82,7 @@ flowchart TD
 
 `backend/chat.py` が `/api/chat`、Agent実行、observability、Pending Action登録、SQLite会話保存、Chroma/Markdown artifact保存を所有します。`backend/main.py` はChat Routerを登録するだけで、会話実装の詳細を持ちません。
 
-PETITの人格と会話原則は `petit_prompt.py` のCore Promptを正とします。Tool不要の雑談・相談・説明・文章作成は最初の1 LLM Callで終了します。Tasks / CalendarのReadだけ不足する会話は `Brain -> Context Broker -> Brain` の原則2 Callで完了し、書き込みや複雑処理だけ既存Deep Agentへ進みます。
+PETITの人格と会話原則は `petit_prompt.py` のCore Promptを正とします。Tool不要の雑談・相談・説明・文章作成は最初の1 LLM Callで終了します。Broker対応sourceのReadだけ不足する会話は `Brain -> Context Broker -> Brain` の原則2 Callで完了し、書き込みや対象外・複雑処理は既存Deep Agentへ進みます。
 
 ---
 
@@ -94,6 +95,7 @@ flowchart TD
     history[直近履歴 最大8件 3200文字]
     activeWork{active または paused の作業があるか}
     workContext[Task 状態 経過時間をcompact contextとして付加]
+    optionalPC[有効時だけPC観測cacheを付加 / staleは不明]
     clock{相対日付や時刻表現があるか}
     userClock[必要な精度の日時をuser側へ付加]
     core[共通PETIT Core Prompt]
@@ -101,13 +103,15 @@ flowchart TD
     result{結果}
     reply[自然文を最終回答として返す]
     request[request_context]
-    normalize[ContextRequestをtasks calendarだけに正規化]
-    parallel[独立Readを並列実行]
+    normalize[ContextRequestを対応source 最大4件に正規化]
+    parallel[共有最大4枠 / 固定Read処理だけ並列実行]
     task[get_tasks]
     calendar[get_schedule]
+    personal[search_memory / search_brain_notes / get_work_status / get_reminders]
+    handoff[SQLiteで対象作業のhandoffを取得]
     packet[raw JSONをAI向けfactsへ正規化]
-    partial[provider失敗はpartialとして保持]
-    second[Core Prompt + Context Packetで2回目Call]
+    partial[期限 / 失敗 / staleをpartialとして保持]
+    second[Core Prompt + 元の状況文脈 + bounded Packetで2回目Call]
     final[自然な最終回答]
     route[route_to_agent]
     parse[Capability 最大4グループを検証]
@@ -115,8 +119,8 @@ flowchart TD
     agent[Deep Agent Tool Loopへ]
 
     start --> planning --> history --> activeWork
-    activeWork -->|はい| workContext --> clock
-    activeWork -->|いいえ| clock
+    activeWork -->|はい| workContext --> optionalPC --> clock
+    activeWork -->|いいえ| optionalPC
     clock -->|はい| userClock --> core
     clock -->|いいえ| core
     core --> selector --> result
@@ -124,13 +128,17 @@ flowchart TD
     result -->|request_context| request --> normalize --> parallel
     parallel --> task --> packet
     parallel --> calendar --> packet
+    parallel --> personal --> packet
+    parallel --> handoff --> packet
     packet --> partial --> second --> final
     result -->|route_to_agent| route --> parse --> map --> agent
 ```
 
 日時はsystem promptへ毎ターン結合せず、相対日付・相対時刻があるターンだけuser側へ注入します。active / pausedのWork Sessionがある場合だけ、小さいuser contextをConversation Entryへ付加します。
 
-Context Brokerの初期スコープは読み取り専用の `tasks` と `calendar` です。Brokerは具体Tool名をLLMへ大量公開せず、`ContextRequest`を既存Toolへ変換します。独立sourceは並列取得し、providerのraw payloadではなく回答に必要なfactsだけを `ContextPacket` に残します。片方のprovider失敗で他方の結果を捨てません。
+Context Brokerは `tasks` / `calendar` / `memory` / `brain` / `work` / `reminders` / `handoff` に対応します。Brokerは具体Tool名をLLMへ大量公開せず、固定したRead処理へ変換し、Toolのriskも実行直前に検証します。独立sourceは最大4件を並列取得し、各source約2500文字のfacts、記録時刻、鮮度、切詰めの有無を返します。詳細なsource対応表は [jarvis-agent.md](jarvis-agent.md) を参照。
+
+`PETIT_CONTEXT_BROKER_TIMEOUT_SECONDS`（既定10秒）を超えたReadを待ち続けず、取得済みの部分結果を返します。実行中のproviderは強制停止できないため終了まで共有枠を占有し、新規要求は枠がなければ`source_busy`。実行待ちのキューを無制限に積みません。不正応答、providerエラー、staleを0件の成功として扱いません。2回目Callにも入口のactive work等を引き継ぎます。
 
 ### Call数の基準
 
@@ -475,7 +483,7 @@ flowchart TD
 flowchart TD
     chat([PETIT Chat])
     direct[Tool不要の会話]
-    context[Tasks Calendar Context Broker]
+    context[タスク 予定 記憶 BRAIN 作業 リマインダー 引き継ぎ]
     tasks[タスクと任意リスト]
     cal[時刻 予定 天気 リマインダー]
     know[BRAIN Notion 記憶検索]
@@ -505,7 +513,7 @@ flowchart TD
 flowchart LR
     limits[停止条件と安全境界]
     onePass[Tool不要会話は1回のLLMで終了]
-    twoPass[Tasks Calendar Readは原則2回]
+    twoPass[Broker対応Readは原則2回]
     brokerRead[Context BrokerはReadのみ]
     partial[provider片方失敗でも部分結果を維持]
     safeFallback[Router失敗時は読取Toolだけ]
@@ -540,6 +548,25 @@ flowchart LR
 ```
 
 ---
+
+## 11. 任意のPC観測
+
+```mermaid
+flowchart TD
+    startup[Module Registryのstartup] --> enabled{設定が有効か}
+    enabled -->|いいえ| off[観測しない]
+    enabled -->|はい| observer[独立Observer thread]
+    observer --> git[指定Gitルートだけを読取 / timeoutあり]
+    git --> app[任意で前面アプリ識別子]
+    app --> cache[時刻付きsnapshotをメモリに保存]
+    cache --> wait[停止可能な間隔待ち]
+    wait --> observer
+    cache --> api[GET /api/workspace-context]
+    cache --> entry[Brain入口 / freshだけ文脈へ]
+    shutdown[shutdown] --> stop[停止要求 / snapshotを破棄]
+```
+
+この拡張は既定無効で、Web利用の前提ではありません。サーバーPCだけを観測し、通知・外部操作・任意コード実行へ直接接続しません。
 
 ## 保守ルール
 

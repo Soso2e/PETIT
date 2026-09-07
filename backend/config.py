@@ -53,6 +53,14 @@ def _list_from_env(name: str) -> list[str]:
     return [part.strip().strip('"') for part in value.split(os.pathsep) if part.strip()]
 
 
+# PC observations stay opt-in and in memory. No directory is inferred.
+WORKSPACE_CONTEXT_ENABLED = os.getenv("PETIT_WORKSPACE_CONTEXT_ENABLED", "0") not in ("0", "false", "False")
+WORKSPACE_CONTEXT_DIRS = _path_list_from_env("PETIT_WORKSPACE_CONTEXT_DIRS")[:3]
+WORKSPACE_CONTEXT_FOREGROUND_ENABLED = os.getenv("PETIT_WORKSPACE_CONTEXT_FOREGROUND_ENABLED", "0") not in ("0", "false", "False")
+WORKSPACE_CONTEXT_INTERVAL_SECONDS = max(15.0, float(os.getenv("PETIT_WORKSPACE_CONTEXT_INTERVAL_SECONDS", "30")))
+WORKSPACE_CONTEXT_MAX_AGE_SECONDS = max(15.0, float(os.getenv("PETIT_WORKSPACE_CONTEXT_MAX_AGE_SECONDS", "90")))
+
+
 # Existing Obsidian vaults that PETIT can use as its Markdown brain.
 # Windows uses ';' as the separator: C:\VaultA;D:\VaultB
 OBSIDIAN_VAULT_DIRS = _path_list_from_env("PETIT_OBSIDIAN_VAULT_DIRS")
@@ -98,6 +106,7 @@ ENABLE_THINKING = os.getenv("PETIT_ENABLE_THINKING", "0") not in ("0", "false", 
 # Agent
 # Maximum number of tool execution rounds. A final answer call is allowed after them.
 MAX_TOOL_ITERATIONS = max(1, min(int(os.getenv("PETIT_MAX_TOOL_ITERATIONS", "3")), 6))
+CONTEXT_BROKER_TIMEOUT_SECONDS = max(0.1, min(float(os.getenv("PETIT_CONTEXT_BROKER_TIMEOUT_SECONDS", "10")), 60.0))
 TOOL_RESULT_MODE = os.getenv("PETIT_TOOL_RESULT_MODE", "auto").strip().lower() or "auto"
 if TOOL_RESULT_MODE not in {"auto", "tool", "user"}:
     TOOL_RESULT_MODE = "auto"

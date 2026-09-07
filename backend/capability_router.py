@@ -5,7 +5,7 @@ import json
 import re
 from typing import Any
 
-from . import config, context_broker, situation, time_context, tools
+from . import config, context_broker, situation, time_context, tools, workspace_context
 from .lmstudio_client import LMStudioError, chat_completion
 from .petit_prompt import CORE_SYSTEM_PROMPT
 
@@ -64,17 +64,21 @@ _ROUTER_SYSTEM_PROMPT = CORE_SYSTEM_PROMPT + """
 
 この会話入口では次の3択で行動してください。
 1. 手元の会話だけで答えられるなら、その場で最終回答する。
-2. タスクまたは予定の読み取り情報だけ足りないなら request_context をcallする。
-3. 書き込み、複雑な調査、BRAIN/Memory/GitHub等、Context Broker対象外の処理が必要なら route_to_agent をcallする。
+2. タスク・予定・関連記憶・BRAIN・現在/今日の作業・リマインダー・引き継ぎの読み取り情報が足りないなら request_context をcallする。
+3. 書き込み、複雑な調査、GitHub等のContext Broker対象外の処理が必要なら route_to_agent をcallする。
 
-request_contextではTool名を選ばず、必要な情報の種類だけを指定してください。現在対応するsourceは tasks と calendar だけです。
+request_contextではTool名を選ばず、必要な情報の種類だけを最大4件指定してください。
+source: tasks=タスク、calendar=予定、memory=関連記憶・過去会話、brain=BRAINノート、work=現在/今日の作業、reminders=未完了リマインダー、handoff=再開メモ。
+memory/brainには検索queryが必須。handoffのqueryには特定した作業名を指定し、省略時は全作業の直近メモです。
+「何から再開する？」「忘れてない？」等は文脈に応じてwork/handoff/tasks/calendar/remindersから必要なものを組み合わせます。
+現在の作業を無関係な別タスクで置き換えず、今やる1個を短く提案してください。
 """
 
 _REQUEST_CONTEXT_SCHEMA: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "request_context",
-        "description": "PETITが自然に回答するために不足している読み取り専用Contextを取得する。現在はtasks/calendarのみ。",
+        "description": "不足するタスク・予定・記憶・BRAIN・作業状況・リマインダー・引き継ぎをまとめて読み取る。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -84,10 +88,11 @@ _REQUEST_CONTEXT_SCHEMA: dict[str, Any] = {
                     "items": {
                         "type": "object",
                         "properties": {
-                            "source": {"type": "string", "enum": ["tasks", "calendar"]},
+                            "source": {"type": "string", "enum": list(context_broker.SUPPORTED_SOURCES)},
                             "scope": {"type": "string", "description": "today/tomorrow等の必要範囲"},
                             "priority": {"type": "string", "enum": ["High", "Mid", "Low", "all"]},
                             "date": {"type": "string", "description": "必要ならYYYY-MM-DD"},
+                            "query": {"type": "string", "description": "memory/brainの検索語。handoffでは対象の作業名。最大500文字。"},
                         },
                         "required": ["source"],
                         "additionalProperties": False,
@@ -265,7 +270,8 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
     recent = history or []
     runtime_context = time_context.prompt_context_for(text, history=recent)
     active_work_context = situation.build_active_work_context()
-    situational_context = "\n\n".join(block for block in (runtime_context, active_work_context) if block)
+    workspace = workspace_context.build_context_block()
+    situational_context = "\n\n".join(block for block in (runtime_context, active_work_context, workspace) if block)
 
     messages: list[dict[str, Any]] = [{"role": "system", "content": _ROUTER_SYSTEM_PROMPT}]
     for item in recent[-6:]:
@@ -295,6 +301,7 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             return {
                 "type": "context",
                 "context_request": request,
+                "situational_context": situational_context,
                 "confidence": None,
                 "source": "one_pass_context_request",
             }

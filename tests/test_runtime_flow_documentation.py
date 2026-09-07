@@ -20,7 +20,7 @@ class RuntimeFlowDocumentationTests(unittest.TestCase):
     def test_runtime_flow_covers_required_execution_paths(self) -> None:
         required_sections = (
             "## 1. 会話全体フロー",
-            "## 2. Capability Selector",
+            "## 2. PETIT Brain / Context Broker",
             "## 3. Agent Tool Loop",
             "## 4. Tool Registryとリスク判定",
             "## 5. 確認付き書き込みと再開",
@@ -64,7 +64,10 @@ class RuntimeFlowDocumentationTests(unittest.TestCase):
             "web",
             "memory",
             "projects",
-            "planning / tool_started / tool_finished / finalizing",
+            "planning",
+            "tool_started",
+            "tool_finished",
+            "finalizing",
             "SQLite jobs",
         ):
             with self.subTest(marker=marker):
