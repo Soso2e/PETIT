@@ -1,7 +1,8 @@
 """PETIT tool registry public API.
 
 Built-in tool implementations are registered explicitly by application
-composition via ``backend.tools.builtins.register_builtin_tools``.
+composition via ``backend.tools.builtins.register_builtin_tools``. Catalog
+members such as ``task_hierarchy`` are declared there rather than imported here.
 
 For standalone callers (tests, scripts, diagnostics), public operations lazily
 bootstrap the complete built-in catalog on first real use. Importing
