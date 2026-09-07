@@ -51,7 +51,9 @@ class RuntimePromptWiringTests(unittest.TestCase):
         self.assertIn("_RUNTIME_AGENT_BASE_PROMPT", agent)
         self.assertNotIn("time_context.with_current_context", agent)
         self.assertIn("time_context.prompt_context_for", router)
-        self.assertIn('f"{text}\\n\\n{runtime_context}"', router)
+        self.assertIn("situation.build_active_work_context", router)
+        self.assertIn("workspace_context.build_context_block", router)
+        self.assertIn('f"{text}\\n\\n{situational_context}"', router)
 
 
 class ResponsiveUniverseLayoutTests(unittest.TestCase):
