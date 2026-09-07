@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -18,8 +19,11 @@ class MotionContinuityTests(unittest.TestCase):
         self.webgl = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
 
     def test_motion_layer_uses_current_assets(self) -> None:
-        self.assertIn('globalThis.PETIT_ASSET_VERSION = "0.18.2"', self.version)
-        self.assertIn('globalThis.PETIT_VERSION = "v0.18.2"', self.version)
+        version_match = re.search(r'globalThis\.PETIT_VERSION = "v(\d+\.\d+\.\d+)"', self.version)
+        asset_match = re.search(r'globalThis\.PETIT_ASSET_VERSION = "(\d+\.\d+\.\d+)"', self.version)
+        self.assertIsNotNone(version_match)
+        self.assertIsNotNone(asset_match)
+        self.assertEqual(version_match.group(1), asset_match.group(1))
         self.assertIn('window.PETIT_ASSET_VERSION = globalThis.PETIT_ASSET_VERSION', self.version)
         self.assertIn('/static/universe-webgl-scene.js', self.version)
         self.assertIn('/static/universe-webgl-scene.css', self.version)

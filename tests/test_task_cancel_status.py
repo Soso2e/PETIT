@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import tempfile
 import unittest
@@ -12,6 +13,11 @@ from backend.tools import task_reads
 
 class TaskCancelStatusTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Load the full catalog first, then re-apply the intentional status-aware
+        # get_tasks override. This keeps the first test deterministic as well as
+        # later tests when modules share one unittest process.
+        tools.register_builtin_tools()
+        importlib.reload(task_reads)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_patch = patch.object(config, "DB_PATH", Path(self.temp_dir.name) / "app.db")
         self.db_patch.start()

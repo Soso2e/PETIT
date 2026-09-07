@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import tempfile
 import unittest
@@ -12,6 +13,9 @@ from backend.tools import task_reads
 
 class TaskConversationFlowTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Other test modules can import the legacy task tool in the same process.
+        # Re-run the status-aware decorator so this suite does not depend on import order.
+        importlib.reload(task_reads)
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_patch = patch.object(config, "DB_PATH", Path(self.temp_dir.name) / "app.db")
         self.db_patch.start()

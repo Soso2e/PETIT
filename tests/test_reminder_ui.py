@@ -34,13 +34,13 @@ class ReminderUiTests(unittest.TestCase):
     def test_conversation_tools_and_backend_exist(self) -> None:
         self.assertTrue((BACKEND / "reminders.py").is_file())
         tool = (BACKEND / "tools" / "reminders.py").read_text(encoding="utf-8")
-        tools_init = (BACKEND / "tools" / "__init__.py").read_text(encoding="utf-8")
+        builtin_catalog = (BACKEND / "tools" / "builtins.py").read_text(encoding="utf-8")
         capability = (BACKEND / "capability_router.py").read_text(encoding="utf-8")
         self.assertIn('name="create_reminder"', tool)
         self.assertIn('name="get_reminders"', tool)
         self.assertIn('name="manage_reminder"', tool)
         self.assertIn("requires_confirmation=True", tool)
-        self.assertIn("reminders", tools_init)
+        self.assertIn('"backend.tools.reminders"', builtin_catalog)
         self.assertIn('"create_reminder"', capability)
 
     def test_service_worker_precaches_and_separates_reminder_notifications(self) -> None:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import io
 import tempfile
 import unittest
@@ -10,7 +9,7 @@ from unittest.mock import patch
 
 import httpx
 
-from backend import aivis_speech, config
+from backend import aivis_speech, app as app_module, config
 from scripts import diagnose_aivis_speech
 
 
@@ -341,11 +340,13 @@ class AivisSpeechTests(unittest.TestCase):
             self.assertEqual(report["stage"], "invalid_audio_response")
             self.assertFalse(output.exists())
 
-    def test_main_declares_tts_routes(self) -> None:
-        source = Path("backend/main.py").read_text(encoding="utf-8")
-        ast.parse(source)
-        self.assertIn('@app.post("/api/tts")', source)
-        self.assertIn('@app.get("/api/tts/status")', source)
+    def test_app_declares_tts_routes(self) -> None:
+        app = app_module.create_app()
+        paths = app.openapi()["paths"]
+        self.assertIn("/api/tts", paths)
+        self.assertIn("post", paths["/api/tts"])
+        self.assertIn("/api/tts/status", paths)
+        self.assertIn("get", paths["/api/tts/status"])
 
 
 if __name__ == "__main__":
