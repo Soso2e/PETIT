@@ -64,6 +64,9 @@ Mainが小型画面を表示 → AudioWorklet録音 → WAV → 明示設定し�
 
 初回は **GitHub ReleasesでDMG / NSISを配布し、Desktopから更新通知**。ストア運用や独自更新サーバーを増やさない。既存リポジトリはpublic。通知確認はGitHubの公開APIだけを使用し、PATを配布しない。
 
+- PRではDesktopテストだけを実行し、インストーラーは生成しない。
+- Actionsの手動実行（`workflow_dispatch`）ではmacOS arm64 / Windows x64をビルドし、未署名の開発用Artifactとして14日保存する。
+- `main`の履歴上にある`v*`タグをpushすると、`desktop/package.json`とのバージョン一致を検証した上で両OSをビルドし、DMG / EXEを同名タグのGitHub Releaseへ自動添付する。workflow自身はタグを作成しない。
 - 安定版SemVer、同じOS/CPU用の`PETIT-<version>-mac-arm64.dmg`、`mac-x64.dmg`、`win-x64.exe`があるReleaseだけ候補にする。WebのみのRelease、draft/prerelease、旧版は除外。
 - 起動10秒後と24時間ごと（設定でOFF可能）、またはトレイ/設定から確認。ネットワーク失敗はアプリ起動を妨げない。自動確認は同一バージョンをプロセス内で重複通知しない。
 - 通知から公式Releaseページを開き、利用者がインストーラーを実行する。初回公開前や対応assetがないときは「利用可能なDesktop更新なし」となる。
@@ -110,11 +113,12 @@ Desktop設定のSTT URLは`http://127.0.0.1:8080/inference`。`file`、`language
 npm test             # OS/マイクなしの境界・録音・取消テスト
 npm run test:smoke   # 実Electron + 仮サーバー + 生成音声。実マイクは使用しない
 npm run pack         # このOS用の展開済みアプリ
-npm run build        # このOS用のインストーラー。Releaseへ自動公開しない
+npm run build        # このOS用のインストーラー。ローカル実行だけではReleaseへ公開しない
 ```
 
-macOSはDMG、WindowsはNSIS。初回CIはPRでNodeの関連テストのみ。OS別パッケージは手動実行のworkflowで作成し、artifactとして14日保存する。自動Release/自動pushは行わない。
-公開用はmacOS Developer ID署名＋公証、Windowsコード署名を整え、インストールと上書き更新を確認してから、同じSemVer tagのGitHub Releaseへassetとチェックサムを添付する。未署名artifactは開発検証用であり、公開済みアプリではない。
+macOSはDMG、WindowsはNSIS。PRではNodeの関連テストのみ。OS別パッケージを試したい場合はActionsを手動実行し、開発用Artifactを取得する。現在の自動ビルド対象はmacOS arm64 / Windows x64。
+公開する場合だけ、`desktop/package.json`のversionと一致するSemVerタグ（例: `v0.20.0`）をmain上のコミットへ付けてpushする。タグpush後は両OSのインストーラーをビルドし、GitHub Releaseを自動作成して添付する。
+macOS Developer ID署名＋公証、Windowsコード署名が未整備の間は、原則として`workflow_dispatch`のArtifactで実機検証し、公開用タグは切らない。署名・インストール・上書き更新を確認後にRelease運用へ移行する。
 
 ## 受け入れ確認と後続
 
