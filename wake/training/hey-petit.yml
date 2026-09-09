@@ -1,0 +1,44 @@
+# Seed configuration for PETIT's custom openWakeWord classifier.
+# Keep this file reproducible; do not commit generated audio/features/corpora.
+
+model_name: "hey_petit"
+
+target_phrase:
+  - "hey petit"
+  - "hey PETIT"
+  - "へいぷてぃ"
+  - "ヘイプティ"
+
+# Add phrases discovered from real false activations here before each model generation.
+custom_negative_phrases:
+  - "hey siri"
+  - "ペット"
+  - "プチ"
+
+# Upstream recommends at least 20k positive samples for serious training;
+# this seed starts there and should be raised after the first measured generation.
+n_samples: 20000
+n_samples_val: 4000
+
+tts_batch_size: 50
+augmentation_batch_size: 16
+augmentation_rounds: 2
+
+piper_sample_generator_path: "./piper-sample-generator"
+output_dir: "./artifacts/hey_petit"
+
+# The negative feature corpus is intentionally not committed to PETIT.
+# Provision its path in the training environment before running upstream train.py.
+feature_data_files:
+  ACAV100M_sample: "./data/openwakeword_features_ACAV100M_2000_hrs_16bit.npy"
+
+batch_n_per_class:
+  ACAV100M_sample: 1024
+  adversarial_negative: 50
+  positive: 50
+
+model_type: "dnn"
+layer_size: 32
+steps: 50000
+max_negative_weight: 1500
+target_false_positives_per_hour: 0.2
