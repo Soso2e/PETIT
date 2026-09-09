@@ -60,6 +60,12 @@ const server = http.createServer(async (request, response) => {
       child.on('exit', () => { clearTimeout(timer); resolve(false); });
     }), probe), true, 'native SDKs load in the actual utility process without opening a microphone');
     const setup = await instance.firstWindow();
+    await setup.locator('#wake-auto').click();
+    await setup.getByText('初回のみPicovoice ConsoleのAccessKeyを入力してください。', { exact: true }).waitFor();
+    assert.equal(await setup.locator('#wake-auto').isEnabled(), true);
+    assert.equal(await setup.locator('[data-model=ppn]').isVisible(), false);
+    await setup.locator('summary').click();
+    assert.equal(await setup.locator('[data-model=ppn]').isVisible(), true);
     await setup.locator('#serverUrl').fill(origin);
     await setup.locator('#updates').uncheck();
     const opened = instance.waitForEvent('window', { predicate: (page) => page !== setup });

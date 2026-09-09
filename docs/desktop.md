@@ -106,7 +106,27 @@ whisper-server -m models/ggml-base.bin --host 127.0.0.1 --port 8080
 Desktop設定のSTT URLは`http://127.0.0.1:8080/inference`。`file`、`language=ja`、`response_format=json`、`model`をmultipartで送り、`{"text":"..."}`を受け取るサーバーに対応する。LM StudioのチャットURLをSTTとして流用しない。
 音声応答は小型画面の「音声応答」をONにする。AivisSpeechは既存の[導入手順](aivis_speech.md)を使用する。
 
-ウェイク検証はPicovoice ConsoleでAccessKey、日本語`.pv`、対象OS/CPU用の`.ppn`を用意し設定へ保存。「マイクで呼びかけを待つ」をON → 小型画面を閉じる → トレイの待機ONを確認 → 呼びかけ → 小型画面が表示されてから用件を話す。
+### ウェイクモデルの自動設定（Issue #256）
+
+1. 設定の「AccessKeyを取得」からPicovoice Consoleへ進み、初回のみAccessKeyを入力する。
+2. 「ウェイクモデルを自動設定」を押す。Mac / Windowsのx64・arm64を実行中のアプリに合わせて判定し、OSのマイク権限を確認する。Macの初回許可はOSのダイアログで行う。
+3. 日本語モデルと「Hey プティ」（生成フレーズは日本語の「へいプティ」）モデルを取得する。
+4. マイク開始の案内後、30秒以内に「へいプティ」と話す。実際の検出に成功すると「準備完了」と表示し、モデルパスを自動保存する。初期化だけでは成功表示しない。
+5. 常時待機を使う場合はSTT URLを設定し、「マイクで呼びかけを待つ」をONにして保存。小型画面を閉じ、トレイの待機ONを確認する。モデル設定・検出テスト自体にはSTTは不要。
+
+取得済みの正常な自動モデルは再利用する。モデルファイルの手動選択とキー削除は「詳細設定」に残す。既存の手動パスは自動設定の検出テスト成功まで変更しない。自動設定で常時マイク待機を勝手にONにはしない。
+
+- `.pv`: [公式Porcupineリポジトリ](https://github.com/Picovoice/porcupine/blob/3d3bdb0a4e0c0c8374b8a94d3590666b214686f7/lib/common/porcupine_params_ja.pv)の固定revisionから取得し、SHA-256を検証。Node SDKは既存の4.0.2を維持。
+- `.ppn`: [公式Porcupine Model API](https://picovoice.ai/docs/model-api/porcupine/)の`POST https://rest.picovoice.ai/ja/api/ppn`を使う。APIにはAccessKey、固定フレーズ、`mac`または`windows`を送る。音声は送信しない。APIの利用可否・生成回数はアカウントに依存する。303による取得先へのリクエストにはAccessKeyを付けない。配布先はHTTPSのPicovoiceドメインのみ許可し、他ドメインが返ったら理由を表示して手動設定へ案内する。
+- 保存先: Electron `userData/wake-models/setup-*/`。開発版の通常の場所はmacOSで`~/Library/Application Support/petit-desktop/`、Windowsで`%APPDATA%/petit-desktop/`。配布版はアプリ名によって変わる。確定したパスは「詳細設定」で確認できる。
+- AccessKey: Electron `safeStorage`で暗号化し、従来と同じ`desktop.json`へ暗号文だけ保存。macOSはKeychainに保護された鍵、WindowsはDPAPIを使用する。安全な保存ができない場合は停止する。既存の`PETIT_PORCUPINE_ACCESS_KEY`環境変数による上書きは継続する。
+- 失敗・中止: 作成途中のディレクトリを削除し、従来のモデルパスを維持。キーは取得やテストが失敗しても暗号化保存済みなので再入力不要（キー自体が無効な場合は修正が必要）。中止ボタン、設定を閉じる、小型画面を開く、ロック・スリープ・終了でテストを停止する。
+- エラー表示: キー/利用権限、API上限、通信、ハッシュ不一致、ファイル保存、モデル互換性、マイク、初期化・検出タイムアウトを区別。SDKの生エラーやキーをUI・ログへ出さない。通常待機のエラーも設定画面に表示する（直近エラーは実行中のみ保持）。
+
+Macの拒否時は「システム設定 → プライバシーとセキュリティ → マイク」でPETIT（開発版はElectron）を許可する。Windowsはマイクアクセスとデスクトップアプリのアクセスを許可する。WindowsではOSの権限状態が不明な場合もあるため、最後にPvRecorderを実際に開始して確認する。
+
+2026-09-09検証: Desktop単体21テスト、実Electron画面操作（キー未入力・詳細設定表示を含む）、macOS arm64の展開ビルドが成功。キー付きModel APIの実生成、実マイクでの「へいプティ」、Windows実機、署名済み配布版は未確認。開発用設定にキーがないため、Macの実検出受け入れは上記手順での入力・発話が必要。
+
 
 ```bash
 # Desktopディレクトリで実行

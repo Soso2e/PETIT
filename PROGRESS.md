@@ -128,3 +128,5 @@
 | 2026-09-07 | 11:10 | #65 | Issue #253: v0.20.0としてDesktop設計、Electron常駐シェル、小型共有UI、取消可能な音声入力、任意ウェイク、更新通知・手動配布workflowを追加。Desktop境界12テスト・既存関連19テストと31 subtest・macOS実Electronの仮サーバー/生成音声操作を確認。古いPrompt/Router回帰テストを現行構成へ追従（実マイク・Windows・署名済み配布は未確認） |
 | 2026-09-08 | 14:16 | #66 | Issue #253: Desktop配布workflowをPRテスト、手動開発Artifact、main上のversion一致`v*`タグによるmacOS arm64/Windows x64ビルド＋GitHub Release自動添付へ整理。タグ/`package.json` version一致とmain履歴チェックを追加（実タグRelease・署名済み配布は未確認） |
 | 2026-09-09 | 12:11 | #255 | Web音声入力の現行UI接続を修正し、録音STT・原因別案内・下書き保持を追加（関連Python24件、Web音声7件、Desktop12件成功。Braveの現行DOM＋模擬認識で送信確認、実マイク・実STT未確認） |
+
+| 2026-09-09 | 12:23 | #256 | Desktopにウェイクモデル自動取得・生成、OS暗号化保存、マイク実検出テスト、原因別表示と詳細手動設定を追加。関連21テスト・実Electron操作・Mac arm64展開ビルド成功。キー付きAPI・実マイク・Windows実機は未確認 |
