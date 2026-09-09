@@ -24,6 +24,8 @@ storage/   SQLite などの実行時データ（git 管理外）
 `desktop`で`npm ci && npm start`を実行し、接続先を設定してください。音声認識にはWhisper互換サーバー、ウェイク検出にはPorcupineのAccessKeyと対象OS用モデルが必要です。
 設計比較、権限、ビルド、検証範囲は [docs/desktop.md](docs/desktop.md) を参照。iPhoneは既存PWAを継続します。
 
+AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktopへの統合は別途です。
+
 ## セットアップ
 
 1. 依存をインストール:

@@ -2,11 +2,13 @@
 
 **Current Version: v0.20.0**
 
-**Last Updated: 2026-09-08**
+**Last Updated: 2026-09-09**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
+
+- Issue #258: `scripts/wakeword/` にWindows/Python 3.13の独立したopenWakeWord学習環境を追加。日本語SAPI合成624クリップを話者分離して学習し、`storage/wakeword/models/v0.1/hey_petit.onnx` を生成済み。ONNX構造・出力一致・openWakeWord実推論・関連2テスト・依存整合・構文を確認。しきい値0.45でtest正例12/12検出、負例11/144誤検出。合成音声のみの実験モデルで、常時待機の実用精度は未達。実声・長時間負例・実マイク評価とDesktop統合が次の作業。詳細は `docs/openwakeword.md`。Desktopは引き続きPorcupine。
 
 - Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、任意Porcupineウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。Desktop配布はPR=テストのみ、手動Actions=macOS arm64/Windows x64開発Artifact、main上のversion一致`v*`タグ=両OSビルド＋GitHub Release自動添付へ整理。未署名中は手動Artifactで検証し、公開タグは切らない。既存Core CI相当はTool Registry未初期化と旧Prompt前提の失敗が別途残るため、PRはDraftで提出する。
 
@@ -125,3 +127,4 @@
 | 2026-09-07 | 06:38 | #64 | Issue #249 / Refs #245: Web中心のJARVIS全体設計、個人Contextの横断Read・期限/最大4枠/サイズ上限・部分失敗、2回目Brainへの状況継続と生成失敗の非保存、任意PC観測Module、FastAPI lifecycle登録互換性を実装。Runtime Mermaid・関連回帰テストを更新（実LLM・外部サービス・PWA/Windows前面アプリE2E未確認） |
 | 2026-09-07 | 11:10 | #65 | Issue #253: v0.20.0としてDesktop設計、Electron常駐シェル、小型共有UI、取消可能な音声入力、任意ウェイク、更新通知・手動配布workflowを追加。Desktop境界12テスト・既存関連19テストと31 subtest・macOS実Electronの仮サーバー/生成音声操作を確認。古いPrompt/Router回帰テストを現行構成へ追従（実マイク・Windows・署名済み配布は未確認） |
 | 2026-09-08 | 14:16 | #66 | Issue #253: Desktop配布workflowをPRテスト、手動開発Artifact、main上のversion一致`v*`タグによるmacOS arm64/Windows x64ビルド＋GitHub Release自動添付へ整理。タグ/`package.json` version一致とmain履歴チェックを追加（実タグRelease・署名済み配布は未確認） |
+| 2026-09-09 | 15:56 | #67 | Issue #258: openWakeWord独立学習環境・日本語SAPI合成・話者分離評価・WAV検証CLIを追加しhey_petit.onnx v0.1を生成（動作確認済み: ONNX/実推論・2テスト・構文・依存整合。test正例12/12、負例誤検出11/144。実声/長時間待機/Desktop統合は未確認、常時待機精度は未達） |
