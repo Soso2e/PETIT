@@ -143,7 +143,7 @@ class UniverseWebglSceneTests(unittest.TestCase):
 
     def test_service_worker_caches_local_and_remote_webgl_assets(self) -> None:
         source = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        self.assertIn('CACHE_NAME = `petit-shell-v${self.PETIT_ASSET_VERSION}-webgl1`', source)
+        self.assertIn('CACHE_NAME = `petit-shell-v${self.PETIT_ASSET_VERSION}-webgl1-voice2-motion1`', source)
         self.assertIn('importScripts("/static/petit-version.js")', source)
         self.assertIn('"/static/universe-webgl-scene.css"', source)
         self.assertIn('"/static/universe-webgl-hierarchy.js"', source)

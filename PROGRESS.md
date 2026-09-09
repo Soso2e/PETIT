@@ -6,6 +6,10 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- Issue #260追加: Three.js Univに天体の登場・選択拡大・発光パルスを実装。実WebGL fixtureで登場・選択・連続選択・reduced motion・描画停止を確認し、関連13テスト成功。大量実データ・実iPhone/macOS性能は未確認。詳細は `docs/universe-motion.md`。
+
+- Issue #260: Web（Universe / Legacy）とDesktop小型会話に共通のメッセージ出現・押下・入力フォーカス・パネル表示アニメーション、Desktop設定の表示・操作反応と録音中の軌道表現を追加。Edgeの1280px / 390px幅と実Electronのfixture smokeで表示・操作・reduced-motionを確認済み。既存PWAからの更新、実iPhone / macOS、配布済みDesktopへの反映は未確認。設定画面CSSの配布にはDesktop更新が必要。
+
 - Issue #255: 現行WebチャットのDOMと音声初期化の不一致を修正。録音→Whisper互換STT、入力方式選択、HTTPS・Mac権限・サービス設定の案内、失敗時の下書き復元を追加。実マイク・実STT・Safari・PWA更新受け入れは未確認。
 
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
@@ -137,3 +141,5 @@
 | 2026-09-10 | 04:11 | #73 | Windows環境におけるwake-settings.test.cjsのURL形式不一致を修正（全21テスト成功） |
 
 
+| 2026-09-09 | 21:33 | #74 | Issue #260: Web/小型Desktopの共通モーション、Desktop設定・録音中の軌道表現、PWAキャッシュ更新を実装。動作確認済み: EdgeのUniverse/Legacy（1280px・390px）と実Electron fixture smoke、通常/reduced-motion、diff確認。既存PWA更新・実iPhone/macOS・配布版反映は未確認 |
+| 2026-09-09 | 21:43 | #75 | Issue #260: Three.js天体の登場・選択拡大・発光パルスを追加し必要時描画を維持。実WebGL fixture確認・関連13テスト・構文成功。古いSWキャッシュ名のテスト期待値を更新。大量実データ・実iPhone/macOS性能は未確認 |

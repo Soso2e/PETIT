@@ -55,6 +55,8 @@
     entries: new Map(),
     labels: new Map(),
     animatedMeshes: [],
+    visualTweens: new Map(),
+    seenBodies: new Set(),
     selectedTaskId: null,
     pointerDown: null,
     cameraTween: null,
@@ -273,6 +275,7 @@
     state.interactiveMeshes = [];
     state.entries.clear();
     state.animatedMeshes = [];
+    state.visualTweens.clear();
     state.labels.forEach(({ element }) => element.remove());
     state.labels.clear();
   };
@@ -336,6 +339,14 @@
     mesh.userData.entry = entry;
     mesh.userData.baseEmissiveIntensity = material.emissiveIntensity;
     mesh.add(createAtmosphere(radius, color, type === "child" ? 0.08 : 0.12));
+    const bodyKey = type === "core" ? "core" : `${type}:${entry.taskId}`;
+    mesh.userData.entering = !state.seenBodies.has(bodyKey);
+    state.seenBodies.add(bodyKey);
+    mesh.userData.selected = Boolean(entry.taskId && entry.taskId === state.selectedTaskId);
+    if (mesh.userData.selected) {
+      mesh.scale.setScalar(1.14);
+      mesh.material.emissiveIntensity = mesh.userData.baseEmissiveIntensity * 1.85;
+    }
     state.interactiveMeshes.push(mesh);
     state.animatedMeshes.push({ mesh, speed: 0.00006 + ((hashString(entry.title) % 7) * 0.000008), type });
     entry.object = mesh;
@@ -500,13 +511,32 @@
   };
 
   const updateSelection = () => {
-    state.entries.forEach((entry, taskId) => {
-      const selected = taskId === state.selectedTaskId;
-      const material = entry.object?.material;
-      if (material?.isMeshStandardMaterial) {
-        material.emissiveIntensity = entry.object.userData.baseEmissiveIntensity * (selected ? 1.85 : 1);
+    state.animatedMeshes.forEach(({ mesh }, index) => {
+      const selected = Boolean(mesh.userData.entry.taskId && mesh.userData.entry.taskId === state.selectedTaskId);
+      const entering = mesh.userData.entering;
+      const toScale = selected ? 1.14 : 1;
+      const toGlow = mesh.userData.baseEmissiveIntensity * (selected ? 1.85 : 1);
+      // Retarget from the current frame when selections change rapidly.
+      if (entering || mesh.userData.selected !== selected) {
+        const atmosphere = mesh.getObjectByName("Atmosphere");
+        state.visualTweens.set(mesh, {
+          startedAt: performance.now() + (entering ? Math.min(index * 35, 175) : 0),
+          duration: entering ? 640 : 420,
+          fromScale: entering ? .72 : mesh.scale.x,
+          toScale,
+          fromGlow: entering ? 0 : mesh.material.emissiveIntensity,
+          toGlow,
+          pulse: entering || selected,
+          atmosphere,
+          baseOpacity: mesh.userData.entry.type === "child" ? .08 : .12,
+        });
+        if (entering) {
+          mesh.scale.setScalar(.72);
+          mesh.material.emissiveIntensity = 0;
+        }
       }
-      entry.object?.scale?.setScalar(selected ? 1.14 : 1);
+      mesh.userData.entering = false;
+      mesh.userData.selected = selected;
     });
     state.labels.forEach(({ element, entry }) => {
       element.classList.toggle("is-selected", Boolean(entry.taskId && entry.taskId === state.selectedTaskId));
@@ -671,7 +701,7 @@
   const updateCameraTween = (time) => {
     const tween = state.cameraTween;
     if (!tween) return false;
-    const progress = clamp((time - tween.startedAt) / tween.duration, 0, 1);
+    const progress = reducedMotion.matches ? 1 : clamp((time - tween.startedAt) / tween.duration, 0, 1);
     const eased = progress < 0.5
       ? 4 * progress * progress * progress
       : 1 - Math.pow(-2 * progress + 2, 3) / 2;
@@ -679,6 +709,21 @@
     state.controls.target.lerpVectors(tween.fromTarget, tween.toTarget, eased);
     if (progress >= 1) state.cameraTween = null;
     return state.cameraTween != null;
+  };
+
+  const updateVisualTweens = (time) => {
+    const instant = reducedMotion.matches || document.documentElement.dataset.petitPerformance === "lite";
+    state.visualTweens.forEach((tween, mesh) => {
+      const progress = instant ? 1 : clamp((time - tween.startedAt) / tween.duration, 0, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      mesh.scale.setScalar(tween.fromScale + (tween.toScale - tween.fromScale) * eased);
+      mesh.material.emissiveIntensity = tween.fromGlow + (tween.toGlow - tween.fromGlow) * eased;
+      const pulse = tween.pulse && !instant ? Math.sin(progress * Math.PI) : 0;
+      tween.atmosphere.scale.setScalar(1 + pulse * .22);
+      tween.atmosphere.material.opacity = tween.baseOpacity + pulse * .14;
+      if (progress >= 1) state.visualTweens.delete(mesh);
+    });
+    return state.visualTweens.size > 0;
   };
 
   const labelForward = new THREE.Vector3();
@@ -727,8 +772,10 @@
 
   function render(time) {
     state.renderFrame = null;
-    if (!state.ready || !isPanelActive()) return;
-    const tweening = updateCameraTween(time);
+    if (!state.ready || !isPanelActive() || document.hidden) return;
+    const cameraMoving = updateCameraTween(time);
+    const bodiesMoving = updateVisualTweens(time);
+    const tweening = cameraMoving || bodiesMoving;
     state.controls.update();
     const liteMode = document.documentElement.dataset.petitPerformance === "lite";
     if (!liteMode && !reducedMotion.matches) {
@@ -790,6 +837,7 @@
     requestRebuild("panel-change");
   });
   window.addEventListener("petit:performance-change", () => requestRender({ updateLabels: false }));
+  reducedMotion.addEventListener("change", () => requestRender());
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) requestRender();
   });

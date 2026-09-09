@@ -60,6 +60,11 @@ const server = http.createServer(async (request, response) => {
       child.on('exit', () => { clearTimeout(timer); resolve(false); });
     }), probe), true, 'native SDKs load in the actual utility process without opening a microphone');
     const setup = await instance.firstWindow();
+    await setup.emulateMedia({ reducedMotion: 'no-preference' });
+    assert.equal(await setup.locator('main').evaluate((el) => getComputedStyle(el).animationName), 'setupEnter');
+    await setup.emulateMedia({ reducedMotion: 'reduce' });
+    assert.equal(await setup.locator('main').evaluate((el) => getComputedStyle(el).animationName), 'none');
+    await setup.emulateMedia({ reducedMotion: 'no-preference' });
     await setup.locator('#wake-auto').click();
     await setup.getByText('初回のみPicovoice ConsoleのAccessKeyを入力してください。', { exact: true }).waitFor();
     assert.equal(await setup.locator('#wake-auto').isEnabled(), true);
@@ -72,6 +77,11 @@ const server = http.createServer(async (request, response) => {
     await setup.locator('button[type=submit]').click();
     const page = await opened;
     await page.waitForURL(`${origin}/static/desktop/index.html`);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    assert.equal(await page.locator('#greeting').evaluate((el) => getComputedStyle(el).animationName), 'petitMessageEnter');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.equal(await page.locator('#greeting').evaluate((el) => getComputedStyle(el).animationName), 'none');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     const errors = []; page.on('pageerror', (e) => errors.push(e.message));
     await page.locator('#input').fill('テスト予定を追加');
     await page.locator('#send').click();

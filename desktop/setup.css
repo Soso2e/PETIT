@@ -9,3 +9,24 @@ button { color: #dce8fa; background: #1c2d47; border: 1px solid #7898bd66; borde
 .primary { background: #b0d8e4; color: #112339; border: 0; }.actions { margin-top: 22px; justify-content: space-between; }
 details { margin-top: 25px; border-top: 1px solid #ffffff15; border-bottom: 1px solid #ffffff15; padding: 15px 0; } summary { cursor: pointer; }
 #result { color: #ffc4b4; } :focus-visible { outline: 2px solid #b0d8e4; outline-offset: 2px; } kbd { font-size: 12px; }
+
+/* Match the Web/overlay timing; this stylesheet is also packaged offline. */
+@media (prefers-reduced-motion: no-preference) {
+  main { animation: setupEnter 280ms cubic-bezier(.22, .76, .28, 1); }
+  button, input, summary {
+    transition: background-color 140ms ease, border-color 140ms ease,
+      box-shadow 180ms ease, scale 140ms cubic-bezier(.22, .76, .28, 1);
+  }
+  button:enabled:active { scale: .96; }
+  input:focus-visible { box-shadow: 0 0 0 4px #b0d8e414; }
+  details[open] > :not(summary) { animation: setupEnter 220ms cubic-bezier(.22, .76, .28, 1); }
+  #result:not(:empty) { animation: setupEnter 180ms ease-out; }
+}
+@media (hover: hover) and (pointer: fine) {
+  button:enabled:hover { background-color: #2a4162; }
+  button.primary:enabled:hover { background-color: #c3e7f0; }
+}
+@keyframes setupEnter {
+  from { opacity: 0; translate: 0 6px; }
+  to { opacity: 1; translate: 0 0; }
+}

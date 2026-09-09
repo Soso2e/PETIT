@@ -5,6 +5,43 @@
   --motion-ease: cubic-bezier(.22, .76, .28, 1);
 }
 
+/* Shared by Universe, Legacy and the Desktop conversation surface. */
+@media (prefers-reduced-motion: no-preference) {
+  :where(button, .view-tab, .petit-corner-nav__button) {
+    transition: background-color 140ms ease, border-color 140ms ease,
+      color 140ms ease, box-shadow 180ms ease, scale 140ms var(--motion-ease);
+  }
+  button:enabled:active { scale: .96; }
+  :where(input, textarea, select, #chat-form) {
+    transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  }
+  #chat-form:focus-within {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-focus, #a4ddec) 14%, transparent);
+  }
+  .msg { animation: petitMessageEnter 260ms var(--motion-ease); }
+  .action-confirm { animation: petitMessageEnter 220ms var(--motion-ease); }
+  .petit-utility-menu:not([hidden]),
+  .task-panel:not([hidden]) .task-panel__sheet,
+  dialog[open] { animation: petitSurfaceEnter 220ms var(--motion-ease); }
+  .task-panel:not([hidden]) .task-panel__backdrop { animation: petitSurfaceEnter 180ms ease; }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  :where(#send, .action-confirm button):enabled:hover { scale: 1.035; }
+  :where(#send, .action-confirm button):enabled:active { scale: .96; }
+}
+
+@keyframes petitMessageEnter {
+  from { opacity: 0; translate: 0 6px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* Opacity only: panels can contain positioned or fixed descendants. */
+@keyframes petitSurfaceEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 html[data-petit-motion-ready="true"] .view-tabs {
   position: relative;
   isolation: isolate;
