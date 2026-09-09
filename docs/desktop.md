@@ -33,7 +33,7 @@ Service WorkerにDesktop資産をprecacheせず、DesktopもService Workerを登
 | 選択肢 | Windows / macOS | 制約・費用・精度 | 採用範囲 |
 | --- | --- | --- | --- |
 | Porcupine | ローカルNode SDK、日本語、OS/CPU別モデル | AccessKeyと利用条件の確認が必要。日本語`.pv`とカスタム`.ppn`が必要 | 任意・初期検証版として実装 |
-| openWakeWord | Python等で別プロセス化可能 | 公式は英語対応。日本語「プティ」を即時保証できず、学習・誤検知評価が必要 | 後続候補 |
+| openWakeWord | Python等で別プロセス化可能 | 公式は英語対応。日本語「プティ」を即時保証できず、学習・誤検知評価が必要 | [v0.1学習環境](openwakeword.md)を追加。Desktop統合は後続 |
 | Voskで全文認識→文字列一致 | 日本語軽量モデルあり | 常時STTは専用検出器より負荷が増える。固有名の誤認識も評価が必要 | 初回不採用 |
 | Web Speech常時再起動 | WebView依存 | 通信・可用性・バックグラウンド・OS差の影響が大きい | 不採用 |
 | トレイ / グローバルキー | 両OS | マイク不要。キー競合時はトレイへ案内 | 常に使える基本入口 |
