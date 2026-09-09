@@ -612,3 +612,25 @@ flowchart TD
     Cancel --> Resume{非ロック・非スリープ・画面非表示・opt-in?}
     Resume -->|はい| Wake
 ```
+
+
+## 11. Web録音入力（Issue #255）
+
+```mermaid
+flowchart TD
+    Mode[音声入力方式の選択] --> Browser[ブラウザ SpeechRecognition]
+    Mode --> Record[MediaRecorder / マイク権限]
+    Record --> Stop[停止ボタンまたは60秒 / マイク解放]
+    Stop --> API[POST /api/stt / 8MiB上限 / 形式検証]
+    API --> STT[設定したWhisper互換STT / 60秒timeout]
+    STT --> Text[確定テキスト]
+    Browser --> Text
+    Text --> Draft{下書きなし・確認待ちの音声回答か}
+    Draft -->|はい| Confirm[既存の音声確認処理]
+    Draft -->|いいえ| Submit[下書きへ追記 / 既存chat form送信]
+    Submit --> Chat[既存 POST /api/chat]
+    Record -->|拒否・失敗| Error[原因別案内 / 下書き復元 / 送信しない]
+    API -->|未設定・上限超過| Error
+    STT -->|通信・応答失敗| Error
+    Browser -->|認識失敗| Error
+```

@@ -47,6 +47,8 @@ storage/   SQLite などの実行時データ（git 管理外）
 
 4. ブラウザで <http://127.0.0.1:8000> を開く。
 
+マイクからチャットへ送る場合は [音声入力の設定・Macの確認手順](docs/voice_mode.md) を参照してください。ブラウザ認識に加え、Whisper互換サーバーによる録音認識を選択できます。
+
 5. 音声読み上げを使う場合は [`docs/aivis_speech.md`](docs/aivis_speech.md) の初期セットアップへ進む。
    - AivisSpeechを使う場合は、Windowsでのインストール → 音声モデル追加 → Engine起動 → `/docs` / `/speakers` → `.env` → 診断CLI → WAV再生の順で確認します。
    - AivisSpeechが未準備・停止中でもチャットは利用でき、対応ブラウザでは無料のブラウザ標準TTSへフォールバックできます。

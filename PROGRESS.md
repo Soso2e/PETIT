@@ -6,6 +6,8 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- Issue #255: 現行WebチャットのDOMと音声初期化の不一致を修正。録音→Whisper互換STT、入力方式選択、HTTPS・Mac権限・サービス設定の案内、失敗時の下書き復元を追加。実マイク・実STT・Safari・PWA更新受け入れは未確認。
+
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
 - Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、任意Porcupineウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。Desktop配布はPR=テストのみ、手動Actions=macOS arm64/Windows x64開発Artifact、main上のversion一致`v*`タグ=両OSビルド＋GitHub Release自動添付へ整理。未署名中は手動Artifactで検証し、公開タグは切らない。既存Core CI相当はTool Registry未初期化と旧Prompt前提の失敗が別途残るため、PRはDraftで提出する。
@@ -125,3 +127,4 @@
 | 2026-09-07 | 06:38 | #64 | Issue #249 / Refs #245: Web中心のJARVIS全体設計、個人Contextの横断Read・期限/最大4枠/サイズ上限・部分失敗、2回目Brainへの状況継続と生成失敗の非保存、任意PC観測Module、FastAPI lifecycle登録互換性を実装。Runtime Mermaid・関連回帰テストを更新（実LLM・外部サービス・PWA/Windows前面アプリE2E未確認） |
 | 2026-09-07 | 11:10 | #65 | Issue #253: v0.20.0としてDesktop設計、Electron常駐シェル、小型共有UI、取消可能な音声入力、任意ウェイク、更新通知・手動配布workflowを追加。Desktop境界12テスト・既存関連19テストと31 subtest・macOS実Electronの仮サーバー/生成音声操作を確認。古いPrompt/Router回帰テストを現行構成へ追従（実マイク・Windows・署名済み配布は未確認） |
 | 2026-09-08 | 14:16 | #66 | Issue #253: Desktop配布workflowをPRテスト、手動開発Artifact、main上のversion一致`v*`タグによるmacOS arm64/Windows x64ビルド＋GitHub Release自動添付へ整理。タグ/`package.json` version一致とmain履歴チェックを追加（実タグRelease・署名済み配布は未確認） |
+| 2026-09-09 | 12:11 | #255 | Web音声入力の現行UI接続を修正し、録音STT・原因別案内・下書き保持を追加（関連Python24件、Web音声7件、Desktop12件成功。Braveの現行DOM＋模擬認識で送信確認、実マイク・実STT未確認） |

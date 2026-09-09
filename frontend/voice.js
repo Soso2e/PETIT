@@ -2,16 +2,16 @@
 (() => {
   const messagesEl = document.getElementById("messages");
   const formEl = document.getElementById("chat-form");
-  const inputEl = document.getElementById("input");
-  const sendEl = document.getElementById("send");
+  const inputEl = document.getElementById("input") || document.getElementById("chat-input");
+  const sendEl = document.getElementById("send") || formEl?.querySelector('button[type="submit"]');
   const micEl = document.getElementById("mic");
   const voiceToggleEl = document.getElementById("voice-toggle");
   const voiceStateEl = document.getElementById("voice-state");
 
-  if (!messagesEl || !formEl || !inputEl || !sendEl || !micEl || !voiceToggleEl || !voiceStateEl) return;
+  if (!messagesEl || !formEl || !inputEl || !sendEl || !micEl || !voiceStateEl) return;
 
-  const SpeechRecognitionApi = window.PetitDesktopSpeechRecognition || window.SpeechRecognition || window.webkitSpeechRecognition;
-  const speechRecognitionSupported = Boolean(SpeechRecognitionApi);
+  let SpeechRecognitionApi = window.PetitDesktopSpeechRecognition || window.SpeechRecognition || window.webkitSpeechRecognition;
+  let speechRecognitionSupported = Boolean(SpeechRecognitionApi);
   const browserSpeechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
   const audioPlaybackSupported = typeof Audio !== "undefined" && typeof fetch === "function";
   const TTS_CHUNK_TARGET_CHARS = 48;
@@ -43,6 +43,10 @@
   let voiceReplyEnabled = localStorage.getItem("petit_voice_reply_enabled") === "1";
   let recognition = null;
   let listening = false;
+  let starting = false;
+  let processing = false;
+  let recognitionFailed = false;
+  let inputModeEl = null;
   let finalTranscript = "";
   let draftBeforeListening = "";
   let observerReady = false;
@@ -56,6 +60,7 @@
   }
 
   function updateVoiceToggle() {
+    if (!voiceToggleEl) return;
     if (!audioPlaybackSupported && !browserSpeechSupported) {
       voiceReplyEnabled = false;
       voiceToggleEl.disabled = true;
@@ -71,15 +76,51 @@
   }
 
   function updateMicAvailability() {
-    if (speechRecognitionSupported) {
-      micEl.disabled = false;
-      micEl.title = "押して話す";
-      return;
-    }
+    const insecure = window.isSecureContext === false;
+    micEl.disabled = insecure || !speechRecognitionSupported;
+    micEl.title = "押して話す";
+    if (insecure) setVoiceState("マイクにはHTTPS接続が必要です。同じMacならlocalhost、別端末ならHTTPSのPETITを開いてください。", { error: true });
+    else if (!speechRecognitionSupported) setVoiceState("ブラウザ音声認識がありません。録音認識を設定するか、入力欄でMacの音声入力を使ってください。", { error: true });
+  }
 
-    micEl.disabled = true;
-    micEl.title = "このブラウザは音声入力に対応していません";
-    setVoiceState("音声入力はこのブラウザでは利用できません。ChromeまたはEdgeで開いてください。", { error: true });
+  async function setupInputMode() {
+    if (window.PetitDesktopSpeechRecognition) return;
+    const nativeApi = window.SpeechRecognition || window.webkitSpeechRecognition;
+    inputModeEl = document.createElement("select");
+    inputModeEl.setAttribute("aria-label", "音声入力方式");
+    for (const [value, text] of [["browser", "ブラウザ認識"], ["recorded", "録音認識（サーバーへ送信）"]]) {
+      const option = document.createElement("option");
+      option.value = value; option.textContent = text; inputModeEl.append(option);
+    }
+    voiceStateEl.before(inputModeEl);
+    const apply = () => {
+      recognition = null;
+      SpeechRecognitionApi = inputModeEl.value === "recorded" ?
+        (window.PetitRecordedSpeechRecognition?.supported() ? window.PetitRecordedSpeechRecognition : null) : nativeApi;
+      speechRecognitionSupported = Boolean(SpeechRecognitionApi);
+      setVoiceState(inputModeEl.value === "recorded" ?
+        "録音認識: 話し終わったら■で文字起こし。最大60秒。確定後チャットへ送信します。" :
+        "ブラウザ認識: 発話終了後に送信。接続エラーが続く場合は録音認識へ切り替えてください。");
+      updateMicAvailability();
+    };
+    inputModeEl.addEventListener("change", () => {
+      localStorage.setItem("petit_voice_input_mode", inputModeEl.value);
+      apply();
+    });
+    const saved = localStorage.getItem("petit_voice_input_mode");
+    inputModeEl.value = saved === "recorded" || !nativeApi ? "recorded" : "browser";
+    apply();
+    try {
+      const response = await fetch("/api/stt/status", { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) return;
+      const status = await response.json();
+      if (!localStorage.getItem("petit_voice_input_mode") && status.configured && !starting && !listening && !processing) {
+        inputModeEl.value = "recorded";
+        apply();
+      } else if (!status.configured && inputModeEl.value === "recorded" && !starting && !listening && !processing) {
+        setVoiceState("録音認識は未設定です。サーバーのPETIT_STT_URLを設定して再起動してください。Macの音声入力も入力欄から使えます。", { error: true });
+      }
+    } catch { /* Native recognition remains usable while PETIT is unreachable. */ }
   }
 
   function normalizeSpeechText(text) {
@@ -440,8 +481,16 @@
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
+      starting = false;
       finalTranscript = "";
       setListeningState(true);
+    };
+
+    recognition.onprocessing = () => {
+      processing = true;
+      setListeningState(false);
+      micEl.disabled = true;
+      setVoiceState("文字起こし中…");
     };
 
     recognition.onresult = (event) => {
@@ -456,30 +505,37 @@
     };
 
     recognition.onerror = (event) => {
-      const friendly = (window.PetitDesktopSpeechRecognition && event.message) || {
-        "audio-capture": "マイクを利用できません。",
-        "not-allowed": "マイクの使用が許可されていません。ブラウザ設定を確認してください。",
+      recognitionFailed = true;
+      const friendly = event.message || {
+        "audio-capture": "マイクを利用できません。Macのシステム設定 → サウンド → 入力でデバイスを確認してください。",
+        "not-allowed": "マイクの使用が許可されていません。サイトの権限とMacのシステム設定 → プライバシーとセキュリティ → マイクを確認してください。",
         "no-speech": "音声を聞き取れませんでした。もう一度試してください。",
-        network: "音声認識サービスへ接続できませんでした。",
+        network: "ブラウザの音声認識サービスへ接続できません。録音認識へ切り替えるか、Macの音声入力を使ってください。",
       }[event.error] || `音声入力に失敗しました（${event.error}）。`;
       setVoiceState(friendly, { error: true });
     };
 
     recognition.onend = () => {
+      starting = false;
+      processing = false;
+      if (inputModeEl) inputModeEl.disabled = false;
+      micEl.disabled = false;
       setListeningState(false);
-      const transcript = finalTranscript.trim();
+      const transcript = recognitionFailed ? "" : finalTranscript.trim();
       if (transcript) {
-        inputEl.value = transcript;
+        inputEl.value = [draftBeforeListening.trim(), transcript].filter(Boolean).join(" ");
         inputEl.dispatchEvent(new Event("input"));
         setVoiceState(`聞き取り: ${transcript}`);
-        if (handlePendingVoiceDecision(transcript)) {
+        if (!draftBeforeListening.trim() && handlePendingVoiceDecision(transcript)) {
           inputEl.value = "";
           inputEl.dispatchEvent(new Event("input"));
           return;
         }
         formEl.requestSubmit();
-      } else if (!inputEl.value.trim()) {
+      } else {
         inputEl.value = draftBeforeListening;
+        inputEl.dispatchEvent(new Event("input"));
+        if (!recognitionFailed) setVoiceState("音声を聞き取れませんでした。もう一度話してください。", { error: true });
       }
     };
 
@@ -487,7 +543,7 @@
   }
 
   function toggleListening() {
-    if (!speechRecognitionSupported || sendEl.disabled) return;
+    if (!speechRecognitionSupported || sendEl.disabled || starting || processing) return;
     const speechRecognition = ensureRecognition();
     if (!speechRecognition) return;
 
@@ -496,6 +552,10 @@
       return;
     }
 
+    starting = true;
+    recognitionFailed = false;
+    if (inputModeEl) inputModeEl.disabled = true;
+    setVoiceState("マイクを準備中… 権限の確認が出たら許可してください。");
     draftBeforeListening = inputEl.value;
     finalTranscript = "";
     stopSpeaking();
@@ -503,12 +563,14 @@
     try {
       speechRecognition.start();
     } catch (error) {
+      starting = false;
+      if (inputModeEl) inputModeEl.disabled = false;
       inputEl.value = draftBeforeListening;
       setVoiceState("音声入力を開始できませんでした。少し待ってから再試行してください。", { error: true });
     }
   }
 
-  voiceToggleEl.addEventListener("click", () => {
+  voiceToggleEl?.addEventListener("click", () => {
     if (!audioPlaybackSupported && !browserSpeechSupported) return;
     voiceReplyEnabled = !voiceReplyEnabled;
     localStorage.setItem("petit_voice_reply_enabled", voiceReplyEnabled ? "1" : "0");
@@ -529,6 +591,12 @@
 
   updateVoiceToggle();
   updateMicAvailability();
+  setupInputMode();
+  window.addEventListener("pagehide", () => {
+    recognitionFailed = true;
+    finalTranscript = "";
+    recognition?.abort();
+  });
 
   // Existing conversations are restored during startup. Enhance them without reading
   // the entire history aloud, then enable auto-speech for newly arriving replies.
