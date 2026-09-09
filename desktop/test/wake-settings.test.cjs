@@ -11,7 +11,8 @@ async function harness(t, { permission = 'granted', secure = true, detection = t
   const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'petit-settings-test-'));
   t.after(() => fsp.rm(directory, { recursive: true, force: true }));
   const handlers = new Map(); const progress = [];
-  const frame = { url: new URL(`file://${path.resolve(__dirname, '../setup.html')}`).href };
+  const { pathToFileURL } = require('node:url');
+  const frame = { url: pathToFileURL(path.resolve(__dirname, '../setup.html')).href };
   const window = { isDestroyed: () => false, webContents: { mainFrame: frame, send: (_channel, message) => progress.push(message) } };
   const event = { sender: window.webContents, senderFrame: frame };
   let acquisitions = 0, stopped = 0;
