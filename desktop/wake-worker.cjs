@@ -7,9 +7,10 @@ let running = false;
 process.parentPort.on('message', async ({ data }) => {
   if (data.type !== 'start' || running) return;
   running = true;
-  let engine, recorder;
+  let engine, recorder, phase = 'engine';
   try {
     engine = new Porcupine(data.key, [data.keywordPath], [0.6], { modelPath: data.modelPath });
+    phase = 'microphone';
     recorder = new PvRecorder(engine.frameLength);
     if (recorder.sampleRate !== engine.sampleRate) throw new Error('sample-rate');
     recorder.start();
@@ -22,8 +23,10 @@ process.parentPort.on('message', async ({ data }) => {
         process.parentPort.postMessage({ type: 'wake' });
       }
     }
-  } catch {
-    process.parentPort.postMessage({ type: 'error' });
+  } catch (error) {
+    const name = String(error?.constructor?.name || '');
+    const code = phase === 'microphone' ? 'microphone' : /Activation|Key/.test(name) ? 'key' : /InvalidArgument|InvalidState/.test(name) ? 'model' : 'engine';
+    process.parentPort.postMessage({ type: 'error', code });
   } finally {
     if (recorder?.isRecording) recorder.stop();
     recorder?.release();

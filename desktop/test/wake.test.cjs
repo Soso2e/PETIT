@@ -29,5 +29,5 @@ test('wake detection releases audio and only emits status/detection, never PCM/k
   assert.deepEqual(await run(), { messages: [{ type: 'ready' }, { type: 'wake' }], stopped: 1, released: 1, engineReleased: 1 });
 });
 test('wake SDK failure reports a sanitized error without credential leakage', async () => {
-  assert.deepEqual(await run(true), { messages: [{ type: 'error' }], stopped: 0, released: 0, engineReleased: 0 });
+  assert.deepEqual(await run(true), { messages: [{ type: 'error', code: 'engine' }], stopped: 0, released: 0, engineReleased: 0 });
 });

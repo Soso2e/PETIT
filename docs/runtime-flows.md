@@ -634,3 +634,32 @@ flowchart TD
     STT -->|通信・応答失敗| Error
     Browser -->|認識失敗| Error
 ```
+
+## 12. Desktopウェイクモデル自動設定（Issue #256）
+
+```mermaid
+flowchart TD
+    Button[自動設定ボタン] --> Guard[設定画面IPC検証 / 同時実行防止]
+    Guard --> OS[OSと実行アーキテクチャ判定]
+    OS --> Key[AccessKeyをsafeStorageで暗号化保存]
+    Key --> Permission[マイク権限確認 / Mac初回許可]
+    Permission --> Cache{保存済み自動モデルのハッシュと対象が一致?}
+    Cache -->|はい| Init[utility processでPorcupine初期化]
+    Cache -->|いいえ| PV[固定revisionの日本語pv取得 / SHA-256検証]
+    PV --> PPN[Model APIでへいプティ生成 / キーを取得先へ転送しない]
+    PPN --> Stage[userDataへ一時配置]
+    Stage --> Init
+    Init --> Listen[PvRecorder開始 / 30秒の発話案内]
+    Listen --> Detected{実際に検出?}
+    Detected -->|はい| Save[モデルパス自動保存 / 準備完了]
+    Detected -->|時間切れ| Fail[原因表示 / 既存モデル設定維持]
+    OS -->|対象外| Fail
+    Key -->|安全な保存不可| Fail
+    Permission -->|拒否| Fail
+    PV -->|通信・形式・ハッシュ異常| Fail
+    PPN -->|キー・利用上限・生成失敗| Fail
+    Init -->|エラー・時間切れ| Fail
+    Cancel[中止 / 設定終了 / 小型画面表示 / ロック・スリープ] --> Fail
+    Fail --> Cleanup[テスト停止 / 作成途中ファイル削除]
+    Save --> StopTest[テスト停止 / 常時待機の選択は維持]
+```
