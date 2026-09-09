@@ -134,3 +134,5 @@
 | 2026-09-09 | 15:56 | #69 | Issue #258: openWakeWord独立学習環境・日本語SAPI合成・話者分離評価・WAV検証CLIを追加しhey_petit.onnx v0.1を生成（動作確認済み: ONNX/実推論・2テスト・構文・依存整合。test正例12/12、負例誤検出11/144。実声/長時間待機/Desktop統合は未確認、常時待機精度は未達） |
 | 2026-09-09 | 17:38 | #70 | Issue #253 / #258調査: Windowsインストール版PETITの起動と保存設定を確認。STT URL未設定、wakeEnabled=false、Porcupineモデル・保存キー未設定のため音声入口は未構成。実装上ウェイクは小型画面非表示時のみ、openWakeWordはDesktop未統合。設定変更・実マイク検証は未実施 |
 | 2026-09-09 | 17:51 | #71 | feat/petit-desktop へ origin/feat/petit-desktop、fix/desktop-wake-auto-setup、main の全最新アップデート・派生ブランチを競合解消して完全マージ統合 |
+| 2026-09-10 | 04:08 | #72 | docs: docs/desktop.md にサーバー/Web側変更（サーバー再起動で即反映）とDesktop本体変更（PRマージ＋タグpushでGitHub Release作成・アプデ通知）の更新フロー切り分けを明記 |
+

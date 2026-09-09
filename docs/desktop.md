@@ -71,6 +71,8 @@ Mainが小型画面を表示 → AudioWorklet録音 → WAV → 明示設定し�
 - 起動10秒後と24時間ごと（設定でOFF可能）、またはトレイ/設定から確認。ネットワーク失敗はアプリ起動を妨げない。自動確認は同一バージョンをプロセス内で重複通知しない。
 - 通知から公式Releaseページを開き、利用者がインストーラーを実行する。初回公開前や対応assetがないときは「利用可能なDesktop更新なし」となる。
 - Desktopのバージョンとサーバーのバージョンは別に進められる。今回の最低サーバーは小型画面の追加を含むv0.20.0。アプリ更新はPythonやユーザーデータを置換しない。サーバー更新は従来のGit等の手順を維持。
+  - **サーバー・Web画面側（Python / HTML / JS等）の変更**: Desktopアプリの再インストール・再配布は不要。サーバーコードを更新・再起動するだけでDesktopアプリ内の画面・機能にも即座に反映される。
+  - **Desktop本体（`desktop/`配下のElectron処理・トレイ・ショートカット等）の変更**: 専用ブランチから `main` へPRを作成してマージし、`v*` タグを push することで GitHub Release が自動作成・配信され、Desktopアプリ側へ更新通知が行く。
 - 署名・公証・鍵管理・実更新テストが揃ったらelectron-updaterのGitHub providerを評価し、署名検証付きのダウンロード＋再起動時適用へ進む。自動更新を実装済みとは扱わない。
 
 [Electron更新ガイド](https://www.electronjs.org/docs/latest/tutorial/updates)、[electron-builder配布](https://www.electron.build/publish/)、[Tauri updaterの署名要件](https://v2.tauri.app/plugin/updater/#signing-updates)を比較。今回は通知で要件を満たし、署名準備前の自己更新を避ける。
