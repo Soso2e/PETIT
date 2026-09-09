@@ -128,3 +128,4 @@
 | 2026-09-07 | 11:10 | #65 | Issue #253: v0.20.0としてDesktop設計、Electron常駐シェル、小型共有UI、取消可能な音声入力、任意ウェイク、更新通知・手動配布workflowを追加。Desktop境界12テスト・既存関連19テストと31 subtest・macOS実Electronの仮サーバー/生成音声操作を確認。古いPrompt/Router回帰テストを現行構成へ追従（実マイク・Windows・署名済み配布は未確認） |
 | 2026-09-08 | 14:16 | #66 | Issue #253: Desktop配布workflowをPRテスト、手動開発Artifact、main上のversion一致`v*`タグによるmacOS arm64/Windows x64ビルド＋GitHub Release自動添付へ整理。タグ/`package.json` version一致とmain履歴チェックを追加（実タグRelease・署名済み配布は未確認） |
 | 2026-09-09 | 15:56 | #67 | Issue #258: openWakeWord独立学習環境・日本語SAPI合成・話者分離評価・WAV検証CLIを追加しhey_petit.onnx v0.1を生成（動作確認済み: ONNX/実推論・2テスト・構文・依存整合。test正例12/12、負例誤検出11/144。実声/長時間待機/Desktop統合は未確認、常時待機精度は未達） |
+| 2026-09-09 | 17:38 | #68 | Issue #253 / #258調査: Windowsインストール版PETITの起動と保存設定を確認。STT URL未設定、wakeEnabled=false、Porcupineモデル・保存キー未設定のため音声入口は未構成。実装上ウェイクは小型画面非表示時のみ、openWakeWordはDesktop未統合。設定変更・実マイク検証は未実施 |
