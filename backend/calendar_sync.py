@@ -1,4 +1,4 @@
-"""Safe, read-only synchronization for Google/local ICS and TimeTree."""
+"""Safe synchronization for Google/local ICS and TimeTree."""
 from __future__ import annotations
 
 import hashlib
@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 from . import config, db
 from .calendar_sources import timetree
+from . import google_calendar_push
 
 log = logging.getLogger(__name__)
 TOKYO = timezone(timedelta(hours=9), name="Asia/Tokyo")
@@ -40,7 +41,7 @@ def status() -> dict[str, Any]:
                        "error": state["last_error"], "stale": bool(state["last_failure_at"] and state["last_success_at"])})
     return {"configured": configured(), "url_count": len(config.CALENDAR_ICS_URLS),
             "file_count": len(config.CALENDAR_ICS_FILES), "timetree_configured": timetree.configured(),
-            "sync_states": states}
+            "google_calendar_push_enabled": google_calendar_push.enabled(), "sync_states": states}
 
 
 def sync_if_configured(force: bool = False) -> dict[str, Any]:
@@ -62,6 +63,7 @@ def sync() -> dict[str, Any]:
         specs.append(("timetree", "timetree", timetree.fetch_ics))
 
     results: list[dict[str, Any]] = []
+    google_push_result: dict[str, Any] | None = None
     seen: set[tuple[str, str, str | None]] = set()
     for source_key, public_source, fetch in specs:
         try:
@@ -76,6 +78,15 @@ def sync() -> dict[str, Any]:
             at = db.record_sync_success(source_key, len(unique))
             results.append({"ok": True, "source": public_source, "synced_count": len(unique), "cached": False,
                             "stale": False, "last_synced_at": at, "error": None})
+            if public_source == "timetree" and google_calendar_push.enabled():
+                try:
+                    counts = google_calendar_push.sync_events(unique)
+                    google_push_result = {"ok": True, "source": "google_calendar_push", **counts, "error": None}
+                except Exception:
+                    google_push_result = {"ok": False, "source": "google_calendar_push", "created": 0,
+                                          "updated": 0, "skipped": 0,
+                                          "error": "Google Calendar への同期に失敗しました"}
+                    log.warning("Google Calendar push sync failed")
         except Exception as exc:  # no exception content: it can contain a private URL or credential
             error = _safe_error(public_source, exc)
             db.record_sync_failure(source_key, error)
@@ -90,7 +101,8 @@ def sync() -> dict[str, Any]:
     )
     return {"ok": ok, "source": "calendar", "synced_count": total, "cached": False,
             "stale": any(item["stale"] for item in results), "last_synced_at": last_synced_at,
-            "error": error, "configured": bool(specs), "sources": results, "synced": total}
+            "error": error, "configured": bool(specs), "sources": results, "synced": total,
+            "google_calendar_push": google_push_result or {"ok": True, "enabled": False}}
 
 
 def _ensure_label_metadata_table(conn: Any) -> None:
