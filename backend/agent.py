@@ -79,8 +79,19 @@ def _notion_read_requested(message: str) -> bool:
 
 
 def _github_review_requested(message: str) -> bool:
+    """Recognize explicit GitHub review/read requests without swallowing link actions."""
     text = str(message or "").casefold()
-    return any(marker in text for marker in ("github", "ギットハブ"))
+    if not any(marker in text for marker in ("github", "ギットハブ")):
+        return False
+    if any(marker in text for marker in ("紐付け", "ひも付け", "リンクして", "登録して", "候補を無視")):
+        return False
+    return any(
+        marker in text
+        for marker in (
+            "レビュー", "差分", "全リポジトリ", "新コミット", "コミット", "commit",
+            "変更履歴", "開発状況", "前回から", "全体",
+        )
+    )
 
 
 def _related_tool_names(message: str) -> list[str]:
