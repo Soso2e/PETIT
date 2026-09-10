@@ -62,7 +62,7 @@ jobs:
             platform: win
             arch: x64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: desktop
@@ -76,10 +76,60 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run test:smoke
-      - name: Build installer
+
+      - name: Validate macOS release credentials
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.platform == 'mac'
+        shell: bash
+        env:
+          MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=0
+          for name in MAC_CSC_LINK MAC_CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required for signed/notarized macOS releases."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Build development installer
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') || matrix.platform != 'mac' }}
         run: npm run build -- --${{ matrix.platform }} --${{ matrix.arch }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Build signed and notarized macOS release
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.platform == 'mac'
+        run: npm run build -- --mac --arm64 -c.mac.notarize=true
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Verify macOS signature and Gatekeeper assessment
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.platform == 'mac'
+        shell: bash
+        run: |
+          app_path="$(find dist/mac-arm64 -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$app_path" ]; then
+            echo "::error::Packaged .app was not found."
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl --assess --type execute --verbose=2 "$app_path"
+          dmg="$(find dist -maxdepth 1 -name '*.dmg' -print -quit)"
+          if [ -z "$dmg" ]; then
+            echo "::error::DMG was not found."
+            exit 1
+          fi
+          xcrun stapler validate "$dmg"
+
       - uses: actions/upload-artifact@v4
         with:
           name: PETIT-${{ matrix.platform }}-${{ matrix.arch }}-${{ startsWith(github.ref, 'refs/tags/v') && 'release' || 'development' }}
