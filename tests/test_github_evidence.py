@@ -182,7 +182,7 @@ class GitHubEvidenceTests(unittest.TestCase):
         self.assertIn("inspect_github_repository", registered_names())
         self.assertIn("sync_github_evidence", registered_names())
         self.assertTrue(requires_confirmation("link_github_repository_candidate"))
-        self.assertTrue(requires_confirmation("ignore_github_repository_candidate"))
+        self.assertFalse(requires_confirmation("ignore_github_repository_candidate"))
 
     def test_snapshot_keeps_evidence_types_distinct_and_idempotent(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")
