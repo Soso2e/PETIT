@@ -29,7 +29,9 @@ async function harness(t, { permission = 'granted', secure = true, detection = t
     } },
   };
   const context = vm.createContext({
-    require: (name) => name === 'electron' ? electron : name === './wake-setup.cjs' ? { ...setup, prepareModels: async () => {
+    require: (name) => name === 'electron' ? electron : name === './wake-setup.cjs' ? { ...setup,
+      targetPlatform: () => ({ platform: 'mac', arch: 'arm64' }),
+      prepareModels: async () => {
       acquisitions++;
       const staging = path.join(directory, 'stage'); await fsp.mkdir(staging);
       return { staging, keywordPath: path.join(staging, 'test.ppn'), modelPath: path.join(staging, 'ja.pv'), metadata: {} };
