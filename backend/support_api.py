@@ -36,9 +36,9 @@ def sync_obsidian_vault(max_files: int | None = None) -> dict[str, Any]:
 
 
 @router.get("/api/proactive")
-def proactive_opener() -> dict[str, Any]:
+def proactive_opener(session_id: str | None = None) -> dict[str, Any]:
     """A line PETIT says first when the user opens the app (talks proactively)."""
-    return proactive.generate_opener()
+    return proactive.generate_opener(session_id=(session_id or "").strip() or None)
 
 
 @router.get("/api/briefing")

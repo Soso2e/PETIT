@@ -125,6 +125,29 @@ class Issue223ActiveWorkContextTests(unittest.TestCase):
         self.assertIn("卒研報告書", result["message"])
         self.assertNotIn("古い作業", result["message"])
 
+    def test_proactive_opener_does_not_use_global_episode_as_current_fact(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_chat(messages, **kwargs):
+            captured["messages"] = messages
+            return {"content": "続き、どうする？"}
+
+        with (
+            patch.object(proactive, "_time_of_day", return_value="昼"),
+            patch.object(proactive.db, "recent_episodes", return_value=[{"summary": "全タスクをキャンセル済み"}]),
+            patch.object(proactive.db, "recent_summaries", return_value=[{"summary": "古い要約"}]),
+            patch.object(proactive.db, "recent_conversations", return_value=[]),
+            patch.object(proactive.db, "all_memory", return_value=[]),
+            patch.object(proactive.work_sessions, "active_session", return_value=None),
+            patch.object(proactive, "chat_completion", side_effect=fake_chat),
+        ):
+            result = proactive.generate_opener(session_id="new-session")
+
+        self.assertEqual(result["kind"], "llm")
+        prompt = captured["messages"][-1]["content"]
+        self.assertNotIn("キャンセル済み", prompt)
+        self.assertNotIn("古い要約", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -429,7 +429,7 @@ async function restoreHistory() {
 // On a new session, let PETIT speak first. Existing sessions restore SQLite history.
 async function loadOpener() {
   try {
-    const res = await fetch("/api/proactive");
+    const res = await fetch(`/api/proactive?session_id=${encodeURIComponent(sessionId)}`);
     const data = await res.json();
     if (data && data.message) {
       const greeting = document.getElementById("greeting");

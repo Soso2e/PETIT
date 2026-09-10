@@ -14,6 +14,8 @@
 
 履歴表が持てない「いま開いている状態」だけをここに書く。最新内容で上書いてよい。
 
+- Proactive openerの古い全体エピソード参照を停止し、同一sessionのユーザー発話と現在の作業だけを候補に変更。誤ったepisode_id=2（「全10件のタスクがキャンセル済み」）をSQLite/Chromaから削除し、DBバックアップを保存。関連テスト成功、実アプリ起動・実LLM表示は未確認。
+
 - Issue #258: `scripts/wakeword/` にWindows/Python 3.13の独立したopenWakeWord学習環境を追加。日本語SAPI合成624クリップを話者分離して学習し、`storage/wakeword/models/v0.1/hey_petit.onnx` を生成済み。ONNX構造・出力一致・openWakeWord実推論・関連2テスト・依存整合・構文を確認。しきい値0.45でtest正例12/12検出、負例11/144誤検出。合成音声のみの実験モデルで、常時待機の実用精度は未達。実声・長時間負例・実マイク評価とDesktop統合が次の作業。詳細は `docs/openwakeword.md`。Desktopは引き続きPorcupine。
 
 - Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、任意Porcupineウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。Desktop配布はPR=テストのみ、手動Actions=macOS arm64/Windows x64開発Artifact、main上のversion一致`v*`タグ=両OSビルド＋GitHub Release自動添付へ整理。未署名中は手動Artifactで検証し、公開タグは切らない。既存Core CI相当はTool Registry未初期化と旧Prompt前提の失敗が別途残るため、PRはDraftで提出する。
@@ -63,6 +65,7 @@
 
 | 日付 | 時間 | 回数 | 変更内容 |
 |------|------|------|----------|
+| 2026-09-10 | 16:42 | #conflict-resolution | origin/mainへfast-forward後、未コミット変更を復帰。競合マーカーなし。対象テストはvenvにpytestがなく未実行。 |
 | 2026-08-02 | 08:54 | #1 | v0.1.0としてバージョン管理ルール、PROGRESS表記、Web UI表示を追加 |
 | 2026-08-02 | 09:12 | #2 | v0.1.1としてAgent Runtimeと会話ToolフローのMermaid図、AGENTS同期ルールを追加 |
 | 2026-08-02 | 09:40 | #3 | v0.2.0としてToday画面、今日の作業時間集計、作業セッション復元APIを追加 |
@@ -141,6 +144,6 @@
 | 2026-09-10 | 04:11 | #73 | Windows環境におけるwake-settings.test.cjsのURL形式不一致を修正（全21テスト成功） |
 | 2026-09-10 | 07:30 | #74 | Porcupine依存を削除し、DesktopをローカルopenWakeWord/ONNX＋Pythonマイクランタイムへ接続。実マイク評価は環境依存で未確認 |
 
-
 | 2026-09-09 | 21:33 | #74 | Issue #260: Web/小型Desktopの共通モーション、Desktop設定・録音中の軌道表現、PWAキャッシュ更新を実装。動作確認済み: EdgeのUniverse/Legacy（1280px・390px）と実Electron fixture smoke、通常/reduced-motion、diff確認。既存PWA更新・実iPhone/macOS・配布版反映は未確認 |
 | 2026-09-09 | 21:43 | #75 | Issue #260: Three.js天体の登場・選択拡大・発光パルスを追加し必要時描画を維持。実WebGL fixture確認・関連13テスト・構文成功。古いSWキャッシュ名のテスト期待値を更新。大量実データ・実iPhone/macOS性能は未確認 |
+| 2026-09-10 | 06:50 | #76 | Proactive openerのセッション外エピソード参照を停止し、誤ったepisode_id=2をSQLite/Chromaから削除（関連10テスト成功、実アプリ・実LLM未確認） |

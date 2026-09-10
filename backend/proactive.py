@@ -40,15 +40,20 @@ def _time_of_day(now: datetime | None = None) -> str:
     return "深夜"
 
 
-def _context_block() -> tuple[str, list[str], dict[str, Any] | None]:
-    """Return recent memory plus the server-backed current work session."""
-    episodes = db.recent_episodes(limit=2)
-    if episodes:
-        latest = str(episodes[-1].get("summary") or "")
-    else:
-        summaries = db.recent_summaries(limit=2)
-        latest = str(summaries[-1].get("summary") or "") if summaries else ""
-    wip = [m["content"] for m in db.all_memory() if m.get("type") == "project"][-3:]
+def _context_block(session_id: str | None = None) -> tuple[str, list[str], dict[str, Any] | None]:
+    """Return same-session user context plus the server-backed current work session.
+
+    Global episode summaries are intentionally excluded: an opener has no reliable
+    way to distinguish an old session's plan or assistant claim from a current fact.
+    """
+    latest = ""
+    if session_id:
+        conversations = db.recent_conversations(limit=2, session_id=session_id)
+        if conversations:
+            latest = str(conversations[-1].get("user_text") or "").strip()
+    # Project memories are also global and may describe an old task; the opener
+    # should use the explicit active work session instead.
+    wip: list[str] = []
     try:
         active_work = work_sessions.active_session()
     except Exception as exc:  # noqa: BLE001
@@ -57,7 +62,7 @@ def _context_block() -> tuple[str, list[str], dict[str, Any] | None]:
     return latest, wip, active_work
 
 
-def generate_opener() -> dict[str, Any]:
+def generate_opener(session_id: str | None = None) -> dict[str, Any]:
     """Generate one proactive opening line. Never raises."""
     tod = _time_of_day()
     if tod == "朝":
@@ -79,7 +84,7 @@ def generate_opener() -> dict[str, Any]:
                 },
             },
         }
-    latest, wip, active_work = _context_block()
+    latest, wip, active_work = _context_block(session_id=session_id)
 
     context_lines = [f"今は{tod}。"]
     if latest:
@@ -95,7 +100,14 @@ def generate_opener() -> dict[str, Any]:
         message = chat_completion(
             [
                 {"role": "system", "content": _SYSTEM},
-                {"role": "user", "content": context},
+                {
+                    "role": "user",
+                    "content": (
+                        f"{context}\n\n"
+                        "この文脈は同一セッションのユーザー発話と現在の作業状態だけです。"
+                        "実行済みであると確認できない操作を、完了した事実として言わないでください。"
+                    ),
+                },
             ],
             tools=None,
             temperature=0.8,
