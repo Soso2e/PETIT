@@ -12,10 +12,6 @@
     "pack": "electron-builder --dir --publish never",
     "test:smoke": "node test/smoke.cjs"
   },
-  "dependencies": {
-    "@picovoice/porcupine-node": "4.0.2",
-    "@picovoice/pvrecorder-node": "1.2.9"
-  },
   "devDependencies": {
     "electron": "44.2.0",
     "electron-builder": "26.15.3",
@@ -35,9 +31,6 @@
         "from": "../frontend/icon-512.png",
         "to": "icon.png"
       }
-    ],
-    "asarUnpack": [
-      "node_modules/@picovoice/**/*"
     ],
     "mac": {
       "target": [

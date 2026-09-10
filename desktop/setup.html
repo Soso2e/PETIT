@@ -7,16 +7,13 @@
 <label>音声認識モデル名<input id="sttModel" placeholder="whisper-1"></label>
 <p class="help">Whisper互換サーバーを別途起動してください。呼び出し後の発話を、このURLへ送信します。空欄なら文字入力で使えます。応答音声は小型画面の「音声応答」で有効にできます。</p>
 <section><h2>「Hey プティ」で呼び出す</h2>
-<p class="help">初回のみAccessKeyを入力してください。ボタンを押すと日本語モデルと呼びかけモデルを取得し、マイクで検出をテストします。生成時はAccessKey・呼びかけ語・OSをPicovoiceに送信します。利用条件・上限は契約に依存します。</p><button id="picovoice-console" type="button">AccessKeyを取得（Picovoice Console）</button><p id="wake-platform" class="help"></p>
-<label>AccessKey（OSで暗号化して保存）<input id="key" type="password" autocomplete="new-password" placeholder="保存済みなら空欄で維持"></label>
-<button id="wake-auto" type="button" class="primary">ウェイクモデルを自動設定</button><button id="wake-cancel" type="button" hidden>中止</button><p id="wake-result" role="status" aria-live="polite"></p>
-<details><summary>詳細設定（手動モデル・AccessKey管理）</summary>
-<label class="check"><input id="clearKey" type="checkbox">保存済みAccessKeyを削除</label>
-<label>カスタムウェイクモデル<div class="file"><input id="keywordPath" readonly><button type="button" data-model="ppn">.ppnを選択</button></div></label>
-<label>日本語モデル<div class="file"><input id="modelPath" readonly><button type="button" data-model="pv">.pvを選択</button></div></label>
-</details>
+<p class="help">ウェイク検出はAccessKey不要のopenWakeWordローカルモデルを使います。モデルと特徴抽出モデルを選択してください。</p><p id="wake-platform" class="help"></p>
+<p id="wake-result" role="status" aria-live="polite"></p>
+<label>ウェイクONNXモデル<div class="file"><input id="modelPath" readonly><button type="button" data-model="onnx">.onnxを選択</button></div></label>
+<label>特徴抽出モデルフォルダ<div class="file"><input id="backbonePath" readonly><button type="button" data-model="dir">フォルダを選択</button></div></label>
+<label>検出しきい値<input id="wakeThreshold" type="number" min="0.05" max="0.99" step="0.01" value="0.45"></label>
 <label class="check"><input id="wakeEnabled" type="checkbox">小型画面を閉じたときに、マイクで呼びかけを待つ</label>
-<p class="help">待機音声は端末内で処理し、保存・サーバー送信しません。小型画面・設定の表示中、ロック中、スリープ中は停止します。アプリ終了中は呼び出せません。自動設定テスト中のみ、設定画面でマイクを使用します。</p></section>
+<p class="help">待機音声は端末内で処理し、保存・サーバー送信しません。小型画面・設定の表示中、ロック中、スリープ中は停止します。アプリ終了中は呼び出せません。</p></section>
 <label class="check"><input id="login" type="checkbox">ログイン時にバックグラウンドで起動（インストール版のみ）</label>
 <label class="check"><input id="updates" type="checkbox">GitHub Releasesを起動時・24時間ごとに確認して更新を通知</label>
 <p class="help">更新のダウンロード・インストールは自分で行います。アプリの更新で会話データを置き換えることはありません。</p>

@@ -32,7 +32,7 @@ Service WorkerにDesktop資産をprecacheせず、DesktopもService Workerを登
 
 | 選択肢 | Windows / macOS | 制約・費用・精度 | 採用範囲 |
 | --- | --- | --- | --- |
-| Porcupine | ローカルNode SDK、日本語、OS/CPU別モデル | AccessKeyと利用条件の確認が必要。日本語`.pv`とカスタム`.ppn`が必要 | 任意・初期検証版として実装 |
+| openWakeWord | Python + ONNXのローカル実行 | 実声・長時間負例の評価が必要 | Desktopウェイク検出に採用 |
 | openWakeWord | Python等で別プロセス化可能 | 公式は英語対応。日本語「プティ」を即時保証できず、学習・誤検知評価が必要 | [v0.1学習環境](openwakeword.md)を追加。Desktop統合は後続 |
 | Voskで全文認識→文字列一致 | 日本語軽量モデルあり | 常時STTは専用検出器より負荷が増える。固有名の誤認識も評価が必要 | 初回不採用 |
 | Web Speech常時再起動 | WebView依存 | 通信・可用性・バックグラウンド・OS差の影響が大きい | 不採用 |
@@ -43,7 +43,7 @@ Service WorkerにDesktop資産をprecacheせず、DesktopもService Workerを登
 
 「プティ」は短く、環境音や会話との区別が難しい可能性がある。初期推奨は日本語モデルの「へいプティ」。実際にConsoleで生成できるフレーズと各OSのモデルを用い、短い「プティ」は誤検知・見逃しを測ってから採用する。名前だけの文字列一致をウェイク検出成功とは扱わない。
 
-`wake-worker.cjs`はElectron utility processでPorcupine＋PvRecorderを実行する。待機PCMは検出器だけに渡し、録音ファイルやサーバーへ送らない。検出時はマイクプロセスを停止し、固定の`wake`イベントだけをMainへ返す。検出語でツールは実行しない。
+`wake-worker.cjs`はElectron utility processからローカルPython/openWakeWordランタイムを起動する。待機PCMは検出器だけに渡し、録音ファイルやサーバーへ送らない。検出時はマイクプロセスを停止し、固定の`wake`イベントだけをMainへ返す。検出語でツールは実行しない。
 
 Mainが小型画面を表示 → AudioWorklet録音 → WAV → 明示設定したSTT URL → 確定文字列 → 共有voice.js → 共有app.js → 既存Chat/確認API、の順に処理する。応答音声は既存TTS。
 

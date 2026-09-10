@@ -1,7 +1,7 @@
 # 「へいプティ」openWakeWord v0.1
 
 Issue #258。AccessKey不要で `hey_petit.onnx` を作る、Windowsローカルの実験用学習環境。
-既存Desktopとは分離している。Desktopのウェイク検出は引き続きPorcupine。
+Desktopのウェイク検出にローカルopenWakeWordランタイムを接続する。
 
 ## 構成
 
@@ -81,6 +81,6 @@ openWakeWordコードのApache-2.0だけで全ての素材の権利が決まる�
 1. ユーザーの実声で「へいプティ」、言い間違い、通常会話を録音し、学習に混ぜない評価セットを作る。
 2. TV・音楽・生活音を含む長時間負例で誤起動回数を測り、しきい値・連続検出・VADを調整する。
 3. 必要なら実音声・多様な背景音を学習へ追加して新バージョンを生成する。
-4. DesktopへPython検出プロセスを接続する。ONNXをPorcupineの`.ppn`欄に指定することはできない。
+4. 実声・長時間負例の評価を行い、しきい値を決める。
 
 公式資料: [openWakeWord](https://github.com/dscripka/openWakeWord)、[言語対応](https://github.com/dscripka/openWakeWord#language-support)、[学習](https://github.com/dscripka/openWakeWord#training-new-models)。

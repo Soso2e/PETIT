@@ -23,7 +23,7 @@ let wakeReady = false, wakeTimer;
 let sleeping = false, locked = false;
 const settingsUrl = pathToFileURL(path.join(__dirname, 'setup.html')).href;
 const defaults = { serverUrl: 'http://127.0.0.1:8000', sttUrl: '', sttModel: 'whisper-1',
-  wakeEnabled: false, keywordPath: '', modelPath: '', encryptedKey: '', login: false, updates: true };
+  wakeEnabled: false, modelPath: '', backbonePath: '', wakeThreshold: 0.45, encryptedKey: '', login: false, updates: true };
 function readConfig() {
   try {
     const value = { ...defaults, ...JSON.parse(fs.readFileSync(configFile, 'utf8')) };
@@ -47,7 +47,7 @@ function stopWake() {
 }
 async function startWake() {
   if (!config.wakeEnabled || wakeFailed || suspended || quitting || overlay?.isVisible() || settingsWindow?.isVisible() || wakeProcess) return;
-  if (!config.keywordPath || !config.modelPath || !config.sttUrl || !wakeKey()) return;
+  if (!config.modelPath || !config.backbonePath || !config.sttUrl) return;
   const token = ++generation;
   if (process.platform === 'darwin' && !(await systemPreferences.askForMediaAccess('microphone'))) {
     if (token !== generation) return;
@@ -74,7 +74,7 @@ async function startWake() {
     else if (message.type === 'ready') { clearTimeout(wakeTimer); wakeReady = true; refreshTray(); }
   });
   child.on('exit', fail);
-  child.on('spawn', () => child.postMessage({ type: 'start', key: wakeKey(), keywordPath: config.keywordPath, modelPath: config.modelPath }));
+  child.on('spawn', () => child.postMessage({ type: 'start', modelPath: config.modelPath, backbonePath: config.backbonePath, threshold: config.wakeThreshold }));
 }
 function refreshTray() {
   if (!tray || !config) return;
@@ -204,12 +204,12 @@ function installIpc() {
   });
   on('settings:read', 'settings', () => ({ ...config, encryptedKey: undefined, hasKey: Boolean(wakeKey()), version: app.getVersion(), shortcutOK, lastWakeError, platform: process.platform, arch: process.arch }));
   on('settings:model', 'settings', async (kind) => {
-    if (!['ppn', 'pv'].includes(kind)) throw new Error('モデル形式が不正です。');
-    const result = await dialog.showOpenDialog(settingsWindow, { properties: ['openFile'], filters: [{ name: 'Porcupine model', extensions: [kind] }] });
+    if (!['onnx', 'dir'].includes(kind)) throw new Error('モデル形式が不正です。');
+    const result = await dialog.showOpenDialog(settingsWindow, { properties: [kind === 'dir' ? 'openDirectory' : 'openFile'], filters: kind === 'onnx' ? [{ name: 'ONNX wake model', extensions: ['onnx'] }] : undefined });
     return result.canceled ? '' : result.filePaths[0];
   });
   on('settings:updates', 'settings', () => checkUpdates(true));
-  on('settings:console', 'settings', () => shell.openExternal('https://console.picovoice.ai/'));
+  on('settings:console', 'settings', () => shell.openExternal('https://github.com/dscripka/openWakeWord'));
   on('settings:wake-cancel', 'settings', () => cancelSetup());
   on('settings:wake-setup', 'settings', async (values = {}) => {
     if (setupController) return { ok: false, message: '自動設定はすでに実行中です。' };
@@ -262,19 +262,17 @@ function installIpc() {
     if (setupController) throw new Error('自動設定が完了するか、中止してから保存してください。');
     const next = { ...defaults, serverUrl: serviceUrl(values.serverUrl, { originOnly: true }),
       sttUrl: values.sttUrl ? serviceUrl(values.sttUrl) : '', sttModel: String(values.sttModel || 'whisper-1').slice(0, 100),
-      keywordPath: String(values.keywordPath || ''), modelPath: String(values.modelPath || ''),
+      modelPath: String(values.modelPath || ''), backbonePath: String(values.backbonePath || ''),
       wakeEnabled: values.wakeEnabled === true, login: values.login === true, updates: values.updates === true,
-      encryptedKey: config.encryptedKey, wakeAuto: config.wakeAuto };
+      encryptedKey: '', wakeThreshold: Number(values.wakeThreshold || 0.45) };
     if (values.clearKey) next.encryptedKey = '';
     if (values.key) {
       if (typeof values.key !== 'string' || values.key.length > 1024 || !safeStorage.isEncryptionAvailable()) throw new Error('AccessKeyを安全に保存できません。OSのキーストアを確認してください。');
       next.encryptedKey = safeStorage.encryptString(values.key).toString('base64');
     }
-    for (const [key, extension] of [['keywordPath', '.ppn'], ['modelPath', '.pv']]) {
-      if (next[key] && (!path.isAbsolute(next[key]) || path.extname(next[key]) !== extension || !fs.statSync(next[key]).isFile())) throw new Error('モデルファイルを選択してください。');
-    }
-    if (next.wakeEnabled && (!next.keywordPath || !next.modelPath || !next.sttUrl || !(next.encryptedKey || process.env.PETIT_PORCUPINE_ACCESS_KEY)))
-      throw new Error('音声待機にはSTT URL・AccessKey・日本語モデル(.pv)・OS別ウェイクモデル(.ppn)が必要です。');
+    if (next.modelPath && (!path.isAbsolute(next.modelPath) || path.extname(next.modelPath) !== '.onnx' || !fs.statSync(next.modelPath).isFile())) throw new Error('ONNXモデルを選択してください。');
+    if (next.backbonePath && (!path.isAbsolute(next.backbonePath) || !fs.statSync(next.backbonePath).isDirectory())) throw new Error('特徴抽出モデルのフォルダを選択してください。');
+    if (next.wakeEnabled && (!next.modelPath || !next.backbonePath || !next.sttUrl)) throw new Error('音声待機にはSTT URL・ONNXモデル・backboneフォルダが必要です。');
     if (next.login && !app.isPackaged) throw new Error('ログイン時の起動はインストール版で設定してください。');
     fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
     fs.renameSync(`${configFile}.tmp`, configFile);

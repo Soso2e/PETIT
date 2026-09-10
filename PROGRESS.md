@@ -139,6 +139,7 @@
 | 2026-09-09 | 17:38 | #70 | Issue #253 / #258調査: Windowsインストール版PETITの起動と保存設定を確認。STT URL未設定、wakeEnabled=false、Porcupineモデル・保存キー未設定のため音声入口は未構成。実装上ウェイクは小型画面非表示時のみ、openWakeWordはDesktop未統合。設定変更・実マイク検証は未実施 |
 | 2026-09-09 | 17:51 | #71 | feat/petit-desktop へ origin/feat/petit-desktop、fix/desktop-wake-auto-setup、main の全最新アップデート・派生ブランチを競合解消して完全マージ統合 |
 | 2026-09-10 | 04:11 | #73 | Windows環境におけるwake-settings.test.cjsのURL形式不一致を修正（全21テスト成功） |
+| 2026-09-10 | 07:30 | #74 | Porcupine依存を削除し、DesktopをローカルopenWakeWord/ONNX＋Pythonマイクランタイムへ接続。実マイク評価は環境依存で未確認 |
 
 
 | 2026-09-09 | 21:33 | #74 | Issue #260: Web/小型Desktopの共通モーション、Desktop設定・録音中の軌道表現、PWAキャッシュ更新を実装。動作確認済み: EdgeのUniverse/Legacy（1280px・390px）と実Electron fixture smoke、通常/reduced-motion、diff確認。既存PWA更新・実iPhone/macOS・配布版反映は未確認 |
