@@ -3,6 +3,8 @@ const { app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, se
   shell, dialog, Notification, powerMonitor, systemPreferences, safeStorage, utilityProcess, screen } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+const { Readable } = require('node:stream');
+const { pipeline } = require('node:stream/promises');
 const { pathToFileURL } = require('node:url');
 const { serviceUrl, isOverlay, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
 const { transcribe } = require('./transcribe.cjs');
@@ -15,6 +17,7 @@ function persistConfig(next) {
   config = next;
 }
 const SHORTCUT = 'CommandOrControl+Shift+Space';
+const MAX_UPDATE_BYTES = 350 * 1024 * 1024;
 let overlay, settingsWindow, tray, wakeProcess, config, configFile;
 let quitting = false, suspended = false, wakeFailed = false, shortcutOK = false, overlayReady = false;
 let pendingActivation = false, sttRequest = null, updateBusy = false, lastUpdate = '';
@@ -161,6 +164,38 @@ function assertSender(event, kind) {
       !(kind === 'settings' ? event.senderFrame.url === settingsUrl : isOverlay(event.senderFrame.url, config.serverUrl)))
     throw new Error('許可されていない呼び出しです。');
 }
+function installerAsset(release) {
+  const version = release.tag_name.replace(/^v/, '');
+  const suffix = process.platform === 'darwin' ? `mac-${process.arch}.dmg` : `win-${process.arch}.exe`;
+  const name = `PETIT-${version}-${suffix}`;
+  const asset = release.assets?.find((item) => item.name === name);
+  if (!asset) return null;
+  const expectedPrefix = `https://github.com/Soso2e/PETIT/releases/download/${encodeURIComponent(release.tag_name)}/`;
+  if (!asset.browser_download_url?.startsWith(expectedPrefix) || asset.browser_download_url !== `${expectedPrefix}${encodeURIComponent(name)}`) return null;
+  return asset;
+}
+async function downloadAndInstallWindows(release) {
+  if (process.platform !== 'win32' || process.arch !== 'x64' || !app.isPackaged) throw new Error('この環境ではアプリ内更新を利用できません。');
+  const asset = installerAsset(release);
+  if (!asset) throw new Error('更新用installerを確認できませんでした。');
+  const destination = path.join(app.getPath('temp'), asset.name);
+  await fs.promises.rm(destination, { force: true }).catch(() => {});
+  const response = await fetch(asset.browser_download_url, { redirect: 'follow', signal: AbortSignal.timeout(120000) });
+  if (!response.ok || !response.body) throw new Error('更新のダウンロードに失敗しました。');
+  const size = Number(response.headers.get('content-length') || 0);
+  if (size && size > MAX_UPDATE_BYTES) throw new Error('更新ファイルのサイズが上限を超えています。');
+  let received = 0;
+  const limiter = new TransformStream({ transform(chunk, controller) {
+    received += chunk.byteLength;
+    if (received > MAX_UPDATE_BYTES) throw new Error('更新ファイルのサイズが上限を超えています。');
+    controller.enqueue(chunk);
+  } });
+  await pipeline(Readable.fromWeb(response.body.pipeThrough(limiter)), fs.createWriteStream(destination, { flags: 'wx' }));
+  const result = await shell.openPath(destination);
+  if (result) throw new Error(`installerを起動できませんでした: ${result}`);
+  quitting = true;
+  app.quit();
+}
 async function checkUpdates(manual = false) {
   if (updateBusy) return '更新確認中です。';
   updateBusy = true;
@@ -170,17 +205,23 @@ async function checkUpdates(manual = false) {
     if (!response.ok) throw new Error('release');
     const release = desktopRelease(await response.json(), app.getVersion(), process.platform, process.arch);
     if (release) {
-      message = `${release.tag_name}を利用できます。GitHub Releasesからインストールしてください。`;
+      const canInstall = process.platform === 'win32' && process.arch === 'x64' && app.isPackaged && installerAsset(release);
+      message = canInstall ? `${release.tag_name}を利用できます。PETITから更新できます。` :
+        `${release.tag_name}を利用できます。GitHub Releasesからインストールしてください。`;
       if (manual) {
-        const answer = await dialog.showMessageBox({ type: 'info', message, buttons: ['Releasesを開く', '後で'], defaultId: 1, cancelId: 1 });
-        if (answer.response === 0) await shell.openExternal(release.html_url);
+        const buttons = canInstall ? ['ダウンロードして更新', 'Releasesを開く', '後で'] : ['Releasesを開く', '後で'];
+        const answer = await dialog.showMessageBox({ type: 'info', message, buttons, defaultId: buttons.length - 1, cancelId: buttons.length - 1 });
+        if (canInstall && answer.response === 0) {
+          await dialog.showMessageBox({ type: 'info', message: '更新をダウンロードします', detail: '完了後にinstallerを起動し、PETITを終了します。' });
+          await downloadAndInstallWindows(release);
+        } else if (answer.response === (canInstall ? 1 : 0)) await shell.openExternal(release.html_url);
       } else if (lastUpdate !== release.tag_name && Notification.isSupported()) {
         const notification = new Notification({ title: 'PETIT アップデート', body: message });
-        notification.on('click', () => void shell.openExternal(release.html_url));
+        notification.on('click', () => void checkUpdates(true));
         notification.show(); lastUpdate = release.tag_name;
       }
     }
-  } catch { message = '更新を確認できませんでした。ネットワークを確認してください。'; }
+  } catch (error) { message = `更新を確認できませんでした。${error?.message ? ` ${error.message}` : 'ネットワークを確認してください。'}`; }
   finally { updateBusy = false; }
   if (manual && !message.includes('利用できます')) await dialog.showMessageBox({ message });
   return message;
@@ -227,7 +268,6 @@ function installIpc() {
       if (!key || key.length > 1024 || /[\r\n]/.test(key)) throw new Error('初回のみPicovoice ConsoleのAccessKeyを入力してください。');
       if (!safeStorage.isEncryptionAvailable()) throw new Error('AccessKeyを安全に保存できません。OSのキーストアを確認してください。');
       const encryptedKey = safeStorage.encryptString(key).toString('base64');
-      // Save the credential once, even when later network/microphone steps need a retry.
       persistConfig({ ...config, encryptedKey });
       stopWake();
       report(`${target.platform} / ${target.arch}：マイク権限を確認中…`);
