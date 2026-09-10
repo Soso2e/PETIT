@@ -7,11 +7,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 from backend import agent, config, db, github_config, github_daily_review, tools
+from backend.tools.builtins import register_builtin_tools
 from backend.tools.registry import registered_names, requires_confirmation
 
 
 class GitHubDailyReviewTests(unittest.TestCase):
     def setUp(self) -> None:
+        register_builtin_tools()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_patch = patch.object(config, "DB_PATH", Path(self.temp_dir.name) / "app.db")
         self.db_patch.start()
