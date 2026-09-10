@@ -1,0 +1,32 @@
+:root { color-scheme: dark; color: #e3ebff; background: #0b1020; font: 14px/1.7 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+* { box-sizing: border-box; } body { margin: 0; } main { max-width: 610px; padding: 28px; margin: auto; }
+h1 { font-size: 23px; font-weight: 550; line-height: 1.4; } p { color: #a8b8d1; }
+.eyebrow { font-size: 11px; letter-spacing: .2em; color: #abdbea; }
+label { display: block; margin: 18px 0 5px; } input:not([type='checkbox']) { display: block; width: 100%; background: #111d32; color: #e8efff; border: 1px solid #7d96bc55; border-radius: 8px; padding: 10px; margin-top: 5px; font: inherit; }
+.check { display: flex; align-items: start; gap: 8px; font-size: 13px; } input[type='checkbox'] { margin-top: 6px; accent-color: #9edced; }
+.help { font-size: 12px; margin-top: 6px; }.file, .actions { display: flex; align-items: center; gap: 8px; }.file input { min-width: 0; }.file button { flex-shrink: 0; }
+button { color: #dce8fa; background: #1c2d47; border: 1px solid #7898bd66; border-radius: 8px; padding: 9px 12px; cursor: pointer; font: inherit; font-size: 12px; }
+.primary { background: #b0d8e4; color: #112339; border: 0; }.actions { margin-top: 22px; justify-content: space-between; }
+details { margin-top: 25px; border-top: 1px solid #ffffff15; border-bottom: 1px solid #ffffff15; padding: 15px 0; } summary { cursor: pointer; }
+#result { color: #ffc4b4; } :focus-visible { outline: 2px solid #b0d8e4; outline-offset: 2px; } kbd { font-size: 12px; }
+
+/* Match the Web/overlay timing; this stylesheet is also packaged offline. */
+@media (prefers-reduced-motion: no-preference) {
+  main { animation: setupEnter 280ms cubic-bezier(.22, .76, .28, 1); }
+  button, input, summary {
+    transition: background-color 140ms ease, border-color 140ms ease,
+      box-shadow 180ms ease, scale 140ms cubic-bezier(.22, .76, .28, 1);
+  }
+  button:enabled:active { scale: .96; }
+  input:focus-visible { box-shadow: 0 0 0 4px #b0d8e414; }
+  details[open] > :not(summary) { animation: setupEnter 220ms cubic-bezier(.22, .76, .28, 1); }
+  #result:not(:empty) { animation: setupEnter 180ms ease-out; }
+}
+@media (hover: hover) and (pointer: fine) {
+  button:enabled:hover { background-color: #2a4162; }
+  button.primary:enabled:hover { background-color: #c3e7f0; }
+}
+@keyframes setupEnter {
+  from { opacity: 0; translate: 0 6px; }
+  to { opacity: 1; translate: 0 0; }
+}

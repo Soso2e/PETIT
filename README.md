@@ -18,6 +18,14 @@ frontend/  チャット UI（静的ファイル）
 storage/   SQLite などの実行時データ（git 管理外）
 ```
 
+## Windows / macOS Desktop（段階導入）
+
+既存PETITへ接続するElectron常駐クライアントを追加しています。小型会話UI、トレイ、グローバルショートカット、更新通知、任意の日本語ウェイク検出に対応する初期実装です。
+`desktop`で`npm ci && npm start`を実行し、接続先を設定してください。音声認識にはWhisper互換サーバー、ウェイク検出は初回AccessKey入力後、「ウェイクモデルを自動設定」でモデル取得とマイク検出テストを行えます。手動モデル選択は詳細設定に残しています。
+設計比較、権限、ビルド、検証範囲は [docs/desktop.md](docs/desktop.md) を参照。iPhoneは既存PWAを継続します。
+
+AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktopへの統合は別途です。
+
 ## セットアップ
 
 1. 依存をインストール:
@@ -40,6 +48,8 @@ storage/   SQLite などの実行時データ（git 管理外）
    プロジェクトルートの `.env` は起動時に自動読込されます。既に設定されているOS環境変数が優先されます。
 
 4. ブラウザで <http://127.0.0.1:8000> を開く。
+
+マイクからチャットへ送る場合は [音声入力の設定・Macの確認手順](docs/voice_mode.md) を参照してください。ブラウザ認識に加え、Whisper互換サーバーによる録音認識を選択できます。
 
 5. 音声読み上げを使う場合は [`docs/aivis_speech.md`](docs/aivis_speech.md) の初期セットアップへ進む。
    - AivisSpeechを使う場合は、Windowsでのインストール → 音声モデル追加 → Engine起動 → `/docs` / `/speakers` → `.env` → 診断CLI → WAV再生の順で確認します。

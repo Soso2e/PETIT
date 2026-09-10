@@ -15,11 +15,13 @@ from backend import (
     project_source_refresh,
 )
 from backend.github_client import normalize_repository
+from backend.tools.builtins import register_builtin_tools
 from backend.tools.registry import registered_names, requires_confirmation
 
 
 class GitHubEvidenceTests(unittest.TestCase):
     def setUp(self) -> None:
+        register_builtin_tools()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_patch = patch.object(config, "DB_PATH", Path(self.temp_dir.name) / "app.db")
         self.db_patch.start()
@@ -180,7 +182,7 @@ class GitHubEvidenceTests(unittest.TestCase):
         self.assertIn("inspect_github_repository", registered_names())
         self.assertIn("sync_github_evidence", registered_names())
         self.assertTrue(requires_confirmation("link_github_repository_candidate"))
-        self.assertTrue(requires_confirmation("ignore_github_repository_candidate"))
+        self.assertFalse(requires_confirmation("ignore_github_repository_candidate"))
 
     def test_snapshot_keeps_evidence_types_distinct_and_idempotent(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")

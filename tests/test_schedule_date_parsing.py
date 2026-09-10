@@ -12,6 +12,7 @@ from backend import agent, config
 from backend.date_parser import has_schedule_date_expression, parse_schedule_date
 from backend.lmstudio_client import LMStudioError
 from backend.tools import registry
+from backend.tools.builtins import register_builtin_tools
 
 
 class ScheduleDateParserTests(unittest.TestCase):
@@ -105,6 +106,7 @@ class ForcedScheduleReadTests(unittest.TestCase):
         self.assertEqual(result["model_route"]["actual_route"], "deterministic")
 
     def test_legacy_and_sona_core_receive_the_same_date_argument(self) -> None:
+        register_builtin_tools()
         target = {"date": "2026-07-13"}
         tool_obj = registry._REGISTRY["get_schedule"]
 

@@ -582,3 +582,84 @@ flowchart TD
 - Project Continuity
 
 Mermaid図と実装が一致しない状態でmainへ反映しないでください。
+
+## 10. Desktop音声入口（Issue #253）
+
+Desktopは既存の会話・承認・TTSを使用する。iPhone PWA / Vocal Shortcutは従来経路を維持する。
+詳細と未確認事項は [desktop.md](desktop.md) を参照。
+
+```mermaid
+flowchart TD
+    Tray[トレイ / グローバルショートカット] --> Main[Electron Main]
+    Mic[任意のローカル待機音声] --> Wake[Porcupine utility process]
+    Wake -->|検出のみ・PCMは送信しない| Main
+    Main --> Stop[待機マイク停止]
+    Stop --> Overlay[小型UI表示]
+    Overlay -->|STT設定済み・音声開始| Capture[AudioWorklet録音 / 発話終了判定]
+    Capture --> Validate[IPC送信元・WAV・同時実行上限検証]
+    Validate --> STT[明示設定されたWhisper互換STT]
+    STT -->|確定文字列| Voice[共有 voice.js]
+    Overlay -->|文字入力| ChatUI[共有 app.js]
+    Voice -->|通常発話| ChatUI
+    Voice -->|確認への返事| Approval[既存確認ボタン]
+    ChatUI --> ChatAPI[既存 /api/chat / PETIT Brain]
+    ChatAPI -->|pending_actions| Approval
+    Approval --> ConfirmAPI[既存 /api/actions / Agent state再開]
+    ConfirmAPI --> Reply[共有返答UI]
+    ChatAPI --> Reply
+    Reply --> TTS[共有 /api/tts / 端末TTS]
+    Hide[閉じる / ロック / スリープ] --> Cancel[録音・STT取消 / 遅延結果を破棄]
+    Cancel --> Resume{非ロック・非スリープ・画面非表示・opt-in?}
+    Resume -->|はい| Wake
+```
+
+
+## 11. Web録音入力（Issue #255）
+
+```mermaid
+flowchart TD
+    Mode[音声入力方式の選択] --> Browser[ブラウザ SpeechRecognition]
+    Mode --> Record[MediaRecorder / マイク権限]
+    Record --> Stop[停止ボタンまたは60秒 / マイク解放]
+    Stop --> API[POST /api/stt / 8MiB上限 / 形式検証]
+    API --> STT[設定したWhisper互換STT / 60秒timeout]
+    STT --> Text[確定テキスト]
+    Browser --> Text
+    Text --> Draft{下書きなし・確認待ちの音声回答か}
+    Draft -->|はい| Confirm[既存の音声確認処理]
+    Draft -->|いいえ| Submit[下書きへ追記 / 既存chat form送信]
+    Submit --> Chat[既存 POST /api/chat]
+    Record -->|拒否・失敗| Error[原因別案内 / 下書き復元 / 送信しない]
+    API -->|未設定・上限超過| Error
+    STT -->|通信・応答失敗| Error
+    Browser -->|認識失敗| Error
+```
+
+## 12. Desktopウェイクモデル自動設定（Issue #256）
+
+```mermaid
+flowchart TD
+    Button[自動設定ボタン] --> Guard[設定画面IPC検証 / 同時実行防止]
+    Guard --> OS[OSと実行アーキテクチャ判定]
+    OS --> Key[AccessKeyをsafeStorageで暗号化保存]
+    Key --> Permission[マイク権限確認 / Mac初回許可]
+    Permission --> Cache{保存済み自動モデルのハッシュと対象が一致?}
+    Cache -->|はい| Init[utility processでPorcupine初期化]
+    Cache -->|いいえ| PV[固定revisionの日本語pv取得 / SHA-256検証]
+    PV --> PPN[Model APIでへいプティ生成 / キーを取得先へ転送しない]
+    PPN --> Stage[userDataへ一時配置]
+    Stage --> Init
+    Init --> Listen[PvRecorder開始 / 30秒の発話案内]
+    Listen --> Detected{実際に検出?}
+    Detected -->|はい| Save[モデルパス自動保存 / 準備完了]
+    Detected -->|時間切れ| Fail[原因表示 / 既存モデル設定維持]
+    OS -->|対象外| Fail
+    Key -->|安全な保存不可| Fail
+    Permission -->|拒否| Fail
+    PV -->|通信・形式・ハッシュ異常| Fail
+    PPN -->|キー・利用上限・生成失敗| Fail
+    Init -->|エラー・時間切れ| Fail
+    Cancel[中止 / 設定終了 / 小型画面表示 / ロック・スリープ] --> Fail
+    Fail --> Cleanup[テスト停止 / 作成途中ファイル削除]
+    Save --> StopTest[テスト停止 / 常時待機の選択は維持]
+```

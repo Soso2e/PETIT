@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import agent, briefing, config, db, notion_project_sync, request_context, summarizer, support_api
+from backend import agent, agent_runtime, briefing, config, db, notion_project_sync, request_context, summarizer, support_api
+from backend.tools.builtins import register_builtin_tools
 
 
 class RoutingAndMemoryHardeningTests(unittest.TestCase):
@@ -79,6 +80,7 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
         self.assertIn("やっほー", greeting_result["reply"])
 
     def test_capability_tool_is_executed_with_compressed_user_context(self) -> None:
+        register_builtin_tools()
         calls: list[dict[str, object]] = []
         dispatched: list[tuple[str, object]] = []
         route = {
@@ -110,14 +112,12 @@ class RoutingAndMemoryHardeningTests(unittest.TestCase):
             return json.dumps({"ok": True, "forecast": "rain", "raw": "transport noise"}, ensure_ascii=False)
 
         with (
-            patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
-            patch.object(agent.model_router, "choose", return_value=route),
-            patch.object(config, "CHAT_MODEL", "chat-test"),
+            patch.object(agent_runtime.capability_router, "choose", return_value=route),
             patch.object(config, "AGENT_MODEL", "agent-test"),
-            patch.object(agent, "chat_completion", side_effect=fake_chat),
-            patch.object(agent.tools, "dispatch", side_effect=fake_dispatch),
+            patch.object(agent_runtime, "chat_completion", side_effect=fake_chat),
+            patch.object(agent_runtime.tools, "dispatch", side_effect=fake_dispatch),
         ):
-            result = agent.run("傘を持っていくべき？")
+            result = agent_runtime.run("傘を持っていくべき？")
 
         self.assertEqual([name for name, _ in dispatched], ["get_weather"])
         self.assertEqual([item["name"] for item in result["used_tools"]], ["get_weather"])

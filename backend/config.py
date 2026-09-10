@@ -234,3 +234,8 @@ def timetree_configured() -> bool:
 
 # Ensure storage exists
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Optional Web microphone transcription (Whisper-compatible multipart endpoint).
+STT_URL = os.getenv("PETIT_STT_URL", "").strip()
+STT_MODEL = os.getenv("PETIT_STT_MODEL", "whisper-1").strip()
+STT_API_KEY = os.getenv("PETIT_STT_API_KEY", "").strip()

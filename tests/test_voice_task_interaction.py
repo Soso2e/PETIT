@@ -24,15 +24,18 @@ def _literal_assignment(module: ast.Module, name: str) -> Any:
 
 
 class VoiceTaskInteractionTests(unittest.TestCase):
-    def test_recurring_prompts_are_compact_and_plain_text(self) -> None:
-        _source, module = _module("backend/agent.py")
-        chat_prompt = _literal_assignment(module, "CHAT_SYSTEM_PROMPT")
-        agent_prompt = _literal_assignment(module, "AGENT_SYSTEM_PROMPT")
-        self.assertLess(len(chat_prompt), 120)
-        self.assertLess(len(agent_prompt), 450)
-        self.assertIn("PETIT", chat_prompt)
-        self.assertIn("PETIT", agent_prompt)
-        self.assertIn("プレーンテキスト", agent_prompt)
+    def test_shared_prompt_preserves_speech_friendly_output(self) -> None:
+        # Issue #235 unified both aliases; they are no longer string literals.
+        _source, module = _module("backend/petit_prompt.py")
+        prompt = _literal_assignment(module, "CORE_SYSTEM_PROMPT")
+        self.assertIn("PETIT", prompt)
+        self.assertIn("読み上げやすいプレーンテキスト", prompt)
+        _source, agent_module = _module("backend/agent.py")
+        for name in ("CHAT_SYSTEM_PROMPT", "AGENT_SYSTEM_PROMPT"):
+            assignment = next(node for node in agent_module.body if isinstance(node, ast.Assign)
+                              and any(isinstance(target, ast.Name) and target.id == name for target in node.targets))
+            self.assertIsInstance(assignment.value, ast.Name)
+            self.assertEqual(assignment.value.id, "CORE_SYSTEM_PROMPT")
 
     def test_task_management_is_exposed_as_one_contextual_capability(self) -> None:
         source, _module_ast = _module("backend/capability_router.py")

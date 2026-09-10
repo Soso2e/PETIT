@@ -86,7 +86,8 @@ class CompactChatContextTests(unittest.TestCase):
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["route"], "agent")
-        self.assertIn("直接対応Toolをcallする", agent_runtime._AGENT_SYSTEM_PROMPT)
+        self.assertIn("書き込み確認と実行制御はRuntimeに任せる", agent_runtime._AGENT_SYSTEM_PROMPT)
+        self.assertIn("話題提示だけから作成・変更を推測しない", agent_runtime._AGENT_SYSTEM_PROMPT)
         self.assertIn("事実に基づき", agent_runtime._AGENT_SYSTEM_PROMPT)
 
 

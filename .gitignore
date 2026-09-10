@@ -23,3 +23,10 @@ storage/audit/
 .DS_Store
 .idea/
 .vscode/
+
+# Desktop build output (keep package-lock.json tracked)
+desktop/node_modules/
+desktop/dist/
+
+# Local wake-word training environment, audio and generated models
+storage/wakeword/

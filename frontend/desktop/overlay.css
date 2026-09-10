@@ -1,0 +1,55 @@
+:root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #e8edff; background: #0a1020; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100dvh; overflow: hidden; background: radial-gradient(ellipse at 50% 20%, #233b5938, transparent 60%); }
+header { height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; -webkit-app-region: drag; border-bottom: 1px solid #ffffff0b; }
+.brand { font-size: 12px; letter-spacing: .2em; font-weight: 650; }
+.spark { color: #a0e1f1; margin-right: 6px; }
+#desktop-version { color: #a7b5cc; font-size: 9px; letter-spacing: 0; margin-left: 4px; }
+nav { display: flex; gap: 4px; }
+button, textarea { -webkit-app-region: no-drag; font: inherit; }
+button { cursor: pointer; border: 1px solid transparent; color: #c9d6eb; background: transparent; border-radius: 10px; min-width: 30px; min-height: 30px; }
+button:hover { background: #ffffff12; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid #a4ddec; outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: default; }
+main { height: calc(100% - 48px); display: flex; flex-direction: column; padding: 0 20px 12px; }
+.presence { position: relative; flex-shrink: 0; height: 95px; display: grid; place-items: center; }
+.orb { width: 44px; height: 44px; border-radius: 50%; background: radial-gradient(circle at 30% 25%, #f3fbff, #a3dce4 16%, #638bbc 43%, #342c69 77%); box-shadow: 0 0 32px #75bddf33, inset -5px -8px 15px #0b1636; }
+.orbit { position: absolute; width: 88px; height: 32px; border: 1px solid #abcdf848; border-radius: 50%; transform: rotate(-24deg); box-shadow: 0 0 18px #80b9eb0c; }
+body[data-listening='true'] .orb { animation: breathe 1.5s ease-in-out infinite; }
+.intro { text-align: center; margin-top: -4px; }
+.intro p { font-size: 19px; font-weight: 500; margin: 0 0 8px; letter-spacing: .06em; }
+#status { font-size: 10px; color: #95a6c2; display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#messages { flex: 1; overflow: auto; padding: 16px 0 8px; scrollbar-width: thin; min-height: 55px; }
+.msg { margin: 0 0 12px; display: flex; align-items: end; gap: 4px; font-size: 13px; line-height: 1.65; }
+.bubble { white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg--user { justify-content: flex-end; }
+.msg--user .bubble { padding: 8px 12px; border-radius: 14px 14px 3px 14px; background: #26334e; max-width: 90%; }
+.msg--assistant .bubble { color: #dce8fc; }
+.bubble--error, .voice-state--error { color: #ffc0b4 !important; }
+.tools, .model-route { font-size: 10px; color: #94a7c5; }
+.action-confirm { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.action-confirm button { border-color: #8fb0dd55; padding: 4px 12px; }
+.action-preview { flex-basis: 100%; margin: 0; font-size: 12px; }
+.action-preview dd { margin-left: 0; }
+.action-preview dt { color: #91a2bf; }
+.replay { flex-shrink: 0; font-size: 11px; }
+#chat-form { border: 1px solid #93b7e038; border-radius: 16px; padding: 8px; display: flex; align-items: end; gap: 4px; background: #ffffff06; }
+textarea { resize: none; flex: 1; width: 0; color: #edf5ff; border: 0; background: transparent; padding: 6px 4px; font-size: 13px; max-height: 90px; }
+textarea::placeholder { color: #8d9ab4; }
+#send { background: #bddde9; color: #13223c; font-size: 22px; }
+.mic--listening { color: #adf4f1; background: #5a999333; }
+.voice-footer { min-height: 35px; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+#voice-state { font-size: 10px; color: #a5b7d3; }
+#voice-toggle { flex-shrink: 0; font-size: 10px; padding: 2px 5px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.appearing main { animation: appear .24s ease-out; }
+@media (prefers-reduced-motion: no-preference) {
+  .appearing .presence { animation: appear .4s cubic-bezier(.22, .76, .28, 1); }
+  .appearing .intro { animation: appear .32s cubic-bezier(.22, .76, .28, 1); }
+  .orb { transition: box-shadow 240ms ease; }
+  body[data-listening='true'] .orbit { animation: listeningOrbit 3s ease-in-out infinite; }
+}
+@keyframes listeningOrbit { 50% { transform: rotate(-12deg) scale(1.08); opacity: .55; } }
+@keyframes appear { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes breathe { 50% { transform: scale(1.1); box-shadow: 0 0 45px #75bddf55; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

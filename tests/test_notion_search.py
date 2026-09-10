@@ -7,9 +7,13 @@ from unittest.mock import patch
 from backend import agent, config, notion_search
 from backend.notion_client import NotionError
 from backend import tools
+from backend.tools.builtins import register_builtin_tools
 
 
 class NotionSearchTests(unittest.TestCase):
+    def setUp(self) -> None:
+        register_builtin_tools()
+
     def test_normalize_query_extracts_subject_from_natural_request(self) -> None:
         self.assertEqual(
             notion_search.normalize_query("Notionから卒研に関する情報あったら、今どんな感じか教えて"),
@@ -80,6 +84,9 @@ class NotionSearchTests(unittest.TestCase):
 
 
 class NotionSearchRoutingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        register_builtin_tools()
+
     @staticmethod
     def route() -> dict:
         return {
