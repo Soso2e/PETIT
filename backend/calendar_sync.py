@@ -93,15 +93,33 @@ def sync() -> dict[str, Any]:
             "error": error, "configured": bool(specs), "sources": results, "synced": total}
 
 
+def _ensure_label_metadata_table(conn: Any) -> None:
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS calendar_event_metadata ("
+        "source_key TEXT NOT NULL, external_id TEXT NOT NULL, "
+        "label_name TEXT, label_color TEXT, label_id TEXT, updated_at TEXT NOT NULL, "
+        "PRIMARY KEY(source_key, external_id))"
+    )
+
+
 def _replace_source(source_key: str, source: str, events: list[dict[str, Any]]) -> None:
     now = db.now_iso()
     with db.get_connection() as conn:
+        _ensure_label_metadata_table(conn)
         conn.execute("DELETE FROM calendar_events_cache WHERE source_key = ?", (source_key,))
+        conn.execute("DELETE FROM calendar_event_metadata WHERE source_key = ?", (source_key,))
         for event in events:
             external_id = event.get("external_id") or hashlib.sha256(
                 f"{event['title']}|{event['start_time']}|{event.get('end_time') or ''}".encode()).hexdigest()
             conn.execute("INSERT INTO calendar_events_cache (source, source_key, external_id, title, start_time, end_time, location, description, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                          (source, source_key, external_id, event["title"], event["start_time"], event.get("end_time"), event.get("location"), event.get("description"), now))
+            if event.get("label_name") or event.get("label_color") or event.get("label_id"):
+                conn.execute(
+                    "INSERT INTO calendar_event_metadata "
+                    "(source_key, external_id, label_name, label_color, label_id, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (source_key, external_id, event.get("label_name"), event.get("label_color"), event.get("label_id"), now),
+                )
 
 
 def parse_ics(text: str) -> list[dict[str, Any]]:
@@ -125,7 +143,10 @@ def _event_from_props(props: dict[str, str]) -> dict[str, Any] | None:
     if not title or not start: return None
     return {"external_id": props.get("UID") or None, "title": title, "start_time": start,
             "end_time": _normalize_ical_datetime(props.get("DTEND")), "location": props.get("LOCATION") or None,
-            "description": props.get("DESCRIPTION") or None}
+            "description": props.get("DESCRIPTION") or None,
+            "label_name": props.get("CATEGORIES") or None,
+            "label_color": props.get("COLOR") or None,
+            "label_id": props.get("X-TIMETREE-LABEL-ID") or props.get("X-TIMETREE-LABEL") or None}
 
 
 def _read_url(url: str) -> str:
