@@ -50,27 +50,29 @@ const server = http.createServer(async (request, response) => {
   try {
     fs.writeFileSync(path.join(profile, 'package.json'), JSON.stringify({ name: 'petit-desktop-smoke', version: '0.20.0', main: 'bootstrap.cjs' }));
     instance = await electron.launch({ args: [profile], cwd: path.join(root, 'desktop'), timeout: 30000 });
-    const probe = path.join(profile, 'probe.cjs');
-    const nativeBase = process.env.PETIT_PACKAGED_ASAR || path.join(root, 'desktop');
-    fs.writeFileSync(probe, `require(${JSON.stringify(path.join(nativeBase, 'node_modules/@picovoice/pvrecorder-node'))}); require(${JSON.stringify(path.join(nativeBase, 'node_modules/@picovoice/porcupine-node'))}); process.parentPort.postMessage('loaded');`);
+    const wakeWorker = path.join(root, 'desktop/wake-worker.cjs');
     assert.equal(await instance.evaluate(({ utilityProcess }, file) => new Promise((resolve) => {
       const child = utilityProcess.fork(file, [], { stdio: 'ignore' });
-      const timer = setTimeout(() => { child.kill(); resolve(false); }, 5000);
-      child.on('message', (value) => { clearTimeout(timer); child.kill(); resolve(value === 'loaded'); });
-      child.on('exit', () => { clearTimeout(timer); resolve(false); });
-    }), probe), true, 'native SDKs load in the actual utility process without opening a microphone');
+      let done = false; let timer;
+      const finish = (value) => {
+        if (done) return; done = true; clearTimeout(timer);
+        if (value) child.kill();
+        resolve(value);
+      };
+      timer = setTimeout(() => finish(true), 300);
+      child.on('exit', () => finish(false));
+      child.on('error', () => finish(false));
+    }), wakeWorker), true, 'openWakeWord worker loads in the actual utility process without opening a microphone');
     const setup = await instance.firstWindow();
     await setup.emulateMedia({ reducedMotion: 'no-preference' });
     assert.equal(await setup.locator('main').evaluate((el) => getComputedStyle(el).animationName), 'setupEnter');
     await setup.emulateMedia({ reducedMotion: 'reduce' });
     assert.equal(await setup.locator('main').evaluate((el) => getComputedStyle(el).animationName), 'none');
     await setup.emulateMedia({ reducedMotion: 'no-preference' });
-    await setup.locator('#wake-auto').click();
-    await setup.getByText('初回のみPicovoice ConsoleのAccessKeyを入力してください。', { exact: true }).waitFor();
-    assert.equal(await setup.locator('#wake-auto').isEnabled(), true);
-    assert.equal(await setup.locator('[data-model=ppn]').isVisible(), false);
-    await setup.locator('summary').click();
-    assert.equal(await setup.locator('[data-model=ppn]').isVisible(), true);
+    assert.equal(await setup.locator('[data-model=onnx]').isVisible(), true);
+    assert.equal(await setup.locator('[data-model=dir]').isVisible(), true);
+    assert.equal(await setup.locator('#wakeThreshold').inputValue(), '0.45');
+    assert.equal(await setup.locator('#wakeEnabled').isChecked(), false);
     await setup.locator('#serverUrl').fill(origin);
     await setup.locator('#updates').uncheck();
     const opened = instance.waitForEvent('window', { predicate: (page) => page !== setup });
