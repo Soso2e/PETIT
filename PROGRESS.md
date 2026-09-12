@@ -6,7 +6,7 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- Desktop v0.21.0 Release: Desktop Release本体とWakeモデル配布を分離。`PETIT_WAKE_MODEL_URL` / `PETIT_WAKE_MODEL_SHA256` がどちらも未設定なら、`wake-model.json` に `included=false` を明示したモデルなしinstallerを正常生成する。URLまたはSHAのどちらかが設定された場合はWakeモデル配布を有効扱いにし、HTTPS・SHA-256検証を必須化するため、半端な設定やSHA不一致はbuild失敗のまま。GitHub Actions Run #90でモデル未同梱のmacOS arm64 DMG / Windows x64 EXEを実生成し、両OSともnpm test・Smoke・installer build・packaged Wake resources・Artifact upload成功。`VERSION`は0.21.0へ同期済み。`.github/workflows/desktop-release.yml` に、mainのversion整合確認→annotated tag作成/再利用→tag refでDesktop Release workflow起動までを1回の手動Actionsで行う導線を追加。実`v0.21.0`タグ作成とGitHub Release実行は未実施。
+- Desktop v0.21.0 Release: Desktop Release本体とWakeモデル配布を分離。`PETIT_WAKE_MODEL_URL` / `PETIT_WAKE_MODEL_SHA256` がどちらも未設定なら、`wake-model.json` に `included=false` を明示したモデルなしinstallerを正常生成する。URLまたはSHAのどちらかが設定された場合はWakeモデル配布を有効扱いにし、HTTPS・SHA-256検証を必須化するため、半端な設定やSHA不一致はbuild失敗のまま。GitHub Actions Run #90でモデル未同梱のmacOS arm64 DMG / Windows x64 EXEを実生成し、両OSともnpm test・Smoke・installer build・packaged Wake resources・Artifact upload成功。`VERSION`は0.21.0へ同期済み。`.github/workflows/desktop-release.yml` に、mainのversion整合確認→annotated tag作成/再利用→tag refでDesktop Release workflow起動までを1回の手動Actionsで行う導線を追加。`v0.21.0`タグをrelease準備済みmain（`9b6a517`）へ作成し、Desktop Release Run #92でtest・macOS arm64・Windows x64・GitHub Release作成が全て成功。`PETIT-0.21.0-mac-arm64.dmg` / `PETIT-0.21.0-win-x64.exe` をReleaseへ添付済み。macOSは署名資格情報未設定のため個人利用向け未署名DMG。
 
 - Issue #270 Step 3: Desktop openWakeWordのinstaller配布経路を実装。WakeモデルはGit管理外のまま、build時にローカル`storage/wakeword/models/v0.1/hey_petit.onnx`または`PETIT_WAKE_MODEL_URL` + `PETIT_WAKE_MODEL_SHA256`から注入でき、HTTPS・SHA-256検証、`wake-model.json` manifest同梱、packaged resources検証を行う。Wakeモデル配布が未設定でもDesktop Release本体は成立する。未完了は、Wakeを配布する場合の実モデル配布元、インストール版の自動設定→diagnostic、実マイクWake `ready`、実声「Hey プティ」検出と誤起動評価。
 
@@ -65,7 +65,7 @@
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
 - Windows起動導線: `scripts/start-petit-tailscale.ps1` で起動モード選択、Tailscale接続、`.venv` のPETIT起動、`/api/health`確認、管理者権限付きTailscale Serve、ブラウザ起動まで実行する。LM Studioは事前起動が必要。
 - 今回の検証: Context Broker単体・Brain routeの回帰テストを追加。GitHub Actions / pytest / 実LM Studio E2Eは未確認。
-- 次にやること: GitHub Actionsの`Create PETIT Desktop Release`を実行し、`v0.21.0`タグ作成→tag refでDesktop Releaseを起動→DMG/EXE付きGitHub Release生成を確認する。その後Issue #270で実モデル配布・自動設定diagnostic・実マイク`ready`・実声/誤起動評価を継続し、Issue #235の実LM Studio検証へ戻る。
+- 次にやること: v0.21.0 ReleaseのWindows EXE / macOS DMGを実機インストールして更新・設定保持を受入確認する。WakeはIssue #270で実モデル配布・自動設定diagnostic・実マイク`ready`・実声/誤起動評価を継続し、その後Issue #235の実LM Studio検証へ戻る。
 
 ## 履歴
 
@@ -159,3 +159,4 @@
 | 2026-09-12 | 10:24 | #78 | Issue #270 Step 2: Desktop設定からopenWakeWord環境を一括準備できる導線を追加。Python検出、専用venv、依存、backbone、既存/生成済みWakeモデルの管理領域化、マイクなしdiagnostic、進捗/中止、managed runtimeパス保存を実装し、Desktop CI成功。packagedモデル同梱・実マイク`ready`・実声はStep 3へ残す。 |
 | 2026-09-12 | 10:53 | #79 | Issue #270 Step 3 / PR #272: Desktop openWakeWordのinstaller配布経路を実装。Wakeモデルをbuild時にローカルまたはURL+SHA-256から注入し、manifest同梱・packaged resource検証を追加。Run #76でmacOS arm64 DMG / Windows x64 EXE生成とSmoke/packaged検証に成功。実モデル同梱build、自動設定→diagnostic、実マイク`ready`、実声/誤起動評価は実機受入として継続。 |
 | 2026-09-12 | 12:53 | #80 | v0.21.0 Release blockerを解消。Wakeモデル未設定時は未同梱manifest付きinstaller/Releaseを許可し、モデル配布設定が存在する場合だけHTTPS+SHA-256検証を必須化。Run #90でモデルなしmacOS arm64/Windows x64 packageを実生成し全工程成功。`VERSION`同期と1ボタンRelease workflowを追加し、実タグ/Release実行のみ未確認。Issue #270はWake実機受入として継続。 |
+| 2026-09-12 | 13:02 | #81 | v0.21.0を正式Release。タグは`9b6a517`へ作成し、Run #92でtest・macOS arm64未署名DMG・Windows x64 EXE・packaged Wake resources・GitHub Release作成が全て成功。Release資産2件を公開。Wakeモデルは未同梱で、実機Wake受入はIssue #270で継続。 |
