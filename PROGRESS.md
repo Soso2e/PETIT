@@ -2,9 +2,11 @@
 
 **Current Version: v0.20.0**
 
-**Last Updated: 2026-09-09**
+**Last Updated: 2026-09-12**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化。旧Picovoice/Porcupine AccessKey・PPN・自動生成IPC・暗号化キー保存を撤去し、旧設定を読み込んだ場合も秘密情報と旧モデルmetadataを自動除去する。WakeはONNX分類モデル＋melspectrogram/embedding backbone＋Python runtimeのみを使用。Step 2でPython/venv/backbone/モデルの自動準備とdiagnosticを実装予定。
 
 - Issue #260追加: Three.js Univに天体の登場・選択拡大・発光パルスを実装。実WebGL fixtureで登場・選択・連続選択・reduced motion・描画停止を確認し、関連13テスト成功。大量実データ・実iPhone/macOS性能は未確認。詳細は `docs/universe-motion.md`。
 
@@ -16,9 +18,9 @@
 
 - Proactive openerの古い全体エピソード参照を停止し、同一sessionのユーザー発話と現在の作業だけを候補に変更。誤ったepisode_id=2（「全10件のタスクがキャンセル済み」）をSQLite/Chromaから削除し、DBバックアップを保存。関連テスト成功、実アプリ起動・実LLM表示は未確認。
 
-- Issue #258: `scripts/wakeword/` にWindows/Python 3.13の独立したopenWakeWord学習環境を追加。日本語SAPI合成624クリップを話者分離して学習し、`storage/wakeword/models/v0.1/hey_petit.onnx` を生成済み。ONNX構造・出力一致・openWakeWord実推論・関連2テスト・依存整合・構文を確認。しきい値0.45でtest正例12/12検出、負例11/144誤検出。合成音声のみの実験モデルで、常時待機の実用精度は未達。実声・長時間負例・実マイク評価とDesktop統合が次の作業。詳細は `docs/openwakeword.md`。Desktopは引き続きPorcupine。
+- Issue #258: `scripts/wakeword/` にWindows/Python 3.13の独立したopenWakeWord学習環境を追加。日本語SAPI合成624クリップを話者分離して学習し、`storage/wakeword/models/v0.1/hey_petit.onnx` を生成済み。ONNX構造・出力一致・openWakeWord実推論・関連2テスト・依存整合・構文を確認。しきい値0.45でtest正例12/12検出、負例11/144誤検出。合成音声のみの実験モデルで、常時待機の実用精度は未達。実声・長時間負例・実マイク評価とDesktop統合が次の作業。詳細は `docs/openwakeword.md`。Desktop実行経路はopenWakeWordへ移行済み。
 
-- Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、任意Porcupineウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。Desktop配布はPR=テストのみ、手動Actions=macOS arm64/Windows x64開発Artifact、main上のversion一致`v*`タグ=両OSビルド＋GitHub Release自動添付へ整理。未署名中は手動Artifactで検証し、公開タグは切らない。既存Core CI相当はTool Registry未初期化と旧Prompt前提の失敗が別途残るため、PRはDraftで提出する。
+- Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、openWakeWordウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。Desktop配布はPR=テストのみ、手動Actions=macOS arm64/Windows x64開発Artifact、main上のversion一致`v*`タグ=両OSビルド＋GitHub Release自動添付へ整理。未署名中は手動Artifactで検証し、公開タグは切らない。
 
 - Issue #249 / #245: Web中心のJARVIS設計を `docs/jarvis-agent.md` に整理。BrokerへMemory/BRAIN/Work/Reminders/Handoff、待ち時間・同時実行・Context量の上限、2回目Brainへの状況継続を追加。PC観測は既定無効の任意Module。作業ブランチで関連58テスト・Python構文・diff確認済み。実LLM・外部サービス・PWA E2E、Conversation State統合、永続提案・自律実行は未完了。
 
@@ -114,7 +116,7 @@
 | 2026-08-22 | 16:43 | #47 | Issue #168: Task ID付き作業履歴、状態遷移イベント、今日・期間集計、チャットTool、Universeのサーバーactive同期を実装（関連自動テスト・構文確認済み、実LM Studio・PC／iPhone E2E未確認） |
 | 2026-08-17 | 00:00 | #47 | Git整理の中間対応として、`c26db2b` から `feat/chat-work-session` を作成し、整理前の `agent/univ-three-work-chat` を `backup-before-branch-cleanup-20260817` タグへ保存（リモート削除・履歴書き換えは未実施） |
 | 2026-08-17 | 00:00 | #48 | GitHub上のリモートブランチを `main` と `feat/chat-work-session` に整理し、重複リモート `PETIT` と旧ローカルブランチ `agent/univ-three-work-chat` を削除（作業ブランチはPush済み、PROGRESS変更は未コミット） |
-| 2026-08-17 | 00:00 | #49 | Issue #215: Univ表示時のhtml/body・メイン領域を固定し、safe-area対応の100dvh viewportとWebGL単一背景を実装（関連回帰26件成功、実ブラウザ・実iPhone未確認） |
+| 2026-08-17 | 00:00 | #49 | Issue #215: Univ表示時だけページを固定し、safe-area対応の100dvh viewportとWebGL単一背景を実装（関連回帰26件成功、実ブラウザ・実iPhone未確認） |
 | 2026-08-16 | 16:36 | #50 | Issue #215: URL直開き時のWebGL未読込と詳細初期化例外を修正し、星の1クリックFocus・HUD同期、全画面Canvas、PC／390x844のHUD・詳細配置を再調整（関連57件・実ブラウザ成功、実iPhone未確認） |
 | 2026-08-16 | 23:04 | #47 | Issue #215: v0.18.0としてUnivを100dvh固定Three.js空間へ統一し、WebGL時のCSS背景重複を廃止、mobile safe-area内へHUDを固定（静的回帰テスト追加、実PC／iPhone操作感は未確認） |
 | 2026-08-18 | 11:53 | #48 | Issue #218: 「へいプティ」Vocal Shortcut向け `POST /api/voice` を追加し、既存 `/api/chat` へ委譲。最新mainへ競合解消し、確認付き書き込み・回帰テスト・iPhone設定手順を維持（実iPhone E2E未確認） |
@@ -147,3 +149,4 @@
 | 2026-09-09 | 21:33 | #74 | Issue #260: Web/小型Desktopの共通モーション、Desktop設定・録音中の軌道表現、PWAキャッシュ更新を実装。動作確認済み: EdgeのUniverse/Legacy（1280px・390px）と実Electron fixture smoke、通常/reduced-motion、diff確認。既存PWA更新・実iPhone/macOS・配布版反映は未確認 |
 | 2026-09-09 | 21:43 | #75 | Issue #260: Three.js天体の登場・選択拡大・発光パルスを追加し必要時描画を維持。実WebGL fixture確認・関連13テスト・構文成功。古いSWキャッシュ名のテスト期待値を更新。大量実データ・実iPhone/macOS性能は未確認 |
 | 2026-09-10 | 06:50 | #76 | Proactive openerのセッション外エピソード参照を停止し、誤ったepisode_id=2をSQLite/Chromaから削除（関連10テスト成功、実アプリ・実LLM未確認） |
+| 2026-09-12 | 10:10 | #77 | Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化し、旧Picovoice/Porcupine AccessKey・PPN・自動設定IPC・暗号化キー保存を撤去。旧設定読込時の秘密情報/metadata除去とopenWakeWordエラー分類の回帰テストを追加（実マイク・installerはStep 3で確認） |
