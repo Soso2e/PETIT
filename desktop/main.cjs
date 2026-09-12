@@ -20,7 +20,7 @@ let wakeReady = false, wakeTimer;
 let sleeping = false, locked = false;
 const settingsUrl = pathToFileURL(path.join(__dirname, 'setup.html')).href;
 const defaults = { serverUrl: 'http://127.0.0.1:8000', sttUrl: '', sttModel: 'whisper-1',
-  wakeEnabled: false, modelPath: '', backbonePath: '', wakePythonPath: '', wakeRuntimePath: '',
+  wakeEnabled: false, modelPath: '', backbonePath: '', wakePythonPath: '',
   wakeThreshold: 0.45, login: false, updates: true };
 function persistConfig(next) {
   fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
@@ -41,13 +41,12 @@ function readConfig() {
       modelPath,
       backbonePath: typeof raw.backbonePath === 'string' ? raw.backbonePath : '',
       wakePythonPath: typeof raw.wakePythonPath === 'string' ? raw.wakePythonPath : '',
-      wakeRuntimePath: typeof raw.wakeRuntimePath === 'string' ? raw.wakeRuntimePath : '',
       wakeThreshold: Number.isFinite(threshold) && threshold >= 0.05 && threshold <= 0.99 ? threshold : defaults.wakeThreshold,
       wakeEnabled: raw.wakeEnabled === true && Boolean(modelPath && raw.backbonePath),
       login: raw.login === true,
       updates: raw.updates !== false,
     };
-    const hadLegacyWakeConfig = ['encryptedKey', 'keywordPath', 'wakeAuto'].some((key) => Object.hasOwn(raw, key));
+    const hadLegacyWakeConfig = ['encryptedKey', 'keywordPath', 'wakeAuto', 'wakeRuntimePath'].some((key) => Object.hasOwn(raw, key));
     if (hadLegacyWakeConfig) persistConfig(value);
     return value;
   } catch { return { ...defaults }; }
@@ -90,7 +89,7 @@ async function startWake() {
   });
   child.on('exit', () => fail('runtime'));
   child.on('spawn', () => child.postMessage({ type: 'start', modelPath: config.modelPath, backbonePath: config.backbonePath,
-    pythonPath: config.wakePythonPath || undefined, runtimePath: config.wakeRuntimePath || undefined, threshold: config.wakeThreshold }));
+    pythonPath: config.wakePythonPath || undefined, threshold: config.wakeThreshold }));
 }
 function refreshTray() {
   if (!tray || !config) return;
@@ -276,7 +275,7 @@ function installIpc() {
       });
       controller.signal.throwIfAborted();
       persistConfig({ ...config, modelPath: prepared.modelPath, backbonePath: prepared.backbonePath,
-        wakePythonPath: prepared.pythonPath, wakeRuntimePath: prepared.runtimePath });
+        wakePythonPath: prepared.pythonPath });
       wakeFailed = false; lastWakeError = '';
       return { ok: true, modelPath: config.modelPath, backbonePath: config.backbonePath,
         message: 'openWakeWordの準備とdiagnosticが完了しました。STT URLを設定し、音声待機をONにして保存してください。' };
@@ -294,7 +293,7 @@ function installIpc() {
     const next = { ...defaults, serverUrl: serviceUrl(values.serverUrl, { originOnly: true }),
       sttUrl: values.sttUrl ? serviceUrl(values.sttUrl) : '', sttModel: String(values.sttModel || 'whisper-1').slice(0, 100),
       modelPath: String(values.modelPath || ''), backbonePath: String(values.backbonePath || ''),
-      wakePythonPath: config.wakePythonPath || '', wakeRuntimePath: config.wakeRuntimePath || '',
+      wakePythonPath: config.wakePythonPath || '',
       wakeEnabled: values.wakeEnabled === true, login: values.login === true, updates: values.updates === true,
       wakeThreshold: threshold };
     if (next.modelPath && (!path.isAbsolute(next.modelPath) || path.extname(next.modelPath).toLowerCase() !== '.onnx' || !fs.statSync(next.modelPath).isFile())) throw new Error('ONNXモデルを選択してください。');
