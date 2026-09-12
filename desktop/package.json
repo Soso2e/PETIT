@@ -30,6 +30,14 @@
       {
         "from": "../frontend/icon-512.png",
         "to": "icon.png"
+      },
+      {
+        "from": "../scripts/wakeword/runtime.py",
+        "to": "wakeword/runtime.py"
+      },
+      {
+        "from": "../scripts/wakeword/requirements.txt",
+        "to": "wakeword/requirements.txt"
       }
     ],
     "mac": {
