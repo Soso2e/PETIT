@@ -19,8 +19,16 @@ on:
         required: false
         type: string
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+    paths:
+      - 'desktop/**'
+      - 'frontend/desktop/**'
+      - 'frontend/voice.js'
+      - 'scripts/wakeword/runtime.py'
+      - '.github/workflows/desktop.yml'
 
 concurrency:
   group: desktop-${{ github.workflow }}-${{ github.ref }}
