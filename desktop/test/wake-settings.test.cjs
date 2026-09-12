@@ -6,24 +6,29 @@ const path = require('node:path');
 const os = require('node:os');
 const vm = require('node:vm');
 
-async function harness(t, initialConfig) {
+async function harness(t, initialConfig, { prepareWakeEnvironment } = {}) {
   const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'petit-settings-test-'));
   t.after(() => fsp.rm(directory, { recursive: true, force: true }));
   const configFile = path.join(directory, 'desktop.json');
   await fsp.writeFile(configFile, JSON.stringify(initialConfig));
   const handlers = new Map();
+  const progress = [];
   const { pathToFileURL } = require('node:url');
   const frame = { url: pathToFileURL(path.resolve(__dirname, '../setup.html')).href };
-  const window = { isDestroyed: () => false, webContents: { mainFrame: frame } };
+  const window = { isDestroyed: () => false, webContents: { mainFrame: frame, send: (_channel, message) => progress.push(message) } };
   const event = { sender: window.webContents, senderFrame: frame };
   const electron = {
-    app: { getVersion: () => '0.20.3' },
+    app: { getVersion: () => '0.20.3', getPath: () => directory },
     ipcMain: { handle: (name, handler) => handlers.set(name, handler) },
   };
   const context = vm.createContext({
-    require: (name) => name === 'electron' ? electron : name.startsWith('./') ? require(path.join(__dirname, '..', name)) : require(name),
+    require: (name) => {
+      if (name === 'electron') return electron;
+      if (name === './wake-auto-setup.cjs' && prepareWakeEnvironment) return { prepareWakeEnvironment };
+      return name.startsWith('./') ? require(path.join(__dirname, '..', name)) : require(name);
+    },
     __dirname: path.resolve(__dirname, '..'),
-    process: { platform: 'darwin', arch: 'arm64', env: {} },
+    process: { platform: 'darwin', arch: 'arm64', env: {}, resourcesPath: '' },
     Buffer, AbortController, setTimeout, clearTimeout,
     fixtureWindow: window, fixtureConfigFile: configFile,
   });
@@ -36,6 +41,7 @@ async function harness(t, initialConfig) {
     call: (name, values) => handlers.get(name)(event, values),
     handlers,
     configFile,
+    progress,
   };
 }
 
@@ -78,12 +84,33 @@ test('openWakeWord ONNX/backbone settings remain the only wake configuration', a
   assert.equal(state.wakeEnabled, true);
 });
 
-test('obsolete Picovoice setup IPC is no longer registered', async (t) => {
+test('openWakeWord setup IPC is registered without old Picovoice console IPC', async (t) => {
   const h = await harness(t, { serverUrl: 'http://127.0.0.1:8000' });
-  assert.equal(h.handlers.has('settings:wake-setup'), false);
-  assert.equal(h.handlers.has('settings:wake-cancel'), false);
+  assert.equal(h.handlers.has('settings:wake-setup'), true);
+  assert.equal(h.handlers.has('settings:wake-cancel'), true);
   assert.equal(h.handlers.has('settings:console'), false);
   assert.equal(h.handlers.has('settings:read'), true);
   assert.equal(h.handlers.has('settings:model'), true);
   assert.equal(h.handlers.has('settings:save'), true);
+});
+
+test('automatic setup persists managed openWakeWord paths after diagnostic', async (t) => {
+  const managed = {
+    pythonPath: '/managed/.venv/bin/python3',
+    runtimePath: '/app/runtime.py',
+    modelPath: '/managed/models/hey_petit.onnx',
+    backbonePath: '/managed/backbone',
+  };
+  const h = await harness(t, { serverUrl: 'http://127.0.0.1:8000' }, {
+    prepareWakeEnvironment: async ({ report }) => { report('diagnostic'); return managed; },
+  });
+  const result = await h.call('settings:wake-setup');
+  assert.equal(result.ok, true);
+  assert.equal(result.modelPath, managed.modelPath);
+  assert.deepEqual(h.progress, ['diagnostic']);
+  const persisted = JSON.parse(await fsp.readFile(h.configFile, 'utf8'));
+  assert.equal(persisted.modelPath, managed.modelPath);
+  assert.equal(persisted.backbonePath, managed.backbonePath);
+  assert.equal(persisted.wakePythonPath, managed.pythonPath);
+  assert.equal(persisted.wakeRuntimePath, managed.runtimePath);
 });
