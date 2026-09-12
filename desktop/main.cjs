@@ -9,9 +9,10 @@ const { pathToFileURL } = require('node:url');
 const { serviceUrl, isOverlay, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
 const { transcribe } = require('./transcribe.cjs');
 const { wakeError } = require('./wake-setup.cjs');
+const { prepareWakeEnvironment } = require('./wake-auto-setup.cjs');
 const SHORTCUT = 'CommandOrControl+Shift+Space';
 const MAX_UPDATE_BYTES = 350 * 1024 * 1024;
-let overlay, settingsWindow, tray, wakeProcess, config, configFile;
+let overlay, settingsWindow, tray, wakeProcess, config, configFile, wakeSetupController;
 let quitting = false, suspended = false, wakeFailed = false, shortcutOK = false, overlayReady = false;
 let pendingActivation = false, sttRequest = null, updateBusy = false, lastUpdate = '', lastWakeError = '';
 let generation = 0;
@@ -19,7 +20,14 @@ let wakeReady = false, wakeTimer;
 let sleeping = false, locked = false;
 const settingsUrl = pathToFileURL(path.join(__dirname, 'setup.html')).href;
 const defaults = { serverUrl: 'http://127.0.0.1:8000', sttUrl: '', sttModel: 'whisper-1',
-  wakeEnabled: false, modelPath: '', backbonePath: '', wakeThreshold: 0.45, login: false, updates: true };
+  wakeEnabled: false, modelPath: '', backbonePath: '', wakePythonPath: '', wakeRuntimePath: '',
+  wakeThreshold: 0.45, login: false, updates: true };
+function persistConfig(next) {
+  fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
+  fs.renameSync(`${configFile}.tmp`, configFile);
+  config = next;
+}
+function cancelWakeSetup() { wakeSetupController?.abort(); }
 function readConfig() {
   try {
     const raw = JSON.parse(fs.readFileSync(configFile, 'utf8'));
@@ -32,16 +40,15 @@ function readConfig() {
       sttModel: String(raw.sttModel || defaults.sttModel).slice(0, 100),
       modelPath,
       backbonePath: typeof raw.backbonePath === 'string' ? raw.backbonePath : '',
+      wakePythonPath: typeof raw.wakePythonPath === 'string' ? raw.wakePythonPath : '',
+      wakeRuntimePath: typeof raw.wakeRuntimePath === 'string' ? raw.wakeRuntimePath : '',
       wakeThreshold: Number.isFinite(threshold) && threshold >= 0.05 && threshold <= 0.99 ? threshold : defaults.wakeThreshold,
       wakeEnabled: raw.wakeEnabled === true && Boolean(modelPath && raw.backbonePath),
       login: raw.login === true,
       updates: raw.updates !== false,
     };
     const hadLegacyWakeConfig = ['encryptedKey', 'keywordPath', 'wakeAuto'].some((key) => Object.hasOwn(raw, key));
-    if (hadLegacyWakeConfig) {
-      fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(value, null, 2), { mode: 0o600 });
-      fs.renameSync(`${configFile}.tmp`, configFile);
-    }
+    if (hadLegacyWakeConfig) persistConfig(value);
     return value;
   } catch { return { ...defaults }; }
 }
@@ -82,7 +89,8 @@ async function startWake() {
     else if (message.type === 'ready') { clearTimeout(wakeTimer); wakeReady = true; refreshTray(); }
   });
   child.on('exit', () => fail('runtime'));
-  child.on('spawn', () => child.postMessage({ type: 'start', modelPath: config.modelPath, backbonePath: config.backbonePath, threshold: config.wakeThreshold }));
+  child.on('spawn', () => child.postMessage({ type: 'start', modelPath: config.modelPath, backbonePath: config.backbonePath,
+    pythonPath: config.wakePythonPath || undefined, runtimePath: config.wakeRuntimePath || undefined, threshold: config.wakeThreshold }));
 }
 function refreshTray() {
   if (!tray || !config) return;
@@ -114,7 +122,7 @@ function showSettings() {
   settingsWindow = new BrowserWindow({ width: 620, height: 780, title: 'PETIT 設定', backgroundColor: '#0b1020',
     webPreferences: { preload: path.join(__dirname, 'setup-preload.cjs'), sandbox: true, contextIsolation: true, nodeIntegration: false } });
   lockNavigation(settingsWindow, (url) => url === settingsUrl);
-  settingsWindow.on('closed', () => { settingsWindow = null; void startWake(); });
+  settingsWindow.on('closed', () => { cancelWakeSetup(); settingsWindow = null; void startWake(); });
   void settingsWindow.loadURL(settingsUrl);
 }
 function showOverlay(voice = false) {
@@ -253,22 +261,48 @@ function installIpc() {
     const result = await dialog.showOpenDialog(settingsWindow, { properties: [kind === 'dir' ? 'openDirectory' : 'openFile'], filters: kind === 'onnx' ? [{ name: 'ONNX wake model', extensions: ['onnx'] }] : undefined });
     return result.canceled ? '' : result.filePaths[0];
   });
+  on('settings:wake-cancel', 'settings', () => { cancelWakeSetup(); return true; });
+  on('settings:wake-setup', 'settings', async () => {
+    if (wakeSetupController) return { ok: false, message: 'openWakeWordの自動設定はすでに実行中です。' };
+    if (suspended || quitting) return { ok: false, message: 'ロック・スリープ解除後に再試行してください。' };
+    const controller = new AbortController(); wakeSetupController = controller;
+    const owner = settingsWindow;
+    const report = (message) => { if (message && owner && !owner.isDestroyed()) owner.webContents.send('settings:wake-progress', message); };
+    try {
+      stopWake();
+      const prepared = await prepareWakeEnvironment({
+        userData: app.getPath('userData'), projectRoot: path.resolve(__dirname, '..'), resourcesPath: process.resourcesPath || '',
+        currentModelPath: config.modelPath, signal: controller.signal, report,
+      });
+      controller.signal.throwIfAborted();
+      persistConfig({ ...config, modelPath: prepared.modelPath, backbonePath: prepared.backbonePath,
+        wakePythonPath: prepared.pythonPath, wakeRuntimePath: prepared.runtimePath });
+      wakeFailed = false; lastWakeError = '';
+      return { ok: true, modelPath: config.modelPath, backbonePath: config.backbonePath,
+        message: 'openWakeWordの準備とdiagnosticが完了しました。STT URLを設定し、音声待機をONにして保存してください。' };
+    } catch (error) {
+      const message = controller.signal.aborted ? 'openWakeWordの自動設定を中止しました。' : error.message;
+      lastWakeError = message;
+      return { ok: false, message };
+    } finally { wakeSetupController = null; }
+  });
   on('settings:updates', 'settings', () => checkUpdates(true));
   on('settings:save', 'settings', (values) => {
+    if (wakeSetupController) throw new Error('openWakeWordの自動設定が完了するか、中止してから保存してください。');
     const threshold = Number(values.wakeThreshold || defaults.wakeThreshold);
     if (!Number.isFinite(threshold) || threshold < 0.05 || threshold > 0.99) throw new Error('検出しきい値は0.05〜0.99で指定してください。');
     const next = { ...defaults, serverUrl: serviceUrl(values.serverUrl, { originOnly: true }),
       sttUrl: values.sttUrl ? serviceUrl(values.sttUrl) : '', sttModel: String(values.sttModel || 'whisper-1').slice(0, 100),
       modelPath: String(values.modelPath || ''), backbonePath: String(values.backbonePath || ''),
+      wakePythonPath: config.wakePythonPath || '', wakeRuntimePath: config.wakeRuntimePath || '',
       wakeEnabled: values.wakeEnabled === true, login: values.login === true, updates: values.updates === true,
       wakeThreshold: threshold };
     if (next.modelPath && (!path.isAbsolute(next.modelPath) || path.extname(next.modelPath).toLowerCase() !== '.onnx' || !fs.statSync(next.modelPath).isFile())) throw new Error('ONNXモデルを選択してください。');
     if (next.backbonePath && (!path.isAbsolute(next.backbonePath) || !fs.statSync(next.backbonePath).isDirectory())) throw new Error('特徴抽出モデルのフォルダを選択してください。');
     if (next.wakeEnabled && (!next.modelPath || !next.backbonePath || !next.sttUrl)) throw new Error('音声待機にはSTT URL・ONNXモデル・backboneフォルダが必要です。');
     if (next.login && !app.isPackaged) throw new Error('ログイン時の起動はインストール版で設定してください。');
-    fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
-    fs.renameSync(`${configFile}.tmp`, configFile);
-    stopWake(); cancelStt(); config = next; wakeFailed = false; lastWakeError = '';
+    persistConfig(next);
+    stopWake(); cancelStt(); wakeFailed = false; lastWakeError = '';
     if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: config.login, args: ['--background'] });
     if (overlay && !overlay.isDestroyed()) overlay.destroy(); overlay = null;
     settingsWindow.close(); showOverlay(false); refreshTray();
@@ -280,7 +314,7 @@ else {
   app.on('second-instance', () => showOverlay());
   app.on('activate', () => { if (config) showOverlay(); });
   app.on('window-all-closed', () => {});
-  app.on('before-quit', () => { quitting = true; stopWake(); cancelStt(); globalShortcut.unregisterAll(); });
+  app.on('before-quit', () => { quitting = true; cancelWakeSetup(); stopWake(); cancelStt(); globalShortcut.unregisterAll(); });
   app.whenReady().then(() => {
     configFile = path.join(app.getPath('userData'), 'desktop.json'); config = readConfig();
     session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
@@ -297,7 +331,7 @@ else {
     installIpc(); refreshTray();
     const syncPower = () => {
       suspended = sleeping || locked;
-      if (suspended) { stopWake(); hideOverlay(false); } else void startWake();
+      if (suspended) { cancelWakeSetup(); stopWake(); hideOverlay(false); } else void startWake();
     };
     powerMonitor.on('suspend', () => { sleeping = true; syncPower(); });
     powerMonitor.on('lock-screen', () => { locked = true; syncPower(); });
