@@ -51,13 +51,22 @@ test('rejects a model when SHA-256 does not match', async (t) => {
   await assert.rejects(() => fsp.stat(path.join(options.assetsDir, 'hey_petit.onnx')), /ENOENT/);
 });
 
-test('writes an explicit no-model manifest for non-release development builds', async (t) => {
+test('writes an explicit no-model manifest when Wake distribution is not configured', async (t) => {
   const options = await fixture(t);
-  const result = await prepareWakeModel({ ...options, env: {} });
+  const result = await prepareWakeModel({ ...options, env: { PETIT_WAKE_MODEL_REQUIRED: '0' } });
   assert.equal(result.manifest.included, false);
   assert.equal(result.manifest.source, 'none');
   const persisted = JSON.parse(await fsp.readFile(result.manifestPath, 'utf8'));
   assert.equal(persisted.included, false);
+  await assert.rejects(() => fsp.stat(path.join(options.assetsDir, 'hey_petit.onnx')), /ENOENT/);
+});
+
+test('fails when Wake distribution is explicitly required but no source is configured', async (t) => {
+  const options = await fixture(t);
+  await assert.rejects(() => prepareWakeModel({
+    ...options,
+    env: { PETIT_WAKE_MODEL_REQUIRED: '1' },
+  }), /Wakeモデルが必要/);
 });
 
 test('requires SHA-256 when downloading a model URL', async (t) => {
