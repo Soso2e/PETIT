@@ -102,7 +102,7 @@ async function installModel(options) {
     await downloadFile(options.env.PETIT_WAKE_MODEL_URL, destination, options);
     return destination;
   }
-  throw new Error('「Hey プティ」のONNXモデルが見つかりません。開発版では先にopenWakeWord v0.1モデルを生成するか、詳細設定でモデルを選択してください。');
+  throw new Error('「Hey プティ」のONNXモデルが見つかりません。このPETIT ReleaseはWakeモデルなしでも正常に利用できます。Wake機能を使う場合はモデルを選択するか、モデル配布設定後に自動設定を再実行してください。');
 }
 
 async function prepareWakeEnvironment({
