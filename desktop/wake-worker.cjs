@@ -14,7 +14,7 @@ process.parentPort.on('message', ({ data }) => {
   running = true;
   child = spawn(python, [runtime, '--model', data.modelPath, '--backbone', data.backbonePath, '--threshold', String(data.threshold ?? 0.45)], { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
   let buffer = '';
-  child.stdout.on('data', (chunk) => { buffer += chunk.toString(); const lines = buffer.split('\n'); buffer = lines.pop(); for (const line of lines) { try { const message = JSON.parse(line); const safe = message.type === 'ready' ? { type: 'ready' } : message.type === 'wake' ? { type: 'wake' } : message.type === 'error' ? { type: 'error', code: ['microphone', 'runtime', 'model'].includes(message.code) ? message.code : 'runtime' } : null; if (safe) process.parentPort.postMessage(safe); if (safe?.type === 'wake') stop(); } catch {} } });
+  child.stdout.on('data', (chunk) => { buffer += chunk.toString(); const lines = buffer.split('\n'); buffer = lines.pop(); for (const line of lines) { try { const message = JSON.parse(line); const safe = message.type === 'ready' ? { type: 'ready' } : message.type === 'wake' ? { type: 'wake' } : message.type === 'error' ? { type: 'error', code: ['microphone', 'runtime', 'model', 'backbone'].includes(message.code) ? message.code : 'runtime' } : null; if (safe) process.parentPort.postMessage(safe); if (safe?.type === 'wake') stop(); } catch {} } });
   child.on('error', () => { running = false; process.parentPort.postMessage({ type: 'error', code: 'runtime' }); });
   child.on('exit', (code) => { const wasRunning = running; running = false; child = null; if (wasRunning && code !== 0) process.parentPort.postMessage({ type: 'error', code: 'runtime' }); });
 });
