@@ -1,0 +1,80 @@
+name: Release v0.21.0 once
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/release-v0.21.0-once.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  start-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate clean release target
+        env:
+          TARGET: 9b6a5171f1d50d39636c2dbdbd7ae93c563e0e63
+          TAG: v0.21.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git merge-base --is-ancestor "$TARGET" HEAD; then
+            echo "Expected release target is not in current main history."
+            exit 1
+          fi
+          version="$(git show "$TARGET:desktop/package.json" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>console.log(JSON.parse(s).version))")"
+          version_file="$(git show "$TARGET:VERSION" | tr -d '\r\n')"
+          if [ "v$version" != "$TAG" ] || [ "$version_file" != "$version" ]; then
+            echo "Release target version mismatch: desktop=$version VERSION=$version_file tag=$TAG"
+            exit 1
+          fi
+          if ! git show "$TARGET:frontend/petit-version.js" | grep -Fq "globalThis.PETIT_VERSION = \"$TAG\";"; then
+            echo "frontend version does not match $TAG."
+            exit 1
+          fi
+          if ! git show "$TARGET:PROGRESS.md" | grep -Fq "**Current Version: $TAG**"; then
+            echo "PROGRESS version does not match $TAG."
+            exit 1
+          fi
+
+      - name: Create or verify v0.21.0 tag
+        env:
+          TARGET: 9b6a5171f1d50d39636c2dbdbd7ae93c563e0e63
+          TAG: v0.21.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin --tags --force
+          if git show-ref --tags --verify --quiet "refs/tags/$TAG"; then
+            existing="$(git rev-list -n 1 "$TAG")"
+            if [ "$existing" != "$TARGET" ]; then
+              echo "Tag $TAG already points to $existing instead of $TARGET."
+              exit 1
+            fi
+            echo "$TAG already points to the intended release target."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" "$TARGET" -m "PETIT $TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Start Desktop release on tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v0.21.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run desktop.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+          echo "Started Desktop release workflow for $TAG."
