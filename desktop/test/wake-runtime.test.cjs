@@ -39,5 +39,5 @@ test('wake assets require runtime, wake model and both backbone models', () => {
   const existsSync = (file) => files.has(file);
   assert.equal(validateWakeAssets({ runtimePath: path.join(root, 'runtime.py'), modelPath: path.join(root, 'hey_petit.onnx'), backbonePath: path.join(root, 'backbone') }, existsSync), '');
   files.delete(path.join(root, 'backbone', 'embedding_model.onnx'));
-  assert.equal(validateWakeAssets({ runtimePath: path.join(root, 'runtime.py'), modelPath: path.join(root, 'hey_petit.onnx'), backbonePath: path.join(root, 'backbone') }, existsSync), 'model');
+  assert.equal(validateWakeAssets({ runtimePath: path.join(root, 'runtime.py'), modelPath: path.join(root, 'hey_petit.onnx'), backbonePath: path.join(root, 'backbone') }, existsSync), 'backbone');
 });
