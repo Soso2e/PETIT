@@ -46,7 +46,7 @@ function validateWakeAssets({ modelPath, backbonePath, runtimePath }, existsSync
   if (!runtimePath || !existsSync(runtimePath)) return 'runtime';
   if (!modelPath || !existsSync(modelPath)) return 'model';
   if (!backbonePath || !existsSync(path.join(backbonePath, 'melspectrogram.onnx')) ||
-      !existsSync(path.join(backbonePath, 'embedding_model.onnx'))) return 'model';
+      !existsSync(path.join(backbonePath, 'embedding_model.onnx'))) return 'backbone';
   return '';
 }
 
