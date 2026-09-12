@@ -13,7 +13,7 @@ const SHORTCUT = 'CommandOrControl+Shift+Space';
 const MAX_UPDATE_BYTES = 350 * 1024 * 1024;
 let overlay, settingsWindow, tray, wakeProcess, config, configFile;
 let quitting = false, suspended = false, wakeFailed = false, shortcutOK = false, overlayReady = false;
-let pendingActivation = false, sttRequest = null, updateBusy = false, lastUpdate = '';
+let pendingActivation = false, sttRequest = null, updateBusy = false, lastUpdate = '', lastWakeError = '';
 let generation = 0;
 let wakeReady = false, wakeTimer;
 let sleeping = false, locked = false;
