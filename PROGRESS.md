@@ -155,4 +155,4 @@
 | 2026-09-10 | 06:50 | #76 | Proactive openerのセッション外エピソード参照を停止し、誤ったepisode_id=2をSQLite/Chromaから削除（関連10テスト成功、実アプリ・実LLM未確認） |
 | 2026-09-12 | 10:10 | #77 | Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化し、旧Picovoice/Porcupine AccessKey・PPN・自動設定IPC・暗号化キー保存を撤去。旧設定読込時の秘密情報/metadata除去とopenWakeWordエラー分類の回帰テストを追加（実マイク・installerはStep 3で確認） |
 | 2026-09-12 | 10:24 | #78 | Issue #270 Step 2: Desktop設定からopenWakeWord環境を一括準備できる導線を追加。Python検出、専用venv、依存、backbone、既存/生成済みWakeモデルの管理領域化、マイクなしdiagnostic、進捗/中止、managed runtimeパス保存を実装し、Desktop CI成功。packagedモデル同梱・実マイク`ready`・実声はStep 3へ残す。 |
-| 2026-09-12 | 10:53 | #79 | Issue #270 Step 3: Wakeモデルのinstaller注入経路（ローカル生成物またはHTTPS URL＋SHA-256）、manifest同梱、packaged resources検証を実装。Run #76でmacOS arm64 DMG / Windows x64 EXEを実生成しSmoke・resource検証成功。実モデル配布元を使った同梱build、インストール版自動設定→diagnostic、実マイク`ready`、実声検出・誤起動評価は未完了。PR #272 Draft継続。 |
+| 2026-09-12 | 10:53 | #79 | Issue #270 Step 3 / PR #272: Desktop openWakeWordのinstaller配布経路を実装。Wakeモデルをbuild時にローカルまたはURL+SHA-256から注入し、manifest同梱・packaged resource検証を追加。Run #76でmacOS arm64 DMG / Windows x64 EXE生成とSmoke/packaged検証に成功。実モデル同梱build、自動設定→diagnostic、実マイク`ready`、実声/誤起動評価は実機受入として継続。 |
