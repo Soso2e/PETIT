@@ -7,7 +7,7 @@
 <label>音声認識モデル名<input id="sttModel" placeholder="whisper-1"></label>
 <p class="help">Whisper互換サーバーを別途起動してください。呼び出し後の発話を、このURLへ送信します。空欄なら文字入力で使えます。応答音声は小型画面の「音声応答」で有効にできます。</p>
 <section><h2>「Hey プティ」で呼び出す</h2>
-<p class="help">ウェイク検出はAccessKey不要のopenWakeWordローカルモデルを使います。モデルと特徴抽出モデルを選択してください。</p><p id="wake-platform" class="help"></p>
+<p class="help">ウェイク検出は端末内のopenWakeWordで処理します。現在はONNXモデルと特徴抽出モデルを選択して設定します。</p><p id="wake-platform" class="help"></p>
 <p id="wake-result" role="status" aria-live="polite"></p>
 <label>ウェイクONNXモデル<div class="file"><input id="modelPath" readonly><button type="button" data-model="onnx">.onnxを選択</button></div></label>
 <label>特徴抽出モデルフォルダ<div class="file"><input id="backbonePath" readonly><button type="button" data-model="dir">フォルダを選択</button></div></label>
