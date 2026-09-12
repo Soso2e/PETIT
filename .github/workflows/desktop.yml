@@ -6,6 +6,7 @@ on:
       - 'desktop/**'
       - 'frontend/desktop/**'
       - 'frontend/voice.js'
+      - 'scripts/wakeword/runtime.py'
       - '.github/workflows/desktop.yml'
   workflow_dispatch:
   push:
@@ -38,6 +39,7 @@ jobs:
       - name: Syntax checks
         run: |
           for file in *.cjs *.js ../frontend/desktop/*.js ../frontend/voice.js; do node --check "$file"; done
+          python3 -m py_compile ../scripts/wakeword/runtime.py
       - name: Validate release tag matches Desktop version
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
