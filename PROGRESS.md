@@ -6,9 +6,11 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- Issue #270 Step 3: Desktop openWakeWordのinstaller配布経路を実装。WakeモデルはGit管理外のまま、build時にローカル`storage/wakeword/models/v0.1/hey_petit.onnx`または`PETIT_WAKE_MODEL_URL` + `PETIT_WAKE_MODEL_SHA256`から注入し、HTTPS・SHA-256検証、`wake-model.json` manifest同梱、packaged resources検証を行う。GitHub Actions Run #76でmacOS arm64 DMG / Windows x64 EXEを実生成し、Smoke・packaged Wake resources検証とも成功。PR #272で実装済み。未完了は、実モデルを配布元へ置いたモデル同梱build、インストール版の自動設定→diagnostic、実マイクWake `ready`、実声「Hey プティ」検出と誤起動評価。
+- Desktop v0.21.0 Release: Desktop Release本体とWakeモデル配布を分離。`PETIT_WAKE_MODEL_URL` / `PETIT_WAKE_MODEL_SHA256` がどちらも未設定なら、`wake-model.json` に `included=false` を明示したモデルなしinstallerを正常生成する。URLまたはSHAのどちらかが設定された場合はWakeモデル配布を有効扱いにし、HTTPS・SHA-256検証を必須化するため、半端な設定やSHA不一致はbuild失敗のまま。GitHub Actions Run #90でモデル未同梱のmacOS arm64 DMG / Windows x64 EXEを実生成し、両OSともnpm test・Smoke・installer build・packaged Wake resources・Artifact upload成功。`VERSION`は0.21.0へ同期済み。`.github/workflows/desktop-release.yml` に、mainのversion整合確認→annotated tag作成/再利用→tag refでDesktop Release workflow起動までを1回の手動Actionsで行う導線を追加。実`v0.21.0`タグ作成とGitHub Release実行は未実施。
 
-- Issue #270 Step 2: Desktop設定にopenWakeWordの「ウェイク環境を自動設定」を追加。Python 3検出→専用venv作成→依存導入→openWakeWord v0.5.1 backbone取得→既存/生成済み`hey_petit.onnx`を管理領域へコピー→マイクを開かないdiagnosticまで一括実行し、managed Python/runtime/model/backboneパスを設定へ保存する。中止・進捗表示・回帰テスト・Python runtime構文チェックを追加。Desktop CIでnpm test・Syntax checks成功。packaged配布経路はStep 3で実装済み。実モデル同梱build・実マイク`ready`・実声評価は未完了。
+- Issue #270 Step 3: Desktop openWakeWordのinstaller配布経路を実装。WakeモデルはGit管理外のまま、build時にローカル`storage/wakeword/models/v0.1/hey_petit.onnx`または`PETIT_WAKE_MODEL_URL` + `PETIT_WAKE_MODEL_SHA256`から注入でき、HTTPS・SHA-256検証、`wake-model.json` manifest同梱、packaged resources検証を行う。Wakeモデル配布が未設定でもDesktop Release本体は成立する。未完了は、Wakeを配布する場合の実モデル配布元、インストール版の自動設定→diagnostic、実マイクWake `ready`、実声「Hey プティ」検出と誤起動評価。
+
+- Issue #270 Step 2: Desktop設定にopenWakeWordの「ウェイク環境を自動設定」を追加。Python 3検出→専用venv作成→依存導入→openWakeWord v0.5.1 backbone取得→既存/生成済み`hey_petit.onnx`を管理領域へコピー→マイクを開かないdiagnosticまで一括実行し、managed Python/runtime/model/backboneパスを設定へ保存する。中止・進捗表示・回帰テスト・Python runtime構文チェックを追加。Desktop CIでnpm test・Syntax checks成功。packaged配布経路はStep 3で実装済み。実モデル配布・実マイク`ready`・実声評価は未完了。
 
 - Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化。旧Picovoice/Porcupine AccessKey・PPN・自動生成IPC・暗号化キー保存を撤去し、旧設定を読み込んだ場合も秘密情報と旧モデルmetadataを自動除去する。WakeはONNX分類モデル＋melspectrogram/embedding backbone＋Python runtimeのみを使用。Desktop CIでnpm test・Syntax checks成功。
 
@@ -24,7 +26,7 @@
 
 - Issue #258: `scripts/wakeword/` にWindows/Python 3.13の独立したopenWakeWord学習環境を追加。日本語SAPI合成624クリップを話者分離して学習し、`storage/wakeword/models/v0.1/hey_petit.onnx` を生成済み。ONNX構造・出力一致・openWakeWord実推論・関連2テスト・依存整合・構文を確認。しきい値0.45でtest正例12/12検出、負例11/144誤検出。合成音声のみの実験モデルで、常時待機の実用精度は未達。実声・長時間負例・実マイク評価とDesktop統合が次の作業。詳細は `docs/openwakeword.md`。Desktop実行経路はopenWakeWordへ移行済み。
 
-- Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、openWakeWordウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。Desktop配布はPR=テストのみ、手動Actions=macOS arm64/Windows x64開発Artifact、main上のversion一致`v*`タグ=両OSビルド＋GitHub Release自動添付へ整理。未署名中は手動Artifactで検証し、公開タグは切らない。
+- Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、openWakeWordウェイク、Whisper互換STT、GitHub Releases更新通知を追加。Desktop配布はPR=テスト、手動Actions=macOS arm64/Windows x64開発Artifact、version一致`v*`タグ=両OSbuild＋GitHub Release自動添付。macOS署名資格情報がない場合は個人利用向け未署名DMGへfallbackする。一般配布向け署名・公証、実更新、実マイク/モデル/LLM/TTSの受入は未確認。iPhoneはPWAを継続。
 
 - Issue #249 / #245: Web中心のJARVIS設計を `docs/jarvis-agent.md` に整理。BrokerへMemory/BRAIN/Work/Reminders/Handoff、待ち時間・同時実行・Context量の上限、2回目Brainへの状況継続を追加。PC観測は既定無効の任意Module。作業ブランチで関連58テスト・Python構文・diff確認済み。実LLM・外部サービス・PWA E2E、Conversation State統合、永続提案・自律実行は未完了。
 
@@ -38,7 +40,7 @@
 - バージョン管理: v0.18.3。FastAPIのstartup/shutdownとChroma初期同期を `backend/lifecycle.py` へ分離し、`main.py` はlifecycle登録のみを担当。
 - バージョン管理: v0.18.4。Pending Actionの状態管理・確認API・Sona Core分岐・Tool dispatchを `backend/pending_actions.py` へ分離し、Chat/確認APIモデルを `backend/chat_models.py` へ共通化。
 - バージョン管理: v0.18.5。`POST /api/chat`、Agent実行、observability、会話保存・artifact保存を `backend/chat.py` へ分離し、`main.py` はChat Router登録のみを担当。iOS Vocal ShortcutもChat moduleへ直接接続。
-- バージョン管理: v0.18.6。Issue #227 Phase 2を完了。補助API群とStatic Frontend配線まで `main.py` から分離し、`main.py` はFastAPI生成・Router登録・lifecycle/frontend登録・起動のみを担当するComposition Rootになった。
+- バージョン管理: v0.18.6。Issue #227 Phase 2を完了。補助API群とStatic Frontend配線まで `backend/main.py` から分離し、`main.py` はFastAPI生成・Router登録・lifecycle/frontend登録・起動のみを担当するComposition Rootになった。
 - バージョン管理: v0.19.0。Issue #227 Phase 3を開始。`ModuleDefinition` / `ModuleRegistry` と `create_app()` を追加し、Router・registrar・依存関係を明示的に組み立てる土台へ移行。`main.py` は `create_app()` を呼ぶ起動shimへ縮小。
 - バージョン管理: v0.19.1。Issue #227 Phase 3を完了。`backend.tools` のimport副作用登録を廃止し、built-in Tool catalogを `builtin-tools` Moduleとして明示登録。Chat / Pending ActionはTool bootstrapへの依存を宣言し、Module Registryが起動順を保証する。
 - Univ UI 刷新: 大きなカード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
@@ -63,7 +65,7 @@
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
 - Windows起動導線: `scripts/start-petit-tailscale.ps1` で起動モード選択、Tailscale接続、`.venv` のPETIT起動、`/api/health`確認、管理者権限付きTailscale Serve、ブラウザ起動まで実行する。LM Studioは事前起動が必要。
 - 今回の検証: Context Broker単体・Brain routeの回帰テストを追加。GitHub Actions / pytest / 実LM Studio E2Eは未確認。
-- 次にやること: Issue #235の最小縦切りを実LM Studioで検証し、`今日何やる？` / `明日大丈夫？` のCall数・応答時間・Context量を現行と比較する。その後にIssue #227 Phase 4を再開する。
+- 次にやること: GitHub Actionsの`Create PETIT Desktop Release`を実行し、`v0.21.0`タグ作成→tag refでDesktop Releaseを起動→DMG/EXE付きGitHub Release生成を確認する。その後Issue #270で実モデル配布・自動設定diagnostic・実マイク`ready`・実声/誤起動評価を継続し、Issue #235の実LM Studio検証へ戻る。
 
 ## 履歴
 
@@ -156,3 +158,4 @@
 | 2026-09-12 | 10:10 | #77 | Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化し、旧Picovoice/Porcupine AccessKey・PPN・自動設定IPC・暗号化キー保存を撤去。旧設定読込時の秘密情報/metadata除去とopenWakeWordエラー分類の回帰テストを追加（実マイク・installerはStep 3で確認） |
 | 2026-09-12 | 10:24 | #78 | Issue #270 Step 2: Desktop設定からopenWakeWord環境を一括準備できる導線を追加。Python検出、専用venv、依存、backbone、既存/生成済みWakeモデルの管理領域化、マイクなしdiagnostic、進捗/中止、managed runtimeパス保存を実装し、Desktop CI成功。packagedモデル同梱・実マイク`ready`・実声はStep 3へ残す。 |
 | 2026-09-12 | 10:53 | #79 | Issue #270 Step 3 / PR #272: Desktop openWakeWordのinstaller配布経路を実装。Wakeモデルをbuild時にローカルまたはURL+SHA-256から注入し、manifest同梱・packaged resource検証を追加。Run #76でmacOS arm64 DMG / Windows x64 EXE生成とSmoke/packaged検証に成功。実モデル同梱build、自動設定→diagnostic、実マイク`ready`、実声/誤起動評価は実機受入として継続。 |
+| 2026-09-12 | 12:53 | #80 | v0.21.0 Release blockerを解消。Wakeモデル未設定時は未同梱manifest付きinstaller/Releaseを許可し、モデル配布設定が存在する場合だけHTTPS+SHA-256検証を必須化。Run #90でモデルなしmacOS arm64/Windows x64 packageを実生成し全工程成功。`VERSION`同期と1ボタンRelease workflowを追加し、実タグ/Release実行のみ未確認。Issue #270はWake実機受入として継続。 |
