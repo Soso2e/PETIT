@@ -60,7 +60,7 @@ jobs:
           fi
 
   package:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'pull_request' && github.head_ref == 'fix/openwakeword-desktop-runtime')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: test
     strategy:
       fail-fast: false
