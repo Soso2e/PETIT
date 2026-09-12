@@ -1,0 +1,98 @@
+name: Create PETIT Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      wake_model_url:
+        description: 'Optional HTTPS URL for hey_petit.onnx'
+        required: false
+        type: string
+      wake_model_sha256:
+        description: 'Optional SHA-256 for hey_petit.onnx'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: petit-desktop-release
+  cancel-in-progress: false
+
+jobs:
+  create-tag-and-start-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Validate release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./desktop/package.json').version")"
+          tag="v${version}"
+          target="$(git rev-parse HEAD)"
+          version_file="$(tr -d '\r\n' < VERSION)"
+
+          if [ "$version_file" != "$version" ]; then
+            echo "VERSION ($version_file) does not match desktop/package.json ($version)."
+            exit 1
+          fi
+          if ! grep -Fq "globalThis.PETIT_VERSION = \"$tag\";" frontend/petit-version.js; then
+            echo "frontend/petit-version.js does not match $tag."
+            exit 1
+          fi
+          if ! grep -Fq "**Current Version: $tag**" PROGRESS.md; then
+            echo "PROGRESS.md does not match $tag."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "Release target: $tag -> $target"
+
+      - name: Create or verify annotated tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          TARGET: ${{ steps.version.outputs.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin --tags --force
+          if git show-ref --tags --verify --quiet "refs/tags/$TAG"; then
+            existing="$(git rev-list -n 1 "$TAG")"
+            if [ "$existing" != "$TARGET" ]; then
+              echo "Tag $TAG already points to $existing, not current main $TARGET."
+              exit 1
+            fi
+            echo "Tag $TAG already points to current main; reusing it."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" "$TARGET" -m "PETIT $TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Start Desktop release workflow on tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          WAKE_MODEL_URL: ${{ inputs.wake_model_url }}
+          WAKE_MODEL_SHA256: ${{ inputs.wake_model_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run desktop.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$TAG" \
+            -f wake_model_url="$WAKE_MODEL_URL" \
+            -f wake_model_sha256="$WAKE_MODEL_SHA256"
+          echo "Started Desktop release workflow for $TAG."
