@@ -6,9 +6,9 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- Issue #270 Step 3: Desktop openWakeWordのinstaller配布経路を実装。WakeモデルはGit管理外のまま、build時にローカル`storage/wakeword/models/v0.1/hey_petit.onnx`または`PETIT_WAKE_MODEL_URL` + `PETIT_WAKE_MODEL_SHA256`から注入し、HTTPS・SHA-256検証、`wake-model.json` manifest同梱、packaged resources検証を行う。GitHub Actions Run #76でmacOS arm64 DMG / Windows x64 EXEを実生成し、Smoke・packaged Wake resources検証とも成功。PR #272はDraft継続。未完了は、実モデルを配布元へ置いたモデル同梱build、インストール版の自動設定→diagnostic、実マイクWake `ready`、実声「Hey プティ」検出と誤起動評価。
+- Issue #270 Step 3: Desktop openWakeWordのinstaller配布経路を実装。WakeモデルはGit管理外のまま、build時にローカル`storage/wakeword/models/v0.1/hey_petit.onnx`または`PETIT_WAKE_MODEL_URL` + `PETIT_WAKE_MODEL_SHA256`から注入し、HTTPS・SHA-256検証、`wake-model.json` manifest同梱、packaged resources検証を行う。GitHub Actions Run #76でmacOS arm64 DMG / Windows x64 EXEを実生成し、Smoke・packaged Wake resources検証とも成功。PR #272で実装済み。未完了は、実モデルを配布元へ置いたモデル同梱build、インストール版の自動設定→diagnostic、実マイクWake `ready`、実声「Hey プティ」検出と誤起動評価。
 
-- Issue #270 Step 2: Desktop設定にopenWakeWordの「ウェイク環境を自動設定」を追加。Python 3検出→専用venv作成→依存導入→openWakeWord v0.5.1 backbone取得→既存/生成済み`hey_petit.onnx`を管理領域へコピー→マイクを開かないdiagnosticまで一括実行し、managed Python/runtime/model/backboneパスを設定へ保存する。中止・進捗表示・回帰テスト・Python runtime構文チェックを追加。Desktop CIでnpm test・Syntax checks成功。packaged EXE/DMGへのWakeモデル同梱と実マイク`ready`確認はStep 3で行う。
+- Issue #270 Step 2: Desktop設定にopenWakeWordの「ウェイク環境を自動設定」を追加。Python 3検出→専用venv作成→依存導入→openWakeWord v0.5.1 backbone取得→既存/生成済み`hey_petit.onnx`を管理領域へコピー→マイクを開かないdiagnosticまで一括実行し、managed Python/runtime/model/backboneパスを設定へ保存する。中止・進捗表示・回帰テスト・Python runtime構文チェックを追加。Desktop CIでnpm test・Syntax checks成功。packaged配布経路はStep 3で実装済み。実モデル同梱build・実マイク`ready`・実声評価は未完了。
 
 - Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化。旧Picovoice/Porcupine AccessKey・PPN・自動生成IPC・暗号化キー保存を撤去し、旧設定を読み込んだ場合も秘密情報と旧モデルmetadataを自動除去する。WakeはONNX分類モデル＋melspectrogram/embedding backbone＋Python runtimeのみを使用。Desktop CIでnpm test・Syntax checks成功。
 
