@@ -27,6 +27,8 @@ storage/audit/
 # Desktop build output (keep package-lock.json tracked)
 desktop/node_modules/
 desktop/dist/
+desktop/wakeword-assets/hey_petit.onnx
+desktop/wakeword-assets/wake-model.json
 
 # Local wake-word training environment, audio and generated models
 storage/wakeword/
