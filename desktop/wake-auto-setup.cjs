@@ -55,7 +55,7 @@ async function findPython({ platform = process.platform, env = process.env, sign
 }
 
 async function downloadFile(url, destination, { signal, fetchImpl = fetch } = {}) {
-  const response = await fetchImpl(url, { redirect: 'error', signal: AbortSignal.any([signal || new AbortController().signal, AbortSignal.timeout(120000)]) });
+  const response = await fetchImpl(url, { redirect: 'follow', signal: AbortSignal.any([signal || new AbortController().signal, AbortSignal.timeout(120000)]) });
   if (!response.ok || !response.body) throw new Error(`必要ファイルを取得できませんでした（HTTP ${response.status}）。`);
   await fsp.mkdir(path.dirname(destination), { recursive: true, mode: 0o700 });
   const temporary = `${destination}.part`;
@@ -67,7 +67,12 @@ async function downloadFile(url, destination, { signal, fetchImpl = fetch } = {}
       if (size > 20 * 1024 * 1024) throw new Error('取得ファイルのサイズが上限を超えています。');
       await handle.write(chunk);
     }
-  } finally { await handle.close(); }
+  } catch (error) {
+    await handle.close().catch(() => {});
+    await fsp.rm(temporary, { force: true }).catch(() => {});
+    throw error;
+  }
+  await handle.close();
   if (size < 1024) { await fsp.rm(temporary, { force: true }); throw new Error('取得したモデルファイルが不正です。'); }
   await fsp.rename(temporary, destination);
 }
