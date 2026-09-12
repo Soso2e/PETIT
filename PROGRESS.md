@@ -90,8 +90,8 @@
 | 2026-08-03 | 20:23 | #21 | Issue #189: v0.14.0として四隅型App Shell、右上3アイコン、左上状態表示、左下補助ドック、旧UI設定導線、PWA cache同期を追加 |
 | 2026-08-04 | 07:12 | #22 | v0.14.1として静的資産とPWA cacheの版を統一し、App Shell系の二重読込・初期化と初回タスクAPI重複取得を修正（静的回帰・構文確認済み、PC／スマホ実ブラウザ未確認） |
 | 2026-08-04 | 07:57 | #23 | Notionプロパティ解析に英語名・日英フォールバック検索（`Parent item`/`親タスク`, `DoneDate`/`Done`等）を追加し、新規端末初期同期時のプロパティ名不一致エラーを自動修正（単体テスト追加・全件通過確認） |
-| 2026-08-04 | 08:34 | #24 | 全画面共通UIの再初期化・Service Worker登録共有・Legacy Jobポーリング重複・Corner Shell Observerの自己誘発監視を抑止（Node構文・関連回帰37件成功、実ブラウザ未完了） |
-| 2026-08-04 | 08:34 | #25 | Service WorkerをPush有効化操作まで遅延登録し、通常のUniverse／Legacy起動時の登録・precache待ちを除去（Node構文・関連回帰37件成功、実ブラウザ未完了） |
+| 2026-08-04 | 08:34 | #24 | 全画面共通UIの再初期化・Service Worker登録共有・Legacy Jobポーリング重複・Corner Shell Observerの自己誘発監視を抑止（関連回帰37件成功、実ブラウザ未完了） |
+| 2026-08-04 | 08:34 | #25 | Service WorkerをPush有効化操作まで遅延登録し、通常のUniverse／Legacy起動時の登録・precache待ちを除去（関連回帰37件成功、実ブラウザ未完了） |
 | 2026-08-04 | 08:54 | #26 | universe-next.jsの更新中Observer一時切断と重複軽減・petit-ui-system/app_shellの監視責務分離および差分DOM更新を実装（関連回帰34件全件成功） |
 | 2026-08-04 | 09:10 | #27 | v0.15.0としてUniverse UIを根本刷新。カード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、軌道・接続線からなる純粋な天体システムを実装 |
 | 2026-08-05 | 09:26 | #28 | `origin/main`を先に取り込み、`refactor/universe-render-scheduler`を競合解消付きでmainへ統合。関連66テスト、Node/Python構文、差分検査に成功（実ブラウザ・実サービスE2E未確認） |
@@ -116,7 +116,7 @@
 | 2026-08-22 | 16:43 | #47 | Issue #168: Task ID付き作業履歴、状態遷移イベント、今日・期間集計、チャットTool、Universeのサーバーactive同期を実装（関連自動テスト・構文確認済み、実LM Studio・PC／iPhone E2E未確認） |
 | 2026-08-17 | 00:00 | #47 | Git整理の中間対応として、`c26db2b` から `feat/chat-work-session` を作成し、整理前の `agent/univ-three-work-chat` を `backup-before-branch-cleanup-20260817` タグへ保存（リモート削除・履歴書き換えは未実施） |
 | 2026-08-17 | 00:00 | #48 | GitHub上のリモートブランチを `main` と `feat/chat-work-session` に整理し、重複リモート `PETIT` と旧ローカルブランチ `agent/univ-three-work-chat` を削除（作業ブランチはPush済み、PROGRESS変更は未コミット） |
-| 2026-08-17 | 00:00 | #49 | Issue #215: Univ表示時だけページを固定し、safe-area対応の100dvh viewportとWebGL単一背景を実装（関連回帰26件成功、実ブラウザ・実iPhone未確認） |
+| 2026-08-17 | 00:00 | #49 | Issue #215: Univ表示時のhtml/body・メイン領域を固定し、safe-area対応の100dvh viewportとWebGL単一背景を実装（関連回帰26件成功、実ブラウザ・実iPhone未確認） |
 | 2026-08-16 | 16:36 | #50 | Issue #215: URL直開き時のWebGL未読込と詳細初期化例外を修正し、星の1クリックFocus・HUD同期、全画面Canvas、PC／390x844のHUD・詳細配置を再調整（関連57件・実ブラウザ成功、実iPhone未確認） |
 | 2026-08-16 | 23:04 | #47 | Issue #215: v0.18.0としてUnivを100dvh固定Three.js空間へ統一し、WebGL時のCSS背景重複を廃止、mobile safe-area内へHUDを固定（静的回帰テスト追加、実PC／iPhone操作感は未確認） |
 | 2026-08-18 | 11:53 | #48 | Issue #218: 「へいプティ」Vocal Shortcut向け `POST /api/voice` を追加し、既存 `/api/chat` へ委譲。最新mainへ競合解消し、確認付き書き込み・回帰テスト・iPhone設定手順を維持（実iPhone E2E未確認） |
