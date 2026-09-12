@@ -6,7 +6,7 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化。旧Picovoice/Porcupine AccessKey・PPN・自動生成IPC・暗号化キー保存を撤去し、旧設定を読み込んだ場合も秘密情報と旧モデルmetadataを自動除去する。WakeはONNX分類モデル＋melspectrogram/embedding backbone＋Python runtimeのみを使用。Desktop CI Run #52でnpm test・Syntax checks成功。Step 2でPython/venv/backbone/モデルの自動準備とdiagnosticを実装予定。
+- Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化。旧Picovoice/Porcupine AccessKey・PPN・自動生成IPC・暗号化キー保存を撤去し、旧設定を読み込んだ場合も秘密情報と旧モデルmetadataを自動除去する。WakeはONNX分類モデル＋melspectrogram/embedding backbone＋Python runtimeのみを使用。Desktop CIでnpm test・Syntax checks成功。Step 2でPython/venv/backbone/モデルの自動準備とdiagnosticを実装予定。
 
 - Issue #260追加: Three.js Univに天体の登場・選択拡大・発光パルスを実装。実WebGL fixtureで登場・選択・連続選択・reduced motion・描画停止を確認し、関連13テスト成功。大量実データ・実iPhone/macOS性能は未確認。詳細は `docs/universe-motion.md`。
 
