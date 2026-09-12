@@ -1,10 +1,16 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.20.0**
+**Current Version: v0.21.0**
 
-**Last Updated: 2026-09-09**
+**Last Updated: 2026-09-12**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- Issue #270 Step 3: Desktop openWakeWordのinstaller配布経路を実装。WakeモデルはGit管理外のまま、build時にローカル`storage/wakeword/models/v0.1/hey_petit.onnx`または`PETIT_WAKE_MODEL_URL` + `PETIT_WAKE_MODEL_SHA256`から注入し、HTTPS・SHA-256検証、`wake-model.json` manifest同梱、packaged resources検証を行う。GitHub Actions Run #76でmacOS arm64 DMG / Windows x64 EXEを実生成し、Smoke・packaged Wake resources検証とも成功。PR #272で実装済み。未完了は、実モデルを配布元へ置いたモデル同梱build、インストール版の自動設定→diagnostic、実マイクWake `ready`、実声「Hey プティ」検出と誤起動評価。
+
+- Issue #270 Step 2: Desktop設定にopenWakeWordの「ウェイク環境を自動設定」を追加。Python 3検出→専用venv作成→依存導入→openWakeWord v0.5.1 backbone取得→既存/生成済み`hey_petit.onnx`を管理領域へコピー→マイクを開かないdiagnosticまで一括実行し、managed Python/runtime/model/backboneパスを設定へ保存する。中止・進捗表示・回帰テスト・Python runtime構文チェックを追加。Desktop CIでnpm test・Syntax checks成功。packaged配布経路はStep 3で実装済み。実モデル同梱build・実マイク`ready`・実声評価は未完了。
+
+- Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化。旧Picovoice/Porcupine AccessKey・PPN・自動生成IPC・暗号化キー保存を撤去し、旧設定を読み込んだ場合も秘密情報と旧モデルmetadataを自動除去する。WakeはONNX分類モデル＋melspectrogram/embedding backbone＋Python runtimeのみを使用。Desktop CIでnpm test・Syntax checks成功。
 
 - Issue #260追加: Three.js Univに天体の登場・選択拡大・発光パルスを実装。実WebGL fixtureで登場・選択・連続選択・reduced motion・描画停止を確認し、関連13テスト成功。大量実データ・実iPhone/macOS性能は未確認。詳細は `docs/universe-motion.md`。
 
@@ -16,9 +22,9 @@
 
 - Proactive openerの古い全体エピソード参照を停止し、同一sessionのユーザー発話と現在の作業だけを候補に変更。誤ったepisode_id=2（「全10件のタスクがキャンセル済み」）をSQLite/Chromaから削除し、DBバックアップを保存。関連テスト成功、実アプリ起動・実LLM表示は未確認。
 
-- Issue #258: `scripts/wakeword/` にWindows/Python 3.13の独立したopenWakeWord学習環境を追加。日本語SAPI合成624クリップを話者分離して学習し、`storage/wakeword/models/v0.1/hey_petit.onnx` を生成済み。ONNX構造・出力一致・openWakeWord実推論・関連2テスト・依存整合・構文を確認。しきい値0.45でtest正例12/12検出、負例11/144誤検出。合成音声のみの実験モデルで、常時待機の実用精度は未達。実声・長時間負例・実マイク評価とDesktop統合が次の作業。詳細は `docs/openwakeword.md`。Desktopは引き続きPorcupine。
+- Issue #258: `scripts/wakeword/` にWindows/Python 3.13の独立したopenWakeWord学習環境を追加。日本語SAPI合成624クリップを話者分離して学習し、`storage/wakeword/models/v0.1/hey_petit.onnx` を生成済み。ONNX構造・出力一致・openWakeWord実推論・関連2テスト・依存整合・構文を確認。しきい値0.45でtest正例12/12検出、負例11/144誤検出。合成音声のみの実験モデルで、常時待機の実用精度は未達。実声・長時間負例・実マイク評価とDesktop統合が次の作業。詳細は `docs/openwakeword.md`。Desktop実行経路はopenWakeWordへ移行済み。
 
-- Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、任意Porcupineウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。Desktop配布はPR=テストのみ、手動Actions=macOS arm64/Windows x64開発Artifact、main上のversion一致`v*`タグ=両OSビルド＋GitHub Release自動添付へ整理。未署名中は手動Artifactで検証し、公開タグは切らない。既存Core CI相当はTool Registry未初期化と旧Prompt前提の失敗が別途残るため、PRはDraftで提出する。
+- Issue #253: Windows/macOS向けElectron Desktopの初期実装。既存Webの会話・確認・TTSを共有する小型UI、トレイ・ショートカット、openWakeWordウェイク、Whisper互換STT、GitHub Releases更新通知を追加。macOSの実Electronと生成音声の操作テスト済み。実マイク/モデル/LLM/TTS、Windows実機、署名・公証・実更新は未確認。iPhoneはPWAを継続。Desktop配布はPR=テストのみ、手動Actions=macOS arm64/Windows x64開発Artifact、main上のversion一致`v*`タグ=両OSビルド＋GitHub Release自動添付へ整理。未署名中は手動Artifactで検証し、公開タグは切らない。
 
 - Issue #249 / #245: Web中心のJARVIS設計を `docs/jarvis-agent.md` に整理。BrokerへMemory/BRAIN/Work/Reminders/Handoff、待ち時間・同時実行・Context量の上限、2回目Brainへの状況継続を追加。PC観測は既定無効の任意Module。作業ブランチで関連58テスト・Python構文・diff確認済み。実LLM・外部サービス・PWA E2E、Conversation State統合、永続提案・自律実行は未完了。
 
@@ -88,7 +94,7 @@
 | 2026-08-03 | 20:23 | #21 | Issue #189: v0.14.0として四隅型App Shell、右上3アイコン、左上状態表示、左下補助ドック、旧UI設定導線、PWA cache同期を追加 |
 | 2026-08-04 | 07:12 | #22 | v0.14.1として静的資産とPWA cacheの版を統一し、App Shell系の二重読込・初期化と初回タスクAPI重複取得を修正（静的回帰・構文確認済み、PC／スマホ実ブラウザ未確認） |
 | 2026-08-04 | 07:57 | #23 | Notionプロパティ解析に英語名・日英フォールバック検索（`Parent item`/`親タスク`, `DoneDate`/`Done`等）を追加し、新規端末初期同期時のプロパティ名不一致エラーを自動修正（単体テスト追加・全件通過確認） |
-| 2026-08-04 | 08:34 | #24 | 全画面共通UIの再初期化・Service Worker登録共有・Legacy Jobポーリング重複・Corner Shell Observerの自己誘発監視を抑止（Node構文・関連回帰37件成功、実ブラウザ未完了） |
+| 2026-08-04 | 08:34 | #24 | 全画面共通UIの再初期化・Service Worker登録共有・Legacy Jobポーリング重複・Corner Shell Observerの自己誘発監視を抑止（関連回帰37件成功、実ブラウザ未完了） |
 | 2026-08-04 | 08:34 | #25 | Service WorkerをPush有効化操作まで遅延登録し、通常のUniverse／Legacy起動時の登録・precache待ちを除去（Node構文・関連回帰37件成功、実ブラウザ未完了） |
 | 2026-08-04 | 08:54 | #26 | universe-next.jsの更新中Observer一時切断と重複軽減・petit-ui-system/app_shellの監視責務分離および差分DOM更新を実装（関連回帰34件全件成功） |
 | 2026-08-04 | 09:10 | #27 | v0.15.0としてUniverse UIを根本刷新。カード矩形UIを全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、軌道・接続線からなる純粋な天体システムを実装 |
@@ -147,3 +153,6 @@
 | 2026-09-09 | 21:33 | #74 | Issue #260: Web/小型Desktopの共通モーション、Desktop設定・録音中の軌道表現、PWAキャッシュ更新を実装。動作確認済み: EdgeのUniverse/Legacy（1280px・390px）と実Electron fixture smoke、通常/reduced-motion、diff確認。既存PWA更新・実iPhone/macOS・配布版反映は未確認 |
 | 2026-09-09 | 21:43 | #75 | Issue #260: Three.js天体の登場・選択拡大・発光パルスを追加し必要時描画を維持。実WebGL fixture確認・関連13テスト・構文成功。古いSWキャッシュ名のテスト期待値を更新。大量実データ・実iPhone/macOS性能は未確認 |
 | 2026-09-10 | 06:50 | #76 | Proactive openerのセッション外エピソード参照を停止し、誤ったepisode_id=2をSQLite/Chromaから削除（関連10テスト成功、実アプリ・実LLM未確認） |
+| 2026-09-12 | 10:10 | #77 | Issue #270 Step 1: Desktop Wake設定をopenWakeWordへ一本化し、旧Picovoice/Porcupine AccessKey・PPN・自動設定IPC・暗号化キー保存を撤去。旧設定読込時の秘密情報/metadata除去とopenWakeWordエラー分類の回帰テストを追加（実マイク・installerはStep 3で確認） |
+| 2026-09-12 | 10:24 | #78 | Issue #270 Step 2: Desktop設定からopenWakeWord環境を一括準備できる導線を追加。Python検出、専用venv、依存、backbone、既存/生成済みWakeモデルの管理領域化、マイクなしdiagnostic、進捗/中止、managed runtimeパス保存を実装し、Desktop CI成功。packagedモデル同梱・実マイク`ready`・実声はStep 3へ残す。 |
+| 2026-09-12 | 10:53 | #79 | Issue #270 Step 3 / PR #272: Desktop openWakeWordのinstaller配布経路を実装。Wakeモデルをbuild時にローカルまたはURL+SHA-256から注入し、manifest同梱・packaged resource検証を追加。Run #76でmacOS arm64 DMG / Windows x64 EXE生成とSmoke/packaged検証に成功。実モデル同梱build、自動設定→diagnostic、実マイク`ready`、実声/誤起動評価は実機受入として継続。 |

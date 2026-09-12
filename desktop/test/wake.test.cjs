@@ -6,7 +6,9 @@ const { EventEmitter } = require('node:events');
 function run() {
   let handler; const messages = []; const child = new EventEmitter(); child.stdout = new EventEmitter(); child.kill = () => {};
   vm.runInNewContext(fs.readFileSync(require.resolve('../wake-worker.cjs'), 'utf8'), {
-    require: (name) => name === 'node:child_process' ? { spawn: () => child } : require(name),
+    require: (name) => name === 'node:child_process' ? { spawn: () => child } : name === './wake-runtime.cjs' ? {
+      resolveWakePython: () => '/python', resolveWakeRuntime: () => '/runtime.py', validateWakeAssets: () => '',
+    } : require(name),
     process: { env: {}, platform: 'darwin', parentPort: { on: (_event, callback) => { handler = callback; }, postMessage: (data) => messages.push(data) }, on: () => {} }, __dirname: '/tmp',
   });
   return { handler, child, messages };

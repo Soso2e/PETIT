@@ -1,6 +1,6 @@
 {
   "name": "petit-desktop",
-  "version": "0.20.3",
+  "version": "0.21.0",
   "private": true,
   "description": "PETIT desktop companion",
   "author": "Soso2e",
@@ -8,9 +8,11 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.cjs",
-    "build": "electron-builder --publish never",
-    "pack": "electron-builder --dir --publish never",
-    "test:smoke": "node test/smoke.cjs"
+    "prepare:wake-model": "node scripts/prepare-wake-model.cjs",
+    "build": "npm run prepare:wake-model && electron-builder --publish never",
+    "pack": "npm run prepare:wake-model && electron-builder --dir --publish never",
+    "test:smoke": "node test/smoke.cjs",
+    "test:package-resources": "node test/package-resources.cjs"
   },
   "devDependencies": {
     "electron": "44.2.0",
@@ -30,6 +32,22 @@
       {
         "from": "../frontend/icon-512.png",
         "to": "icon.png"
+      },
+      {
+        "from": "../scripts/wakeword/runtime.py",
+        "to": "wakeword/runtime.py"
+      },
+      {
+        "from": "../scripts/wakeword/requirements.txt",
+        "to": "wakeword/requirements.txt"
+      },
+      {
+        "from": "wakeword-assets",
+        "to": "wakeword",
+        "filter": [
+          "wake-model.json",
+          "hey_petit.onnx"
+        ]
       }
     ],
     "mac": {

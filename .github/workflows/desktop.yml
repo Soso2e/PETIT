@@ -6,8 +6,18 @@ on:
       - 'desktop/**'
       - 'frontend/desktop/**'
       - 'frontend/voice.js'
+      - 'scripts/wakeword/runtime.py'
       - '.github/workflows/desktop.yml'
   workflow_dispatch:
+    inputs:
+      wake_model_url:
+        description: 'HTTPS URL for hey_petit.onnx'
+        required: false
+        type: string
+      wake_model_sha256:
+        description: 'SHA-256 for hey_petit.onnx'
+        required: false
+        type: string
   push:
     tags:
       - 'v*'
@@ -37,7 +47,8 @@ jobs:
       - run: npm test
       - name: Syntax checks
         run: |
-          for file in *.cjs *.js ../frontend/desktop/*.js ../frontend/voice.js; do node --check "$file"; done
+          for file in *.cjs *.js scripts/*.cjs ../frontend/desktop/*.js ../frontend/voice.js; do node --check "$file"; done
+          python3 -m py_compile ../scripts/wakeword/runtime.py
       - name: Validate release tag matches Desktop version
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -63,6 +74,10 @@ jobs:
             arch: x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    env:
+      PETIT_WAKE_MODEL_REQUIRED: ${{ (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')) && '1' || '0' }}
+      PETIT_WAKE_MODEL_URL: ${{ github.event.inputs.wake_model_url || vars.PETIT_WAKE_MODEL_URL || '' }}
+      PETIT_WAKE_MODEL_SHA256: ${{ github.event.inputs.wake_model_sha256 || vars.PETIT_WAKE_MODEL_SHA256 || '' }}
     defaults:
       run:
         working-directory: desktop
@@ -116,6 +131,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Verify packaged Wake resources
+        run: npm run test:package-resources
 
       - name: Verify macOS signature and Gatekeeper assessment
         if: startsWith(github.ref, 'refs/tags/v') && matrix.platform == 'mac' && env.HAS_MAC_RELEASE_CREDS == 'true'
