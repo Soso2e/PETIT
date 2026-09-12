@@ -112,5 +112,5 @@ test('automatic setup persists managed openWakeWord paths after diagnostic', asy
   assert.equal(persisted.modelPath, managed.modelPath);
   assert.equal(persisted.backbonePath, managed.backbonePath);
   assert.equal(persisted.wakePythonPath, managed.pythonPath);
-  assert.equal(persisted.wakeRuntimePath, managed.runtimePath);
+  assert.equal('wakeRuntimePath' in persisted, false);
 });
