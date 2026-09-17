@@ -2,10 +2,20 @@
   const bridge = window.petitDesktop;
   if (!bridge) { document.getElementById('voice-state').textContent = 'Desktop用画面です。Web版は通常のPETITを開いてください。'; return; }
   const mic = document.getElementById('mic');
+  const date = document.getElementById('desktop-date');
+  const syncDate = () => {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('ja-JP', {
+      month: 'long', day: 'numeric', weekday: 'long'
+    }).formatToParts(now);
+    const value = (type) => parts.find((part) => part.type === type)?.value || '';
+    date.textContent = `${value('month')}${value('day')} ${value('weekday')}`;
+  };
   document.getElementById('chat-form').addEventListener('submit', (event) => {
     if (document.getElementById('send').disabled) { event.preventDefault(); event.stopImmediatePropagation(); }
   }, true);
   function activate({ voice = false } = {}) {
+    syncDate();
     document.body.classList.remove('appearing');
     requestAnimationFrame(() => document.body.classList.add('appearing'));
     document.getElementById('input').focus();
