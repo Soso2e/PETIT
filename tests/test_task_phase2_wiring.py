@@ -35,9 +35,9 @@ class TaskPhase2WiringTests(unittest.TestCase):
         self.assertIs(registry._REGISTRY["create_task"].handler, task_defaults.create_task)
         self.assertIs(registry._REGISTRY["complete_task"].handler, tasks_phase2.complete_task)
         self.assertIs(registry._REGISTRY["update_task"].handler, tasks_phase2.update_task)
-        self.assertTrue(registry.requires_confirmation("update_task"))
-        self.assertTrue(registry.requires_confirmation("retry_task_sync"))
-        self.assertTrue(registry.requires_confirmation("set_task_parent"))
+        self.assertFalse(registry.requires_confirmation("update_task"))
+        self.assertFalse(registry.requires_confirmation("retry_task_sync"))
+        self.assertFalse(registry.requires_confirmation("set_task_parent"))
 
     def test_agent_routes_are_installed_once(self) -> None:
         tasks_phase2.install_agent_routes()

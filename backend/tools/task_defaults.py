@@ -14,7 +14,7 @@ _PRIORITIES = list(tasks_phase2._PRIORITIES)  # noqa: SLF001 - keep the register
 @tool(
     name="create_task",
     description=(
-        "新しいタスクを作成する。Notion設定時は承認後すぐSQLiteへ保存し、Notion書き込みは"
+        "新しいタスクを作成する。明示依頼ならすぐSQLiteへ保存し、Notion書き込みは"
         "pendingキューでバックグラウンド実行する。priority省略時はHigh。"
         "due_dateはユーザーが日付を指定した場合だけ設定し、省略時は期限なしにする。"
     ),
@@ -42,7 +42,7 @@ _PRIORITIES = list(tasks_phase2._PRIORITIES)  # noqa: SLF001 - keep the register
         },
         "required": ["title"],
     },
-    requires_confirmation=True,
+    risk="low_risk_write",
 )
 def create_task(
     title: str,

@@ -244,7 +244,7 @@ flowchart TD
     badArgs[invalid_tool_arguments結果]
     duplicate{同じToolと引数を実行済みか}
     duplicateStop[duplicate_tool_call結果]
-    confirmation{確認が必要か}
+    confirmation{Tool riskが確認対象か}
     writeFlow[確認付き書き込みフロー]
     execute[Toolをdispatch]
     progressStart[tool_started進捗]
@@ -277,7 +277,7 @@ flowchart TD
     compact --> append --> call
 ```
 
-親子関係の変更は`set_task_parent`へ集約します。タスク名変更も同時に必要な場合は、同じTool callの`title`へ含め、Runtimeの確認を1回だけ表示します。
+親子関係の変更は`set_task_parent`へ集約します。タスク名変更も同時に必要な場合は、同じTool callの`title`へ含めます。作成・変更・完了・親子変更・同期再試行は、ユーザーの明示指示がある場合に限ってAgentがToolをcallし、`low_risk_write`として同じターン内で実行します。対象が曖昧な場合はToolをcallせず、候補を絞る質問を返します。
 
 Agentの出力もPETIT Core Promptを共有し、Toolあり/なしで人格を切り替えません。
 
@@ -342,6 +342,8 @@ flowchart LR
     confirmWrite --> approval
     destructive --> approval
 ```
+
+タスク操作では`create_task`、`update_task`、`complete_task`、`set_task_parent`、`retry_task_sync`を可逆な`low_risk_write`として扱います。予定追加、BRAIN本文編集、外部ソースとの紐付けなど影響範囲が広い操作は`confirm_write`を維持し、削除などの`destructive`は常に確認対象です。riskにかかわらず、書き込みToolの引数はschemaで検証してから実行します。
 
 ---
 
@@ -421,7 +423,10 @@ flowchart TD
     none[一致なしと回答]
     unique{最高得点候補が1件か}
     multiple[候補を提示して確認]
-    confirm[complete_taskの確認を返す]
+    execute[complete_taskを即時実行]
+    failed{書き込み成功か}
+    success[完了を反映したと回答]
+    failure[未反映を明示]
 
     input --> extract
     extract -->|いいえ| skip
@@ -431,7 +436,9 @@ flowchart TD
     completed -->|いいえ| none
     active -->|はい| unique
     unique -->|いいえ| multiple
-    unique -->|はい| confirm
+    unique -->|はい| execute --> failed
+    failed -->|はい| success
+    failed -->|いいえ| failure
 ```
 
 ---
@@ -522,9 +529,10 @@ flowchart LR
     calls[Tool総数6回]
     duplicate[同一Tool 同一引数の再実行禁止]
     allowed[Capability外Toolの拒否]
-    args[確認対象引数を承認前に検証]
+    args[全書き込み引数を実行前に検証]
     defer[作業予告のみの回答を1回再実行]
     confirm[confirm_write destructiveは承認必須]
+    explicit[可逆なタスク変更は明示指示時のみ即時実行]
     resume[Agent state 30分TTL]
     approval[approval_id 10分TTL]
     writeOnce[承認後の追加書き込みは禁止]
@@ -542,6 +550,7 @@ flowchart LR
     limits --> args
     limits --> defer
     limits --> confirm
+    limits --> explicit
     limits --> resume
     limits --> approval
     limits --> writeOnce
