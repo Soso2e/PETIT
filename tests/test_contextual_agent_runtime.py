@@ -85,6 +85,51 @@ class ContextualAgentRuntimeTests(unittest.TestCase):
         self.assertEqual(items["total_count"], 1)
         self.assertEqual(items["items"][0]["title"], "iPhoneコースガイド見る")
 
+    def test_explicit_task_change_executes_without_confirmation(self) -> None:
+        created = json.loads(tools.dispatch("create_task", {"title": "レポートを書く"}))
+        task_id = int(created["task"]["id"])
+        model_results = [
+            tool_call(
+                "update_task",
+                {"task_id": task_id, "priority": "High"},
+                call_id="update",
+            ),
+            {"content": "優先度をHighに変更したよ。", "tool_calls": []},
+        ]
+        with patch.object(agent_runtime.capability_router, "choose", return_value=self.route(["lists_and_tasks"])):
+            with patch.object(agent_runtime, "chat_completion", side_effect=model_results):
+                result = agent_runtime.run(
+                    "レポートを書くタスクの優先度をHighに変更して",
+                    history=[],
+                )
+
+        self.assertNotIn("pending_actions", result)
+        self.assertEqual(result["reply"], "優先度をHighに変更したよ。")
+        self.assertEqual([item["name"] for item in result["used_tools"]], ["update_task"])
+        updated = json.loads(tools.dispatch("get_tasks", {"priority": "high"}))
+        self.assertTrue(any(int(item["id"]) == task_id for item in updated["tasks"]))
+
+    def test_confirm_write_still_returns_runtime_approval(self) -> None:
+        with patch.object(agent_runtime.capability_router, "choose", return_value=self.route(["calendar"])):
+            with patch.object(
+                agent_runtime,
+                "chat_completion",
+                return_value=tool_call(
+                    "add_schedule",
+                    {"title": "歯医者", "start_time": "2026-09-20 10:00"},
+                    call_id="schedule",
+                ),
+            ):
+                result = agent_runtime.run("明日10時に歯医者を予定へ追加して", history=[])
+
+        self.assertIn("pending_actions", result)
+        self.assertEqual(result["pending_actions"][0]["name"], "execute_agent_write")
+        self.assertEqual(
+            result["pending_actions"][0]["arguments"]["tool_name"],
+            "add_schedule",
+        )
+        self.assertEqual(result["used_tools"], [])
+
     def test_topic_only_message_does_not_create_a_list(self) -> None:
         with patch.object(agent_runtime.capability_router, "choose", return_value=self.route(["lists_and_tasks"])):
             with patch.object(

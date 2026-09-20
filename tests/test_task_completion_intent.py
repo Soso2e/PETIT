@@ -14,8 +14,9 @@ class TaskCompletionIntentTests(unittest.TestCase):
     def test_explicit_project_completion_is_not_intercepted(self) -> None:
         self.assertIsNone(task_completion_intent.extract_target("PETITプロジェクトは完了した"))
 
+    @patch("backend.task_completion_intent.tools.dispatch")
     @patch("backend.task_completion_intent._candidate_rows")
-    def test_unique_candidate_returns_confirmation_on_first_turn(self, rows) -> None:
+    def test_unique_candidate_is_completed_on_first_turn(self, rows, dispatch) -> None:
         rows.return_value = (
             [
                 {
@@ -29,13 +30,31 @@ class TaskCompletionIntentTests(unittest.TestCase):
             [],
         )
 
+        dispatch.return_value = '{"completed": true, "task": {"title": "LiTのデザイン実装"}}'
+
         result = task_completion_intent.try_handle("LiTデザインは完了した！")
 
-        self.assertEqual(result["reply"], "「LiTのデザイン実装」を完了にしますか？")
+        self.assertEqual(result["reply"], "「LiTのデザイン実装」を完了にしたよ。")
         self.assertEqual(
-            result["pending_actions"],
-            [{"name": "complete_task", "arguments": {"task_id": 42}}],
+            [item["name"] for item in result["used_tools"]],
+            ["get_tasks", "complete_task"],
         )
+        self.assertNotIn("pending_actions", result)
+        dispatch.assert_called_once_with("complete_task", {"task_id": 42})
+
+    @patch("backend.task_completion_intent.tools.dispatch", return_value='{"completed": false}')
+    @patch("backend.task_completion_intent._candidate_rows")
+    def test_unique_candidate_reports_write_failure(self, rows, _dispatch) -> None:
+        rows.return_value = (
+            [{"id": 42, "title": "LiTのデザイン実装", "match_score": 87}],
+            [],
+        )
+
+        result = task_completion_intent.try_handle("LiTデザインは完了した！")
+
+        self.assertIn("完了にできなかった", result["reply"])
+        self.assertFalse(result["persist"])
+        self.assertNotIn("pending_actions", result)
 
     @patch("backend.task_completion_intent._candidate_rows")
     def test_multiple_candidates_are_presented_without_write(self, rows) -> None:

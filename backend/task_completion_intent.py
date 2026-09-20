@@ -1,11 +1,12 @@
 """Deterministic resolution for named task-completion reports."""
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from typing import Any
 
-from . import config, db
+from . import config, db, tools
 
 _COMPLETION_PATTERNS = (
     re.compile(r"^(?P<target>.+?)(?:は|を)?(?:完了(?:した|しました|済み)?|終わ(?:った|りました)|終え(?:た|ました)|できた)[！!。\s]*$", re.IGNORECASE),
@@ -116,17 +117,32 @@ def try_handle(message: str) -> dict[str, Any] | None:
 
     task = best[0]
     title = str(task["title"])
+    arguments = {"task_id": int(task["id"])}
+    raw_result = tools.dispatch("complete_task", arguments)
+    try:
+        completion = json.loads(raw_result)
+    except json.JSONDecodeError:
+        completion = None
+    failed = (
+        raw_result.startswith("[error]")
+        or not isinstance(completion, dict)
+        or not completion.get("completed")
+    )
+    if failed:
+        return {
+            "reply": f"「{title}」を完了にできなかったよ。同期状態を確認して、もう一度試して。",
+            "used_tools": [{"name": "complete_task", "arguments": arguments, "deterministic": True}],
+            "persist": False,
+            "model_route": _route("completion_failed"),
+        }
     return {
-        "reply": f"「{title}」を完了にしますか？",
-        "used_tools": [{"name": "get_tasks", "arguments": {"title_query": target}, "deterministic": True}],
-        "pending_actions": [
-            {
-                "name": "complete_task",
-                "arguments": {"task_id": int(task["id"])},
-            }
+        "reply": f"「{title}」を完了にしたよ。",
+        "used_tools": [
+            {"name": "get_tasks", "arguments": {"title_query": target}, "deterministic": True},
+            {"name": "complete_task", "arguments": arguments, "deterministic": True},
         ],
         "persist": True,
-        "model_route": _route("unique_candidate"),
+        "model_route": _route("completed_unique_candidate"),
     }
 
 
@@ -136,6 +152,10 @@ def _route(reason: str) -> dict[str, Any]:
         "requested_route": "deterministic",
         "actual_route": "deterministic",
         "model": None,
-        "tools": ["get_tasks", "complete_task"] if reason == "unique_candidate" else [],
+        "tools": (
+            ["get_tasks", "complete_task"]
+            if reason in {"completed_unique_candidate", "completion_failed"}
+            else []
+        ),
         "reasons": [f"named_task_completion:{reason}"],
     }

@@ -229,7 +229,7 @@ def get_tasks(
 @tool(
     name="create_task",
     description=(
-        "新しいタスクを作成する。Notion設定時は承認後すぐSQLiteへ保存し、Notion書き込みは"
+        "新しいタスクを作成する。明示依頼ならすぐSQLiteへ保存し、Notion書き込みは"
         "pendingキューでバックグラウンド実行する。"
     ),
     parameters={
@@ -245,7 +245,7 @@ def get_tasks(
         },
         "required": ["title"],
     },
-    requires_confirmation=True,
+    risk="low_risk_write",
 )
 def create_task(
     title: str,
@@ -372,7 +372,7 @@ def _update_payload(
 @tool(
     name="update_task",
     description=(
-        "既存タスクを編集する。NotionタスクはSQLiteへ即時反映し、確認済み内容を非同期同期する。"
+        "明示された既存タスクの変更を実行する。NotionタスクはSQLiteへ即時反映し、変更内容を非同期同期する。"
         "競合中はNotion側の変更内容を確認してから再編集する。"
     ),
     parameters={
@@ -392,7 +392,7 @@ def _update_payload(
             "done_date": {"type": "string"},
         },
     },
-    requires_confirmation=True,
+    risk="low_risk_write",
 )
 def update_task(
     task_id: int | str | None = None,
@@ -522,7 +522,7 @@ def update_task(
             "done_date": {"type": "string"},
         },
     },
-    requires_confirmation=True,
+    risk="low_risk_write",
 )
 def complete_task(
     task_id: int | str | None = None,
@@ -544,13 +544,13 @@ def complete_task(
 
 @tool(
     name="retry_task_sync",
-    description="failedになったNotionタスク同期を承認後に再試行する。conflictは再試行せず再編集を求める。",
+    description="failedになったNotionタスク同期を明示依頼に基づいて再試行する。conflictは再試行せず再編集を求める。",
     parameters={
         "type": "object",
         "properties": {"task_id": {"type": "integer"}},
         "required": ["task_id"],
     },
-    requires_confirmation=True,
+    risk="low_risk_write",
 )
 def retry_task_sync(task_id: int) -> dict[str, Any]:
     return task_sync_queue.retry_task(int(task_id))

@@ -74,8 +74,8 @@ Content-Type: application/json
   "pending_actions": [
     {
       "approval_id": "...",
-      "name": "complete_task",
-      "arguments": {}
+      "name": "add_schedule",
+      "arguments": {"title": "歯医者", "start": "2026-09-20T10:00:00+09:00"}
     }
   ],
   "error": null

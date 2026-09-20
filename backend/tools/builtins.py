@@ -53,8 +53,8 @@ def register_builtin_tools(_app: object | None = None) -> None:
         "update_task",
         (
             "タスクの親子関係は変更しない。parent_idやparent_task_idを渡さず、"
-            "親子変更にはset_task_parentを使う。明示的な書き込み依頼では自然文で事前確認せずToolをcallし、"
-            "確認はRuntimeに一度だけ表示させる。"
+            "親子変更にはset_task_parentを使う。話題提示だけでは変更せず、"
+            "明示的な書き込み依頼では自然文で事前確認せずToolをcallする。"
         ),
     )
 

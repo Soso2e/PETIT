@@ -2,7 +2,7 @@
 
 **Current Version: v0.21.0**
 
-**Last Updated: 2026-09-12**
+**Last Updated: 2026-09-19**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
@@ -54,13 +54,13 @@
 - 制作伴走 / Today: 作業セッションをNotion Task DBの変更なしでPETIT内部Task IDへ紐づけ、状態遷移イベントをSQLiteへ永続化する。20分ごとの継続確認と無応答時の自動停止、タスク別・プロジェクト別・直近1〜90日集計、チャットからの開始・一時停止・再開・終了・実績参照に対応。Today機能自体は残し、トップレベルタブからは外す。
 - Issue #223対応: active / paused Work Sessionを通常会話の小さい状況文脈へ追加し、Tool routeを増やさず脱線後も現在作業を認識可能にする。proactive openerは古いproject memoryより実セッションを優先（関連自動テスト済み、実LM Studio未確認）。
 - Issue #235対応中: PETIT人格をCore Promptへ一本化し、通常会話1 Call、Tasks / CalendarのReadを `Brain -> Context Broker -> Brain` の原則2 Callで処理する最小縦切りを実装。Read sourceは並列取得し、AI向けfactsへ正規化する。実LM Studio・実Notion/Calendar・latency/token比較は未確認。
-- 会話 / Agent Runtime: Tool不要の会話はPETIT Brainの最初のLLM回答で終了し、Tasks / CalendarのReadだけ不足する場合はContext Brokerへ進む。書き込み・複雑処理は既存Agent Tool Loopを維持する。
+- 会話 / Agent Runtime: Tool不要の会話はPETIT Brainの最初のLLM回答で終了し、Tasks / CalendarのReadだけ不足する場合はContext Brokerへ進む。書き込み・複雑処理は既存Agent Tool Loopを維持する。Issue #274で、明示されたタスク作成・変更・完了・親子変更・同期再試行を可逆な`low_risk_write`として同じターン内に実行するよう変更。話題提示や対象曖昧時は書き込まず、予定追加・BRAIN編集・外部紐付け・破壊的操作の確認境界は維持する（関連自動テスト済み、実LLM会話E2E未確認）。
 - Prompt / 時刻: PETITの人格・会話原則を共通Core Promptへ統合。動的日時はsystem promptへ常時結合せず、相対日付・時刻を含むターンだけuser側へ必要な精度で注入する。
 - 音声: AivisSpeech Engine経由のWAV再生、ブラウザTTS fallback、再試行、直列化、モバイル音声アンロックを実装。実PC／iPhone E2Eは未確認。
 - Notionタスク復旧: Tasks画面の明示Notion同期、失敗同期の再試行、競合時の再編集案内を追加。実Notion接続・実ブラウザ操作は未確認。
-- へいプティ音声入口（仮実装）: Issue #218 / `feat/petit-vocal-shortcut-prototype` で、iOS Vocal Shortcuts + Appleショートカットから `POST /api/voice` へ音声認識済みテキストを渡し、既存 `/api/chat` へ委譲する導線を追加。PWA自身では常時マイク監視せず、書き込み確認は既存フローを維持する。実iPhone E2Eは未確認。
+- へいプティ音声入口（仮実装）: Issue #218 / `feat/petit-vocal-shortcut-prototype` で、iOS Vocal Shortcuts + Appleショートカットから `POST /api/voice` へ音声認識済みテキストを渡し、既存 `/api/chat` へ委譲する導線を追加。PWA自身では常時マイク監視せず、タスクの明示操作は即時実行、確認対象の別操作は既存フローを維持する。実iPhone E2Eは未確認。
 - Web Push通知: Service Worker、Push API、VAPID、購読／解除API、カテゴリ別opt-in、通知履歴を実装。cache名をv0.14.1へ更新し、Univ空間と四隅App Shellの資産をprecacheへ追加。
-- タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。作成・完了・親子変更は確認付きでNotion同期する。
+- タスク管理: Notionを外部正本、SQLiteをPETITの即時統合ビューとして扱う。通常取得はHigh優先。ユーザーが作成・変更・完了・親子変更・同期再試行を明示した場合は追加確認なしでSQLiteへ反映し、Notion同期キューへ送る。対象が曖昧な場合は書き込まない。
 - Project Continuity: 内部project台帳、alias、source link、checkpoint、handoff、cache-first resumeを統合済み。
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
 - Windows起動導線: `scripts/start-petit-tailscale.ps1` で起動モード選択、Tailscale接続、`.venv` のPETIT起動、`/api/health`確認、管理者権限付きTailscale Serve、ブラウザ起動まで実行する。LM Studioは事前起動が必要。
@@ -160,3 +160,4 @@
 | 2026-09-12 | 10:53 | #79 | Issue #270 Step 3 / PR #272: Desktop openWakeWordのinstaller配布経路を実装。Wakeモデルをbuild時にローカルまたはURL+SHA-256から注入し、manifest同梱・packaged resource検証を追加。Run #76でmacOS arm64 DMG / Windows x64 EXE生成とSmoke/packaged検証に成功。実モデル同梱build、自動設定→diagnostic、実マイク`ready`、実声/誤起動評価は実機受入として継続。 |
 | 2026-09-12 | 12:53 | #80 | v0.21.0 Release blockerを解消。Wakeモデル未設定時は未同梱manifest付きinstaller/Releaseを許可し、モデル配布設定が存在する場合だけHTTPS+SHA-256検証を必須化。Run #90でモデルなしmacOS arm64/Windows x64 packageを実生成し全工程成功。`VERSION`同期と1ボタンRelease workflowを追加し、実タグ/Release実行のみ未確認。Issue #270はWake実機受入として継続。 |
 | 2026-09-12 | 13:02 | #81 | v0.21.0を正式Release。タグは`9b6a517`へ作成し、Run #92でtest・macOS arm64未署名DMG・Windows x64 EXE・packaged Wake resources・GitHub Release作成が全て成功。Release資産2件を公開。Wakeモデルは未同梱で、実機Wake受入はIssue #270で継続。 |
+| 2026-09-19 | 00:33 | #82 | Issue #274: 明示されたタスク作成・変更・完了・親子変更・同期再試行を追加確認なしで即時実行し、全書き込み引数検証と決定論的完了報告を更新（関連70テスト・31 subtest・Python構文・diff確認済み、実LM Studio会話E2E未確認）。 |

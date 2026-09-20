@@ -49,7 +49,8 @@ class TaskParentConfirmationGuardTests(unittest.TestCase):
         }
         self.assertIn("親子変更にはset_task_parentを使う", schemas["update_task"]["description"])
         self.assertIn("update_taskではなく必ずこのToolを使う", schemas["set_task_parent"]["description"])
-        self.assertIn("確認はRuntimeが一度だけ表示する", schemas["set_task_parent"]["description"])
+        self.assertIn("話題提示だけでは実行せず", schemas["set_task_parent"]["description"])
+        self.assertIn("明示依頼を受けたら事前確認なし", schemas["set_task_parent"]["description"])
 
     def test_runtime_detects_manual_write_confirmation(self) -> None:
         self.assertTrue(agent_runtime._is_manual_write_confirmation("この内容で実行しますか？"))

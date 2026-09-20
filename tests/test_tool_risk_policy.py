@@ -16,6 +16,10 @@ class ToolRiskPolicyTests(unittest.TestCase):
             "create_task",
             "add_task",
             "add_list_item",
+            "update_task",
+            "complete_task",
+            "set_task_parent",
+            "retry_task_sync",
             "create_handoff_note",
             "save_memory",
             "ignore_github_repository_candidate",
@@ -28,8 +32,6 @@ class ToolRiskPolicyTests(unittest.TestCase):
     def test_confirm_writes_stay_gated(self) -> None:
         for name in (
             "add_schedule",
-            "update_task",
-            "complete_task",
             "edit_brain_note",
             "create_list",
             "link_github_repository_candidate",
@@ -38,6 +40,10 @@ class ToolRiskPolicyTests(unittest.TestCase):
                 continue
             self.assertEqual(tools.risk_for(name), "confirm_write", name)
             self.assertTrue(tools.requires_confirmation(name), name)
+
+    def test_low_risk_write_arguments_are_validated_before_dispatch(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unknown arguments for update_task"):
+            tools.parse_arguments("update_task", {"task_id": 1, "unexpected": True})
 
     def test_legacy_requires_confirmation_maps_to_confirm_write(self) -> None:
         name = "_test_legacy_confirm_write"

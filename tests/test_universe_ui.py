@@ -156,7 +156,7 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('parent_task_id: Number', script)
         self.assertNotIn('/parent`', decorator)
         self.assertIn('name="set_task_parent"', tool)
-        self.assertIn("requires_confirmation=True", tool)
+        self.assertIn('risk="low_risk_write"', tool)
         self.assertIn("parent_external_ids", service)
         self.assertIn("task_hierarchy", tools_init)
         self.assertIn('"set_task_parent"', capability)

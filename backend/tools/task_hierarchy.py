@@ -19,8 +19,7 @@ def _failed(result: dict[str, Any]) -> bool:
         "『XをPETIT開発の子タスクにして』『XをLife直下へ戻して』のような親子関係の依頼では、"
         "update_taskではなく必ずこのToolを使う。親として選べるのはLife直下のタスクだけ。"
         "同時にタスク名も変える場合はtitleを渡す。"
-        "ユーザーへ自然文で事前確認を求めず、明示依頼を受けたらこのToolをcallする。"
-        "確認はRuntimeが一度だけ表示する。"
+        "話題提示だけでは実行せず、ユーザーから明示依頼を受けたら事前確認なしでこのToolをcallする。"
     ),
     parameters={
         "type": "object",
@@ -36,7 +35,7 @@ def _failed(result: dict[str, Any]) -> bool:
             "move_to_life": {"type": "boolean", "default": False},
         },
     },
-    requires_confirmation=True,
+    risk="low_risk_write",
 )
 def set_task_parent_tool(
     task_id: int | str | None = None,

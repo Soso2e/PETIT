@@ -26,8 +26,10 @@ _DEFAULT_RISKS: dict[str, ToolRisk] = {
     "save_memory": "low_risk_write",
     "ignore_github_repository_candidate": "low_risk_write",
     "add_schedule": "confirm_write",
-    "update_task": "confirm_write",
-    "complete_task": "confirm_write",
+    "update_task": "low_risk_write",
+    "complete_task": "low_risk_write",
+    "set_task_parent": "low_risk_write",
+    "retry_task_sync": "low_risk_write",
     "edit_brain_note": "confirm_write",
     "create_list": "confirm_write",
     "link_github_repository_candidate": "confirm_write",
@@ -141,9 +143,9 @@ def _matches_type(value: Any, expected: str) -> bool:
 
 
 def _validate_write_arguments(name: str, arguments: dict[str, Any]) -> None:
-    """Reject malformed confirmation-gated writes before asking the user."""
+    """Reject malformed writes before confirmation or immediate dispatch."""
     tool_obj = _REGISTRY.get(name)
-    if tool_obj is None or tool_obj.risk not in {"confirm_write", "destructive"}:
+    if tool_obj is None or tool_obj.risk == "safe_read":
         return
 
     schema = tool_obj.parameters if isinstance(tool_obj.parameters, dict) else {}

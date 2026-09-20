@@ -65,7 +65,7 @@ Life
 ### Chat
 
 - 選択中Taskを文脈としてPETITへ相談する
-- `set_task_parent`を使い、確認後にTaskを別Taskの子へ移す
+- 明示依頼時は`set_task_parent`を使い、追加確認なしでTaskを別Taskの子へ移す
 - 「XをPETIT開発の子タスクにして」または「XをLife直下へ戻して」に対応する
 - 作業継続確認中にチャットへ返答した場合も、作業継続として扱う
 
