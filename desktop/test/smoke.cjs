@@ -48,7 +48,7 @@ const server = http.createServer(async (request, response) => {
   fs.writeFileSync(bootstrap, `require('electron').app.setPath('userData', ${JSON.stringify(profile)}); require(${JSON.stringify(path.join(root, 'desktop/main.cjs'))});`);
   let instance;
   try {
-    fs.writeFileSync(path.join(profile, 'package.json'), JSON.stringify({ name: 'petit-desktop-smoke', version: '0.20.0', main: 'bootstrap.cjs' }));
+    fs.writeFileSync(path.join(profile, 'package.json'), JSON.stringify({ name: 'petit-desktop-smoke', version: '0.22.0', main: 'bootstrap.cjs' }));
     instance = await electron.launch({ args: [profile], cwd: path.join(root, 'desktop'), timeout: 30000 });
     const wakeWorker = path.join(root, 'desktop/wake-worker.cjs');
     assert.equal(await instance.evaluate(({ utilityProcess }, file) => new Promise((resolve) => {

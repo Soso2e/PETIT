@@ -6,6 +6,7 @@
     tasks: { label: "Tasks", title: "Tasks", icon: "check" },
     chat: { label: "PETIT", title: "Chat", icon: "chat" },
     reminders: { label: "Reminders", title: "Reminders", icon: "bell" },
+    settings: { label: "Settings", title: "Settings", icon: "settings" },
   };
 
   const ICONS = {

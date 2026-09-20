@@ -36,9 +36,9 @@ class AppNotificationUnificationTests(unittest.TestCase):
 
     def test_universe_app_shell_has_univ_first_primary_navigation(self):
         source = (ROOT / "frontend" / "app_shell.js").read_text(encoding="utf-8")
-        self.assertIn('{ view: "univ", target: "universe", label: "Univ" }', source)
-        self.assertIn('{ view: "tasks", target: "tasks", label: "Tasks" }', source)
-        self.assertIn('{ view: "chat", target: "chat", label: "PETIT" }', source)
+        self.assertIn('{ view: "univ", target: "universe", label: "Univ", title: "Universe"', source)
+        self.assertIn('{ view: "tasks", target: "tasks", label: "Tasks", title: "Tasks"', source)
+        self.assertIn('{ view: "chat", target: "chat", label: "PETIT", title: "PETIT"', source)
         self.assertIn('reminders: "reminders"', source)
         self.assertIn('focus: "univ"', source)
 

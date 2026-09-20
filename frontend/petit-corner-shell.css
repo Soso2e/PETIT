@@ -6,12 +6,15 @@
   --petit-corner-control: 48px;
 }
 
-.petit-area-rail {
-  display: none !important;
-}
-
-.universe-shell {
-  padding-left: 0 !important;
+@media (min-width: 960px) {
+  .petit-area-rail { display: flex !important; }
+  .universe-shell { padding-left: var(--petit-rail-width) !important; }
+  .universe-topbar .petit-corner-status,
+  .universe-topbar .view-tabs.petit-corner-nav,
+  .petit-utility-dock { display: none !important; }
+  .universe-main,
+  .petit-univ-active .universe-main { padding-top: 18px; }
+  .petit-univ-active .univ-viewport { min-height: calc(100dvh - 18px); }
 }
 
 .universe-topbar {
@@ -43,9 +46,9 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   padding: 10px 13px;
-  border: 1px solid rgb(205 218 255 / 13%);
+  border: 1px solid var(--ui-line, rgb(255 255 255 / 10%));
   border-radius: 17px;
-  background: rgb(6 10 25 / 66%);
+  background: color-mix(in srgb, var(--ui-bg-2, #101113) 82%, transparent);
   box-shadow: 0 16px 44px rgb(0 0 0 / 22%), inset 0 1px 0 rgb(255 255 255 / 5%);
   backdrop-filter: blur(22px) saturate(1.15);
   pointer-events: auto;
@@ -59,7 +62,7 @@
 }
 
 .petit-corner-status__eyebrow {
-  color: rgb(176 196 255 / 64%);
+  color: var(--ui-dim, rgb(210 210 205 / 64%));
   font-family: "DM Mono", monospace;
   font-size: 8px;
   letter-spacing: .18em;
@@ -80,7 +83,7 @@
   align-items: center;
   gap: 7px;
   overflow: hidden;
-  color: rgb(205 217 251 / 55%);
+  color: var(--ui-muted, rgb(210 210 205 / 58%));
   font-family: "DM Mono", monospace;
   font-size: 8px;
   letter-spacing: .06em;
@@ -112,9 +115,9 @@
   grid-template-columns: none;
   gap: 6px;
   padding: 5px;
-  border: 1px solid rgb(205 218 255 / 13%);
+  border: 1px solid var(--ui-line, rgb(255 255 255 / 10%));
   border-radius: 18px;
-  background: rgb(6 10 25 / 70%);
+  background: color-mix(in srgb, var(--ui-bg-2, #101113) 84%, transparent);
   box-shadow: 0 16px 44px rgb(0 0 0 / 22%), inset 0 1px 0 rgb(255 255 255 / 5%);
   backdrop-filter: blur(22px) saturate(1.15);
   pointer-events: auto;
@@ -133,7 +136,7 @@
   border: 1px solid transparent;
   border-radius: 13px;
   background: transparent;
-  color: rgb(198 210 245 / 62%);
+  color: var(--ui-muted, rgb(210 210 205 / 62%));
   font-size: 11px;
   transition: color .2s ease, background .2s ease, border-color .2s ease, transform .2s ease;
 }
@@ -146,8 +149,8 @@
 }
 
 .universe-topbar .view-tab.petit-corner-nav__item.is-active {
-  border-color: rgb(196 214 255 / 17%);
-  background: rgb(255 255 255 / 11%);
+  border-color: var(--ui-line-strong, rgb(255 255 255 / 16%));
+  background: var(--ui-accent-soft, rgb(255 255 255 / 8%));
   color: #fff;
   box-shadow: 0 6px 20px rgb(0 0 0 / 20%), inset 0 1px 0 rgb(255 255 255 / 8%);
 }
@@ -186,6 +189,62 @@
   display: none !important;
 }
 
+/* Keep the galaxy as content for Universe; ordinary work views use a quiet desk. */
+body:not(.petit-univ-active) {
+  background: var(--ui-bg, #0b0c0e) !important;
+}
+
+body:not(.petit-univ-active) .space {
+  opacity: .055;
+  filter: grayscale(1);
+}
+
+body:not(.petit-univ-active) .chat-panel,
+body:not(.petit-univ-active) .chat-context,
+body:not(.petit-univ-active) .task-table-wrap,
+body:not(.petit-univ-active) .today-card,
+body:not(.petit-univ-active) .reminder-list,
+body:not(.petit-univ-active) .notification-panel {
+  border-color: var(--ui-line, rgb(255 255 255 / 8%));
+  border-radius: var(--ui-r-md, 12px);
+  background: var(--ui-surface, rgb(20 21 23 / 94%));
+  box-shadow: var(--ui-shadow, 0 8px 24px rgb(0 0 0 / 18%));
+  backdrop-filter: blur(16px);
+}
+
+body:not(.petit-univ-active) .message--assistant {
+  border-color: var(--ui-line, rgb(255 255 255 / 8%));
+  background: var(--ui-soft, rgb(255 255 255 / 3%));
+}
+
+body:not(.petit-univ-active) .message--user {
+  border-color: var(--ui-line-strong, rgb(255 255 255 / 15%));
+  background: var(--ui-accent-soft, rgb(255 255 255 / 8%));
+}
+
+body:not(.petit-univ-active) .chat-composer {
+  border-color: var(--ui-line-strong, rgb(255 255 255 / 15%));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ui-surface-solid, #151618) 94%, transparent);
+}
+
+body:not(.petit-univ-active) .task-table tbody tr,
+body:not(.petit-univ-active) .reminder-item,
+body:not(.petit-univ-active) .reminder-card,
+body:not(.petit-univ-active) .notification-item {
+  border-color: var(--ui-line, rgb(255 255 255 / 8%)) !important;
+  background: var(--ui-soft, rgb(255 255 255 / 3%)) !important;
+  box-shadow: none !important;
+}
+
+body:not(.petit-univ-active) .task-table tbody tr:hover,
+body:not(.petit-univ-active) .task-table tbody tr.is-selected {
+  border-color: var(--ui-line-strong, rgb(255 255 255 / 15%)) !important;
+  background: var(--ui-accent-soft, rgb(255 255 255 / 8%)) !important;
+}
+
+.petit-subnav { display: none; }
+
 .petit-utility-dock {
   position: fixed;
   left: var(--petit-corner-inline);
@@ -205,10 +264,10 @@
   justify-content: center;
   gap: 7px;
   padding: 0 12px;
-  border: 1px solid rgb(205 218 255 / 13%);
+  border: 1px solid var(--ui-line, rgb(255 255 255 / 10%));
   border-radius: 15px;
-  background: rgb(6 10 25 / 70%);
-  color: rgb(217 226 251 / 72%);
+  background: color-mix(in srgb, var(--ui-bg-2, #101113) 84%, transparent);
+  color: var(--ui-muted, rgb(220 220 215 / 72%));
   box-shadow: 0 16px 44px rgb(0 0 0 / 24%), inset 0 1px 0 rgb(255 255 255 / 5%);
   backdrop-filter: blur(22px) saturate(1.15);
   cursor: pointer;
@@ -219,7 +278,7 @@
 .petit-utility-dock__button:focus-visible,
 .petit-utility-dock__button[aria-expanded="true"] {
   outline: none;
-  border-color: rgb(213 225 255 / 32%);
+  border-color: var(--ui-line-strong, rgb(255 255 255 / 20%));
   background: rgb(255 255 255 / 10%);
   color: #fff;
 }
@@ -236,9 +295,9 @@
   display: grid;
   gap: 7px;
   padding: 10px;
-  border: 1px solid rgb(207 220 255 / 16%);
+  border: 1px solid var(--ui-line-strong, rgb(255 255 255 / 16%));
   border-radius: 21px;
-  background: rgb(7 11 28 / 94%);
+  background: color-mix(in srgb, var(--ui-surface-solid, #151618) 96%, transparent);
   color: #f4f7ff;
   box-shadow: 0 24px 80px rgb(0 0 0 / 45%), inset 0 1px 0 rgb(255 255 255 / 6%);
   backdrop-filter: blur(28px) saturate(1.15);
@@ -352,6 +411,9 @@
 }
 
 @media (max-width: 959px) {
+  .petit-area-rail { display: none !important; }
+  .universe-shell { padding-left: 0 !important; }
+  .petit-context-bar { display: none !important; }
   .universe-topbar .view-tabs.petit-corner-nav {
     inset: var(--petit-corner-top) var(--petit-corner-right) auto auto;
     min-height: 54px;
@@ -459,6 +521,21 @@
   .petit-univ-active .univ-viewport {
     min-height: calc(100dvh - 66px - env(safe-area-inset-top));
   }
+
+  .chat-panel .section-head--compact {
+    display: grid;
+    gap: 9px;
+    padding: 16px 14px 0;
+  }
+
+  .chat-head-actions {
+    width: 100%;
+    display: grid;
+    gap: 7px;
+  }
+
+  .chat-head-actions select { width: 100%; min-height: 38px; }
+  .chat-status { padding-top: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

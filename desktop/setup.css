@@ -1,14 +1,14 @@
-:root { color-scheme: dark; color: #e3ebff; background: #0b1020; font: 14px/1.7 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-* { box-sizing: border-box; } body { margin: 0; } main { max-width: 610px; padding: 28px; margin: auto; }
-h1 { font-size: 23px; font-weight: 550; line-height: 1.4; } p { color: #a8b8d1; }
-.eyebrow { font-size: 11px; letter-spacing: .2em; color: #abdbea; }
-label { display: block; margin: 18px 0 5px; } input:not([type='checkbox']) { display: block; width: 100%; background: #111d32; color: #e8efff; border: 1px solid #7d96bc55; border-radius: 8px; padding: 10px; margin-top: 5px; font: inherit; }
+:root { color-scheme: dark; color: #efefec; background: #0c0d0f; font: 14px/1.7 Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; --line:#ffffff14; --line-strong:#ffffff24; --surface:#151618; --muted:#9f9f9a; --dim:#6f6f6a; }
+* { box-sizing: border-box; } body { margin: 0; background:linear-gradient(145deg,#ffffff08,transparent 34rem),#0c0d0f; } main { max-width: 640px; padding: 34px 30px 44px; margin: auto; }
+h1 { margin-block:5px 8px; font-size: 24px; font-weight: 600; line-height: 1.35; letter-spacing:-.025em; } p { color: var(--muted); }
+.eyebrow { font-size: 9px; letter-spacing: .18em; color: var(--dim); }
+label { display: block; margin: 20px 0 6px; color:#d6d6d1; font-size:12px; } input:not([type='checkbox']) { display: block; width: 100%; background: var(--surface); color: #efefec; border: 1px solid var(--line); border-radius: 8px; padding: 10px 11px; margin-top: 6px; font: inherit; }
 .check { display: flex; align-items: start; gap: 8px; font-size: 13px; } input[type='checkbox'] { margin-top: 6px; accent-color: #9edced; }
 .help { font-size: 12px; margin-top: 6px; }.file, .actions { display: flex; align-items: center; gap: 8px; }.file input { min-width: 0; }.file button { flex-shrink: 0; }
-button { color: #dce8fa; background: #1c2d47; border: 1px solid #7898bd66; border-radius: 8px; padding: 9px 12px; cursor: pointer; font: inherit; font-size: 12px; }
-.primary { background: #b0d8e4; color: #112339; border: 0; }.actions { margin-top: 22px; justify-content: space-between; }
-details { margin-top: 25px; border-top: 1px solid #ffffff15; border-bottom: 1px solid #ffffff15; padding: 15px 0; } summary { cursor: pointer; }
-#result { color: #ffc4b4; } :focus-visible { outline: 2px solid #b0d8e4; outline-offset: 2px; } kbd { font-size: 12px; }
+button { color: #dcdcd7; background: #ffffff08; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; cursor: pointer; font: inherit; font-size: 11px; }
+.primary { background: #e3e3de; color: #20211f; border-color:transparent; font-weight:650; }.actions { margin-top: 24px; justify-content: space-between; }
+details { margin-top: 26px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; } summary { cursor: pointer; color:#d4d4cf; }
+#result { color: #c98282; } :focus-visible { outline: 2px solid #d9d9d2; outline-offset: 2px; box-shadow:0 0 0 4px #ffffff0a; } kbd { font-size: 11px; }
 
 /* Match the Web/overlay timing; this stylesheet is also packaged offline. */
 @media (prefers-reduced-motion: no-preference) {
@@ -18,13 +18,13 @@ details { margin-top: 25px; border-top: 1px solid #ffffff15; border-bottom: 1px 
       box-shadow 180ms ease, scale 140ms cubic-bezier(.22, .76, .28, 1);
   }
   button:enabled:active { scale: .96; }
-  input:focus-visible { box-shadow: 0 0 0 4px #b0d8e414; }
+  input:focus-visible { border-color:var(--line-strong); box-shadow: 0 0 0 4px #ffffff0a; }
   details[open] > :not(summary) { animation: setupEnter 220ms cubic-bezier(.22, .76, .28, 1); }
   #result:not(:empty) { animation: setupEnter 180ms ease-out; }
 }
 @media (hover: hover) and (pointer: fine) {
-  button:enabled:hover { background-color: #2a4162; }
-  button.primary:enabled:hover { background-color: #c3e7f0; }
+  button:enabled:hover { background-color: #ffffff10; border-color:var(--line-strong); }
+  button.primary:enabled:hover { background-color: #f0f0eb; }
 }
 @keyframes setupEnter {
   from { opacity: 0; translate: 0 6px; }
