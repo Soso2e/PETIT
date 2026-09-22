@@ -137,6 +137,7 @@
     if (state.loading) return;
     state.loading = true;
     refreshEl?.setAttribute("aria-busy", "true");
+    listEl?.setAttribute("aria-busy", "true");
     setStatus("読み込み中");
     try {
       const data = await requestJson(`/api/notifications/reminders?scope=${encodeURIComponent(state.scope)}&limit=200`);
@@ -151,6 +152,7 @@
     } finally {
       state.loading = false;
       refreshEl?.removeAttribute("aria-busy");
+      listEl?.removeAttribute("aria-busy");
     }
   };
 

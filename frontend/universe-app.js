@@ -1053,7 +1053,10 @@
 
   const loadUniverse = async ({ focusTaskId = "", openFocus = false } = {}) => {
     const refresh = byId("refresh-universe");
+    const loadingPanels = document.querySelectorAll('[data-view-panel="universe"], [data-view-panel="tasks"]');
     if (refresh) refresh.disabled = true;
+    loadingPanels.forEach((panel) => panel.setAttribute("aria-busy", "true"));
+    syncPillEl.dataset.state = "loading";
     try {
       const briefing = await requestJson("/api/briefing");
       state.briefing = briefing;
@@ -1104,6 +1107,7 @@
       console.error("PETIT Universe load failed", error);
     } finally {
       if (refresh) refresh.disabled = false;
+      loadingPanels.forEach((panel) => panel.removeAttribute("aria-busy"));
     }
   };
 
@@ -1203,6 +1207,7 @@
       return;
     }
     const pending = appendMessage("assistant", "考え中…");
+    pending.classList.add("is-loading");
     try {
       if (state.workSession?.awaiting_response_since && state.workSessionId) {
         const session = await workSessionRequest(`/${encodeURIComponent(state.workSessionId)}/respond`);
@@ -1218,6 +1223,8 @@
       state.history.push({ role: "user", content: message }, { role: "assistant", content: data.reply || "" });
       await loadUniverse();
     } catch (error) {
+      pending.classList.remove("is-loading");
+      pending.classList.add("message--error");
       pending.textContent = `通信に失敗しました: ${error.message}`;
     }
   };

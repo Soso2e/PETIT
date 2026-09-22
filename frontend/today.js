@@ -164,7 +164,9 @@
 
   const load = async () => {
     const refresh = byId("refresh-today");
+    const panel = document.querySelector('[data-view-panel="today"]');
     if (refresh) refresh.disabled = true;
+    panel?.setAttribute("aria-busy", "true");
     try {
       render(await requestJson("/api/work-sessions/today"));
     } catch (error) {
@@ -172,6 +174,7 @@
       byId("today-message").textContent = `今日の情報を取得できませんでした: ${error.message}`;
     } finally {
       if (refresh) refresh.disabled = false;
+      panel?.removeAttribute("aria-busy");
     }
   };
 

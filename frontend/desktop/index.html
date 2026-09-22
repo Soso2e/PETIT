@@ -10,14 +10,14 @@
 </head>
 <body>
   <header>
-    <div class="brand"><span class="spark">✦</span> PETIT <span id="desktop-version"></span></div>
-    <nav aria-label="ウィンドウ操作"><button id="open-web" title="Web版を開く" aria-label="Web版を開く">↗</button><button id="desktop-settings" title="設定" aria-label="設定">⚙</button><button id="hide" title="閉じて待機（Escape）" aria-label="閉じて待機">×</button></nav>
+    <div class="brand"><span class="spark" aria-hidden="true"></span><span>PETIT</span><span id="desktop-version"></span></div>
+    <nav aria-label="ウィンドウ操作"><button id="open-web" title="Web版を開く" aria-label="Web版を開く">Web</button><button id="desktop-settings" title="設定" aria-label="設定">設定</button><button id="hide" title="閉じて待機（Escape）" aria-label="閉じて待機">閉じる</button></nav>
   </header>
   <main>
     <div class="presence" aria-hidden="true"><div class="orbit"></div><div class="orb"></div></div>
     <div class="intro"><p id="desktop-date"></p><span id="status" role="status">接続確認中…</span></div>
     <section id="messages" aria-label="PETITとの会話" aria-live="polite"><div id="greeting" class="msg msg--assistant"><div class="bubble">何から始めよう？</div></div></section>
-    <form id="chat-form"><label for="input" class="sr-only">メッセージ</label><textarea id="input" rows="1" placeholder="話しかける、または入力…"></textarea><button id="mic" type="button" aria-label="音声入力を開始">🎤</button><button id="send" type="submit" aria-label="送信">↑</button></form>
+    <form id="chat-form"><label for="input" class="sr-only">メッセージ</label><textarea id="input" rows="1" placeholder="PETITに話しかける…"></textarea><button id="mic" type="button" aria-label="音声入力を開始">音声</button><button id="send" type="submit" aria-label="送信">送信</button></form>
     <div class="voice-footer"><span id="voice-state" role="status"></span><button id="voice-toggle" type="button" aria-pressed="false">音声応答 OFF</button></div>
   </main>
   <script src="/static/session.js"></script>

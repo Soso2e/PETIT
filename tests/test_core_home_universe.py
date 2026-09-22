@@ -9,9 +9,9 @@ FRONTEND = ROOT / "frontend"
 class UnivSpaceTests(unittest.TestCase):
     def test_app_shell_has_three_primary_areas(self):
         source = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
-        self.assertIn('{ view: "univ", target: "universe", label: "Univ" }', source)
-        self.assertIn('{ view: "tasks", target: "tasks", label: "Tasks" }', source)
-        self.assertIn('{ view: "chat", target: "chat", label: "PETIT" }', source)
+        self.assertIn('{ view: "univ", target: "universe", label: "Univ", title: "Universe"', source)
+        self.assertIn('{ view: "tasks", target: "tasks", label: "Tasks", title: "Tasks"', source)
+        self.assertIn('{ view: "chat", target: "chat", label: "PETIT", title: "PETIT"', source)
         self.assertNotIn('label: "Home"', source)
         self.assertNotIn('label: "Focus"', source)
         self.assertIn('home: "univ"', source)

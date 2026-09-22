@@ -36,12 +36,20 @@ class ThreeAreaAppShellTests(unittest.TestCase):
         self.assertIn('.petit-corner-nav__label', style)
         self.assertIn('env(safe-area-inset-top)', style)
 
-    def test_desktop_uses_corner_shell_instead_of_left_rail(self):
+    def test_desktop_uses_adaptive_workspace_rail(self):
         source = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
         self.assertIn('.petit-area-rail', source)
-        self.assertIn('display: none !important', source)
+        self.assertIn('display: flex !important', source)
+        self.assertIn('@media (max-width: 959px)', source)
         self.assertIn('.petit-corner-status', source)
         self.assertIn('.petit-utility-dock', source)
+
+    def test_workspace_has_command_palette_and_keyboard_shortcuts(self):
+        source = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
+        self.assertIn('petit-command-palette', source)
+        self.assertIn('event.key.toLowerCase() === "k"', source)
+        self.assertIn('event.key === ","', source)
+        self.assertIn('data-shell-target="settings"', source)
 
     def test_univ_assets_are_versioned_loaded_and_bootstrapped(self):
         shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")

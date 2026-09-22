@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.21.0**
+**Current Version: v0.22.0**
 
-**Last Updated: 2026-09-19**
+**Last Updated: 2026-09-20**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- Issue #276 / v0.22.0: PETITをローカルAIワークスペースとして再構成。デスクトップ幅では適応型サイドバー、状態・バージョン表示、検索兼コマンドパレット（Ctrl/Cmd+K）、設定ショートカット（Ctrl/Cmd+,）を提供し、狭い幅では既存の四隅ナビゲーションへ戻す。Web/小型Desktopの色・余白・文字・境界・Focus/Loading/Error/Empty/Disabled状態をモノトーンの共通トークンへ統一。Codex内ブラウザの390px/デスクトップ幅、キーボード操作、実Electron fixture smokeで確認済み。配布済みWindows/macOSアプリ、実iPhone/PWA、スクリーンリーダー、実LLM/外部サービスは未確認。
 
 - Desktop v0.21.0 Release: Desktop Release本体とWakeモデル配布を分離。`PETIT_WAKE_MODEL_URL` / `PETIT_WAKE_MODEL_SHA256` がどちらも未設定なら、`wake-model.json` に `included=false` を明示したモデルなしinstallerを正常生成する。URLまたはSHAのどちらかが設定された場合はWakeモデル配布を有効扱いにし、HTTPS・SHA-256検証を必須化するため、半端な設定やSHA不一致はbuild失敗のまま。GitHub Actions Run #90でモデル未同梱のmacOS arm64 DMG / Windows x64 EXEを実生成し、両OSともnpm test・Smoke・installer build・packaged Wake resources・Artifact upload成功。`VERSION`は0.21.0へ同期済み。`.github/workflows/desktop-release.yml` に、mainのversion整合確認→annotated tag作成/再利用→tag refでDesktop Release workflow起動までを1回の手動Actionsで行う導線を追加。`v0.21.0`タグをrelease準備済みmain（`9b6a517`）へ作成し、Desktop Release Run #92でtest・macOS arm64・Windows x64・GitHub Release作成が全て成功。`PETIT-0.21.0-mac-arm64.dmg` / `PETIT-0.21.0-win-x64.exe` をReleaseへ添付済み。macOSは署名資格情報未設定のため個人利用向け未署名DMG。
 
@@ -31,7 +33,7 @@
 - Issue #249 / #245: Web中心のJARVIS設計を `docs/jarvis-agent.md` に整理。BrokerへMemory/BRAIN/Work/Reminders/Handoff、待ち時間・同時実行・Context量の上限、2回目Brainへの状況継続を追加。PC観測は既定無効の任意Module。作業ブランチで関連58テスト・Python構文・diff確認済み。実LLM・外部サービス・PWA E2E、Conversation State統合、永続提案・自律実行は未完了。
 
 - プロダクトの軸は `PETIT_AS_JARVIS`。FastAPIとPWAを基盤に、タスク・予定・会話・知識・開発状況を継続支援する個人用アシスタントとして開発中。
-- バージョン管理: v0.17.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
+- バージョン管理: v0.22.0。`main`反映時にSemantic Versioning形式で更新し、PROGRESSとWeb UIへ明記する。
 - Univ UI 刷新: 大きなカード矩形を全廃し、Core＝中心惑星、親タスク＝惑星、子タスク＝衛星、関係性＝軌道・接続線からなる天体UIへ根本刷新。詳細情報は天体選択時に右側詳細パネルで確認・操作する。
 - Univ描画: WebGL依存を追加せず、CSS 3D・radial-gradient・既存SVG接続線で軽量な球体表現を実装。レイヤーは前面HUD、選択対象の説明、惑星・衛星、接続線、背景の順で固定する。
 - Issue #215対応: Univ表示時だけページを固定し、100dvhとsafe-area内のThree.js viewportへ切り替える。WebGL成功時はCSS宇宙背景を隠し、Canvasを単一の背景描画面として扱う。星の初回クリックでカメラFocusとHUD選択を同期し、2回目で詳細を開く（PC・390x844ブラウザ確認済み、実iPhone未確認）。
@@ -65,7 +67,7 @@
 - LM Studio: 同一PCの `127.0.0.1:1234/v1/models` は応答済みだが、実環境設定と会話E2Eは継続確認が必要。
 - Windows起動導線: `scripts/start-petit-tailscale.ps1` で起動モード選択、Tailscale接続、`.venv` のPETIT起動、`/api/health`確認、管理者権限付きTailscale Serve、ブラウザ起動まで実行する。LM Studioは事前起動が必要。
 - 今回の検証: Context Broker単体・Brain routeの回帰テストを追加。GitHub Actions / pytest / 実LM Studio E2Eは未確認。
-- 次にやること: v0.21.0 ReleaseのWindows EXE / macOS DMGを実機インストールして更新・設定保持を受入確認する。WakeはIssue #270で実モデル配布・自動設定diagnostic・実マイク`ready`・実声/誤起動評価を継続し、その後Issue #235の実LM Studio検証へ戻る。
+- 次にやること: v0.22.0のUIを配布版Windows/macOSと実iPhone/PWAで受入確認し、キーボード・スクリーンリーダーの実機検証を行う。並行してWakeはIssue #270で実モデル配布・自動設定diagnostic・実マイク`ready`・実声/誤起動評価を継続し、その後Issue #235の実LM Studio検証へ戻る。
 
 ## 履歴
 
@@ -161,3 +163,4 @@
 | 2026-09-12 | 12:53 | #80 | v0.21.0 Release blockerを解消。Wakeモデル未設定時は未同梱manifest付きinstaller/Releaseを許可し、モデル配布設定が存在する場合だけHTTPS+SHA-256検証を必須化。Run #90でモデルなしmacOS arm64/Windows x64 packageを実生成し全工程成功。`VERSION`同期と1ボタンRelease workflowを追加し、実タグ/Release実行のみ未確認。Issue #270はWake実機受入として継続。 |
 | 2026-09-12 | 13:02 | #81 | v0.21.0を正式Release。タグは`9b6a517`へ作成し、Run #92でtest・macOS arm64未署名DMG・Windows x64 EXE・packaged Wake resources・GitHub Release作成が全て成功。Release資産2件を公開。Wakeモデルは未同梱で、実機Wake受入はIssue #270で継続。 |
 | 2026-09-19 | 00:33 | #82 | Issue #274: 明示されたタスク作成・変更・完了・親子変更・同期再試行を追加確認なしで即時実行し、全書き込み引数検証と決定論的完了報告を更新（関連70テスト・31 subtest・Python構文・diff確認済み、実LM Studio会話E2E未確認）。 |
+| 2026-09-20 | 09:24 | #83 | Issue #276 / v0.22.0: Web/Desktop UIを静かなAIワークスペースへ刷新し、適応型サイドバー、コマンドパレット、共通トークン、状態UIを実装（関連21テスト・Desktop 32 subtest・実Electron fixture smoke・Codex内ブラウザ操作確認済み、配布版/実iPhone/スクリーンリーダーは未確認）。 |

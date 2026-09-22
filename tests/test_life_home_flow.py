@@ -9,7 +9,7 @@ class UnivHomeFlowAssetTests(unittest.TestCase):
     def test_univ_is_the_app_shell_home(self) -> None:
         shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
         self.assertIn('const HOME_VIEW = "universe"', shell)
-        self.assertIn('{ view: "univ", target: "universe", label: "Univ" }', shell)
+        self.assertIn('{ view: "univ", target: "universe", label: "Univ", title: "Universe"', shell)
         self.assertIn('home: "univ"', shell)
         self.assertIn('focus: "univ"', shell)
         self.assertIn('activateView(initialView)', shell)
