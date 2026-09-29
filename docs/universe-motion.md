@@ -10,3 +10,15 @@ Issue #260。`frontend/universe-webgl-scene.js`で実装する。
 - OSのreduced motionと軽量モードでは天体の動きを省略する。reduced motionを途中で有効にした場合も最終状態へ移る。
 
 Windows Edgeで実Three.js/WebGLとテスト用タスクを使い、登場、選択の中間値・最終値、連続選択、reduced motion、描画停止を確認。実データを使った大量天体・実iPhone/macOSの性能は未確認。Desktop小型会話画面にはThree.js空間はなく、これはWebのUnivに対する変更。
+
+
+## タスク状態更新時の遷移
+
+Issue #279。タスク完了などでUniverseのデータが更新される場合も、シーン全体を瞬間的に切り替えない。
+
+- 完了APIが成功した天体は、280msで縮小・減光してから新しいタスク一覧へ更新する。
+- 再構築後も残る天体は、更新前のワールド座標を保存し、520msで新しいレイアウト位置へ補間する。
+- 新しく追加された天体は既存の登場アニメーションをそのまま利用する。
+- 補間中だけ `requestAnimationFrame` を継続し、完了後は描画を停止する。常時レンダーループは追加しない。
+- `prefers-reduced-motion` または軽量モードでは退出・位置補間を即時反映する。
+- Web/PWAのThree.js Univが対象。Desktop小型会話UIにはThree.jsシーンがないため、Web UIを表示する導線でのみ同じ挙動になる。
