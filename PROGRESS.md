@@ -6,6 +6,9 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- Issue #279: Three.js Univのタスク状態更新をシームレス化。完了成功時は対象天体を縮小・減光してから更新し、残存天体は更新前のワールド座標から新配置へ補間する。新規天体は既存登場演出を利用し、Tween中のみ描画。reduced-motion / lite modeでは即時反映。コード・回帰テスト追加済み、実WebGL・実iPhone/macOS性能は未確認。
+
+
 - Issue #276 / v0.22.0: PETITをローカルAIワークスペースとして再構成。デスクトップ幅では適応型サイドバー、状態・バージョン表示、検索兼コマンドパレット（Ctrl/Cmd+K）、設定ショートカット（Ctrl/Cmd+,）を提供し、狭い幅では既存の四隅ナビゲーションへ戻す。Web/小型Desktopの色・余白・文字・境界・Focus/Loading/Error/Empty/Disabled状態をモノトーンの共通トークンへ統一。Codex内ブラウザの390px/デスクトップ幅、キーボード操作、実Electron fixture smokeで確認済み。配布済みWindows/macOSアプリ、実iPhone/PWA、スクリーンリーダー、実LLM/外部サービスは未確認。
 
 - Desktop v0.21.0 Release: Desktop Release本体とWakeモデル配布を分離。`PETIT_WAKE_MODEL_URL` / `PETIT_WAKE_MODEL_SHA256` がどちらも未設定なら、`wake-model.json` に `included=false` を明示したモデルなしinstallerを正常生成する。URLまたはSHAのどちらかが設定された場合はWakeモデル配布を有効扱いにし、HTTPS・SHA-256検証を必須化するため、半端な設定やSHA不一致はbuild失敗のまま。GitHub Actions Run #90でモデル未同梱のmacOS arm64 DMG / Windows x64 EXEを実生成し、両OSともnpm test・Smoke・installer build・packaged Wake resources・Artifact upload成功。`VERSION`は0.21.0へ同期済み。`.github/workflows/desktop-release.yml` に、mainのversion整合確認→annotated tag作成/再利用→tag refでDesktop Release workflow起動までを1回の手動Actionsで行う導線を追加。`v0.21.0`タグをrelease準備済みmain（`9b6a517`）へ作成し、Desktop Release Run #92でtest・macOS arm64・Windows x64・GitHub Release作成が全て成功。`PETIT-0.21.0-mac-arm64.dmg` / `PETIT-0.21.0-win-x64.exe` をReleaseへ添付済み。macOSは署名資格情報未設定のため個人利用向け未署名DMG。
