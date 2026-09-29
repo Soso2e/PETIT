@@ -1,8 +1,8 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.22.0**
+**Current Version: v0.22.1**
 
-**Last Updated: 2026-09-20**
+**Last Updated: 2026-09-30**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
