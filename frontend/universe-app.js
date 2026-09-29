@@ -79,6 +79,11 @@
   const taskKey = (task, index = 0) => String(task.id || task.external_id || task.url || `task-${index}`);
   const taskProject = (task) => String(task.project_title || task.project_name || "未分類").trim() || "未分類";
   const taskNumericId = (task) => /^\d+$/.test(String(task.id || "")) ? Number(task.id) : null;
+  const animateTaskExit = async (task) => {
+    if (!task) return false;
+    const key = taskKey(task, state.tasks.indexOf(task));
+    return window.PetitUnivWebGL?.animateTaskExit?.(key) || false;
+  };
   const text = (value, fallback = "—") => {
     const normalized = String(value ?? "").trim();
     return normalized || fallback;
@@ -678,6 +683,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ resolve_notification: false }),
     });
+    await animateTaskExit(task);
     const title = text(task.title, "タスク");
     showFeedback(`「${title}」を完了しました。`, "元に戻す", async () => {
       feedbackActionEl.disabled = true;
@@ -1162,8 +1168,8 @@
       const cancel = document.createElement("button");
       cancel.type = "button";
       cancel.textContent = "キャンセル";
-      approve.addEventListener("click", () => decideAction(action.approval_id, true, controls));
-      cancel.addEventListener("click", () => decideAction(action.approval_id, false, controls));
+      approve.addEventListener("click", () => decideAction(action.approval_id, true, controls, action));
+      cancel.addEventListener("click", () => decideAction(action.approval_id, false, controls, action));
       controls.append(description, approve, cancel);
       item.appendChild(controls);
     }
@@ -1173,7 +1179,7 @@
     return item;
   };
 
-  const decideAction = async (approvalId, approved, controls) => {
+  const decideAction = async (approvalId, approved, controls, action = null) => {
     controls.querySelectorAll("button").forEach((button) => { button.disabled = true; });
     try {
       const data = await requestJson(`/api/actions/${encodeURIComponent(approvalId)}`, {
@@ -1181,6 +1187,15 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ approved }),
       });
+      if (approved && action?.name === "complete_task") {
+        const requestedId = String(action.arguments?.task_id || "");
+        const titleQuery = String(action.arguments?.title_query || "").trim().toLocaleLowerCase("ja");
+        const completedTask = state.tasks.find((task, index) => (
+          (requestedId && taskKey(task, index) === requestedId)
+          || (titleQuery && text(task.title, "").toLocaleLowerCase("ja") === titleQuery)
+        ));
+        await animateTaskExit(completedTask);
+      }
       appendMessage("assistant", data.reply || (approved ? "実行しました。" : "キャンセルしました。"));
       await loadUniverse();
     } catch (error) {
