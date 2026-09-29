@@ -15,6 +15,7 @@
     reset: () => {},
     focusTask: () => false,
     selectTask: () => false,
+    animateTaskExit: async () => false,
     zoomIn: () => {},
     zoomOut: () => {},
   };
@@ -434,6 +435,13 @@
     }
 
     const previousSelection = state.selectedTaskId;
+    const previousPositions = new Map();
+    state.entries.forEach((entry, taskId) => {
+      if (!entry?.object || !taskId) return;
+      const position = new THREE.Vector3();
+      entry.object.getWorldPosition(position);
+      previousPositions.set(String(taskId), position);
+    });
     clearUniverse();
 
     const coreEntry = {
@@ -480,6 +488,30 @@
 
     state.selectedTaskId = previousSelection && state.entries.has(previousSelection) ? previousSelection : null;
     updateSelection();
+
+    // Preserve spatial continuity across task mutations. Rebuilt bodies start
+    // at their previous world-space position and only render while interpolating
+    // toward the new layout. New bodies keep the existing entrance animation.
+    if (!reducedMotion.matches && document.documentElement.dataset.petitPerformance !== "lite") {
+      state.entries.forEach((entry, taskId) => {
+        const previousWorld = previousPositions.get(String(taskId));
+        const object = entry?.object;
+        if (!previousWorld || !object?.parent) return;
+        object.parent.updateMatrixWorld(true);
+        const targetPosition = object.position.clone();
+        const fromPosition = object.parent.worldToLocal(previousWorld.clone());
+        if (fromPosition.distanceToSquared(targetPosition) < 0.0001) return;
+        object.position.copy(fromPosition);
+        const current = state.visualTweens.get(object) || {};
+        state.visualTweens.set(object, {
+          ...current,
+          startedAt: performance.now(),
+          duration: 520,
+          fromPosition,
+          toPosition: targetPosition,
+        });
+      });
+    }
     clearStatus();
     document.body.classList.add("petit-univ-webgl-ready");
     window.dispatchEvent(new CustomEvent("petit:univ-webgl-rendered", {
@@ -716,12 +748,25 @@
     state.visualTweens.forEach((tween, mesh) => {
       const progress = instant ? 1 : clamp((time - tween.startedAt) / tween.duration, 0, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      mesh.scale.setScalar(tween.fromScale + (tween.toScale - tween.fromScale) * eased);
-      mesh.material.emissiveIntensity = tween.fromGlow + (tween.toGlow - tween.fromGlow) * eased;
+      if (Number.isFinite(tween.fromScale) && Number.isFinite(tween.toScale)) {
+        mesh.scale.setScalar(tween.fromScale + (tween.toScale - tween.fromScale) * eased);
+      }
+      if (Number.isFinite(tween.fromGlow) && Number.isFinite(tween.toGlow)) {
+        mesh.material.emissiveIntensity = tween.fromGlow + (tween.toGlow - tween.fromGlow) * eased;
+      }
+      if (tween.fromPosition && tween.toPosition) {
+        mesh.position.lerpVectors(tween.fromPosition, tween.toPosition, eased);
+        state.labelsNeedUpdate = true;
+      }
       const pulse = tween.pulse && !instant ? Math.sin(progress * Math.PI) : 0;
-      tween.atmosphere.scale.setScalar(1 + pulse * .22);
-      tween.atmosphere.material.opacity = tween.baseOpacity + pulse * .14;
-      if (progress >= 1) state.visualTweens.delete(mesh);
+      if (tween.atmosphere) {
+        tween.atmosphere.scale.setScalar(1 + pulse * .22);
+        tween.atmosphere.material.opacity = (tween.baseOpacity ?? tween.atmosphere.material.opacity) + pulse * .14;
+      }
+      if (progress >= 1) {
+        state.visualTweens.delete(mesh);
+        tween.onComplete?.();
+      }
     });
     return state.visualTweens.size > 0;
   };
@@ -818,6 +863,39 @@
     publicApi.selectTask = (taskId) => {
       const entry = state.entries.get(String(taskId || ""));
       return entry ? selectEntry(entry) : false;
+    };
+    publicApi.animateTaskExit = (taskId) => {
+      const entry = state.entries.get(String(taskId || ""));
+      const mesh = entry?.object;
+      if (!mesh) return Promise.resolve(false);
+      const label = state.labels.get(String(taskId || ""))?.element;
+      if (label) label.hidden = true;
+      state.interactiveMeshes = state.interactiveMeshes.filter((candidate) => candidate !== mesh);
+      const instant = reducedMotion.matches || document.documentElement.dataset.petitPerformance === "lite";
+      if (instant) {
+        mesh.visible = false;
+        requestRender();
+        return Promise.resolve(true);
+      }
+      return new Promise((resolve) => {
+        const atmosphere = mesh.getObjectByName("Atmosphere");
+        state.visualTweens.set(mesh, {
+          startedAt: performance.now(),
+          duration: 280,
+          fromScale: mesh.scale.x,
+          toScale: 0.06,
+          fromGlow: mesh.material.emissiveIntensity,
+          toGlow: 0,
+          pulse: true,
+          atmosphere,
+          baseOpacity: entry.type === "child" ? .08 : .12,
+          onComplete: () => {
+            mesh.visible = false;
+            resolve(true);
+          },
+        });
+        requestRender();
+      });
     };
     publicApi.zoomIn = () => zoomBy(0.84);
     publicApi.zoomOut = () => zoomBy(1.18);

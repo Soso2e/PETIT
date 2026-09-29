@@ -1,10 +1,13 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.22.0**
+**Current Version: v0.22.1**
 
-**Last Updated: 2026-09-20**
+**Last Updated: 2026-09-30**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- Issue #279: Three.js Univのタスク状態更新をシームレス化。完了成功時は対象天体を縮小・減光してから更新し、残存天体は更新前のワールド座標から新配置へ補間する。新規天体は既存登場演出を利用し、Tween中のみ描画。reduced-motion / lite modeでは即時反映。コード・回帰テスト追加済み、実WebGL・実iPhone/macOS性能は未確認。
+
 
 - Issue #276 / v0.22.0: PETITをローカルAIワークスペースとして再構成。デスクトップ幅では適応型サイドバー、状態・バージョン表示、検索兼コマンドパレット（Ctrl/Cmd+K）、設定ショートカット（Ctrl/Cmd+,）を提供し、狭い幅では既存の四隅ナビゲーションへ戻す。Web/小型Desktopの色・余白・文字・境界・Focus/Loading/Error/Empty/Disabled状態をモノトーンの共通トークンへ統一。Codex内ブラウザの390px/デスクトップ幅、キーボード操作、実Electron fixture smokeで確認済み。配布済みWindows/macOSアプリ、実iPhone/PWA、スクリーンリーダー、実LLM/外部サービスは未確認。
 
