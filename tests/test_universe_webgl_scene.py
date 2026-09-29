@@ -94,6 +94,18 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn('dataset.petitPerformance === "lite"', source)
         self.assertIn('new CustomEvent("petit:performance-change"', preferences)
 
+    def test_task_mutations_animate_exit_and_spatial_reflow_on_demand(self) -> None:
+        source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        app = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        self.assertIn("animateTaskExit", source)
+        self.assertIn("previousPositions", source)
+        self.assertIn("fromPosition", source)
+        self.assertIn("toPosition", source)
+        self.assertIn("await animateTaskExit(task)", app)
+        self.assertIn('action?.name === "complete_task"', app)
+        self.assertIn('dataset.petitPerformance !== "lite"', source)
+        self.assertNotIn("setAnimationLoop(animate)", source)
+
     def test_task_name_labels_are_clickable_selection_targets(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
