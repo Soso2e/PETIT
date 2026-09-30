@@ -74,7 +74,7 @@ def _deepseek_target(profile: str) -> dict[str, Any]:
     if profile == "deepseek_pro":
         model = os.getenv("PETIT_DEEPSEEK_PRO_MODEL", "deepseek-v4-pro").strip()
     else:
-        model = os.getenv("PETIT_DEEPSEEK_FLASH_MODEL", "deepseek-v4-flash").strip()
+        model = os.getenv("PETIT_DEEPSEEK_FLASH_MODEL", "deepseek-flash").strip()
     return {
         "provider": "deepseek",
         "base_url": base_url,

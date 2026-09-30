@@ -30,7 +30,7 @@ PETIT_LOCAL_AGENT_API_KEY=lm-studio
 # DeepSeekプロファイル
 PETIT_DEEPSEEK_API_KEY=ここにAPIキー
 PETIT_DEEPSEEK_BASE_URL=https://api.deepseek.com
-PETIT_DEEPSEEK_FLASH_MODEL=deepseek-v4-flash
+PETIT_DEEPSEEK_FLASH_MODEL=deepseek-flash
 PETIT_DEEPSEEK_PRO_MODEL=deepseek-v4-pro
 ```
 

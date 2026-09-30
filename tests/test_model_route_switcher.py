@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import ssl
 import tempfile
 import unittest
 from pathlib import Path
@@ -78,7 +79,7 @@ class ProviderPayloadTests(unittest.TestCase):
             "provider": "deepseek",
             "base_url": "https://api.deepseek.com",
             "api_key": "secret",
-            "model": "deepseek-v4-flash",
+            "model": "deepseek-flash",
             "configured": True,
             "external": True,
         }
@@ -92,9 +93,11 @@ class ProviderPayloadTests(unittest.TestCase):
 
         self.assertEqual(result["content"], "ok")
         payload = post_mock.call_args.kwargs["json"]
-        self.assertEqual(payload["model"], "deepseek-v4-flash")
+        self.assertEqual(payload["model"], "deepseek-flash")
         self.assertEqual(payload["thinking"], {"type": "disabled"})
         self.assertNotIn("chat_template_kwargs", payload)
+        self.assertIs(post_mock.call_args.kwargs["verify"], lmstudio_client._SYSTEM_TRUST_CONTEXT)
+        self.assertIsInstance(post_mock.call_args.kwargs["verify"], ssl.SSLContext)
 
     @patch("backend.lmstudio_client.httpx.post")
     @patch("backend.lmstudio_client.model_routing.endpoint")
@@ -116,6 +119,29 @@ class ProviderPayloadTests(unittest.TestCase):
         payload = post_mock.call_args.kwargs["json"]
         self.assertIn("chat_template_kwargs", payload)
         self.assertNotIn("thinking", payload)
+        self.assertIs(post_mock.call_args.kwargs["verify"], True)
+
+    @patch("backend.lmstudio_client.httpx.get")
+    @patch("backend.lmstudio_client.model_routing.endpoint")
+    def test_deepseek_health_uses_system_trust_store(self, endpoint_mock, get_mock) -> None:
+        endpoint_mock.return_value = {
+            "route": "chat",
+            "profile": "deepseek_flash",
+            "label": "DeepSeek V4 Flash",
+            "provider": "deepseek",
+            "base_url": "https://api.deepseek.com",
+            "api_key": "secret",
+            "model": "deepseek-flash",
+            "configured": True,
+            "external": True,
+        }
+        get_mock.return_value = _Response({"data": [{"id": "deepseek-flash"}]})
+
+        result = lmstudio_client.health("chat")
+
+        self.assertTrue(result["server_ok"])
+        self.assertTrue(result["model_loaded"])
+        self.assertIs(get_mock.call_args.kwargs["verify"], lmstudio_client._SYSTEM_TRUST_CONTEXT)
 
 
 if __name__ == "__main__":

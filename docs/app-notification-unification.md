@@ -24,6 +24,8 @@ Universeは見た目を担当し、チャット入力、履歴、音声、承認
 
 TimeTreeを予定の原本として扱い、PETITのカレンダー連携は読み取り専用とします。
 
+TimeTree exporterのHTTPS検証にはOS信頼ストアから生成した一時CAファイルを使用します。`REQUESTS_CA_BUNDLE`または`CURL_CA_BUNDLE`が設定されている場合はそちらを優先します。一時CAはexporter子プロセスだけで使用し、終了時に削除します。証明書・ホスト名検証は有効のままです。
+
 次の発話はカレンダー予定ではなくPETIT内部Reminderです。
 
 ```text
