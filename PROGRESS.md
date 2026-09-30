@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.22.1**
+**Current Version: v0.22.2**
 
 **Last Updated: 2026-09-30**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- Issue #281: Windows版PETITのDeepSeek接続は、httpx既定CAでWindows管理ルートを参照できず `CERTIFICATE_VERIFY_FAILED` になっていた。DeepSeek通信だけOS信頼ストアを使う検証済みSSLContextへ変更し、FlashモデルIDを`deepseek-flash`へ更新。対象6テスト、Python構文、実DeepSeekのChat/Agent、実FastAPI `/api/chat` で動作確認済み。`pytest`は`.venv`に未導入で実行不可、広範囲の旧`test_assistant_context.py`には今回と無関係な既存失敗が残る。
 
 - Issue #279: Three.js Univのタスク状態更新をシームレス化。完了成功時は対象天体を縮小・減光してから更新し、残存天体は更新前のワールド座標から新配置へ補間する。新規天体は既存登場演出を利用し、Tween中のみ描画。reduced-motion / lite modeでは即時反映。コード・回帰テスト追加済み、実WebGL・実iPhone/macOS性能は未確認。
 
@@ -167,3 +169,5 @@
 | 2026-09-12 | 13:02 | #81 | v0.21.0を正式Release。タグは`9b6a517`へ作成し、Run #92でtest・macOS arm64未署名DMG・Windows x64 EXE・packaged Wake resources・GitHub Release作成が全て成功。Release資産2件を公開。Wakeモデルは未同梱で、実機Wake受入はIssue #270で継続。 |
 | 2026-09-19 | 00:33 | #82 | Issue #274: 明示されたタスク作成・変更・完了・親子変更・同期再試行を追加確認なしで即時実行し、全書き込み引数検証と決定論的完了報告を更新（関連70テスト・31 subtest・Python構文・diff確認済み、実LM Studio会話E2E未確認）。 |
 | 2026-09-20 | 09:24 | #83 | Issue #276 / v0.22.0: Web/Desktop UIを静かなAIワークスペースへ刷新し、適応型サイドバー、コマンドパレット、共通トークン、状態UIを実装（関連21テスト・Desktop 32 subtest・実Electron fixture smoke・Codex内ブラウザ操作確認済み、配布版/実iPhone/スクリーンリーダーは未確認）。 |
+| 2026-09-29 | 23:58 | #84 | Issue #281: DeepSeek通信へOS信頼ストアによる証明書検証を適用し、FlashモデルIDを`deepseek-flash`へ更新（動作確認済み: 対象6テスト・構文・実Chat/Agent・FastAPI `/api/chat`、pytest未導入・旧広範囲テストの既存失敗は未解決）。 |
+| 2026-09-30 | 00:06 | #85 | Issue #281のmain反映準備としてPatchバージョンをv0.22.2へ更新し、`VERSION`・Web表示・PWA asset versionを同期。 |

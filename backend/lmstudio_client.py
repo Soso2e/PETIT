@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import ssl
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -12,6 +13,11 @@ import httpx
 from . import config, model_routing
 
 log = logging.getLogger(__name__)
+
+# HTTPX defaults to its bundled CA set. Use the operating system trust store for
+# external DeepSeek TLS so Windows-managed roots remain available without
+# weakening certificate verification.
+_SYSTEM_TRUST_CONTEXT = ssl.create_default_context()
 
 
 class LMStudioError(RuntimeError):
@@ -101,7 +107,8 @@ def _post_completion(
 ) -> dict[str, Any]:
     provider_name = _provider_name(target)
     try:
-        resp = httpx.post(url, json=payload, headers=headers, timeout=config.LM_TIMEOUT)
+        verify = _SYSTEM_TRUST_CONTEXT if target.get("provider") == "deepseek" else True
+        resp = httpx.post(url, json=payload, headers=headers, timeout=config.LM_TIMEOUT, verify=verify)
         resp.raise_for_status()
     except httpx.ConnectError as exc:
         raise LMStudioError(
@@ -306,7 +313,8 @@ def health(route: str = "chat") -> dict[str, Any]:
     headers = {"Authorization": f"Bearer {target['api_key']}"}
     started = time.monotonic()
     try:
-        resp = httpx.get(url, headers=headers, timeout=10)
+        verify = _SYSTEM_TRUST_CONTEXT if target.get("provider") == "deepseek" else True
+        resp = httpx.get(url, headers=headers, timeout=10, verify=verify)
         resp.raise_for_status()
         models = [m.get("id") for m in resp.json().get("data", [])]
         result = {
