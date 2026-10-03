@@ -67,3 +67,10 @@ Desktopは従来のAudioWorklet / Desktop STT設定を利用します。今回�
 - `node --test tests/frontend/voice-input.test.cjs`
 - `.venv/bin/python -m pytest tests/test_web_stt.py tests/test_voice_router.py tests/test_frontend_router.py tests/test_voice_task_interaction.py -q`
 - 実機確認: Safari / Chromeで権限許可・拒否、録音停止、文字起こし、チャット送信、下書き復元を確認します。実マイク・実STTは自動テストとは別の受け入れ確認です。
+
+## Desktopの連続音声会話
+
+Wake検出、または小型画面の「音声会話」で開始します。音声応答を有効にし、発話の無音区間で録音を終え、STT→既存チャット→読み上げの後に次の録音へ進みます。
+「会話終了」、Escape、画面非表示、無音、マイク/STT/チャット/再生失敗で停止します。確認付き操作も自動録音を停止し、画面から判断できます。失敗後は「音声会話」で再開してください。
+
+半二重方式なのでPETITの再生中は自動録音しません。マイクボタンによる手動割り込みは可能です。実マイクのWake精度、実声「Hey プティ」、誤起動、会話の自然さ、Windows/macOS使用感、iPhone音声再生は人間による未確認項目です。

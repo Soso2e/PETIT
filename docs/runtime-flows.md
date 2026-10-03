@@ -672,3 +672,25 @@ flowchart TD
     Fail --> Cleanup[テスト停止 / 作成途中ファイル削除]
     Save --> StopTest[テスト停止 / 常時待機の選択は維持]
 ```
+
+## Desktop Voice Conversation MVP (#286)
+
+```mermaid
+flowchart TD
+    Wake[openWakeWord / 音声会話ボタン] --> Record[Desktop録音 / 無音で終了]
+    Record --> STT[Desktop STT IPC]
+    STT --> Chat[共有 app.js / api/chat]
+    Chat --> Brain[既存 PETIT Brain / Context Broker / 決定論ルート]
+    Brain --> Reply[テキスト即時表示]
+    Reply --> TTS[共有 voice.js 分割TTS / 端末音声fallback]
+    TTS --> Join{Chat完了と再生完了?}
+    Join -->|両方成功| Record
+    Chat -->|失敗または確認付きAction| Stop[自動録音停止 / 手動再開]
+    Record -->|無音またはマイク失敗| Stop
+    TTS -->|再生失敗| Stop
+    Hide[非表示 / ロック / 会話終了] --> Stop
+```
+
+Desktopのみ連続会話を開始する。Web/PWAは既存の手動入力を維持。
+確認付きActionでは自動録音を停止し、既存の承認UI/音声判断境界を維持する。
+再生中の音声による割り込み検出は未実装。マイクボタンで再生を停止して入力できる。
