@@ -22,7 +22,7 @@
     cancel.hidden = false;
     byId('wake-result').textContent = 'openWakeWordの自動設定を開始します…';
     try {
-      const result = await api.autoSetup();
+      const result = await api.autoSetup({ modelPath: byId('modelPath').value.trim() });
       byId('wake-result').textContent = result.message;
       if (result.ok) {
         byId('modelPath').value = result.modelPath;

@@ -114,3 +114,16 @@ test('automatic setup persists managed openWakeWord paths after diagnostic', asy
   assert.equal(persisted.wakePythonPath, managed.pythonPath);
   assert.equal('wakeRuntimePath' in persisted, false);
 });
+
+test('automatic setup prefers unsaved selected model over persisted model', async (t) => {
+  let selected;
+  const h = await harness(t, { serverUrl: 'http://127.0.0.1:8000', modelPath: '/old.onnx' }, {
+    prepareWakeEnvironment: async (options) => {
+      selected = options.currentModelPath;
+      return { modelPath: '/managed.onnx', backbonePath: '/backbone', pythonPath: '/python' };
+    },
+  });
+  const result = await h.call('settings:wake-setup', { modelPath: ' /new.onnx ' });
+  assert.equal(result.ok, true);
+  assert.equal(selected, '/new.onnx');
+});
