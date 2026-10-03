@@ -54,6 +54,7 @@
   let currentAudioUrl = null;
   let currentTtsRequest = null;
   let browserPlaybackGeneration = 0;
+  let browserPlaybackTimer = null;
 
   let conversation = null;
   if (window.PetitDesktopSpeechRecognition && window.PetitVoiceConversationController) {
@@ -306,6 +307,8 @@
 
   function stopSpeaking() {
     browserPlaybackGeneration++;
+    window.clearTimeout(browserPlaybackTimer);
+    browserPlaybackTimer = null;
     if (currentTtsRequest) {
       currentTtsRequest.abort();
       currentTtsRequest = null;
@@ -326,8 +329,17 @@
     utterance.onstart = () => setVoiceState(reason);
     const token = conversation?.generation;
     const playbackGeneration = browserPlaybackGeneration;
-    utterance.onend = () => { if (playbackGeneration !== browserPlaybackGeneration) return; setVoiceState(""); conversation?.finishAudio(token, true); };
-    utterance.onerror = () => { if (playbackGeneration !== browserPlaybackGeneration) return; setVoiceState("音声を再生できませんでした。", { error: true }); conversation?.finishAudio(token, false); };
+    const finish = success => {
+      if (playbackGeneration !== browserPlaybackGeneration) return;
+      browserPlaybackGeneration++;
+      window.clearTimeout(browserPlaybackTimer); browserPlaybackTimer = null;
+      if (!success) window.speechSynthesis.cancel();
+      setVoiceState(success ? "" : "音声を再生できませんでした。", { error: !success });
+      conversation?.finishAudio(token, success);
+    };
+    utterance.onend = () => finish(true);
+    utterance.onerror = () => finish(false);
+    browserPlaybackTimer = window.setTimeout(() => finish(false), Math.min(120000, Math.max(30000, text.length * 250)));
     window.speechSynthesis.speak(utterance);
     return true;
   }
@@ -390,9 +402,11 @@
 
     await new Promise((resolve, reject) => {
       let settled = false;
+      let playbackTimer;
       const finish = (error = null) => {
         if (settled) return;
         settled = true;
+        window.clearTimeout(playbackTimer);
         controller.signal.removeEventListener("abort", handleAbort);
         if (currentAudio === audio) releaseAudio();
         if (error) reject(error);
@@ -406,6 +420,7 @@
       };
       audio.onended = () => finish();
       audio.onerror = () => finish(new Error("AivisSpeech音声の再生に失敗しました。"));
+      playbackTimer = window.setTimeout(() => finish(new Error("音声再生が時間切れになりました。")), 30000);
       audio.play().catch((error) => finish(error));
     });
   }
