@@ -14,6 +14,7 @@ from backend import (
     project_source_refresh,
     vault_indexer,
 )
+from backend.tools import register_builtin_tools
 from backend.tools.registry import registered_names, requires_confirmation
 
 
@@ -92,6 +93,7 @@ class BrainProjectMappingTests(unittest.TestCase):
         self.assertFalse(non_markdown["ok"])
 
     def test_link_requires_confirmation_and_builds_bounded_cache(self) -> None:
+        register_builtin_tools()
         candidate = self.discover_candidate()
 
         linked = brain_project_sync.link_candidate(int(candidate["id"]), "petit")
