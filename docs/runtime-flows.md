@@ -696,3 +696,5 @@ Desktopのみ連続会話を開始する。Web/PWAは既存の手動入力を維
 再生中の音声による割り込み検出は未実装。マイクボタンで再生を停止して入力できる。
 
 `conversation_mode` は `text`（既定）または `voice`。request-local contextで初回Brain・Broker後・Deep Agentのsystem方針へ反映し、本文/履歴や決定論ルート・承認判定を変更しない。実LLMによる1〜3文の遵守は未確認。
+
+会話復元は `voiceSilent` として表示し、自動TTSと現在再生の停止を起こさない。新規返答は従来のTTSへ渡す。
