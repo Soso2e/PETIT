@@ -9,7 +9,11 @@
       if (this.active) throw new Error('録音中です。');
       this.active = true; this.chunks = []; this.processing = false;
       const generation = ++this.generation;
-      this.onstart?.();
+      this.timer = setTimeout(() => {
+        if (generation !== this.generation) return;
+        this.onerror?.({ error: 'audio-capture', message: 'マイクの準備が時間切れになりました。マイク権限を確認して再開してください。' });
+        this.finish();
+      }, 30000);
       void this.capture(generation).catch((error) => {
         if (generation !== this.generation) return;
         this.onerror?.({ error: error.name === 'NotAllowedError' ? 'not-allowed' : 'audio-capture',
@@ -37,7 +41,9 @@
       this.source.connect(this.node);
       // The processor outputs silence; connecting keeps the audio graph running without mic feedback.
       this.node.connect(this.context.destination);
+      clearTimeout(this.timer);
       this.timer = setTimeout(() => this.stop(), 31000);
+      this.onstart?.();
     }
     release() {
       clearTimeout(this.timer);

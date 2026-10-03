@@ -33,12 +33,10 @@ Service WorkerにDesktop資産をprecacheせず、DesktopもService Workerを登
 | 選択肢 | Windows / macOS | 制約・費用・精度 | 採用範囲 |
 | --- | --- | --- | --- |
 | openWakeWord | Python + ONNXのローカル実行 | 実声・長時間負例の評価が必要 | Desktopウェイク検出に採用 |
-| openWakeWord | Python等で別プロセス化可能 | 公式は英語対応。日本語「プティ」を即時保証できず、学習・誤検知評価が必要 | [v0.1学習環境](openwakeword.md)を追加。Desktop統合は後続 |
 | Voskで全文認識→文字列一致 | 日本語軽量モデルあり | 常時STTは専用検出器より負荷が増える。固有名の誤認識も評価が必要 | 初回不採用 |
 | Web Speech常時再起動 | WebView依存 | 通信・可用性・バックグラウンド・OS差の影響が大きい | 不採用 |
 | トレイ / グローバルキー | 両OS | マイク不要。キー競合時はトレイへ案内 | 常に使える基本入口 |
 
-[Porcupine概要](https://picovoice.ai/docs/porcupine/)と[Node SDK](https://picovoice.ai/docs/quick-start/porcupine-nodejs/)は日本語・デスクトップ対応、AccessKey、プラットフォーム別モデルを説明している。
 [openWakeWordの言語対応](https://github.com/dscripka/openWakeWord#language-support)、[Voskモデル一覧](https://alphacephei.com/vosk/models)も比較した。
 
 「プティ」は短く、環境音や会話との区別が難しい可能性がある。初期推奨は日本語モデルの「へいプティ」。実際にConsoleで生成できるフレーズと各OSのモデルを用い、短い「プティ」は誤検知・見逃しを測ってから採用する。名前だけの文字列一致をウェイク検出成功とは扱わない。
@@ -47,7 +45,7 @@ Service WorkerにDesktop資産をprecacheせず、DesktopもService Workerを登
 
 Mainが小型画面を表示 → AudioWorklet録音 → WAV → 明示設定したSTT URL → 確定文字列 → 共有voice.js → 共有app.js → 既存Chat/確認API、の順に処理する。応答音声は既存TTS。
 
-初回は一発話単位。応答後は再びマイクを押すか、小型画面を閉じて再度呼びかける。UI表示中はウェイクを停止するため、自分の返答による再検出を避けられる。TTS後に自動で次の録音へ進む完全ハンズフリー会話、割り込み発話、ウェイクと用件を一息で話す際の先頭音声引継ぎは後続。
+Wakeまたは「音声会話」で連続会話を開始する。Chat完了とTTS再生完了の両方を待って次の録音へ進む半二重方式。UI表示中はウェイクを停止する。無音・エラー・非表示・会話終了・確認付き操作で自動録音を停止する。発話による自動割り込み、ウェイクと用件を一息で話す際の先頭音声引継ぎは未実装。マイクボタンでの手動割り込みは可能。
 
 ## 常駐・OS権限
 
@@ -89,7 +87,7 @@ sandbox / contextIsolationを有効にし、Node integrationは無効。外部�
 URLは認証情報・queryなしのHTTPS、または厳密なloopback HTTPだけ。STTは利用者が設定した固定URLのみで、リダイレクトは禁止。応答音声とチャットの相対URLはPETITサーバーと同一originを維持する。
 **接続するPETITサーバー自体は信頼する必要がある。** シェルは汎用ブラウザとして利用しない。
 
-設定はElectron userDataの`desktop.json`。AccessKeyはsafeStorageで暗号化し、Rendererへ復号値を返さない。OS/端末間で暗号文をコピーしない。STT用Bearer keyは任意の`PETIT_DESKTOP_STT_KEY`、Porcupine keyの環境変数代替は`PETIT_PORCUPINE_ACCESS_KEY`。鍵・録音・認識本文をログに書かない。
+設定はElectron userDataの`desktop.json`。WakeはAccessKey不要のopenWakeWordのみ。旧Porcupineの秘密情報・モデルmetadataは読み込み時に除去する。STT用Bearer keyは任意の`PETIT_DESKTOP_STT_KEY`。鍵・録音・認識本文をログに書かない。
 
 録音はmono PCM16 WAV、無音8秒・発話後無音1.2秒・最大30秒で終了。サーバー送信前に形式/サイズを再検証し、STT通信は最大60秒。同時送信は1件。取消・画面非表示後の遅延結果は破棄。現状のRMS判定は簡易実装であり、騒音環境のVAD評価は後続。
 
@@ -114,27 +112,28 @@ whisper-server -m models/ggml-base.bin --host 127.0.0.1 --port 8080
 Desktop設定のSTT URLは`http://127.0.0.1:8080/inference`。`file`、`language=ja`、`response_format=json`、`model`をmultipartで送り、`{"text":"..."}`を受け取るサーバーに対応する。LM StudioのチャットURLをSTTとして流用しない。
 音声応答は小型画面の「音声応答」をONにする。AivisSpeechは既存の[導入手順](aivis_speech.md)を使用する。
 
-### ウェイクモデルの自動設定（Issue #256）
+### openWakeWordの自動設定（#270 / #273）
 
-1. 設定の「AccessKeyを取得」からPicovoice Consoleへ進み、初回のみAccessKeyを入力する。
-2. 「ウェイクモデルを自動設定」を押す。Mac / Windowsのx64・arm64を実行中のアプリに合わせて判定し、OSのマイク権限を確認する。Macの初回許可はOSのダイアログで行う。
-3. 日本語モデルと「Hey プティ」（生成フレーズは日本語の「へいプティ」）モデルを取得する。
-4. マイク開始の案内後、30秒以内に「へいプティ」と話す。実際の検出に成功すると「準備完了」と表示し、モデルパスを自動保存する。初期化だけでは成功表示しない。
-5. 常時待機を使う場合はSTT URLを設定し、「マイクで呼びかけを待つ」をONにして保存。小型画面を閉じ、トレイの待機ONを確認する。モデル設定・検出テスト自体にはSTTは不要。
+1. Python 3と「Hey プティ」の`hey_petit.onnx`を用意する。モデルを同梱しないinstallerもあるため、設定画面でONNXを選択する。[学習・実験モデル](openwakeword.md)を参照。
+2. 「ウェイク環境を自動設定」を押す。保存前の画面上のONNX選択も使用する。
+3. 専用venvへ依存導入、backboneモデル取得、ONNXコピーを行い、マイクを開かないdiagnostic後にmanagedパスを保存する。diagnostic成功は実マイク検出成功を意味しない。
+4. STT URLを設定し、Wake待機をONにして保存。小型画面を閉じてトレイの待機ONを確認する。マイクでのreadyと実声検出は実機受入で確認する。
 
-取得済みの正常な自動モデルは再利用する。モデルファイルの手動選択とキー削除は「詳細設定」に残す。既存の手動パスは自動設定の検出テスト成功まで変更しない。自動設定で常時マイク待機を勝手にONにはしない。
+managed環境はElectron `userData/wakeword/`。Python候補が見つからない場合はPython 3を導入するか`PETIT_WAKE_BOOTSTRAP_PYTHON`を指定する。runtime.pyとrequirementsはpackaged resourcesから参照する。自動設定は常時待機を勝手にONにしない。
 
-- `.pv`: [公式Porcupineリポジトリ](https://github.com/Picovoice/porcupine/blob/3d3bdb0a4e0c0c8374b8a94d3590666b214686f7/lib/common/porcupine_params_ja.pv)の固定revisionから取得し、SHA-256を検証。Node SDKは既存の4.0.2を維持。
-- `.ppn`: [公式Porcupine Model API](https://picovoice.ai/docs/model-api/porcupine/)の`POST https://rest.picovoice.ai/ja/api/ppn`を使う。APIにはAccessKey、固定フレーズ、`mac`または`windows`を送る。音声は送信しない。APIの利用可否・生成回数はアカウントに依存する。303による取得先へのリクエストにはAccessKeyを付けない。配布先はHTTPSのPicovoiceドメインのみ許可し、他ドメインが返ったら理由を表示して手動設定へ案内する。
-- 保存先: Electron `userData/wake-models/setup-*/`。開発版の通常の場所はmacOSで`~/Library/Application Support/petit-desktop/`、Windowsで`%APPDATA%/petit-desktop/`。配布版はアプリ名によって変わる。確定したパスは「詳細設定」で確認できる。
-- AccessKey: Electron `safeStorage`で暗号化し、従来と同じ`desktop.json`へ暗号文だけ保存。macOSはKeychainに保護された鍵、WindowsはDPAPIを使用する。安全な保存ができない場合は停止する。既存の`PETIT_PORCUPINE_ACCESS_KEY`環境変数による上書きは継続する。
-- 失敗・中止: 作成途中のディレクトリを削除し、従来のモデルパスを維持。キーは取得やテストが失敗しても暗号化保存済みなので再入力不要（キー自体が無効な場合は修正が必要）。中止ボタン、設定を閉じる、小型画面を開く、ロック・スリープ・終了でテストを停止する。
-- エラー表示: キー/利用権限、API上限、通信、ハッシュ不一致、ファイル保存、モデル互換性、マイク、初期化・検出タイムアウトを区別。SDKの生エラーやキーをUI・ログへ出さない。通常待機のエラーも設定画面に表示する（直近エラーは実行中のみ保持）。
+macOSでは「システム設定 → プライバシーとセキュリティ → マイク」でPETIT（開発版はElectron）を許可する。Windowsではマイクアクセスとデスクトップアプリのアクセスを許可する。
+録音準備は30秒、録音は無音8秒・発話後無音1.2秒・最大約30秒、STT通信は60秒を上限とする。TTS合成はチャンクごと5秒、WAV再生はチャンクごと30秒、端末TTSは文字数に応じ30〜120秒を上限とする。時間切れ時は再開操作を行う。
 
-Macの拒否時は「システム設定 → プライバシーとセキュリティ → マイク」でPETIT（開発版はElectron）を許可する。Windowsはマイクアクセスとデスクトップアプリのアクセスを許可する。WindowsではOSの権限状態が不明な場合もあるため、最後にPvRecorderを実際に開始して確認する。
+### 人間によるVoice MVP受入（未確認）
 
-2026-09-09検証: Desktop単体21テスト、実Electron画面操作（キー未入力・詳細設定表示を含む）、macOS arm64の展開ビルドが成功。キー付きModel APIの実生成、実マイクでの「へいプティ」、Windows実機、署名済み配布版は未確認。開発用設定にキーがないため、Macの実検出受け入れは上記手順での入力・発話が必要。
+- Backend / LM Studio / STT / AivisSpeechを起動し、設定画面で接続先を指定する。
+- diagnostic後に画面を閉じ、実マイクでWake readyと「Hey プティ」の実声検出を確認する。
+- 呼びかけ後は録音表示を確認して話し、短い返答の再生後に次の録音へ進むことを確認する。
+- 無音、会話終了、Escape、ロック、STT/LLM/TTS停止時に録音が止まることを確認する。
+- 音声の自然さ、発話終了の間、誤起動、騒音、Windows/macOS使用感を評価する。
+- iPhoneはPWAの手動音声入力・音声再生を確認する。常時Wake待機はDesktopの範囲。
 
+コード・合成入力テストは実声の受入を代替しない。モデル未同梱buildはWake ONNXを別途用意する。OS署名・実インストール版の受入も未確認。
 
 ```bash
 # Desktopディレクトリで実行

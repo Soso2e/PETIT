@@ -21,7 +21,7 @@ function environment() {
     localStorage: { getItem: key => storage.get(key), setItem: (k, v) => storage.set(k, v) },
     document: { getElementById: id => nodes[id], createElement: element, addEventListener() {} },
     MutationObserver: class { observe() {} }, fetch: async () => ({ ok: true, json: async () => ({ configured: false }) }) };
-  context.window = { isSecureContext: true, setTimeout() {}, addEventListener() {},
+  context.window = { isSecureContext: true, setTimeout() {}, clearTimeout() {}, addEventListener() {},
     SpeechRecognition: class extends Native { constructor() { super(); native = this; } } };
   vm.createContext(context);
   return { context, nodes, storage, get native() { return native; }, get submits() { return submits; } };
@@ -106,4 +106,45 @@ test('current Universe DOM initializes microphone without legacy IDs or voice to
   const result = [{ transcript: '明日の予定は' }]; result.isFinal = true;
   env.native.onresult({ resultIndex: 0, results: [result] }); env.native.onend();
   assert.equal(input.value, '明日の予定は'); assert.equal(env.submits, 1);
+});
+
+function playbackEnvironment() {
+  const env = environment(); const timers = new Map(); let id = 0, cancelled = 0;
+  env.context.window.setTimeout = (fn, delay) => { const key = ++id; timers.set(key, { fn, delay }); return key; };
+  env.context.window.clearTimeout = key => timers.delete(key);
+  env.context.URL = { createObjectURL: () => 'blob:fixture', revokeObjectURL() {} };
+  env.context.Audio = class { play() { return Promise.resolve(); } pause() {} };
+  env.context.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+  let utterance;
+  env.context.window.SpeechSynthesisUtterance = env.context.SpeechSynthesisUtterance;
+  env.context.window.speechSynthesis = { getVoices: () => [], cancel() { cancelled++; }, speak(value) { utterance = value; } };
+  // Test only: access the playback boundary without changing the shipped API.
+  vm.runInContext(source('voice.js').replace(/\}\)\(\);\s*$/, 'window.playbackTest = { playAudioBlob, speakWithBrowser, stopSpeaking }; })();'), env.context);
+  return { ...env, timers, get utterance() { return utterance; }, get cancelled() { return cancelled; } };
+}
+test('missing Audio ended event times out and rejects rather than waiting forever', async () => {
+  const env = playbackEnvironment();
+  const result = env.context.window.playbackTest.playAudioBlob(new Blob(['fixture']), new AbortController());
+  const rejected = assert.rejects(result, /時間切れ/);
+  [...env.timers.values()].find(timer => timer.delay === 30000).fn();
+  await rejected;
+});
+test('browser playback timeout cancels synthesis; late end cannot clear error', () => {
+  const env = playbackEnvironment();
+  env.context.window.playbackTest.speakWithBrowser('こんにちは');
+  [...env.timers.values()].find(timer => timer.delay === 30000).fn();
+  assert.match(env.nodes['voice-state'].textContent, /再生できません/);
+  env.utterance.onend();
+  assert.match(env.nodes['voice-state'].textContent, /再生できません/);
+  assert.equal(env.cancelled, 1);
+});
+test('stopped browser playback ignores its stale callback', () => {
+  const env = playbackEnvironment();
+  env.context.window.playbackTest.speakWithBrowser('こんにちは');
+  const old = env.utterance;
+  env.context.window.playbackTest.stopSpeaking();
+  env.context.window.playbackTest.speakWithBrowser('次の返答');
+  env.nodes['voice-state'].textContent = '次の再生';
+  old.onend();
+  assert.equal(env.nodes['voice-state'].textContent, '次の再生');
 });
