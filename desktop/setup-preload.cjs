@@ -4,7 +4,7 @@ contextBridge.exposeInMainWorld('petitSettings', {
   read: () => ipcRenderer.invoke('settings:read'),
   save: (values) => ipcRenderer.invoke('settings:save', values),
   selectModel: (kind) => ipcRenderer.invoke('settings:model', kind),
-  autoSetup: () => ipcRenderer.invoke('settings:wake-setup'),
+  autoSetup: (values) => ipcRenderer.invoke('settings:wake-setup', values),
   cancelSetup: () => ipcRenderer.invoke('settings:wake-cancel'),
   onProgress: (callback) => {
     const listener = (_event, message) => callback(message);

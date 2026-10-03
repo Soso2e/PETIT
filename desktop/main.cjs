@@ -261,7 +261,7 @@ function installIpc() {
     return result.canceled ? '' : result.filePaths[0];
   });
   on('settings:wake-cancel', 'settings', () => { cancelWakeSetup(); return true; });
-  on('settings:wake-setup', 'settings', async () => {
+  on('settings:wake-setup', 'settings', async (values = {}) => {
     if (wakeSetupController) return { ok: false, message: 'openWakeWordの自動設定はすでに実行中です。' };
     if (suspended || quitting) return { ok: false, message: 'ロック・スリープ解除後に再試行してください。' };
     const controller = new AbortController(); wakeSetupController = controller;
@@ -271,7 +271,7 @@ function installIpc() {
       stopWake();
       const prepared = await prepareWakeEnvironment({
         userData: app.getPath('userData'), projectRoot: path.resolve(__dirname, '..'), resourcesPath: process.resourcesPath || '',
-        currentModelPath: config.modelPath, signal: controller.signal, report,
+        currentModelPath: typeof values.modelPath === 'string' ? values.modelPath.trim() : config.modelPath, signal: controller.signal, report,
       });
       controller.signal.throwIfAborted();
       persistConfig({ ...config, modelPath: prepared.modelPath, backbonePath: prepared.backbonePath,
