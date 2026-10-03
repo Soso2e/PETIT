@@ -160,21 +160,37 @@ const server = http.createServer(async (request, response) => {
     // Exercise the real DOM/voice/controller wiring, using synthetic playback.
     await voicePage.evaluate(() => {
       window.Audio = class {
-        play() { setTimeout(() => { this.onplay?.(); this.onended?.(); }, 20); return Promise.resolve(); }
-        pause() {} removeAttribute() {} load() {}
+        play() { window.fixtureAudio = this; window.fixtureAudioPlaying = true; this.onplay?.(); return Promise.resolve(); }
+        pause() { window.fixtureAudioPlaying = false; } removeAttribute() {} load() {}
       };
     });
-    await voicePage.route('**/api/tts', route => route.fulfill({ status: 200, contentType: 'audio/wav', body: Buffer.from('fixture') }));
+    let ttsRequests = 0;
+    await voicePage.route('**/api/tts', route => { ttsRequests++; return route.fulfill({ status: 200, contentType: 'audio/wav', body: Buffer.from('fixture') }); });
     await voicePage.locator('#voice-conversation').click();
     await voicePage.locator('#mic.mic--listening').waitFor();
     await voicePage.waitForTimeout(450);
     await voicePage.locator('#mic').click();
     await voicePage.getByText('こんにちは。', { exact: true }).last().waitFor();
     assert.equal(calls.filter(call => call.path === '/api/chat').at(-1).data.conversation_mode, 'voice');
+    await voicePage.waitForFunction(() => window.fixtureAudioPlaying);
+    // Restore real fixture history while a new answer is playing. It must neither
+    // enqueue the old reply nor treat an old user bubble as a new interruption.
+    await voicePage.route('**/api/conversations?*', route => route.fulfill({ json: {
+      conversations: [{ user_text: '過去の質問', assistant_text: '過去の返答' }],
+    } }));
+    assert.equal(await voicePage.evaluate(() => restoreHistory()), true);
+    await voicePage.getByText('過去の返答', { exact: true }).waitFor();
+    assert.equal(ttsRequests, 1);
+    assert.equal(await voicePage.evaluate(() => window.fixtureAudioPlaying), true);
+    await voicePage.evaluate(() => window.fixtureAudio.onended());
     await voicePage.locator('#mic.mic--listening').waitFor();
     await voicePage.locator('#voice-conversation').click();
     assert.equal(await voicePage.locator('#mic').getAttribute('aria-label'), '音声入力を開始');
     assert.equal(await voicePage.locator('#voice-conversation').getAttribute('aria-pressed'), 'false');
+    await voicePage.getByText('過去の返答', { exact: true }).locator('..').getByRole('button', { name: 'この返答を読み上げる' }).click();
+    await voicePage.waitForFunction(() => window.fixtureAudioPlaying);
+    assert.equal(ttsRequests, 2, 'restored replies retain manual playback');
+    await voicePage.evaluate(() => window.fixtureAudio.onended());
     // Sleep and screen lock overlap: resume alone must not permit activation.
     await instance.evaluate(({ powerMonitor }) => { powerMonitor.emit('lock-screen'); powerMonitor.emit('suspend'); powerMonitor.emit('resume'); });
     await instance.evaluate(({ app }) => app.emit('activate'));

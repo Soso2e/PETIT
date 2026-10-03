@@ -507,14 +507,14 @@
     replay.addEventListener("click", () => void speakText(replyText, { force: true }));
     message.appendChild(replay);
 
-    if (autoSpeak && (observerReady || conversation?.active)) void speakText(replyText);
+    if (autoSpeak && message.dataset.voiceSilent !== "1" && (observerReady || conversation?.active)) void speakText(replyText);
   }
 
   const messageObserver = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (!(node instanceof Element)) continue;
-        if (node.matches(".msg--user")) stopSpeaking();
+        if (node.matches(".msg--user") && node.dataset.voiceSilent !== "1") stopSpeaking();
         if (node.matches(".msg--assistant")) enhanceAssistantMessage(node, { autoSpeak: true });
         for (const message of node.querySelectorAll?.(".msg--assistant") || []) {
           enhanceAssistantMessage(message, { autoSpeak: true });

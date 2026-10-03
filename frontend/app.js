@@ -24,9 +24,10 @@ function freshnessLabel(status, label) {
   return `${label}: ${status.stale ? "古いキャッシュ" : "最新"}`;
 }
 
-function addMessage(role, text, { tools, error, actions, modelRoute } = {}) {
+function addMessage(role, text, { tools, error, actions, modelRoute, silent = false } = {}) {
   const wrap = document.createElement("div");
   wrap.className = `msg msg--${role}`;
+  if (silent) wrap.dataset.voiceSilent = "1";
 
   const bubble = document.createElement("div");
   bubble.className = "bubble" + (error ? " bubble--error" : "");
@@ -417,11 +418,11 @@ async function restoreHistory() {
     removeStaticGreeting();
     for (const row of rows) {
       if (row.user_text) {
-        addMessage("user", row.user_text);
+        addMessage("user", row.user_text, { silent: true });
         history.push({ role: "user", content: row.user_text });
       }
       if (row.assistant_text) {
-        addMessage("assistant", row.assistant_text);
+        addMessage("assistant", row.assistant_text, { silent: true });
         history.push({ role: "assistant", content: row.assistant_text });
       }
     }
