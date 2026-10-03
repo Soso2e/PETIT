@@ -7,7 +7,7 @@ from typing import Any
 
 from . import config, context_broker, situation, time_context, tools, workspace_context
 from .lmstudio_client import LMStudioError, chat_completion
-from .petit_prompt import CORE_SYSTEM_PROMPT
+from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
 
 CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
     "lists_and_tasks": (
@@ -273,7 +273,7 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
     workspace = workspace_context.build_context_block()
     situational_context = "\n\n".join(block for block in (runtime_context, active_work_context, workspace) if block)
 
-    messages: list[dict[str, Any]] = [{"role": "system", "content": _ROUTER_SYSTEM_PROMPT}]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": _ROUTER_SYSTEM_PROMPT + voice_turn_instructions()}]
     for item in recent[-6:]:
         role = item.get("role")
         content = str(item.get("content") or "").strip()

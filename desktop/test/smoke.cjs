@@ -170,6 +170,7 @@ const server = http.createServer(async (request, response) => {
     await voicePage.waitForTimeout(450);
     await voicePage.locator('#mic').click();
     await voicePage.getByText('こんにちは。', { exact: true }).last().waitFor();
+    assert.equal(calls.filter(call => call.path === '/api/chat').at(-1).data.conversation_mode, 'voice');
     await voicePage.locator('#mic.mic--listening').waitFor();
     await voicePage.locator('#voice-conversation').click();
     assert.equal(await voicePage.locator('#mic').getAttribute('aria-label'), '音声入力を開始');

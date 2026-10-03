@@ -679,8 +679,8 @@ flowchart TD
 flowchart TD
     Wake[openWakeWord / 音声会話ボタン] --> Record[Desktop録音 / 無音で終了]
     Record --> STT[Desktop STT IPC]
-    STT --> Chat[共有 app.js / api/chat]
-    Chat --> Brain[既存 PETIT Brain / Context Broker / 決定論ルート]
+    STT --> Chat[共有 app.js / api/chat voiceモード]
+    Chat --> Brain[既存 Brain / Broker / 決定論ルート・音声短文方針]
     Brain --> Reply[テキスト即時表示]
     Reply --> TTS[共有 voice.js 分割TTS / 端末音声fallback]
     TTS --> Join{Chat完了と再生完了?}
@@ -694,3 +694,5 @@ flowchart TD
 Desktopのみ連続会話を開始する。Web/PWAは既存の手動入力を維持。
 確認付きActionでは自動録音を停止し、既存の承認UI/音声判断境界を維持する。
 再生中の音声による割り込み検出は未実装。マイクボタンで再生を停止して入力できる。
+
+`conversation_mode` は `text`（既定）または `voice`。request-local contextで初回Brain・Broker後・Deep Agentのsystem方針へ反映し、本文/履歴や決定論ルート・承認判定を変更しない。実LLMによる1〜3文の遵守は未確認。

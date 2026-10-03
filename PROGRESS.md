@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.23.0**
+**Current Version: v0.23.1**
 
 **Last Updated: 2026-10-03**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #288: 連続音声会話のChatリクエストにvoiceモードを付与し、Brainの初回応答・Broker後の応答・Deep Agentへ1〜3文の返答方針を渡す。通常テキスト会話・履歴・承認は維持。実LLMの短さ・自然さは未確認。
 
 - #286: DesktopのWake/音声会話ボタンからSTT→共有Chat/Brain/Broker→TTS→次の録音を接続。返答と再生の両完了を待ち、無音・エラー・非表示・終了・確認付き操作では自動録音を停止。実声/実マイク/OS/iPhone/会話自然さは未確認。
 
@@ -176,9 +178,11 @@
 | 2026-09-19 | 00:33 | #82 | Issue #274: 明示されたタスク作成・変更・完了・親子変更・同期再試行を追加確認なしで即時実行し、全書き込み引数検証と決定論的完了報告を更新（関連70テスト・31 subtest・Python構文・diff確認済み、実LM Studio会話E2E未確認）。 |
 | 2026-09-20 | 09:24 | #83 | Issue #276 / v0.22.0: Web/Desktop UIを静かなAIワークスペースへ刷新し、適応型サイドバー、コマンドパレット、共通トークン、状態UIを実装（関連21テスト・Desktop 32 subtest・実Electron fixture smoke・Codex内ブラウザ操作確認済み、配布版/実iPhone/スクリーンリーダーは未確認）。 |
 | 2026-09-29 | 23:58 | #84 | Issue #281: DeepSeek通信へOS信頼ストアによる証明書検証を適用し、FlashモデルIDを`deepseek-flash`へ更新（動作確認済み: 対象6テスト・構文・実Chat/Agent・FastAPI `/api/chat`、pytest未導入・旧広範囲テストの既存失敗は未解決）。 |
-| 2026-09-30 | 00:06 | #85 | Issue #281のmain反映準備としてPatchバージョンをv0.23.0へ更新し、`VERSION`・Web表示・PWA asset versionを同期。 |
+| 2026-09-30 | 00:06 | #85 | Issue #281のmain反映準備としてPatchバージョンをv0.23.1へ更新し、`VERSION`・Web表示・PWA asset versionを同期。 |
 | 2026-09-30 | 06:15 | #86 | Issue #284: TimeTree exporter専用CAへOS信頼ルートを含め、TLS検証失敗を修正（動作確認済み: 実同期1,221件・キャッシュ更新・関連7テスト成功。旧NotionテストのAPI不一致は別途未解決）。 |
 
 | 2026-10-03 | 19:17 | #273 | Wake自動設定へ設定画面で選択中のONNXを渡す。 |
 
 | 2026-10-03 | 19:21 | #286 | Desktopに返答再生完了後の次発話待機と停止制御を追加。 |
+
+| 2026-10-03 | 19:25 | #288 | 音声会話だけに短文応答方針をrequest-localで適用。 |

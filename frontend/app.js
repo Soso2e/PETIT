@@ -333,7 +333,8 @@ async function sendMessage(text) {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history, request_id: requestId, session_id: sessionId }),
+      body: JSON.stringify({ message: text, history, request_id: requestId, session_id: sessionId,
+        conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }),
     });
     const data = await res.json();
     setTyping(false);

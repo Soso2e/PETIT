@@ -23,3 +23,18 @@ CORE_SYSTEM_PROMPT = """あなたはPETIT。ユーザーの生活・制作・開
 - 通常は読み上げやすいプレーンテキストを使う。
 - 比較、手順、コードなど可読性が明確に上がる場合だけ最小限のMarkdownを使う。
 """
+
+
+def voice_turn_instructions() -> str:
+    """Presentation preference only; tool/risk decisions remain authoritative."""
+    from . import request_context
+
+    if request_context.current_conversation_mode() != "voice":
+        return ""
+    return (
+        "\n\n今は音声会話です。返答は原則1〜3文の短く自然な日本語にしてください。"
+        "要点を先に話し、Markdown・URL・コード・表の読み上げを避けてください。"
+        "必要な確認や失敗理由は省略せず、詳しい説明が必要ならユーザーに提案してください。"
+        "利用可能なContextや現在の作業を活かし、不要な検索やTool呼び出しは増やさないでください。"
+        "この方針は表示形式だけを変え、ツール権限・承認・確認境界を変更しません。"
+    )
