@@ -53,6 +53,45 @@
   let currentAudio = null;
   let currentAudioUrl = null;
   let currentTtsRequest = null;
+  let browserPlaybackGeneration = 0;
+
+  let conversation = null;
+  if (window.PetitDesktopSpeechRecognition && window.PetitVoiceConversationController) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = "voice-conversation";
+    voiceStateEl.before(button);
+    conversation = new window.PetitVoiceConversationController({
+      listen: () => {
+        if (document.hidden || sendEl.disabled || micEl.disabled || inputEl.value.trim()) {
+          conversation.stop(); return;
+        }
+        toggleListening();
+      },
+      changed: active => {
+        button.textContent = active ? "会話終了" : "音声会話";
+        button.setAttribute("aria-pressed", String(active));
+      },
+    });
+    const startConversation = () => {
+      if (conversation.active || micEl.disabled || sendEl.disabled) return;
+      voiceReplyEnabled = true;
+      updateVoiceToggle();
+      conversation.start();
+    };
+    button.addEventListener("click", () => {
+      if (conversation.active) {
+        conversation.stop(); finalTranscript = ""; recognitionFailed = true;
+        recognition?.abort(); stopSpeaking();
+      } else startConversation();
+    });
+    conversation.changed(false);
+    window.PetitVoiceConversation = {
+      start: startConversation,
+      beginTurn: () => conversation.beginTurn(),
+      finishChat: (token, result) => conversation.finishChat(token, result),
+    };
+  }
 
   function setVoiceState(message, { error = false } = {}) {
     voiceStateEl.textContent = message || "";
@@ -265,6 +304,7 @@
   }
 
   function stopSpeaking() {
+    browserPlaybackGeneration++;
     if (currentTtsRequest) {
       currentTtsRequest.abort();
       currentTtsRequest = null;
@@ -283,8 +323,10 @@
     const voice = findJapaneseVoice();
     if (voice) utterance.voice = voice;
     utterance.onstart = () => setVoiceState(reason);
-    utterance.onend = () => setVoiceState("");
-    utterance.onerror = () => setVoiceState("音声を再生できませんでした。", { error: true });
+    const token = conversation?.generation;
+    const playbackGeneration = browserPlaybackGeneration;
+    utterance.onend = () => { if (playbackGeneration !== browserPlaybackGeneration) return; setVoiceState(""); conversation?.finishAudio(token, true); };
+    utterance.onerror = () => { if (playbackGeneration !== browserPlaybackGeneration) return; setVoiceState("音声を再生できませんでした。", { error: true }); conversation?.finishAudio(token, false); };
     window.speechSynthesis.speak(utterance);
     return true;
   }
@@ -371,7 +413,8 @@
     if (window.PetitDesktopSpeechRecognition && document.hidden) return;
     if (!voiceReplyEnabled && !force) return;
     const spoken = normalizeSpeechText(text);
-    if (!spoken) return;
+    if (!spoken) { conversation?.stop(); return; }
+    const conversationToken = conversation?.generation;
 
     stopSpeaking();
     if (!audioPlaybackSupported) {
@@ -408,6 +451,7 @@
       if (currentTtsRequest === controller) {
         currentTtsRequest = null;
         setVoiceState("");
+        conversation?.finishAudio(conversationToken, true);
       }
     } catch (error) {
       const cancelled = controller.signal.aborted || currentTtsRequest !== controller;
@@ -424,6 +468,7 @@
         : "AivisSpeechを利用できないため、端末の音声で再生しています…";
       if (!speakWithBrowser(remainingText, { reason })) {
         setVoiceState("音声を再生できませんでした。", { error: true });
+        conversation?.stop();
       }
     }
   }
@@ -446,7 +491,7 @@
     replay.addEventListener("click", () => void speakText(replyText, { force: true }));
     message.appendChild(replay);
 
-    if (autoSpeak && observerReady) void speakText(replyText);
+    if (autoSpeak && (observerReady || conversation?.active)) void speakText(replyText);
   }
 
   const messageObserver = new MutationObserver((mutations) => {
@@ -506,6 +551,7 @@
 
     recognition.onerror = (event) => {
       recognitionFailed = true;
+      conversation?.stop();
       const friendly = event.message || {
         "audio-capture": "マイクを利用できません。Macのシステム設定 → サウンド → 入力でデバイスを確認してください。",
         "not-allowed": "マイクの使用が許可されていません。サイトの権限とMacのシステム設定 → プライバシーとセキュリティ → マイクを確認してください。",
@@ -527,12 +573,14 @@
         inputEl.dispatchEvent(new Event("input"));
         setVoiceState(`聞き取り: ${transcript}`);
         if (!draftBeforeListening.trim() && handlePendingVoiceDecision(transcript)) {
+          conversation?.stop();
           inputEl.value = "";
           inputEl.dispatchEvent(new Event("input"));
           return;
         }
         formEl.requestSubmit();
       } else {
+        conversation?.stop();
         inputEl.value = draftBeforeListening;
         inputEl.dispatchEvent(new Event("input"));
         if (!recognitionFailed) setVoiceState("音声を聞き取れませんでした。もう一度話してください。", { error: true });
@@ -564,6 +612,7 @@
       speechRecognition.start();
     } catch (error) {
       starting = false;
+      conversation?.stop();
       if (inputModeEl) inputModeEl.disabled = false;
       inputEl.value = draftBeforeListening;
       setVoiceState("音声入力を開始できませんでした。少し待ってから再試行してください。", { error: true });
@@ -574,7 +623,7 @@
     if (!audioPlaybackSupported && !browserSpeechSupported) return;
     voiceReplyEnabled = !voiceReplyEnabled;
     localStorage.setItem("petit_voice_reply_enabled", voiceReplyEnabled ? "1" : "0");
-    if (!voiceReplyEnabled) stopSpeaking();
+    if (!voiceReplyEnabled) { conversation?.stop(); stopSpeaking(); }
     updateVoiceToggle();
     setVoiceState(voiceReplyEnabled ? "音声応答を有効にしました。" : "音声応答を無効にしました。");
   });
@@ -583,6 +632,7 @@
 
   if (window.PetitDesktopSpeechRecognition) {
     document.addEventListener("petit:desktop-deactivate", () => {
+      conversation?.stop();
       finalTranscript = "";
       recognition?.abort();
       stopSpeaking();
@@ -593,6 +643,7 @@
   updateMicAvailability();
   setupInputMode();
   window.addEventListener("pagehide", () => {
+    conversation?.stop();
     recognitionFailed = true;
     finalTranscript = "";
     recognition?.abort();

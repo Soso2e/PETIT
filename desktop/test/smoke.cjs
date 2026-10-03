@@ -26,7 +26,7 @@ const server = http.createServer(async (request, response) => {
     const number = calls.filter((call) => call.path === '/inference').length;
     calls.push({ path: '/inference' });
     response.setHeader('Content-Type', 'application/json');
-    response.end(JSON.stringify({ text: number === 0 ? 'テスト予定を追加' : 'はい' })); return;
+    response.end(JSON.stringify({ text: number === 0 ? 'テスト予定を追加' : number === 1 ? 'はい' : 'こんにちは' })); return;
   }
   let body = raw.toString();
   const data = body ? JSON.parse(body) : {};
@@ -37,7 +37,8 @@ const server = http.createServer(async (request, response) => {
   if (url.pathname === '/api/conversations') payload = { conversations: [] };
   if (url.pathname === '/api/proactive') payload = { message: '何から始めよう？' };
   if (url.pathname === '/api/jobs') payload = { jobs: [] };
-  if (url.pathname === '/api/chat') payload = { request_id: data.request_id, reply: 'テスト予定を追加しますか？', pending_actions: [{ name: 'add_schedule', approval_id: 'fixture-approval', arguments: { title: 'テスト予定' } }] };
+  if (url.pathname === '/api/chat' && data.message === 'こんにちは') payload = { request_id: data.request_id, reply: 'こんにちは。' };
+  else if (url.pathname === '/api/chat') payload = { request_id: data.request_id, reply: 'テスト予定を追加しますか？', pending_actions: [{ name: 'add_schedule', approval_id: 'fixture-approval', arguments: { title: 'テスト予定' } }] };
   if (url.pathname === '/api/actions/fixture-approval') payload = { reply: data.approved ? '予定を追加しました。' : 'キャンセルしました。' };
   response.end(JSON.stringify(payload));
 });
@@ -156,6 +157,23 @@ const server = http.createServer(async (request, response) => {
     }
     assert.equal(calls.filter((call) => call.path === '/inference').length, 2);
     assert.equal(calls.filter((call) => call.path.includes('/api/actions/')).length, beforeVoice + 1);
+    // Exercise the real DOM/voice/controller wiring, using synthetic playback.
+    await voicePage.evaluate(() => {
+      window.Audio = class {
+        play() { setTimeout(() => { this.onplay?.(); this.onended?.(); }, 20); return Promise.resolve(); }
+        pause() {} removeAttribute() {} load() {}
+      };
+    });
+    await voicePage.route('**/api/tts', route => route.fulfill({ status: 200, contentType: 'audio/wav', body: Buffer.from('fixture') }));
+    await voicePage.locator('#voice-conversation').click();
+    await voicePage.locator('#mic.mic--listening').waitFor();
+    await voicePage.waitForTimeout(450);
+    await voicePage.locator('#mic').click();
+    await voicePage.getByText('こんにちは。', { exact: true }).last().waitFor();
+    await voicePage.locator('#mic.mic--listening').waitFor();
+    await voicePage.locator('#voice-conversation').click();
+    assert.equal(await voicePage.locator('#mic').getAttribute('aria-label'), '音声入力を開始');
+    assert.equal(await voicePage.locator('#voice-conversation').getAttribute('aria-pressed'), 'false');
     // Sleep and screen lock overlap: resume alone must not permit activation.
     await instance.evaluate(({ powerMonitor }) => { powerMonitor.emit('lock-screen'); powerMonitor.emit('suspend'); powerMonitor.emit('resume'); });
     await instance.evaluate(({ app }) => app.emit('activate'));

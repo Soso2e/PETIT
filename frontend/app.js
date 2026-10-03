@@ -320,6 +320,8 @@ async function checkHealth() {
 }
 
 async function sendMessage(text) {
+  const voiceTurn = window.PetitVoiceConversation?.beginTurn();
+  let voiceResult = null;
   const requestId = crypto.randomUUID();
   activeRequestId = requestId;
   addMessage("user", text);
@@ -342,6 +344,7 @@ async function sendMessage(text) {
     if (data.error) {
       addMessage("assistant", "⚠️ " + data.error, { error: true });
     } else {
+      voiceResult = data;
       history.push({ role: "user", content: text });
       if (data.reply) {
         addMessage("assistant", data.reply, { tools: data.used_tools, actions: data.pending_actions, modelRoute: data.model_route });
@@ -354,6 +357,7 @@ async function sendMessage(text) {
   } finally {
     if (activeRequestId === requestId) activeRequestId = null;
     sendEl.disabled = false;
+    window.PetitVoiceConversation?.finishChat(voiceTurn, voiceResult);
     inputEl.focus();
   }
 }

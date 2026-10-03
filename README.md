@@ -21,10 +21,10 @@ storage/   SQLite などの実行時データ（git 管理外）
 ## Windows / macOS Desktop（段階導入）
 
 既存PETITへ接続するElectron常駐クライアントを追加しています。小型会話UI、トレイ、グローバルショートカット、更新通知、任意の日本語ウェイク検出に対応する初期実装です。
-`desktop`で`npm ci && npm start`を実行し、接続先を設定してください。音声認識にはWhisper互換サーバー、ウェイク検出は初回AccessKey入力後、「ウェイクモデルを自動設定」でモデル取得とマイク検出テストを行えます。手動モデル選択は詳細設定に残しています。
+`desktop`で`npm ci && npm start`を実行し、接続先を設定してください。音声認識にはWhisper互換サーバーを設定します。ウェイク検出はopenWakeWordを使用し、ONNXモデルを選んで「ウェイク環境を自動設定」を実行します。Wakeまたは「音声会話」から、返答再生後に次の発話を待つ連続会話を開始できます。
 設計比較、権限、ビルド、検証範囲は [docs/desktop.md](docs/desktop.md) を参照。iPhoneは既存PWAを継続します。
 
-AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktopへの統合は別途です。
+AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
 
 ## セットアップ
 

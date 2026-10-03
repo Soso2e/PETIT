@@ -50,6 +50,7 @@
     stop() {
       if (!this.active || this.processing) return;
       this.processing = true; this.release();
+      this.onprocessing?.();
       const generation = this.generation;
       if (!this.chunks.length || !this.endpoint?.speech) {
         this.onerror?.({ error: 'no-speech' }); this.finish(); return;

@@ -19,7 +19,7 @@
     document.body.classList.remove('appearing');
     requestAnimationFrame(() => document.body.classList.add('appearing'));
     document.getElementById('input').focus();
-    if (voice && !mic.disabled && !mic.classList.contains('mic--listening') && !document.getElementById('send').disabled) mic.click();
+    if (voice && !mic.disabled && !mic.classList.contains('mic--listening') && !document.getElementById('send').disabled) (window.PetitVoiceConversation ? window.PetitVoiceConversation.start() : mic.click());
   }
   bridge.onActivate(activate);
   bridge.onHide(() => document.dispatchEvent(new Event('petit:desktop-deactivate')));
