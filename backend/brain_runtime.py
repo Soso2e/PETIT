@@ -5,7 +5,7 @@ from typing import Any
 
 from . import agent_progress, agent_runtime, capability_router, config, context_broker, conversation_state, request_context
 from .lmstudio_client import LMStudioError, chat_completion
-from .petit_prompt import CORE_SYSTEM_PROMPT
+from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
 
 _STATE_HISTORY_MESSAGES = 4
 _STATE_HISTORY_CHARS = 1800
@@ -36,7 +36,7 @@ def _base_messages(
     user_message: str,
     state_context: str,
 ) -> list[dict[str, Any]]:
-    messages: list[dict[str, Any]] = [{"role": "system", "content": CORE_SYSTEM_PROMPT}]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": CORE_SYSTEM_PROMPT + voice_turn_instructions()}]
     if state_context:
         messages.append(
             {

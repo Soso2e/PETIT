@@ -8,6 +8,11 @@ on:
       - "backend/config.py"
       - "backend/main.py"
       - "backend/voice.py"
+      - "backend/chat.py"
+      - "backend/request_context.py"
+      - "backend/petit_prompt.py"
+      - "backend/brain_runtime.py"
+      - "tests/test_voice_conversation_mode.py"
       - "frontend/index.html"
       - "frontend/mobile_audio_unlock.js"
       - "frontend/voice.js"
@@ -44,4 +49,4 @@ jobs:
           node --check frontend/mobile_audio_unlock.js
           node --check frontend/voice.js
       - name: Run AivisSpeech tests
-        run: python -m unittest tests.test_aivis_speech tests.test_tts_api_contract -v
+        run: python -m unittest tests.test_aivis_speech tests.test_tts_api_contract tests.test_voice_conversation_mode tests.test_brain_runtime -v

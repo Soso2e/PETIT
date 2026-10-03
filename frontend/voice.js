@@ -88,6 +88,7 @@
     conversation.changed(false);
     window.PetitVoiceConversation = {
       start: startConversation,
+      active: () => conversation.active,
       beginTurn: () => conversation.beginTurn(),
       finishChat: (token, result) => conversation.finishChat(token, result),
     };

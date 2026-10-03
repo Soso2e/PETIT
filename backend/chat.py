@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 import time
 from uuid import uuid4
+from typing import Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -34,6 +35,7 @@ class ChatRequest(BaseModel):
     history: list[dict[str, str]] | None = None
     request_id: str | None = None
     session_id: str | None = None
+    conversation_mode: Literal["text", "voice"] = "text"
 
 
 @router.post("/api/chat", response_model=ChatResponse)
@@ -46,7 +48,7 @@ def chat(req: ChatRequest) -> ChatResponse:
 
     started = time.monotonic()
     try:
-        with request_context.bind(request_id=request_id, session_id=session_id):
+        with request_context.bind(request_id=request_id, session_id=session_id, conversation_mode=req.conversation_mode):
             with lmstudio_client.observe_turn() as turn_metrics:
                 result = agent.run(message, history=req.history)
     except LMStudioError as exc:
