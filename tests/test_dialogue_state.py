@@ -50,6 +50,7 @@ class DialogueStateTests(unittest.TestCase):
                 tools.dispatch(name, args)
         self.assertEqual(dialogue_state.load("a")["focus_stack"][-1]["entity_id"], task["id"])
         for result in ({"created": False, "task": task}, {"created": True, "error": "bad", "task": task},
+                       {"created": True, "partial_update": True, "task": task},
                        "[error] bad", "not json", {"created": True, "task": {"id": True, "title": "bad"}}):
             dialogue_state.observe_tool_result(session_id="b", tool="create_task", arguments={}, result=result)
         self.assertFalse(dialogue_state.load("b"))

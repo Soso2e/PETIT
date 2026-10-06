@@ -88,24 +88,30 @@ def select(answer: str, candidates: list[dict[str, Any]]) -> dict[str, Any] | No
 
 
 def _focus(ref: str, state: dict[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]], str]:
-    stack = _live_candidates(state.get("focus_stack") or [])
-    primary = [item for item in stack if item.get("role") != "parent"]
-    if not primary:
+    original = [item for item in state.get("focus_stack", []) if item.get("role") != "parent"]
+    primary = _live_candidates(original)
+    if not original:
         return None, [], "missing_focus"
     if ref in {"前者", "後者", "1番", "2番"}:
         # Ordinals refer only to explicitly saved candidate order, not recency.
         return None, primary, "candidate_order_required"
+    latest = original[-1]
+    source = "last_selected" if latest["role"] == "last_selected" else "last_tool_result"
+    group = [item for item in original if item.get("turn_id") == latest.get("turn_id")]
     if ref == "前の":
-        earlier = [item for item in primary if item.get("turn_id") != primary[-1].get("turn_id")]
-        if earlier:
-            group = [item for item in earlier if item.get("turn_id") == earlier[-1].get("turn_id")]
-            return (group[0] if len(group) == 1 else None), group, "previous_focus"
-        return None, primary, "ambiguous_previous_focus"
-    latest = primary[-1]
-    group = [item for item in primary if item.get("turn_id") == latest.get("turn_id")]
+        earlier = [item for item in original if item.get("turn_id") != latest.get("turn_id")]
+        if not earlier:
+            return None, primary, "ambiguous_previous_focus"
+        group = [item for item in earlier if item.get("turn_id") == earlier[-1].get("turn_id")]
+        source = "previous_focus"
+    live_group = _live_candidates(group)
+    # Removing a stale/deleted member cannot promote an older entity or turn an
+    # ambiguous group into an implicit unique selection.
+    if len(live_group) != len(group):
+        return None, primary, "stale_focus"
     if len(group) == 1:
-        return latest, primary, "last_selected" if latest["role"] == "last_selected" else "last_tool_result"
-    return None, group, "ambiguous_focus"
+        return live_group[0], primary, source
+    return None, live_group, "ambiguous_focus"
 
 
 def _reply(text: str, source: str, used: list[dict[str, Any]] | None = None) -> dict[str, Any]:

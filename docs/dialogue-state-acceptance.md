@@ -32,7 +32,7 @@
   tests.test_pending_actions_router tests.test_generic_lists tests.test_task_cancel_status -q
 ```
 
-147テスト成功。Python compileall、共有Frontend JS/バージョンJS構文、git diffチェック成功。既存のContextual Agent CIに新ケースを追加し、同内容の新workflowは作成しない。
+148テスト成功。Python compileall、共有Frontend JS/バージョンJS構文、git diffチェック成功。既存のContextual Agent CIに新ケースを追加し、同内容の新workflowは作成しない。
 
 追加で実行した`tests.test_task_selection_parent_apply`は旧Universe UIのソース文字列期待2件が失敗。変更前main (`514208f`)の同じFrontendとtestを`git archive`で隔離しても4件中同じ2件が失敗し、今回の変更に起因しない。対象ファイルは変更しない。この既存不整合は別作業。
 

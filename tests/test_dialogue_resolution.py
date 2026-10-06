@@ -105,6 +105,15 @@ class DialogueResolutionTests(unittest.TestCase):
         self.assertFalse(result["used_tools"])
         self.assertEqual(result["model_route"]["dialogue_resolution_source"], "stale_candidate")
 
+    def test_deleted_latest_focus_does_not_promote_older_task(self):
+        a, b = self.create("A", turn="1"), self.create("B", turn="2")
+        with db.get_connection() as conn:
+            conn.execute("DELETE FROM tasks_cache WHERE id=?", (b["id"],))
+        result = self.turn("その期限明日にして")
+        self.assertFalse(result["used_tools"])
+        self.assertEqual(result["model_route"]["dialogue_resolution_source"], "stale_focus")
+        self.assertIsNone(task_hierarchy_task(a["id"])["due_date"])
+
     def test_missing_focus_exact_name_answer_can_continue(self):
         a = self.create("ゲーム開発", session="b")
         self.turn("その子にWEVORA追加")

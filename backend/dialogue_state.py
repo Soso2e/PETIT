@@ -55,6 +55,10 @@ def load(session_id: str | None) -> dict[str, Any]:
                 or pending.get("owner") != "tasks" or not pending.get("id")
                 or not isinstance(pending.get("operation"), dict)
                 or pending["operation"].get("kind") not in {"create_child_task", "update_task", "complete_task", "select_task"}
+                or (pending["operation"].get("kind") == "create_child_task"
+                    and not isinstance(pending["operation"].get("title"), str))
+                or (pending["operation"].get("kind") in {"update_task", "complete_task"}
+                    and not isinstance(pending["operation"].get("arguments"), dict))
                 or not isinstance(pending.get("candidates"), list)
                 or any(not isinstance(item, dict) or item.get("entity_type") != "task"
                        or not entity(item, "mentioned") for item in pending.get("candidates", []))):
@@ -121,7 +125,8 @@ def take_pending(session_id: str | None, pending_id: str) -> bool:
     """Consume exactly once, before writes; concurrent/replayed replies cannot repeat them."""
     def change(state):
         pending = state.get("pending_dialogue")
-        if not isinstance(pending, dict) or pending.get("id") != pending_id:
+        if (not isinstance(pending, dict) or pending.get("id") != pending_id
+                or not _fresh(pending.get("created_at"), PENDING_TTL_SECONDS)):
             return False
         state["pending_dialogue"] = None
         return True
