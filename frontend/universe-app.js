@@ -111,6 +111,7 @@
     });
     if (!["universe", "tasks"].includes(name)) state.overviewSelectionId = null;
     if (name === "chat") chatInputEl?.focus();
+    renderCurrentDetail();
   };
 
   tabs.forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
@@ -535,6 +536,7 @@
       clearWorkSession();
       renderActive();
     }
+    renderCurrentDetail({ force: false });
   };
 
   const selectTask = (task, index = 0) => {
@@ -545,7 +547,7 @@
     }
     renderOrbit();
     renderProjectControls();
-    renderDetail(task, index);
+    renderCurrentDetail();
     byId("chat-context-title").textContent = text(task.title, "タスク");
     byId("chat-context-copy").textContent = `Life › ${taskProject(task)} › ${text(task.title, "タスク")}`;
   };
@@ -999,6 +1001,63 @@
     window.dispatchEvent(new CustomEvent("petit:universe-rendered"));
   };
 
+  const detailDisplayState = () => {
+    const view = panels.find((panel) => !panel.hidden)?.dataset.viewPanel;
+    if (["universe", "focus"].includes(view)) {
+      return { mode: "selection", task: selectedTask(), session: null };
+    }
+    const session = state.workSession;
+    if (!session || !["active", "paused"].includes(session.status)) {
+      return { mode: "work", task: null, session: null };
+    }
+    // The server session owns the identity. Cached activeTaskId can be stale
+    // when a session has no task_id or its task is absent from the current list.
+    const task = session.task_id == null ? null : state.tasks.find((candidate, index) => (
+      taskKey(candidate, index) === String(session.task_id)
+      || String(candidate.external_id || "") === String(session.task_id)
+    )) || null;
+    return { mode: "work", task, session };
+  };
+
+  let detailDisplaySignature = "";
+  const renderCurrentDetail = ({ force = true } = {}) => {
+    const display = detailDisplayState();
+    const signature = JSON.stringify({
+      mode: display.mode,
+      task: display.task,
+      session: display.session && {
+        id: display.session.session_id, status: display.session.status,
+        task_id: display.session.task_id, task: display.session.task,
+      },
+    });
+    if (!force && signature === detailDisplaySignature) return;
+    detailDisplaySignature = signature;
+    detailPanelEl.dataset.detailMode = display.mode;
+    if (display.task) {
+      renderDetail(display.task, state.tasks.indexOf(display.task));
+    } else if (display.mode === "selection") {
+      renderDetailEmpty();
+    } else {
+      // Free-form sessions still have a name, but must not inherit another
+      // task's edit/complete actions simply because that task was selected.
+      delete detailPanelEl.dataset.taskId;
+      const empty = document.createElement("div");
+      empty.className = "detail-panel__empty";
+      const label = document.createElement("span");
+      label.className = "eyebrow";
+      label.textContent = "TASK DETAIL";
+      const title = document.createElement("h2");
+      title.dataset.detail = "title";
+      title.textContent = display.session ? text(display.session.task, "作業中のタスク") : "作業中のタスクはありません";
+      const copy = document.createElement("p");
+      copy.textContent = display.session
+        ? (display.session.status === "paused" ? "この作業は一時停止中です。" : "この作業を計測中です。")
+        : "Univでタスクの作業を開始すると、ここに表示されます。";
+      empty.append(label, title, copy);
+      detailPanelEl.replaceChildren(empty);
+    }
+  };
+
   const renderActive = () => {
     const task = activeTask();
     const session = state.workSession;
@@ -1043,9 +1102,7 @@
     renderConstellations();
     renderActive();
     renderSync();
-    const task = selectedTask();
-    if (task) renderDetail(task, state.tasks.indexOf(task));
-    else renderDetailEmpty();
+    renderCurrentDetail();
   };
 
   const normalizeTaskRows = (tasks) => {
@@ -1388,6 +1445,8 @@
 
   chatModelSelectEl?.addEventListener("change", () => updateModelRouting("chat", chatModelSelectEl.value));
   agentModelSelectEl?.addEventListener("change", () => updateModelRouting("agent", agentModelSelectEl.value));
+
+  window.addEventListener("petit:panel-change", () => renderCurrentDetail());
 
   window.setInterval(() => {
     renderActive();

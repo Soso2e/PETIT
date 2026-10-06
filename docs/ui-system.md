@@ -1,4 +1,4 @@
-# PETIT UI System v0.7.0
+# PETIT UI System v0.24.1
 
 ## 目的
 
@@ -11,7 +11,15 @@ PETITの各画面を個別に装飾するのではなく、共通の情報階層
 - `frontend/petit-ui-system.css`
 - `frontend/petit-ui-system.js`
 
-既存のLife・Focus・Tasks・Today・Remind・Chat実装とAPI契約は変更せず、最後の共通レイヤーとして適用する。
+既存のLife・Focus・Tasks・Today・Remind・Chat実装とAPI契約は維持する。
+
+`petit-corner-shell.js`は既存Shell CSSの後へ`petit-ui-polish.css`を追加する。共通トークンへGalaxy・Shellの色を接続し、旧装飾CSSに上書きされない具体的なセレクタで仕上げる。Desktopも同じCSSを読み込み、`petit-desktop-ui`で小型ウィンドウ専用の調整を適用する。
+
+- Universeの天体・WebGL・カメラ操作は既存描画を維持する。
+- Tasks / Chat / Settings / Remindersは背景・境界・文字・余白を揃える。
+- 960px未満は四隅ナビ、PC幅はサイドバーを使用する。
+- 空一覧の`colspan`セルは通常のタスク行Gridから外し、全幅で表示する。
+- 変更時はService Workerのキャッシュ世代を更新し、仕上げCSSもprecacheへ含める。
 
 ## 情報階層
 
@@ -29,7 +37,7 @@ PETITの各画面を個別に装飾するのではなく、共通の情報階層
 - 宇宙表現は背景と奥行きに限定し、情報より強くしない
 - High Taskと現在の作業を最優先にする
 - 同じ意味のボタン、カード、状態には同じ見た目を使う
-- モバイルでは主要Viewを下部ナビへ固定する
+- モバイルでは主要Viewを右上、補助機能を左下へ配置する
 - 操作領域はおおむね40〜48pxを確保する
 - ダーク／ライトを同じ構造で提供する
 - `prefers-reduced-motion`を尊重する
@@ -37,7 +45,7 @@ PETITの各画面を個別に装飾するのではなく、共通の情報階層
 
 ## Focusの立体表現
 
-Three.jsは現時点で導入されていない。新しい依存や描画ループを増やさず、既存Orbitへ次を追加する。
+旧Focus Orbitは次のCSS表現を使用する。現在のUniverse主描画はThree.js WebGLで、利用できない場合のみCSS表示へフォールバックする。
 
 - CSS `perspective`
 - ノードごとの浅いZ深度
@@ -59,6 +67,12 @@ Three.jsは現時点で導入されていない。新しい依存や描画ルー
 - コンテキストバーとCSS 3Dがある
 - タブとパネルへARIA roleを設定する
 - IME Enter保護を維持する
-- Web UIバージョンがv0.7.0である
+- Web UIバージョンとAsset Versionが一致する
 
 実ブラウザではPC幅、390x844、実iPhone PWA、ソフトウェアキーボード表示、ライト／ダーク、Focus Orbit負荷を別途確認する。
+
+Issue #296では隔離したサンプルデータのブラウザで、320px / 390px / 1440px幅、空・複数タスク、Chat、Settingsのテーマ切替、Universe表示、小型Desktop HTMLを確認。実iPhoneキーボード、配布Electron、実LLM・音声・外部サービスは未確認。
+
+## Task Detailの対象（Issue #297）
+
+Univでは選択タスク、それ以外ではサーバーのactive / paused Work Sessionの`task_id`に一致するタスクを表示する。作業なし・終了時は選択タスクへ戻さず「作業中のタスクはありません」と表示する。一時停止中は対象を保持する。自由入力の作業や取得一覧に存在しないTaskはセッションの作業名だけを表示し、別Taskの編集・完了ボタンを流用しない。ビュー切替・セッション復元・開始/終了・15秒ポーリングへ追従し、変化のないポーリングでは編集フォームを置き換えない。
