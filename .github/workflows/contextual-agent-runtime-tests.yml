@@ -3,6 +3,19 @@ name: Contextual agent runtime tests
 on:
   pull_request:
     paths:
+      - "backend/dialogue_state.py"
+      - "backend/dialogue_resolution.py"
+      - "backend/conversation_state.py"
+      - "backend/brain_runtime.py"
+      - "backend/chat.py"
+      - "backend/pending_actions.py"
+      - "backend/project_router.py"
+      - "backend/task_completion_intent.py"
+      - "tests/test_dialogue_state.py"
+      - "tests/test_dialogue_resolution.py"
+      - "tests/test_project_router_context_guard.py"
+      - "tests/test_conversation_state.py"
+      - "tests/test_brain_runtime.py"
       - "backend/agent.py"
       - "backend/agent_runtime.py"
       - "backend/agent_state.py"
@@ -48,6 +61,14 @@ jobs:
       - name: Run contextual Agent tests
         run: |
           python -m unittest \
+            tests.test_dialogue_state \
+            tests.test_dialogue_resolution \
+            tests.test_project_router_context_guard \
+            tests.test_conversation_state \
+            tests.test_brain_runtime \
+            tests.test_context_broker \
+            tests.test_personal_context_broker \
+            tests.test_task_hierarchy_idempotency \
             tests.test_contextual_agent_runtime \
             tests.test_tool_risk_policy \
             tests.test_task_parent_confirmation_guard \

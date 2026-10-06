@@ -92,7 +92,12 @@ def _parse_action(message: str) -> tuple[str, str] | None:
         if re.fullmatch(r"(?:さっきの|前の)?続き(?:を)?(?:やる|進める|再開(?:する)?)?[。．.!！?？]*", compact):
             return "続き", "続ける"
         return None
-    return _clean_target(match.group("target")), match.group("action")
+    target, action = match.group("target"), match.group("action")
+    if action == "開発":
+        return None  # Bare compound nouns (ゲーム開発 / Web開発) are not commands.
+    if _clean_target(target) not in _ACTIVE_CONTEXT_TARGETS:
+        target = re.sub(r"(?:の開発(?:を)?|(?:の)?続き(?:を)?)$", "", target)
+    return _clean_target(target), action
 
 
 def _alias_rows() -> list[dict[str, Any]]:

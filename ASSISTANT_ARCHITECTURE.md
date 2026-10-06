@@ -65,7 +65,11 @@ reassigned to another project.
 
 ### Deterministic conversation path
 
-Before ordinary chat or tool routing, PETIT checks a narrow set of project intents:
+Before project/capability routing, session-owned Dialogue State receives pending
+Task clarification replies and cancels, resolves short Task references by stable
+SQLite ID, and handles narrow explicit Task creation. Ambiguity produces a saved
+candidate selection, never an inferred write. Existing action approval remains
+owned by the confirmation API. Then PETIT checks a narrow set of project intents:
 
 1. confirmed project registration or alias command
 2. pending or explicit project completion report
@@ -254,3 +258,27 @@ one-model setup remains valid and an Agent can instead run on another PC/GPU.
 - Route every external write through scoped approval, idempotency, and audit.
 - Add evaluation cases for routing, retrieval relevance, source conflicts, and
   tool selection.
+
+## Dialogue Working Memory (#294)
+
+Conversation State now includes bounded structured `focus_stack`, `last_action`,
+and TTL-based `pending_dialogue` alongside its existing compressed prose. SQLite
+is authoritative per session; recent entity strings and Frontend history cannot
+override stable IDs. The Tool Registry observes successful Task writes in both
+direct and Agent paths. Parent/child changes preserve the child as primary focus
+and the parent as related focus. List reads and failed/partial writes do not
+replace focus. Clarification ownership precedes Project routing, so a reply such
+as `ゲーム開発` resumes child creation instead of registering `ゲーム`.
+
+Working memory does not replace Project Continuity, hierarchy validation,
+Context Broker's read-only policy, approval receipts, or long-term Memory. Bare
+compound nouns ending in `開発` are not Project actions; explicit verbs continue
+to work. State reads/updates are best effort, and the existing `history` API stays
+compatible. See [conversation-state.md](docs/conversation-state.md) for bounds,
+TTL, deterministic expressions, limitations, and acceptance checks.
+
+The four responsibility layers are Turn History, Dialogue Working Memory,
+Episodic Memory, and Knowledge/Sources. The future Backend thread should own
+messages, Tool calls/results and approval events, accepting `message + session_id`
+and building bounded history itself. This change establishes Backend-owned
+working memory without migrating or replacing existing event/approval stores.

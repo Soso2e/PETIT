@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.23.3**
+**Current Version: v0.24.0**
 
-**Last Updated: 2026-10-03**
+**Last Updated: 2026-10-06**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #294: session別SQLite Dialogue Stateにstable Task focus・last action・TTL付き確認所有権を追加。確認回答と短期照応をProject/Brainより先に解決し、成功Task Toolの共通hookで更新。9 Acceptance Criteriaと既存回帰を自動確認、隔離した実アプリ/ブラウザで「ゲーム開発→その子にWEVORA」をと再起動後の同じWEVORA期限更新を確認。Notion未同期親の既存制約を維持し、実Notion同期・配布Desktop/音声会話は未確認。Frontend history互換を維持、次はBackend threadイベント正本への段階移行。
 
 - #292: 会話履歴の復元を自動音声対象外に明示し、Wake直後や遅延復元でも過去の返答を読まず、過去user表示が現在のTTSを停止しない。新規応答/手動再生は維持。実会話は未確認。
 
@@ -194,3 +196,5 @@
 | 2026-10-03 | 19:31 | #290 | マイク準備/再生待機を上限で停止し、現行Wakeと実機受入手順を整理。 |
 
 | 2026-10-03 | 19:34 | #292 | 非同期で復元した会話履歴の自動読み上げと現在TTSの停止を防止。 |
+
+| 2026-10-06 | 06:26 | #294 | v0.24.0: Dialogue Working MemoryでTask実体参照と確認回答を継続し、開発名詞句のProject誤解析を修正。9ケース自動検証と隔離実ブラウザ会話を確認、実Notion同期は未確認。 |

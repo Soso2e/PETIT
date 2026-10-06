@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import agent_progress, agent_runtime, capability_router, config, context_broker, conversation_state, request_context
+from . import dialogue_state, agent_progress, agent_runtime, capability_router, config, context_broker, conversation_state, request_context
 from .lmstudio_client import LMStudioError, chat_completion
 from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
 
@@ -81,7 +81,7 @@ def _run_context_path(
     original_request: str,
     recent: list[dict[str, str]],
     route: dict[str, Any],
-    state_context: str,
+    state_context: str = "",
 ) -> dict[str, Any]:
     agent_progress.emit("gathering_context", "必要な情報をまとめてるよ")
     request = dict(route.get("context_request") or {})
@@ -186,7 +186,7 @@ def run(user_message: str, history: list[dict[str, str]] | None = None) -> dict[
     """Run one PETIT turn while keeping ordinary conversation at one LLM call."""
     original_request = str(user_message or "").strip()
     _request_id, session_id = request_context.current_ids()
-    state = conversation_state.load(session_id)
+    state = dialogue_state.load(session_id)
     state_context = conversation_state.render_for_model(state)
     recent = _bounded_history(history, state_present=bool(state_context))
 

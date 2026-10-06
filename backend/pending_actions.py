@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter
 
-from . import config, tools
+from . import config, request_context, tools
 from .chat_models import ActionDecision, ChatResponse, PendingAction
 
 router = APIRouter()
@@ -19,7 +19,7 @@ _pending_actions_lock = threading.Lock()
 _PENDING_ACTION_TTL_SECONDS = 600
 
 
-def register(actions: list[dict[str, Any]]) -> list[PendingAction]:
+def register(actions: list[dict[str, Any]], *, session_id: str | None = None) -> list[PendingAction]:
     now = time.monotonic()
     registered: list[PendingAction] = []
     with _pending_actions_lock:
@@ -40,6 +40,7 @@ def register(actions: list[dict[str, Any]]) -> list[PendingAction]:
                 "name": action_name,
                 "arguments": action_arguments,
                 "created_at": now,
+                "session_id": session_id or request_context.current_ids()[1],
             }
             _pending_actions[approval_id] = value
             registered.append(PendingAction(approval_id=approval_id, name=value["name"], arguments=value["arguments"]))
@@ -78,7 +79,8 @@ def decide_action(approval_id: str, decision: ActionDecision) -> ChatResponse:
     if not decision.approved:
         return ChatResponse(reply="書き込みをキャンセルしました。")
 
-    result = tools.dispatch(action["name"], action["arguments"])
+    with request_context.bind(request_id=approval_id, session_id=action.get("session_id")):
+        result = tools.dispatch(action["name"], action["arguments"])
     if _tool_result_failed(result):
         return ChatResponse(reply="", error=f"書き込みに失敗しました。{_short_tool_result(result)}")
     return ChatResponse(

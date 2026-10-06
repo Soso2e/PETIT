@@ -236,6 +236,15 @@ def dispatch(name: str, arguments: dict[str, Any] | str | None) -> str:
     except Exception as exc:  # noqa: BLE001 - surface tool errors to the model
         return f"[error] {name} failed: {exc}"
 
+    # Observe after successful handler execution, across Agent and direct paths.
+    # State failures must not change the Tool's result or execution policy.
+    try:
+        from .. import dialogue_state, request_context
+        dialogue_state.observe_tool_result(session_id=request_context.current_ids()[1],
+                                          tool=name, arguments=arguments, result=result)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("tool dialogue observation unavailable")
     if isinstance(result, str):
         return result
     return json.dumps(result, ensure_ascii=False, default=str)

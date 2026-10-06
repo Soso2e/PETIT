@@ -37,12 +37,18 @@ _MAX_ITEM = 180
 _CONTINUATION = re.compile(r"^(?:あれ|それ|これ|さっき|続き|その続き|例の|うん|そう|で、|じゃあ|ちなみに)")
 _DECISION = re.compile(r"(?:にする|でいく|採用|決め|導入|やることに|方針で|進めることに)")
 _UNRESOLVED = re.compile(r"(?:未確認|確認が必要|不明|分から|できなかった|失敗|未解決|要確認)")
-_ENTITY = re.compile(r"[「『\"`]([^」』\"`]{2,80})[」』\"`]|\b([A-Za-z][A-Za-z0-9_.#/-]{2,40})\b")
+_ENTITY = re.compile(r"[「『\"`]([^」』\"`]{2,80})[」』\"`]|(?<![A-Za-z0-9_])([A-Za-z][A-Za-z0-9_.#/-]{2,40})(?![A-Za-z0-9_])")
 
 
 def ensure_schema() -> None:
     with db.get_connection() as conn:
         conn.executescript(_SCHEMA)
+        # Additive migration: existing compact state and history remain intact.
+        conn.execute("BEGIN IMMEDIATE")
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(conversation_state)")}
+        for name, default in (("focus_stack", "[]"), ("last_action", "null"), ("pending_dialogue", "null")):
+            if name not in columns:
+                conn.execute(f"ALTER TABLE conversation_state ADD COLUMN {name} TEXT NOT NULL DEFAULT '{default}'")
 
 
 def _load_json_list(value: str | None) -> list[str]:
@@ -87,6 +93,12 @@ def load(session_id: str | None) -> dict[str, Any] | None:
         result["active_project"] = json.loads(result["active_project"]) if result.get("active_project") else None
     except json.JSONDecodeError:
         result["active_project"] = None
+    for key, default in (("focus_stack", []), ("last_action", None), ("pending_dialogue", None)):
+        try:
+            value = json.loads(result.get(key) or "null")
+        except (json.JSONDecodeError, TypeError):
+            value = None
+        result[key] = value if isinstance(value, type(default) if default is not None else dict) else default
     return result
 
 
@@ -195,6 +207,8 @@ def render_for_model(state: dict[str, Any] | None, *, max_chars: int = 1600) -> 
     if not state:
         return ""
     lines = ["[Conversation State]"]
+    if state.get("focus_stack"):
+        lines.append("task_focus: " + json.dumps(state["focus_stack"][-3:], ensure_ascii=False))
     if state.get("current_topic"):
         lines.append(f"current_topic: {state['current_topic']}")
     if state.get("user_goal"):

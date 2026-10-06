@@ -24,6 +24,8 @@
 - `backend/agent_progress.py`
 - `backend/project_router.py`
 - `backend/task_completion_intent.py`
+- `backend/dialogue_state.py`
+- `backend/dialogue_resolution.py`
 
 ---
 
@@ -58,14 +60,20 @@ flowchart TD
     response[ChatResponseを生成]
     pending[pending_actions.registerで確認待ち操作を登録]
     persist{persist が true か}
-    save[会話をSQLiteへ保存]
+    save[会話をSQLiteへ保存 / 圧縮State更新 / focusは維持]
     artifacts[要約や索引などを非同期保存]
     output[/返答 pending_actions model_route/]
 
     input --> api --> validate
     validate -->|はい| output
     validate -->|いいえ| bind --> agentEntry
-    agentEntry --> namedTask
+    dialogue{Pending Dialogue / Task照応 / 明示Taskか}
+    dialogueHandle[候補確認またはstable IDでTask Tool実行]
+    dialogueSave[Tool Registry成功hookでfocusを更新]
+    agentEntry --> dialogue
+    dialogue -->|はい| dialogueHandle --> response
+    dialogueHandle -.->|Tool成功時| dialogueSave --> response
+    dialogue -->|いいえ| namedTask
     namedTask -->|はい| namedTaskRoute --> response
     namedTask -->|いいえ| projectRoute
     projectRoute -->|はい| projectHandle --> response
@@ -307,6 +315,7 @@ flowchart TD
     error{例外や実行時エラーか}
     errorText[[error]文字列]
     result[JSONまたは文字列]
+    observe[Task成功結果だけsessionのfocusとlast_actionへ / best effort]
 
     decorator --> riskInput
     riskInput -->|はい| explicit --> register
@@ -323,7 +332,7 @@ flowchart TD
     writeRisk -->|いいえ| dispatch
     dispatch --> error
     error -->|はい| errorText
-    error -->|いいえ| result
+    error -->|いいえ| observe --> result
 ```
 
 ### リスク区分
@@ -365,7 +374,7 @@ flowchart TD
     validate{対象Toolが確認対象か}
     invalid[許可されていないTool]
     started[tool_started進捗]
-    dispatch[対象Toolをdispatch]
+    dispatch[元のsessionを束縛して対象Toolをdispatch / 成功hook]
     failed{書き込み成功か}
     failure[tool_finished失敗]
     resume[resume_after_write]
@@ -465,7 +474,8 @@ flowchart TD
     activate[active projectを切替]
     resume[checkpointや外部sourceから復帰文を生成]
 
-    input --> registration
+    guard[Dialogue State入口でTask確認回答を先に処理]
+    input --> guard --> registration
     registration -->|はい| registrationHandle
     registration -->|いいえ| completionDraft
     completionDraft -->|はい| completionHandle
@@ -698,3 +708,27 @@ Desktopのみ連続会話を開始する。Web/PWAは既存の手動入力を維
 `conversation_mode` は `text`（既定）または `voice`。request-local contextで初回Brain・Broker後・Deep Agentのsystem方針へ反映し、本文/履歴や決定論ルート・承認判定を変更しない。実LLMによる1〜3文の遵守は未確認。
 
 会話復元は `voiceSilent` として表示し、自動TTSと現在再生の停止を起こさない。新規返答は従来のTTSへ渡す。
+
+## Dialogue Stateと確認回答 (#294)
+
+```mermaid
+flowchart TD
+    U[同一sessionの入力] --> Load[SQLite Stateを読取 / 失敗はfallback]
+    Load --> Pending{10分以内のtasks所有Pending?}
+    Pending -->|候補回答| Select[保存した順序で名前 ID 前者 後者 番号を選択]
+    Select --> Claim[Pending IDを原子的に一度だけ消費]
+    Claim --> Valid[stable IDで現在のTaskとsourceを再確認]
+    Pending -->|cancel| Cancel[Pendingのみ解除]
+    Pending -->|明示した別の話題| Clear[Pending解除 / 通常入口へ]
+    Pending -->|未解決の短い回答| Ask[候補質問を維持]
+    Pending -->|なし| Focus[24時間以内のfocus / 最大8件]
+    Focus --> Unique{同一turnで一意か}
+    Unique -->|いいえ| Save[操作と候補を保存 / 短く確認]
+    Unique -->|はい| Valid
+    Valid --> Risk[既存low_risk_write / Task hierarchy検証]
+    Risk --> Tool[既存create update complete set_parent]
+    Tool --> Hook[Registry共通hook / 成功だけfocusとlast_action更新]
+    Hook --> Reply[結果を返す / 外部同期と部分失敗を区別]
+```
+
+Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧Readや失敗結果はfocusを上書きしません。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。
