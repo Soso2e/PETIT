@@ -122,6 +122,11 @@ def run(
     _sync_legacy_globals()
     recent_history = _legacy._recent_history(history)
 
+    from . import dialogue_resolution
+    dialogue_turn = dialogue_resolution.try_handle(user_message)
+    if dialogue_turn:
+        return dialogue_turn
+
     task_completion_turn = task_completion_intent.try_handle(user_message)
     if task_completion_turn:
         return task_completion_turn

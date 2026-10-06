@@ -63,7 +63,7 @@ def chat(req: ChatRequest) -> ChatResponse:
 
     used_tools = result.get("used_tools") or []
     reply = (result.get("reply") or "").strip()
-    registered_actions = pending_actions.register(result.get("pending_actions") or [])
+    registered_actions = pending_actions.register(result.get("pending_actions") or [], session_id=session_id)
     if not reply:
         return ChatResponse(
             reply="",
@@ -95,6 +95,8 @@ def chat(req: ChatRequest) -> ChatResponse:
         "brain_references": int("search_brain_notes" in tool_names),
         "memory_references": int("search_memory" in tool_names),
         "conversation_state_chars": int(model_route.get("conversation_state_chars") or 0),
+        "dialogue_state_used": bool(model_route.get("dialogue_state_used")),
+        "dialogue_resolution_source": model_route.get("dialogue_resolution_source"),
         "history_chars": int(model_route.get("history_chars") or 0),
         "history_messages": int(model_route.get("history_messages") or 0),
         "fallback": model_route.get("actual_route") == "chat_fallback",

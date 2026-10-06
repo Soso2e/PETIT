@@ -107,6 +107,11 @@ def try_handle(message: str) -> dict[str, Any] | None:
     best_score = int(active[0]["match_score"])
     best = [item for item in active if int(item["match_score"]) == best_score]
     if len(best) != 1:
+        from . import dialogue_state, request_context
+        session_id = request_context.current_ids()[1]
+        candidates = [dialogue_state.entity(item, "mentioned") for item in best[:dialogue_state.MAX_FOCUS]]
+        dialogue_state.set_pending(session_id, {"kind": "complete_task", "arguments": {}},
+                                   [item for item in candidates if item], message)
         labels = "、".join(f"「{item['title']}」" for item in best[:5])
         return {
             "reply": f"候補が複数あります。どれを完了にしますか？ {labels}",
