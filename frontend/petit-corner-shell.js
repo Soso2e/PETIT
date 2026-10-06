@@ -45,12 +45,17 @@
   const iconMarkup = (name) => `<span class="petit-corner-icon">${ICONS[name] || ""}</span>`;
 
   const ensureStylesheet = () => {
-    if (document.querySelector('link[data-petit-module="corner-shell-style"]')) return;
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = `/static/petit-corner-shell.css?v=${window.PETIT_ASSET_VERSION || "0.14.1"}`;
-    link.dataset.petitModule = "corner-shell-style";
-    document.head.appendChild(link);
+    for (const [name, marker] of [
+      ["petit-corner-shell.css", "corner-shell-style"],
+      ["petit-ui-polish.css", "ui-polish-style"],
+    ]) {
+      if (document.querySelector(`link[data-petit-module="${marker}"]`)) continue;
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `/static/${name}?v=${window.PETIT_ASSET_VERSION || "0.14.1"}`;
+      link.dataset.petitModule = marker;
+      document.head.appendChild(link);
+    }
   };
 
   const activate = (view) => {

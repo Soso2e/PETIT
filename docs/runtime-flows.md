@@ -210,6 +210,10 @@ flowchart LR
     update[一時停止 再開 続行 終了]
     report[今日または1から90日集計]
     ui[Universe Today Chat]
+    view{Task Detailの表示領域}
+    selected[Univは選択中のTask]
+    working[Univ以外はactiveまたはpausedセッションのTask]
+    no_work[作業なし または自由入力の作業名]
 
     request --> resolve
     resolve -->|失敗| ambiguous
@@ -217,6 +221,10 @@ flowchart LR
     update --> sqlite
     sqlite --> active --> ui
     sqlite --> report --> ui
+    ui --> view
+    view -->|Univ| selected
+    view -->|それ以外| working
+    working -->|Taskなし| no_work
 ```
 
 Notion Task DBへ作業時間プロパティは追加しません。SQLiteのセッションへPETIT内部`task_id`を保存し、Notionを含むタスク正本と参照で結びます。開始・一時停止・再開・終了はイベントとして残すため、日付をまたぐ休憩も暦日単位で集計できます。`start_work_session`と`update_work_session`は明示依頼時の低リスク書き込み、`get_work_status`と`get_work_report`は読み取りです。
