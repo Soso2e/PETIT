@@ -20,6 +20,8 @@ storage/   SQLite などの実行時データ（git 管理外）
 
 ## Windows / macOS Desktop（段階導入）
 
+v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeをアプリ内で開けます。接続・画面停止の復旧画面、小型会話の下書き保持、待機中断、位置保持に対応。Backendは別途起動してください。使い分けと実機受入は [Desktop完成・受入台帳](docs/desktop-readiness.md) を参照。
+
 既存PETITへ接続するElectron常駐クライアントを追加しています。小型会話UI、トレイ、グローバルショートカット、更新通知、任意の日本語ウェイク検出に対応する初期実装です。
 `desktop`で`npm ci && npm start`を実行し、接続先を設定してください。音声認識にはWhisper互換サーバーを設定します。ウェイク検出はopenWakeWordを使用し、ONNXモデルを選んで「ウェイク環境を自動設定」を実行します。Wakeまたは「音声会話」から、返答再生後に次の発話を待つ連続会話を開始できます。
 設計比較、権限、ビルド、検証範囲は [docs/desktop.md](docs/desktop.md) を参照。iPhoneは既存PWAを継続します。

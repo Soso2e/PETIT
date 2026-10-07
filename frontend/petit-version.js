@@ -1,5 +1,5 @@
-globalThis.PETIT_VERSION = "v0.24.1";
-globalThis.PETIT_ASSET_VERSION = "0.24.1";
+globalThis.PETIT_VERSION = "v0.25.0";
+globalThis.PETIT_ASSET_VERSION = "0.25.0";
 
 if (typeof window !== "undefined") {
   window.PETIT_VERSION = globalThis.PETIT_VERSION;
@@ -147,6 +147,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
     window.PetitVersionBootstrap = { start: startRuntime };
 
     const refreshServiceWorker = async () => {
+      // Electron uses live server assets; PWA cache lifecycle belongs to browsers.
+      if (window.petitWorkspace || window.petitDesktop) return;
       if (!("serviceWorker" in navigator)) return;
       try {
         const registration = await navigator.serviceWorker.register("/service-worker.js", {

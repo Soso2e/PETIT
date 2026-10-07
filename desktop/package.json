@@ -1,6 +1,6 @@
 {
   "name": "petit-desktop",
-  "version": "0.24.1",
+  "version": "0.25.0",
   "private": true,
   "description": "PETIT desktop companion",
   "author": "Soso2e",
@@ -26,7 +26,10 @@
       "*.cjs",
       "setup.html",
       "setup.js",
-      "setup.css"
+      "setup.css",
+      "recovery.html",
+      "recovery.js",
+      "workspace.css"
     ],
     "extraResources": [
       {

@@ -6,7 +6,8 @@ const path = require('node:path');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { pathToFileURL } = require('node:url');
-const { serviceUrl, isOverlay, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
+const { serviceUrl, isOverlay, isWorkspace, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
+const { windowState } = require('./window-state.cjs');
 const { transcribe } = require('./transcribe.cjs');
 const { wakeError } = require('./wake-setup.cjs');
 const { prepareWakeEnvironment } = require('./wake-auto-setup.cjs');
@@ -18,7 +19,9 @@ let pendingActivation = false, sttRequest = null, updateBusy = false, lastUpdate
 let generation = 0;
 let wakeReady = false, wakeTimer;
 let sleeping = false, locked = false;
+let workspace, recoveryWindow, recoveryState, geometry;
 const settingsUrl = pathToFileURL(path.join(__dirname, 'setup.html')).href;
+const recoveryUrl = pathToFileURL(path.join(__dirname, 'recovery.html')).href;
 const defaults = { serverUrl: 'http://127.0.0.1:8000', sttUrl: '', sttModel: 'whisper-1',
   wakeEnabled: false, modelPath: '', backbonePath: '', wakePythonPath: '',
   wakeThreshold: 0.45, login: false, updates: true };
@@ -60,7 +63,7 @@ function stopWake() {
   refreshTray();
 }
 async function startWake() {
-  if (!config.wakeEnabled || wakeFailed || suspended || quitting || overlay?.isVisible() || settingsWindow?.isVisible() || wakeProcess) return;
+  if (!config.wakeEnabled || wakeFailed || suspended || quitting || overlay?.isVisible() || settingsWindow?.isVisible() || recoveryWindow?.isVisible() || wakeProcess) return;
   if (!config.modelPath || !config.backbonePath || !config.sttUrl) return;
   const token = ++generation;
   if (process.platform === 'darwin' && !(await systemPreferences.askForMediaAccess('microphone'))) {
@@ -70,7 +73,7 @@ async function startWake() {
     refreshTray();
     return;
   }
-  if (token !== generation || suspended || quitting || overlay?.isVisible() || settingsWindow?.isVisible()) return;
+  if (token !== generation || suspended || quitting || overlay?.isVisible() || settingsWindow?.isVisible() || recoveryWindow?.isVisible()) return;
   const child = utilityProcess.fork(path.join(__dirname, 'wake-worker.cjs'), [], { serviceName: 'PETIT Wake Word', stdio: 'ignore' });
   wakeProcess = child;
   const fail = (code) => {
@@ -101,6 +104,7 @@ function refreshTray() {
     { label: wakeLabel, enabled: false },
     { label: shortcutOK ? '呼び出し: Ctrl / ⌘ + Shift + Space' : 'ショートカット登録失敗・トレイで呼び出せます', enabled: false },
     { type: 'separator' },
+    { label: 'ワークスペースを開く', click: () => showWorkspace() },
     { label: 'Web版を開く', click: () => void shell.openExternal(config.serverUrl) },
     { label: '設定', click: () => showSettings() },
     { label: 'アップデートを確認', click: () => void checkUpdates(true) },
@@ -113,6 +117,70 @@ function lockNavigation(win, allowed) {
   win.webContents.on('will-navigate', (event, url) => { if (!allowed(url)) event.preventDefault(); });
   win.webContents.on('will-redirect', (event, url) => { if (!allowed(url)) event.preventDefault(); });
   win.webContents.on('will-attach-webview', (event) => event.preventDefault());
+}
+function clientBounds(kind, width, height) {
+  const primary = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const areas = [primary, ...screen.getAllDisplays().filter((display) => display.id !== primary.id)].map((display) => display.workArea);
+  return geometry.get(kind, { width, height }, areas);
+}
+function rememberWindow(win, kind) {
+  let timer;
+  const save = () => { if (!win.isDestroyed() && !win.isMinimized() && !win.isMaximized()) geometry.remember(kind, win.getBounds()); };
+  const schedule = () => { clearTimeout(timer); timer = setTimeout(save, 300); };
+  win.on('move', schedule); win.on('resize', schedule);
+  win.on('close', save); win.on('closed', () => clearTimeout(timer));
+}
+function showRecovery(target, reason) {
+  if (quitting) return;
+  stopWake(); cancelStt();
+  recoveryState = { target, reason, serverUrl: config.serverUrl };
+  if (recoveryWindow && !recoveryWindow.isDestroyed()) recoveryWindow.destroy();
+  const win = recoveryWindow = new BrowserWindow({ width: 580, height: 440, title: 'PETIT 接続と復旧',
+    backgroundColor: '#101218', webPreferences: { preload: path.join(__dirname, 'recovery-preload.cjs'),
+      sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  lockNavigation(win, (url) => url === recoveryUrl);
+  win.on('closed', () => { if (recoveryWindow === win) recoveryWindow = null; void startWake(); });
+  void win.loadURL(recoveryUrl);
+}
+function watchClient(win, kind) {
+  let readyTimer;
+  const failed = (reason = 'connection') => {
+    if (quitting || win.isDestroyed() || (kind === 'overlay' ? overlay : workspace) !== win) return;
+    if (kind === 'overlay') { overlay = null; overlayReady = false; pendingActivation = false; }
+    else workspace = null;
+    clearTimeout(readyTimer); win.destroy(); showRecovery(kind, reason);
+  };
+  win.webContents.on('render-process-gone', () => failed('renderer'));
+  win.webContents.on('did-fail-load', (_event, code, _description, _url, mainFrame) => {
+    if (mainFrame && code !== -3) failed();
+  });
+  win.webContents.on('did-start-loading', () => { win.petitReady = false; });
+  win.webContents.on('did-finish-load', () => {
+    clearTimeout(readyTimer); readyTimer = setTimeout(() => { if (!win.petitReady) failed(); }, 8000);
+  });
+  win.on('closed', () => clearTimeout(readyTimer));
+  return failed;
+}
+function showWorkspace() {
+  if (suspended || quitting) return;
+  hideOverlay();
+  if (!workspace || workspace.isDestroyed()) {
+    const win = workspace = new BrowserWindow({ ...clientBounds('workspace', 1180, 800), minWidth: 700, minHeight: 480,
+      title: 'PETIT ワークスペース', backgroundColor: '#101218',
+      webPreferences: { preload: path.join(__dirname, 'workspace-preload.cjs'), sandbox: true,
+        contextIsolation: true, nodeIntegration: false } });
+    rememberWindow(win, 'workspace');
+    lockNavigation(win, (url) => isWorkspace(url, config.serverUrl));
+    win.on('close', (event) => { if (!quitting) { event.preventDefault(); win.hide(); } });
+    win.on('closed', () => { if (workspace === win) workspace = null; });
+    win.webContents.on('did-finish-load', () => {
+      void win.webContents.insertCSS(fs.readFileSync(path.join(__dirname, 'workspace.css'), 'utf8'));
+    });
+    const failed = watchClient(win, 'workspace');
+    win.loadURL(`${config.serverUrl}/static/universe.html`).catch(() => failed());
+  }
+  if (workspace.isMinimized()) workspace.restore();
+  workspace.show(); workspace.focus();
 }
 function showSettings() {
   stopWake();
@@ -130,33 +198,18 @@ function showOverlay(voice = false) {
   pendingActivation ||= voice;
   if (!overlay || overlay.isDestroyed()) {
     overlayReady = false;
-    overlay = new BrowserWindow({ width: 430, height: 520, minWidth: 340, minHeight: 400,
+    overlay = new BrowserWindow({ ...clientBounds('overlay', 430, 520), minWidth: 340, minHeight: 400,
       show: false, frame: false, alwaysOnTop: true, resizable: true, backgroundColor: '#0a1020',
       title: 'PETIT', skipTaskbar: false,
       webPreferences: { preload: path.join(__dirname, 'preload.cjs'), sandbox: true, contextIsolation: true,
         nodeIntegration: false, spellcheck: false, backgroundThrottling: true } });
     lockNavigation(overlay, (url) => isOverlay(url, config.serverUrl));
+    rememberWindow(overlay, 'overlay');
     overlay.on('close', (event) => { if (!quitting) { event.preventDefault(); hideOverlay(); } });
     const win = overlay;
-    let readyTimer;
-    const connectionFailed = () => {
-      if (quitting || overlay !== win || win.isDestroyed()) return;
-      clearTimeout(readyTimer); cancelStt();
-      win.destroy(); overlay = null; pendingActivation = false;
-      showSettings();
-      void dialog.showMessageBox(settingsWindow, { type: 'warning', message: 'PETITサーバーへ接続できません',
-        detail: 'サーバーを起動し、接続URLを確認してください。小型画面を含むv0.20.0以降のPETITサーバーが必要です。' });
-    };
-    win.webContents.on('render-process-gone', connectionFailed);
-    win.webContents.on('did-finish-load', () => {
-      readyTimer = setTimeout(() => { if (!overlayReady) connectionFailed(); }, 8000);
-    });
-    win.on('closed', () => clearTimeout(readyTimer));
-    win.loadURL(`${config.serverUrl}/static/desktop/index.html`).catch(connectionFailed);
+    const connectionFailed = watchClient(win, 'overlay');
+    win.loadURL(`${config.serverUrl}/static/desktop/index.html`).catch(() => connectionFailed());
   }
-  const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  const [width, height] = overlay.getSize();
-  overlay.setPosition(Math.round(workArea.x + (workArea.width - width) / 2), Math.max(workArea.y, Math.round(workArea.y + workArea.height - height - 32)));
   overlay.show(); overlay.focus();
   if (overlayReady) {
     overlay.webContents.send('desktop:activate', { voice: pendingActivation });
@@ -170,9 +223,12 @@ function hideOverlay(resume = true) {
   if (resume) void startWake();
 }
 function assertSender(event, kind) {
-  const win = kind === 'settings' ? settingsWindow : overlay;
+  const win = kind === 'settings' ? settingsWindow : kind === 'workspace' ? workspace : kind === 'recovery' ? recoveryWindow : overlay;
+  const allowed = kind === 'settings' ? event.senderFrame?.url === settingsUrl :
+    kind === 'workspace' ? isWorkspace(event.senderFrame?.url, config.serverUrl) :
+    kind === 'recovery' ? event.senderFrame?.url === recoveryUrl : isOverlay(event.senderFrame?.url, config.serverUrl);
   if (!win || event.sender !== win.webContents || event.senderFrame !== event.sender.mainFrame ||
-      !(kind === 'settings' ? event.senderFrame.url === settingsUrl : isOverlay(event.senderFrame.url, config.serverUrl)))
+      !allowed)
     throw new Error('許可されていない呼び出しです。');
 }
 function installerAsset(release) {
@@ -241,10 +297,23 @@ function installIpc() {
   const on = (channel, kind, handler) => ipcMain.handle(channel, (event, ...args) => { assertSender(event, kind); return handler(...args); });
   on('desktop:hide', 'overlay', () => hideOverlay());
   on('desktop:open-web', 'overlay', () => shell.openExternal(config.serverUrl));
+  on('desktop:workspace', 'overlay', () => showWorkspace());
+  on('workspace:chat', 'workspace', () => showOverlay());
+  on('workspace:voice', 'workspace', () => showOverlay(true));
+  on('workspace:settings', 'workspace', () => showSettings());
+  on('workspace:ready', 'workspace', () => { workspace.petitReady = true; });
+  on('recovery:read', 'recovery', () => recoveryState);
+  on('recovery:settings', 'recovery', () => { recoveryWindow.close(); showSettings(); });
+  on('recovery:retry', 'recovery', () => {
+    const target = recoveryState.target;
+    recoveryWindow.close();
+    if (target === 'workspace') showWorkspace(); else showOverlay();
+  });
   on('desktop:settings', 'overlay', () => showSettings());
   on('desktop:cancel', 'overlay', () => cancelStt());
   on('desktop:ready', 'overlay', () => {
     overlayReady = true;
+    overlay.petitReady = true;
     const voice = pendingActivation; pendingActivation = false;
     return { voice, sttConfigured: Boolean(config.sttUrl), version: app.getVersion() };
   });
@@ -300,9 +369,11 @@ function installIpc() {
     if (next.backbonePath && (!path.isAbsolute(next.backbonePath) || !fs.statSync(next.backbonePath).isDirectory())) throw new Error('特徴抽出モデルのフォルダを選択してください。');
     if (next.wakeEnabled && (!next.modelPath || !next.backbonePath || !next.sttUrl)) throw new Error('音声待機にはSTT URL・ONNXモデル・backboneフォルダが必要です。');
     if (next.login && !app.isPackaged) throw new Error('ログイン時の起動はインストール版で設定してください。');
+    const changedServer = next.serverUrl !== config.serverUrl;
     persistConfig(next);
     stopWake(); cancelStt(); wakeFailed = false; lastWakeError = '';
     if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: config.login, args: ['--background'] });
+    if (workspace && !workspace.isDestroyed() && changedServer) workspace.destroy();
     if (overlay && !overlay.isDestroyed()) overlay.destroy(); overlay = null;
     settingsWindow.close(); showOverlay(false); refreshTray();
     return true;
@@ -316,6 +387,7 @@ else {
   app.on('before-quit', () => { quitting = true; cancelWakeSetup(); stopWake(); cancelStt(); globalShortcut.unregisterAll(); });
   app.whenReady().then(() => {
     configFile = path.join(app.getPath('userData'), 'desktop.json'); config = readConfig();
+    geometry = windowState(path.join(app.getPath('userData'), 'windows.json'));
     session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
       callback(Boolean(contents === overlay?.webContents && overlay.isVisible() && isOverlay(contents.getURL(), config.serverUrl) &&
         details.isMainFrame && permission === 'media' && details.mediaTypes?.length === 1 && details.mediaTypes[0] === 'audio'));

@@ -1,4 +1,4 @@
-# PETIT UI System v0.24.1
+# PETIT UI System v0.25.0
 
 ## 目的
 
@@ -72,6 +72,10 @@ PETITの各画面を個別に装飾するのではなく、共通の情報階層
 実ブラウザではPC幅、390x844、実iPhone PWA、ソフトウェアキーボード表示、ライト／ダーク、Focus Orbit負荷を別途確認する。
 
 Issue #296では隔離したサンプルデータのブラウザで、320px / 390px / 1440px幅、空・複数タスク、Chat、Settingsのテーマ切替、Universe表示、小型Desktop HTMLを確認。実iPhoneキーボード、配布Electron、実LLM・音声・外部サービスは未確認。
+
+## Desktopの入口（Issue #299）
+
+小型会話は素早い呼び出し、アプリ内ワークスペースはTasks/Universe等の継続作業に使う。作業画面は既存のテーマ・共通UIを再利用し、同梱toolbarで小型会話とDesktop設定へ戻る。接続失敗とrenderer停止は同梱復旧画面で区別する。小型会話の下書き/未確認応答を状態文で示し、待機中断を操作取消しと表現しない。
 
 ## Task Detailの対象（Issue #297）
 

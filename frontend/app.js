@@ -17,6 +17,30 @@ let modelRoutingSnapshot = null;
 let activeRequestId = null;
 let agentOperationActive = false;
 let jobsPollInFlight = false;
+const desktopChatState = window.PetitDesktopChatState;
+const draftStateEl = document.getElementById('draft-state');
+const waitStopEl = document.getElementById('chat-wait-stop');
+let healthInFlight = false;
+let desktopBackground = false;
+async function chatJson(url, options) {
+  if (desktopChatState) return desktopChatState.request(url, options);
+  const response = await fetch(url, options);
+  return response.json();
+}
+function saveDraft(pending = false, text = inputEl.value) {
+  if (!desktopChatState) return;
+  desktopChatState.save(text, pending);
+  if (draftStateEl) draftStateEl.textContent = text && !pending ? '下書きをこの端末に保存' : '';
+}
+if (desktopChatState) {
+  const saved = desktopChatState.read();
+  if (saved?.text) {
+    inputEl.value = saved.text;
+    if (draftStateEl) draftStateEl.textContent = saved.pending ? '応答が未確認です。履歴と操作結果を確認してから送信してください。' : '下書きを復元しました';
+  }
+  inputEl.addEventListener('input', () => saveDraft());
+  if (waitStopEl) waitStopEl.onclick = () => desktopChatState.stop();
+}
 
 function freshnessLabel(status, label) {
   if (!status || !status.configured) return `${label}: 未使用`;
@@ -259,11 +283,11 @@ async function acknowledgeJobs(ids) {
 }
 
 async function pollJobs() {
+  if (desktopChatState && (desktopBackground || document.hidden)) return;
   if (jobsPollInFlight) return;
   jobsPollInFlight = true;
   try {
-    const res = await fetch(`/api/jobs?limit=20&session_id=${encodeURIComponent(sessionId)}`);
-    const data = await res.json();
+    const data = await chatJson(`/api/jobs?limit=20&session_id=${encodeURIComponent(sessionId)}`);
     const delivered = [];
     for (const job of data.jobs || []) {
       if (job.type === "agent_progress") {
@@ -299,9 +323,10 @@ async function pollJobs() {
 }
 
 async function checkHealth() {
+  if (healthInFlight || (desktopChatState && (desktopBackground || document.hidden))) return;
+  healthInFlight = true;
   try {
-    const res = await fetch("/api/health", { cache: "no-store" });
-    const data = await res.json();
+    const data = await chatJson("/api/health", { cache: "no-store" });
     const chat = data.chat_model || {};
     const agent = data.agent_model || {};
     if (chat.server_ok && agent.server_ok) {
@@ -317,7 +342,7 @@ async function checkHealth() {
   } catch (e) {
     statusEl.textContent = "サーバー未接続";
     statusEl.className = "status status--bad";
-  }
+  } finally { healthInFlight = false; }
 }
 
 async function sendMessage(text) {
@@ -329,15 +354,16 @@ async function sendMessage(text) {
 
   setTyping(true);
   sendEl.disabled = true;
+  if (waitStopEl) waitStopEl.hidden = false;
+  if (desktopChatState) saveDraft(true, text);
 
   try {
-    const res = await fetch("/api/chat", {
+    const data = await chatJson("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text, history, request_id: requestId, session_id: sessionId,
         conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }),
     });
-    const data = await res.json();
     setTyping(false);
 
     if (data.request_id !== requestId) {
@@ -345,7 +371,9 @@ async function sendMessage(text) {
     }
     if (data.error) {
       addMessage("assistant", "⚠️ " + data.error, { error: true });
+      if (desktopChatState && !inputEl.value) { inputEl.value = text; saveDraft(); }
     } else {
+      desktopChatState?.complete(text);
       voiceResult = data;
       history.push({ role: "user", content: text });
       if (data.reply) {
@@ -355,10 +383,17 @@ async function sendMessage(text) {
     }
   } catch (e) {
     setTyping(false);
-    addMessage("assistant", "⚠️ 通信に失敗しました: " + e.message, { error: true });
+    const warning = desktopChatState ? '待機を終了しました。サーバー側で処理が続いている可能性があります。履歴と操作結果を確認してから送信してください。' : '通信に失敗しました: ' + e.message;
+    addMessage("assistant", "⚠️ " + warning, { error: true });
+    if (desktopChatState && !inputEl.value) {
+      inputEl.value = text;
+      saveDraft(true, text);
+      if (draftStateEl) draftStateEl.textContent = '入力を復元しました。実行結果は未確認です。';
+    }
   } finally {
     if (activeRequestId === requestId) activeRequestId = null;
     sendEl.disabled = false;
+    if (waitStopEl) waitStopEl.hidden = true;
     window.PetitVoiceConversation?.finishChat(voiceTurn, voiceResult);
     inputEl.focus();
   }
@@ -366,6 +401,7 @@ async function sendMessage(text) {
 
 formEl.addEventListener("submit", (e) => {
   e.preventDefault();
+  if (sendEl.disabled) return;
   const text = inputEl.value.trim();
   if (!text) return;
   inputEl.value = "";
@@ -411,8 +447,7 @@ function removeStaticGreeting() {
 
 async function restoreHistory() {
   try {
-    const res = await fetch(`/api/conversations?limit=10&session_id=${encodeURIComponent(sessionId)}`);
-    const data = await res.json();
+    const data = await chatJson(`/api/conversations?limit=10&session_id=${encodeURIComponent(sessionId)}`);
     const rows = data.conversations || [];
     if (!rows.length) return false;
     removeStaticGreeting();
@@ -428,6 +463,10 @@ async function restoreHistory() {
     }
     return true;
   } catch (e) {
+    if (desktopChatState) {
+      addMessage('assistant', '会話履歴を取得できませんでした。接続を確認して画面を開き直してください。', { error: true, silent: true });
+      return null;
+    }
     return false;
   }
 }
@@ -435,8 +474,7 @@ async function restoreHistory() {
 // On a new session, let PETIT speak first. Existing sessions restore SQLite history.
 async function loadOpener() {
   try {
-    const res = await fetch(`/api/proactive?session_id=${encodeURIComponent(sessionId)}`);
-    const data = await res.json();
+    const data = await chatJson(`/api/proactive?session_id=${encodeURIComponent(sessionId)}`);
     if (data && data.message) {
       const greeting = document.getElementById("greeting");
       const bubble = greeting && greeting.querySelector(".bubble");
@@ -450,6 +488,7 @@ async function loadOpener() {
 
 async function restoreConversationOrOpener() {
   const restored = await restoreHistory();
+  if (restored === null) return;
   if (!restored) await loadOpener();
 }
 
@@ -469,4 +508,13 @@ function initialize() {
 }
 
 window.setInterval(checkHealth, 60000);
+if (desktopChatState) document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { void checkHealth(); void pollJobs(); }
+});
+if (desktopChatState) {
+  document.addEventListener('petit:desktop-deactivate', () => { desktopBackground = true; });
+  document.addEventListener('petit:desktop-activate', () => {
+    desktopBackground = false; void checkHealth(); void pollJobs();
+  });
+}
 initialize();

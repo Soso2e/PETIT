@@ -5,16 +5,15 @@
   const date = document.getElementById('desktop-date');
   const syncDate = () => {
     const now = new Date();
-    const parts = new Intl.DateTimeFormat('ja-JP', {
+    date.textContent = new Intl.DateTimeFormat('ja-JP', {
       month: 'long', day: 'numeric', weekday: 'long'
-    }).formatToParts(now);
-    const value = (type) => parts.find((part) => part.type === type)?.value || '';
-    date.textContent = `${value('month')}${value('day')} ${value('weekday')}`;
+    }).format(now);
   };
   document.getElementById('chat-form').addEventListener('submit', (event) => {
     if (document.getElementById('send').disabled) { event.preventDefault(); event.stopImmediatePropagation(); }
   }, true);
   function activate({ voice = false } = {}) {
+    document.dispatchEvent(new Event('petit:desktop-activate'));
     syncDate();
     document.body.classList.remove('appearing');
     requestAnimationFrame(() => document.body.classList.add('appearing'));
@@ -25,6 +24,7 @@
   bridge.onHide(() => document.dispatchEvent(new Event('petit:desktop-deactivate')));
   document.getElementById('hide').onclick = () => bridge.hide();
   document.getElementById('open-web').onclick = () => bridge.openWeb();
+  document.getElementById('open-workspace').onclick = () => bridge.workspace();
   document.getElementById('desktop-settings').onclick = () => bridge.settings();
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !event.isComposing) void bridge.hide(); });
   new MutationObserver(() => { document.body.dataset.listening = String(mic.classList.contains('mic--listening')); })
