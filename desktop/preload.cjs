@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('petitDesktop', {
   hide: () => ipcRenderer.invoke('desktop:hide'),
   openWeb: () => ipcRenderer.invoke('desktop:open-web'),
+  workspace: () => ipcRenderer.invoke('desktop:workspace'),
   settings: () => ipcRenderer.invoke('desktop:settings'),
   transcribe: (wav) => ipcRenderer.invoke('desktop:transcribe', wav),
   cancel: () => ipcRenderer.invoke('desktop:cancel'),

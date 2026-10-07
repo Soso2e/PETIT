@@ -1,6 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { serviceUrl, isOverlay, isNewer, desktopRelease, RELEASES_URL } = require('../policy.cjs');
+const { serviceUrl, isOverlay, isWorkspace, isNewer, desktopRelease, RELEASES_URL } = require('../policy.cjs');
+test('workspace navigation stays on known same-origin pages', () => {
+  const origin = 'https://petit.example';
+  for (const url of [origin + '/', origin + '/static/universe.html', origin + '/static/universe.html#tasks']) assert.ok(isWorkspace(url, origin));
+  for (const url of [origin + '/api/chat', origin + '/static/desktop/index.html', origin + '/?token=x', 'https://evil.example/', 'file:///tmp/x', 'invalid', 'https://user@petit.example/']) assert.equal(isWorkspace(url, origin), false);
+});
 test('server trust: HTTPS and loopback only, never credentials/path/query', () => {
   for (const value of ['http://127.0.0.1:8000', 'http://localhost:8000', 'http://[::1]:8000', 'https://petit.example'])
     assert.equal(serviceUrl(value, { originOnly: true }), value);

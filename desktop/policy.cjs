@@ -12,6 +12,13 @@ function serviceUrl(value, { originOnly = false } = {}) {
 function isOverlay(url, serverUrl) {
   return url === `${serverUrl}/static/desktop/index.html`;
 }
+function isWorkspace(value, serverUrl) {
+  try {
+    const url = new URL(value);
+    return url.origin === serverUrl && !url.username && !url.password && !url.search &&
+      ['/', '/static/universe.html'].includes(url.pathname);
+  } catch { return false; }
+}
 function isNewer(candidate, current) {
   const parse = (v) => /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(v)?.slice(1).map(Number);
   const a = parse(candidate), b = parse(current);
@@ -27,4 +34,4 @@ function desktopRelease(releases, current, platform, arch) {
     r.assets?.some((a) => a.name === `PETIT-${r.tag_name.replace(/^v/, '')}-${suffix}`))
     .sort((a, b) => isNewer(a.tag_name, b.tag_name) ? -1 : 1)[0] || null;
 }
-module.exports = { serviceUrl, isOverlay, isNewer, desktopRelease, RELEASES_URL, RELEASES_API };
+module.exports = { serviceUrl, isOverlay, isWorkspace, isNewer, desktopRelease, RELEASES_URL, RELEASES_API };

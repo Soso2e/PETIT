@@ -49,7 +49,7 @@ const server = http.createServer(async (request, response) => {
   fs.writeFileSync(bootstrap, `require('electron').app.setPath('userData', ${JSON.stringify(profile)}); require(${JSON.stringify(path.join(root, 'desktop/main.cjs'))});`);
   let instance;
   try {
-    fs.writeFileSync(path.join(profile, 'package.json'), JSON.stringify({ name: 'petit-desktop-smoke', version: '0.22.0', main: 'bootstrap.cjs' }));
+    fs.writeFileSync(path.join(profile, 'package.json'), JSON.stringify({ name: 'petit-desktop-smoke', version: require('../package.json').version, main: 'bootstrap.cjs' }));
     instance = await electron.launch({ args: [profile], cwd: path.join(root, 'desktop'), timeout: 30000 });
     const wakeWorker = path.join(root, 'desktop/wake-worker.cjs');
     assert.equal(await instance.evaluate(({ utilityProcess }, file) => new Promise((resolve) => {
@@ -111,10 +111,24 @@ const server = http.createServer(async (request, response) => {
     await page.screenshot({ path: screenshot });
     await page.locator('#hide').click();
     assert.equal(await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), false);
+    await page.waitForTimeout(300);
+    const hiddenReads = calls.filter(call => ['/api/jobs', '/api/health'].includes(call.path)).length;
+    await page.waitForTimeout(2200);
+    assert.equal(calls.filter(call => ['/api/jobs', '/api/health'].includes(call.path)).length, hiddenReads, 'hidden quick chat pauses polling');
     await instance.evaluate(({ app }) => app.emit('activate'));
     assert.equal(await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
     // Same persisted window, no conversation reset on reactivation.
     assert.ok(await page.getByText('予定を追加しました。', { exact: true }).isVisible());
+    // A failed write must restore input without automatically sending it twice.
+    const beforeFailure = calls.filter(call => call.path === '/api/chat').length;
+    await page.route('**/api/chat', route => route.fulfill({ status: 503, json: { error: 'fixture offline' } }));
+    await page.locator('#input').fill('失敗時に保持する文章');
+    await page.locator('#send').click();
+    await page.waitForFunction(() => !document.getElementById('send').disabled);
+    assert.equal(await page.locator('#input').inputValue(), '失敗時に保持する文章');
+    assert.equal(calls.filter(call => call.path === '/api/chat').length, beforeFailure);
+    await page.unroute('**/api/chat');
+    await page.locator('#input').fill('設定変更をまたぐ下書き');
     const settingsOpened = instance.waitForEvent('window');
     await page.locator('#desktop-settings').click();
     const settings = await settingsOpened;
@@ -127,6 +141,8 @@ const server = http.createServer(async (request, response) => {
     const voicePage = await voiceOpened;
     await voicePage.waitForURL(`${origin}/static/desktop/index.html`);
     await voicePage.locator('#mic').waitFor();
+    assert.equal(await voicePage.locator('#input').inputValue(), '設定変更をまたぐ下書き');
+    await voicePage.locator('#input').fill('');
     // A generated tone replaces the microphone; the actual AudioWorklet, WAV upload,
     // transcription adapter, shared voice.js and confirmation UI still execute.
     await voicePage.evaluate(() => {
@@ -197,9 +213,44 @@ const server = http.createServer(async (request, response) => {
     assert.equal(await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), false);
     await instance.evaluate(({ powerMonitor, app }) => { powerMonitor.emit('unlock-screen'); app.emit('activate'); });
     assert.equal(await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
-    await instance.evaluate(({ dialog }) => { dialog.showMessageBox = async () => ({ response: 0 }); });
+    // Workspace reuses the real Universe UI but has a narrow, separate IPC bridge.
+    const workspaceOpened = instance.waitForEvent('window');
+    await voicePage.locator('#open-workspace').click();
+    const workspace = await workspaceOpened;
+    await workspace.waitForURL(`${origin}/static/universe.html`);
+    await workspace.locator('#petit-desktop-toolbar').waitFor();
+    assert.equal(await workspace.evaluate(() => typeof require), 'undefined');
+    assert.equal(await workspace.evaluate(() => typeof window.petitDesktop), 'undefined');
+    assert.equal(await workspace.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length), 0);
+    assert.equal(await instance.evaluate(async ({ ipcMain, BrowserWindow }) => {
+      const web = BrowserWindow.getAllWindows().find(win => win.webContents.getURL().endsWith('/static/universe.html'));
+      try { await ipcMain._invokeHandlers.get('desktop:transcribe')({ sender: web.webContents, senderFrame: web.webContents.mainFrame }); return false; }
+      catch { return true; }
+    }), true);
+    await workspace.getByRole('button', { name: '小型会話', exact: true }).click();
+    await workspace.waitForTimeout(1000);
+    assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), true, 'workspace labels remain visible at laptop width');
+    await workspace.locator('.petit-area-rail__nav button').nth(1).click();
+    await workspace.waitForTimeout(350);
+    await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-workspace.png') });
+    await workspace.close();
+    // Renderer crash is distinguished from an unavailable server; draft survives.
+    await voicePage.locator('#input').fill('クラッシュをまたぐ下書き');
+    const crashRecoveryOpened = instance.waitForEvent('window');
+    await instance.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows().find(win => win.webContents.getURL().includes('/static/desktop/index.html')).webContents.forcefullyCrashRenderer();
+    });
+    const crashRecovery = await crashRecoveryOpened;
+    await crashRecovery.waitForURL(/recovery.html$/);
+    await crashRecovery.getByText('画面を再び開けます', { exact: true }).waitFor();
+    assert.equal(await crashRecovery.evaluate(() => typeof window.petitDesktop), 'undefined');
+    const resumedOpened = instance.waitForEvent('window');
+    await crashRecovery.locator('#retry').click();
+    const resumed = await resumedOpened;
+    await resumed.waitForURL(`${origin}/static/desktop/index.html`);
+    assert.equal(await resumed.locator('#input').inputValue(), 'クラッシュをまたぐ下書き');
     const reconnectSettingsOpened = instance.waitForEvent('window');
-    await voicePage.locator('#desktop-settings').click();
+    await resumed.locator('#desktop-settings').click();
     const reconnectSettings = await reconnectSettingsOpened;
     await reconnectSettings.waitForURL(/setup.html$/);
     serveOverlay = false;
@@ -207,10 +258,19 @@ const server = http.createServer(async (request, response) => {
     await reconnectSettings.locator('button[type=submit]').click();
     const incompatibleOverlay = await incompatibleOverlayOpened;
     const recovery = await instance.waitForEvent('window', { timeout: 15000, predicate: (candidate) => candidate !== incompatibleOverlay });
-    await recovery.waitForURL(/setup.html$/);
-    assert.equal(await recovery.locator('#serverUrl').inputValue(), origin);
+    await recovery.waitForURL(/recovery.html$/);
+    await recovery.getByText('PETITに接続できません', { exact: true }).waitFor();
+    assert.equal(await recovery.locator('#server').textContent(), origin);
+    await recovery.waitForTimeout(350);
+    await recovery.screenshot({ path: path.join(root, 'desktop/dist/smoke-recovery.png') });
+    serveOverlay = true;
+    const recoveredOpened = instance.waitForEvent('window');
+    await recovery.locator('#retry').click();
+    const recovered = await recoveredOpened;
+    await recovered.waitForURL(`${origin}/static/desktop/index.html`);
+    assert.equal(await recovered.locator('#input').inputValue(), 'クラッシュをまたぐ下書き');
     assert.deepEqual(errors, []);
-    console.log('PASS: actual Electron setup → shared chat → approval → hide/reopen → settings; synthetic voice/WAV/STT + voice approval; isolated bridge, no PWA registration.');
+    console.log('PASS: isolated Electron chat/approval/synthetic voice, drafts/settings/crash/reconnect, workspace IPC isolation, no PWA registration.');
     console.log(`Screenshot: ${screenshot}`);
   } finally {
     if (instance) await instance.close();

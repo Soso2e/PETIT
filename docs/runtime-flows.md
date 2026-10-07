@@ -416,10 +416,13 @@ flowchart LR
     emit[agent_progress.emit]
     jobs[(SQLite jobs)]
     api[既存Jobs API]
-    ui[Web UIの一時ステータス]
+    visible{Desktop小型画面は表示中?}
+    ui[Web / Desktop UIの一時ステータス]
     history[通常会話履歴]
 
-    runtime --> events --> emit --> jobs --> api --> ui
+    runtime --> events --> emit --> jobs --> api
+    visible -->|表示中・Webは従来どおり| api --> ui
+    visible -->|非表示| skip[Desktop取得休止・再表示で即時取得]
     ui -.->|進捗は履歴へ保存しない| history
 ```
 
@@ -618,10 +621,16 @@ Desktopは既存の会話・承認・TTSを使用する。iPhone PWA / Vocal Sho
 ```mermaid
 flowchart TD
     Tray[トレイ / グローバルショートカット] --> Main[Electron Main]
-    Mic[任意のローカル待機音声] --> Wake[Porcupine utility process]
+    Mic[任意のローカル待機音声] --> Wake[openWakeWord utility process / Python]
     Wake -->|検出のみ・PCMは送信しない| Main
     Main --> Stop[待機マイク停止]
     Stop --> Overlay[小型UI表示]
+    Main -->|画面取得失敗 / renderer停止| Recovery[同梱復旧画面・原因を区別]
+    Recovery -->|再接続・自動再送なし| Main
+    Recovery -->|接続設定| Settings[同梱Desktop設定]
+    Overlay -->|作業画面| Workspace[アプリ内Universe・限定IPC・SW登録なし]
+    Workspace -->|小型会話| Main
+    Workspace -->|Desktop設定| Settings
     Overlay -->|STT設定済み・音声開始| Capture[AudioWorklet録音 / 発話終了判定]
     Capture --> Validate[IPC送信元・WAV・同時実行上限検証]
     Validate --> STT[明示設定されたWhisper互換STT]
@@ -630,6 +639,9 @@ flowchart TD
     Voice -->|通常発話| ChatUI
     Voice -->|確認への返事| Approval[既存確認ボタン]
     ChatUI --> ChatAPI[既存 /api/chat / PETIT Brain]
+    ChatUI --> Draft[小型会話の下書き・送信中文章を端末保存]
+    ChatAPI -->|通信失敗 / 120秒 / 待機中断| Unknown[入力復元・実行結果未確認・自動再送なし]
+    Unknown --> Draft
     ChatAPI -->|pending_actions| Approval
     Approval --> ConfirmAPI[既存 /api/actions / Agent state再開]
     ConfirmAPI --> Reply[共有返答UI]
