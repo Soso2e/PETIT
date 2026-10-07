@@ -1,5 +1,9 @@
 # PETIT Assistant Architecture
 
+Desktopの入口、共有Thread/Turn、起動・復旧の目標は
+[`docs/desktop-foundation-design.md`](docs/desktop-foundation-design.md) に定義する。
+本書の情報源・Domainの正本は維持する。新契約は未実装で、現行Runtimeを置き換えたとは扱わない。
+
 ## Goal
 
 PETIT is a source-aware personal assistant, not a generic chat wrapper. It should

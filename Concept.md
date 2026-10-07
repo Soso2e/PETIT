@@ -5,7 +5,7 @@
 自分の生活・予定・タスク・過去の会話や作業ログを把握し、それに基づいて自然に会話できる 自分専用AIアシスタント を作る。
 
 プロダクト名の軸は `PETIT_AS_JARVIS` とし、最終的にはスマホとPCの両方から使える、音声中心の常駐アシスタントを目指す。
-Webアプリを中心とする常駐エージェントへの再設計と、実装済み・後続の境界は [docs/jarvis-agent.md](docs/jarvis-agent.md) を参照。PC観測は任意拡張とする。
+PCの主入口をDesktop、スマホの入口をWeb/PWAとし、会話・作業・実行結果を共有Coreで継続する目標設計は [docs/desktop-foundation-design.md](docs/desktop-foundation-design.md) を参照。Brain/Brokerの方針は [docs/jarvis-agent.md](docs/jarvis-agent.md)、実装済みと後続の境界は `PROGRESS.md` と `docs/runtime-flows.md` を参照。PC観測は任意拡張とする。
 朝に「おはよう」と話しかけたり、スマホやPCで「今日何やればいい？」と聞いたときに、予定・タスク・昨日の作業・過去の記憶を参照して、自然な返答をしてくれる状態を目指す。
 
 ただし、最初から音声・常時起動・完全自動化を目指すのではなく、まずは テキストチャットMVP として検証し、その後にスマホ利用と常駐導線を広げる。

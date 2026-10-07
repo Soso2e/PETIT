@@ -1,16 +1,18 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.25.0**
+**Current Version: v0.25.1**
 
 **Last Updated: 2026-10-07**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #301 / v0.25.1: DesktopをPCの主入口として、Core正本のThread/Turn/Events・永続承認/結果照会、共通画面状態、ローカルCore管理、下書きのCore/thread/view別保存、起動/復旧/配布を一体設計。`docs/desktop-foundation-design.md` に現行との差分・目標API/所有権・6段階の依存/完了条件を固定。A #302から実装し、B #303、C #304、D #305、E #306、F #307で追跡。設計のみで新API/管理Coreは未実装。Conceptの目的と既存Domain/情報源/承認境界を維持し、過去Web中心設計との優先関係を明記。
+
 - #299 / v0.25.0: 小型会話からアプリ内ワークスペースへ移動し、同梱復旧画面で接続失敗とrenderer停止を区別。小型下書き/送信中文章の保持、待機上限と中断、位置保持、非表示取得休止を追加。Desktop 52件・Frontend 17件・Python UI 25件、隔離実Electronの会話/承認/合成音声/クラッシュ復旧/下書き/非表示を確認。Windows x64開発installer生成・同梱リソース検証済み（未署名）。実インストール、実LLM/マイク、長時間常駐、macOSは未確認。完成条件と次の受入は `docs/desktop-readiness.md`。Backend同梱・端末間会話統合・自然な発話割込みは後続。
 
 - #297: Univ以外のTask Detailを選択タスクからサーバーWork Sessionの対象へ切替。作業なし/終了時は空表示、一時停止中は対象を保持し、自由入力や未取得Taskは作業名だけ表示。ビュー切替・復元・ポーリングへ追従し、Univの選択詳細は維持。関連27テストと隔離ブラウザで確認、実サービス/配布版は未確認。
 
-- #296: 共通の仕上げCSSでWeb / 小型Desktopの配色・文字・余白・境界を統一し、スマホのタスク切替と空一覧の文字潰れ、状態表示の重複を修正。隔離ブラウザで320px / 390px / 1440px、タスク有無・Chat・Settingsテーマ切替・Universe・Desktop HTMLを確認。配布Electron / 実iPhoneキーボード / 実音声・外部サービスは未確認。専用ブランチで管理、main未反映。
+- #296: 共通の仕上げCSSでWeb / 小型Desktopの配色・文字・余白・境界を統一し、スマホのタスク切替と空一覧の文字潰れ、状態表示の重複を修正。隔離ブラウザで320px / 390px / 1440px、タスク有無・Chat・Settingsテーマ切替・Universe・Desktop HTMLを確認。配布Electron / 実iPhoneキーボード / 実音声・外部サービスは未確認。PR #298でmain反映済み。
 
 - #294: session別SQLite Dialogue Stateにstable Task focus・last action・TTL付き確認所有権を追加。確認回答と短期照応をProject/Brainより先に解決し、成功Task Toolの共通hookで更新。9 Acceptance Criteriaと既存回帰を自動確認、隔離した実アプリ/ブラウザで「ゲーム開発→その子にWEVORA」をと再起動後の同じWEVORA期限更新を確認。Notion未同期親の既存制約を維持し、実Notion同期・配布Desktop/音声会話は未確認。Frontend history互換を維持、次はBackend threadイベント正本への段階移行。
 
@@ -209,3 +211,4 @@
 
 | 2026-10-06 | 08:25 | #297 | Univ以外のTask Detailを作業セッション対象へ連動し、選択状態との混同を解消。作業なし/停止/自由入力とUnivの選択詳細を回帰確認。 |
 | 2026-10-07 | 19:59 | #299 | v0.25.0: Desktopの作業画面・同梱復旧・小型下書き保持・待機中断・位置保持・非表示取得休止を実装。関連自動テストと隔離Electron確認、Windows開発installer生成。実機/実サービス受入は未確認。 |
+| 2026-10-07 | 20:27 | #301 | v0.25.1: Desktop/共通Coreの状態・会話/実行・起動/復旧・画面責務・6段階の移行を設計し、#302〜#307へ分割。目標の新API/管理Coreは未実装。 |

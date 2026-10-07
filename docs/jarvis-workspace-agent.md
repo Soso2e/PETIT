@@ -6,7 +6,7 @@
 
 PETITは、ユーザーの目的、過去の判断、今の作業環境を結び、必要なときに次の一手を提案する。
 依頼された実行は既存の承認・監査経路へ渡し、結果を検証して次回の支援へつなぐ。
-製品の中心はWebアプリであり、PC観測は任意拡張とする。全体設計と優先順は [jarvis-agent.md](jarvis-agent.md) を参照。
+PCの主入口はDesktop、スマホはWeb/PWAを使用し、共有Coreで状況を継続する目標とする。PC観測は任意拡張とする。入口/状態/起動の目標は [desktop-foundation-design.md](desktop-foundation-design.md)、Brain/Brokerの方針は [jarvis-agent.md](jarvis-agent.md) を参照。
 
 例えば「今どこまでやった？」に、観測したブランチ・変更箇所と保存済みcheckpointを分けて答える。
 将来は、実際の競合を検出したときに「競合がある。まずこのファイルの差分を確認しよう」と提案し、
