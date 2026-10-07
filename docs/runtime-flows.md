@@ -1,5 +1,7 @@
 # PETIT Runtime Flows
 
+この文書は実装済みのフローを示す。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）のThread/Turn/Events・管理Coreは目標であり、実装する各PRで本書を更新する。
+
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
 実装の根拠:
