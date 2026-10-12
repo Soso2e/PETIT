@@ -18,7 +18,7 @@ test('tag releases use ad-hoc macOS signing without Apple credentials', () => {
   assert.match(workflow, /installers=\(release-assets\/\*\.dmg release-assets\/\*\.exe\)/);
 });
 
-test('manual macOS build remains a development artifact', () => {
-  assert.match(workflow, /if: github\.event_name == 'workflow_dispatch' && matrix\.platform == 'mac'\n\s+run: npm run build:mac:development/);
+test('manual branch builds use development artifacts but tagged dispatch only builds the personal release', () => {
+  assert.match(workflow, /if: github\.event_name == 'workflow_dispatch' && !startsWith\(github\.ref, 'refs\/tags\/v'\) && matrix\.platform == 'mac'\n\s+run: npm run build:mac:development/);
   assert.match(pkg.scripts['build:mac:development'], /development/);
 });

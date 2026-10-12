@@ -47,7 +47,7 @@ v0.24.0を別領域へ`git archive`で復元し、ビルド設定/検証hookだ�
 ## 個人利用リリース運用（2026-10-12決定 / #311）
 
 - PETITは本人のWindows/macOSのみで使用。Apple Developer Program・App Store公開・Developer ID証明書・公証を行わない。
-- 手動`workflow_dispatch`は従来通り`development`名の開発用DMG/EXEをActions Artifactとして14日保存する。
+- ブランチrefでの手動`workflow_dispatch`は`development`名の開発用DMG/EXEをActions Artifactとして14日保存する。タグrefでの手動実行は個人利用リリース用DMGのみを作り、開発用DMGと重複させない。
 - バージョン同期後、新しい`v<version>`タグをmain履歴上にpushすると`desktop.yml`で両OSのビルド・署名整合性/リソース検証・GitHub Release作成を自動実行する。既存`v0.25.2`タグは動かさない。
 - macOSタグビルドは`npm run build:mac:personal`でad-hoc署名し、`PETIT-<version>-mac-arm64.dmg`を生成する。Windowsは従来のEXE。いずれも個人利用限定のためApple/Windowsの公式コード署名はない。
 - ad-hoc署名は**改ざん検知とファイル整合性の検証**であり、開発元の認証やApple公証の代わりにはならない。Safariで取得したDMGから通常起動するとGatekeeperに拒否され得る。本人が入手元を確認し、必要な場合はmacOSの「プライバシーとセキュリティ」からそのアプリを個別に許可する。macOSのセキュリティ機能やquarantine属性を自動解除する処理は追加しない。
