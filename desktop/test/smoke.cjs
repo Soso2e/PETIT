@@ -15,9 +15,25 @@ const fixtureTasks = [
   { id: 2, title: '選択だけの星', status: 'Yet', priority: 'High', source: 'notion', external_id: 'fixture-2', sync_status: 'synced', root_task_id: 2, root_title: '選択だけの星' },
 ];
 let fixturePreferences = { work_session: false };
+let statsFailure = '';
+let statsEmpty = false;
+const fixtureStatsDay = {
+  date: '2026-10-13', timezone: 'Asia/Tokyo', total_seconds: 9000,
+  tasks: [{ task_id: '1', task: 'PETITの改善', elapsed_seconds: 7200 }, { task_id: '2', task: '振り返り <メモ>', elapsed_seconds: 1800 }],
+  sessions: [
+    { session_id: 'stats-a', task: 'PETITの改善', started_at: '2026-10-13T01:00:00+00:00', ended_at: '2026-10-13T02:00:00+00:00', status: 'ended', elapsed_seconds: 3600 },
+    { session_id: 'stats-b', task: '振り返り <メモ>', started_at: '2026-10-13T03:00:00+00:00', ended_at: null, status: 'paused', elapsed_seconds: 1800 },
+    { session_id: 'stats-c', task: 'PETITの改善', started_at: '2026-10-13T04:00:00+00:00', ended_at: '2026-10-13T05:00:00+00:00', status: 'ended', elapsed_seconds: 3600 },
+  ],
+};
+const fixtureStatsWeek = {
+  date_from: '2026-10-07', date_to: '2026-10-13', timezone: 'Asia/Tokyo', total_seconds: 22200,
+  daily: [0, 1800, 3600, 0, 7200, 600, 9000].map((elapsed_seconds, index) => ({ date: `2026-10-${String(7 + index).padStart(2, '0')}`, elapsed_seconds })),
+};
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css' };
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
+  if (statsFailure && url.pathname === `/api/work-sessions/${statsFailure}`) { response.writeHead(503, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'fixture unavailable' })); return; }
   if (!serveOverlay && url.pathname === '/static/desktop/index.html') { response.writeHead(404).end('Not found'); return; }
   if (url.pathname.startsWith('/static/')) {
     const file = path.resolve(root, 'frontend', url.pathname.slice(8));
@@ -46,6 +62,8 @@ const server = http.createServer(async (request, response) => {
   let payload = {};
   if (url.pathname === '/api/notifications/tasks') payload = { tasks: fixtureTasks };
   if (url.pathname === '/api/work-sessions/active') payload = { session: fixtureWork };
+  if (url.pathname === '/api/work-sessions/today') payload = statsEmpty ? { ...fixtureStatsDay, total_seconds: 0, tasks: [], sessions: [], active: null } : { ...fixtureStatsDay, active: fixtureWork };
+  if (url.pathname === '/api/work-sessions/summary') payload = statsEmpty ? { ...fixtureStatsWeek, total_seconds: 0, daily: fixtureStatsWeek.daily.map(day => ({ ...day, elapsed_seconds: 0 })) } : fixtureStatsWeek;
   if (url.pathname.endsWith('/fixture-work/pause')) payload = { session: fixtureWork = { ...fixtureWork, status: 'paused', paused_at: new Date().toISOString() } };
   if (url.pathname.endsWith('/fixture-work/resume')) payload = { session: fixtureWork = { ...fixtureWork, status: 'active', paused_at: null } };
   if (url.pathname.endsWith('/fixture-work/end')) payload = { session: fixtureWork = { ...fixtureWork, status: 'ended' } };
@@ -410,6 +428,46 @@ const server = http.createServer(async (request, response) => {
       assert.equal(await workspace.locator('#chat-input').inputValue(), 'スクロール後も書ける下書き');
     };
     await checkChatViewport('desktop');
+    const checkStatsViewport = async (suffix) => {
+      await workspace.evaluate(() => window.PetitAppShell.activateView('stats'));
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分' && document.querySelectorAll('.stats-week-column').length === 7);
+      assert.equal(await workspace.locator('#today-session-count').textContent(), '3');
+      assert.equal(await workspace.locator('#today-task-count').textContent(), '2');
+      assert.equal(await workspace.locator('#today-longest').textContent(), '1時間0分');
+      assert.equal(await workspace.locator('#stats-week-total').textContent(), '7日間で 6時間10分');
+      assert.deepEqual(await workspace.locator('.stats-task-bar').evaluateAll(bars => bars.map(bar => bar.style.width)), ['80%', '20%']);
+      assert.equal(await workspace.locator('.stats-week-column').first().locator('.stats-week-bar').evaluate(bar => bar.style.height), '0%');
+      assert.equal(await workspace.locator('.stats-session-row').first().locator('.stats-session-time').textContent(), '10:00〜11:00');
+      assert.equal(await workspace.locator('.stats-task-label strong').nth(1).textContent(), '振り返り <メモ>');
+      assert.equal(await workspace.locator('.stats-task-label img').count(), 0);
+      assert.ok(await workspace.locator('[data-shell-area="stats"]').evaluate(button => button.getAttribute('aria-current') === 'page'));
+      assert.ok(await workspace.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'statistics fit the viewport');
+      const chartBounds = await workspace.locator('#stats-week-chart').boundingBox();
+      assert.ok(chartBounds.x >= 0 && chartBounds.x + chartBounds.width <= await workspace.evaluate(() => innerWidth));
+      await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-statistics-${suffix}.png`), fullPage: true });
+      statsFailure = 'summary';
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => document.getElementById('stats-week-state').textContent.includes('前回のグラフ'));
+      assert.equal(await workspace.locator('#today-total').textContent(), '2時間30分', 'weekly failure preserves available today summary');
+      statsFailure = 'today';
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => document.getElementById('stats-load-state').textContent.includes('前回の表示'));
+      statsFailure = ''; statsEmpty = true;
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '0分');
+      assert.equal(await workspace.locator('.stats-task-bar').count(), 0);
+      assert.ok(await workspace.locator('#today-message').textContent().then(copy => copy.includes('記録はまだありません')));
+      assert.equal(await workspace.locator('.stats-week-bar').evaluateAll(bars => bars.every(bar => bar.style.height === '0%')), true);
+      await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-statistics-empty-${suffix}.png`), fullPage: true });
+      statsEmpty = false;
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分');
+      await workspace.evaluate(() => window.PetitAppShell.activateView('tasks'));
+      const beforeInactive = calls.filter(call => ['/api/work-sessions/today', '/api/work-sessions/summary'].includes(call.path)).length;
+      await workspace.waitForTimeout(200);
+      assert.equal(calls.filter(call => ['/api/work-sessions/today', '/api/work-sessions/summary'].includes(call.path)).length, beforeInactive, 'statistics navigation does not fetch while another tab is visible');
+    };
+    await checkStatsViewport('desktop');
     const originalSize = await workspace.evaluate(() => ({ width: innerWidth, height: innerHeight }));
     await workspace.evaluate(() => window.dispatchEvent(new CustomEvent('petit:navigate', { detail: { view: 'univ' } })));
     await workspace.evaluate(() => document.activeElement?.blur());
@@ -426,6 +484,8 @@ const server = http.createServer(async (request, response) => {
     await workspace.waitForTimeout(220);
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-mobile.png') });
     await checkChatViewport('mobile');
+    await checkStatsViewport('mobile');
+    await workspace.evaluate(() => window.PetitAppShell.activateView('chat'));
     await workspace.locator('#petit-context-bar > summary').click();
     await workspace.locator('#work-session-end').click();
     await workspace.waitForFunction(() => document.getElementById('petit-context-session').textContent === '作業なし');
@@ -469,7 +529,7 @@ const server = http.createServer(async (request, response) => {
     await recovered.waitForURL(`${origin}/static/desktop/index.html`);
     assert.equal(await recovered.locator('#input').inputValue(), 'クラッシュをまたぐ下書き');
     assert.deepEqual(errors, []);
-    console.log('PASS: isolated Electron chat/approval/synthetic voice, v27 compact session/dropdown, fixed chat input and message scrolling, actual WebGL work glow/middle pan, voice options, 960/390px layouts, compact/hover/pinned rail, conflicts, notifications, recovery and IPC isolation.');
+    console.log('PASS: isolated Electron statistics totals/7-day chart/task shares/JST/empty/partial failure, v27 session/dropdown/chat scrolling, actual WebGL work glow/middle pan, 960/390px layouts, rail, conflicts, notifications, chat/approval/voice, recovery and IPC isolation.');
     console.log(`Screenshot: ${screenshot}`);
   } finally {
     if (instance) await instance.close();

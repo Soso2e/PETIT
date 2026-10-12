@@ -7,6 +7,7 @@
     { view: "univ", target: "universe", label: "Univ", title: "Universe", description: "タスク空間" },
     { view: "tasks", target: "tasks", label: "Tasks", title: "Tasks", description: "やること" },
     { view: "chat", target: "chat", label: "PETIT", title: "PETIT", description: "会話と相談" },
+    { view: "stats", target: "today", label: "統計", title: "統計", description: "頑張りと振り返り" },
   ];
   const VIEW_ALIASES = {
     home: "univ",
@@ -14,11 +15,12 @@
     universe: "univ",
     projects: "univ",
     petit: "chat",
+    today: "stats",
     reminders: "reminders",
   };
 
   const resolveArea = (view) => VIEW_ALIASES[view] || view;
-  const panelForArea = (area) => area === "univ" ? "universe" : area;
+  const panelForArea = (area) => area === "univ" ? "universe" : area === "stats" ? "today" : area;
 
   const switchPanelDirectly = (panelView) => {
     const tabs = Array.from(document.querySelectorAll("[data-view]"));
@@ -128,6 +130,7 @@
       univ: buttons.get("universe") || buttons.get("today"),
       tasks: buttons.get("tasks"),
       chat: buttons.get("chat"),
+      stats: buttons.get("today"),
     };
 
     PRIMARY_VIEWS.forEach(({ view, label }) => {
@@ -262,6 +265,7 @@
           <button type="button" data-command-view="univ"><strong>Universe</strong><small>タスク空間をひらく</small><kbd>1</kbd></button>
           <button type="button" data-command-view="tasks"><strong>Tasks</strong><small>重要なタスクを確認</small><kbd>2</kbd></button>
           <button type="button" data-command-view="chat"><strong>PETIT</strong><small>会話をはじめる</small><kbd>3</kbd></button>
+          <button type="button" data-command-view="stats"><strong>統計</strong><small>今日の頑張りと7日間の作業を振り返る</small><kbd>4</kbd></button>
           <button type="button" data-command-view="reminders"><strong>Reminders</strong><small>通知と履歴を確認</small></button>
           <button type="button" data-command-view="settings"><strong>Settings</strong><small>モデルと環境を設定</small><kbd>⌘,</kbd></button>
         </div>
@@ -423,7 +427,7 @@
     }
 
     const requested = new URLSearchParams(window.location.search).get("view");
-    const supported = ["univ", "home", "focus", "tasks", "chat", "universe", "reminders", "settings", "petit", "projects"];
+    const supported = ["univ", "home", "focus", "tasks", "chat", "stats", "today", "universe", "reminders", "settings", "petit", "projects"];
     const initialView = requested && supported.includes(requested) ? requested : "univ";
     window.requestAnimationFrame(() => activateView(initialView));
   };

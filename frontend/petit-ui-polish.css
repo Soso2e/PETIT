@@ -146,6 +146,9 @@ body button:focus-visible, body a:focus-visible { outline: 2px solid var(--ui-fo
   body .universe-topbar .petit-corner-status { width: calc(100vw - 182px); max-width: 240px; min-height: 54px; }
 }
 @media (max-width: 640px) {
+  body .universe-topbar .petit-corner-status { width: min(164px, calc(100vw - 214px)); }
+}
+@media (max-width: 640px) {
   body .universe-main { padding-inline: 16px !important; }
   body .section-head { padding-top: 6px; }
   body .section-head p { font-size: 12px; }
