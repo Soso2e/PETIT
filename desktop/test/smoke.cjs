@@ -368,7 +368,7 @@ const server = http.createServer(async (request, response) => {
       await workspace.waitForFunction(() => document.body.classList.contains('petit-chat-screen') && document.getElementById('petit-context-session').textContent === '作業中：作業中の星');
       await workspace.waitForFunction(() => document.querySelector('[data-view-panel="chat"]').getAnimations().every(animation => animation.playState !== 'running'));
       assert.equal(await workspace.locator('#petit-context-view, #petit-context-current, #petit-context-sync').count(), 0);
-      assert.equal(await workspace.locator('.chat-context').isVisible(), false);
+      assert.equal(await workspace.locator('.chat-context, .quick-prompts').count(), 0, 'Chat has no context panel or quick prompts in the DOM');
       assert.equal(await workspace.locator('select[aria-label="音声入力方式"]').isVisible(), false);
       await workspace.locator('.chat-voice-options > summary').click();
       assert.equal(await workspace.locator('select[aria-label="音声入力方式"]').isVisible(), true);

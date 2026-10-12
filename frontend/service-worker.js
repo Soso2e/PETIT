@@ -3,7 +3,7 @@
 importScripts("/static/petit-version.js");
 
 const CACHE_NAME = `petit-shell-v${self.PETIT_ASSET_VERSION}-webgl1-voice2-motion1`;
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-polish1-rail1`;
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-polish1-rail1-context2`;
 const THREE_CDN_ORIGIN = "https://esm.sh";
 const THREE_CDN_PREFIX = "/three@0.185.1";
 
