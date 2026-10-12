@@ -266,7 +266,30 @@ const server = http.createServer(async (request, response) => {
     }), true);
     await workspace.getByRole('button', { name: '小型会話', exact: true }).click();
     await workspace.waitForTimeout(1000);
-    assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), true, 'workspace labels remain visible at laptop width');
+    const rail = workspace.locator('.petit-area-rail');
+    const railWidth = (width) => workspace.waitForFunction(value => Math.round(document.querySelector('.petit-area-rail').getBoundingClientRect().width) === value, width);
+    await workspace.mouse.move(600, 300);
+    await railWidth(72);
+    assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), false, 'Univ starts with an icon rail');
+    const sceneBounds = await workspace.locator('.univ-viewport').boundingBox();
+    await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-compact.png') });
+    await rail.hover(); await railWidth(232);
+    assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), true);
+    assert.deepEqual(await workspace.locator('.univ-viewport').boundingBox(), sceneBounds, 'hover does not move or resize Univ');
+    await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-expanded.png') });
+    await workspace.mouse.move(600, 300); await railWidth(72);
+    await workspace.locator('[data-rail-view="tasks"]').focus(); await railWidth(232);
+    await workspace.locator('[data-rail-view="tasks"]').evaluate(el => el.blur()); await railWidth(72);
+    await workspace.locator('.petit-area-rail__pin').click();
+    await workspace.waitForFunction(() => document.body.dataset.petitRailMode === 'pinned');
+    await workspace.reload();
+    await workspace.waitForFunction(() => document.body.dataset.petitRailMode === 'pinned');
+    await railWidth(232);
+    await workspace.locator('.petit-area-rail__pin').click();
+    await workspace.mouse.move(600, 300); await railWidth(72);
+    await workspace.emulateMedia({ reducedMotion: 'reduce' });
+    assert.ok(await rail.evaluate(el => parseFloat(getComputedStyle(el).transitionDuration) <= .001), 'reduced motion uses the shared near-zero transition');
+    await workspace.emulateMedia({ reducedMotion: 'no-preference' });
     await workspace.waitForFunction(() => window.PetitUniverse?.workingTask() === '1');
     assert.ok(await workspace.locator('[data-task-id="1"].is-working').count() > 0);
     await workspace.evaluate(() => window.PetitUniverse.selectTask('2'));
@@ -296,6 +319,22 @@ const server = http.createServer(async (request, response) => {
     await workspace.locator('.petit-area-rail__nav button').nth(1).click();
     await workspace.waitForTimeout(350);
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-workspace.png') });
+    const originalSize = await workspace.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    await workspace.evaluate(() => window.dispatchEvent(new CustomEvent('petit:navigate', { detail: { view: 'univ' } })));
+    await workspace.evaluate(() => document.activeElement?.blur());
+    const sizeWorkspace = ({ BrowserWindow }, size) => {
+      const win = BrowserWindow.getAllWindows().find(candidate => candidate.webContents.getURL().includes('/static/universe.html'));
+      win.setMinimumSize(320, 400); win.setContentSize(size.width, size.height);
+    };
+    await instance.evaluate(sizeWorkspace, { width: 960, height: 740 });
+    await workspace.mouse.move(500, 300); await railWidth(72);
+    assert.equal(await rail.isVisible(), true);
+    await instance.evaluate(sizeWorkspace, { width: 390, height: 780 });
+    await workspace.waitForFunction(() => innerWidth === 390);
+    assert.equal(await rail.isVisible(), false, 'mobile keeps the existing navigation instead of a sidebar');
+    await workspace.waitForTimeout(220);
+    await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-mobile.png') });
+    await instance.evaluate(sizeWorkspace, originalSize);
     await workspace.close();
     // Renderer crash is distinguished from an unavailable server; draft survives.
     await voicePage.locator('#input').fill('クラッシュをまたぐ下書き');
@@ -333,7 +372,7 @@ const server = http.createServer(async (request, response) => {
     await recovered.waitForURL(`${origin}/static/desktop/index.html`);
     assert.equal(await recovered.locator('#input').inputValue(), 'クラッシュをまたぐ下書き');
     assert.deepEqual(errors, []);
-    console.log('PASS: isolated Electron chat/approval/synthetic voice, IME/repeat/textarea, gentle nudge, work focus/pause, conflict comparison, Desktop notifications without VAPID, recovery and IPC isolation.');
+    console.log('PASS: isolated Electron chat/approval/synthetic voice, input, nudge, work focus, conflicts, notifications, compact/hover/focus/pinned rail without scene reflow, 960/390px layouts, recovery and IPC isolation.');
     console.log(`Screenshot: ${screenshot}`);
   } finally {
     if (instance) await instance.close();

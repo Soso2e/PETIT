@@ -113,6 +113,7 @@
     loadStylesheet("/static/task-flow.css", "task-flow-style");
     loadStylesheet("/static/petit-galaxy.css", "galactic-spatial-style");
     loadStylesheet("/static/petit-four-area-shell.css", "three-area-shell-style");
+    loadStylesheet("/static/petit-rail.css", "resizable-rail-style");
     loadStylesheet("/static/univ-space.css", "univ-space-style");
     loadScript("/static/life-map.js", "life-map-script");
     loadScript("/static/task-flow.js", "task-flow-script");
@@ -157,18 +158,52 @@
     const rail = document.createElement("aside");
     rail.className = "petit-area-rail";
     rail.setAttribute("aria-label", "PETIT主要領域");
+    const header = document.createElement("div");
+    header.className = "petit-area-rail__header";
 
     const brand = document.createElement("a");
     brand.className = "petit-area-rail__brand";
     brand.href = "/?view=univ";
+    brand.setAttribute("aria-label", "PETITのUnivを開く");
     brand.innerHTML = '<img src="/static/branding/icon_logo.png" alt=""><span><strong>PETIT</strong><small>LOCAL WORKSPACE</small></span>';
-    rail.appendChild(brand);
+    header.appendChild(brand);
+    const pin = document.createElement("button");
+    pin.type = "button"; pin.className = "petit-area-rail__pin";
+    let pinned = null;
+    try {
+      const saved = localStorage.getItem("petit_rail_pinned");
+      if (saved === "true" || saved === "false") pinned = saved === "true";
+    } catch { /* The rail also works when storage is unavailable. */ }
+    let hovered = false;
+    const syncRailSize = () => {
+      const compact = pinned === false || (pinned === null && document.body.classList.contains("petit-univ-active"));
+      document.body.dataset.petitRailMode = pinned === true ? "pinned" : compact ? "compact" : "expanded";
+      pin.textContent = compact ? "›" : "‹";
+      pin.setAttribute("aria-pressed", String(pinned === true));
+      pin.setAttribute("aria-label", compact ? "タブバーを広く固定" : "タブバーを小さくする");
+      pin.title = pin.getAttribute("aria-label");
+      const keyboardInside = rail.contains(document.activeElement) && document.activeElement !== pin;
+      const open = compact && (hovered || keyboardInside);
+      if (document.body.classList.contains("petit-rail-open") !== open) document.body.classList.toggle("petit-rail-open", open);
+    };
+    pin.addEventListener("click", () => {
+      pinned = document.body.dataset.petitRailMode === "compact";
+      try { localStorage.setItem("petit_rail_pinned", String(pinned)); } catch { /* Session-only choice. */ }
+      syncRailSize();
+    });
+    rail.addEventListener("pointerenter", (event) => { if (event.pointerType !== "touch") { hovered = true; syncRailSize(); } });
+    rail.addEventListener("pointerleave", () => { hovered = false; syncRailSize(); });
+    rail.addEventListener("focusin", syncRailSize);
+    rail.addEventListener("focusout", () => requestAnimationFrame(syncRailSize));
+    // View switches alter this class; hover expansion never changes the scene geometry.
+    new MutationObserver(syncRailSize).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    header.appendChild(pin); rail.appendChild(header);
 
     const commandButton = document.createElement("button");
     commandButton.type = "button";
     commandButton.className = "petit-area-rail__command";
     commandButton.dataset.commandOpen = "true";
-    commandButton.innerHTML = '<span>移動と操作を検索</span><kbd>Ctrl K</kbd>';
+    commandButton.innerHTML = '<span class="petit-area-rail__command-icon" aria-hidden="true">⌕</span><span class="petit-area-rail__command-label">移動と操作を検索</span><kbd>Ctrl K</kbd>';
     commandButton.setAttribute("aria-label", "移動と操作を検索");
     rail.appendChild(commandButton);
 
@@ -179,6 +214,8 @@
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.railView = view;
+      button.setAttribute("aria-label", `${title}：${description}`);
+      button.title = title;
       button.innerHTML = `<span class="petit-area-rail__monogram" aria-hidden="true">${title.slice(0, 1)}</span><span><strong>${title}</strong><small>${description}</small></span>`;
       button.addEventListener("click", () => activateView(view));
       railNav.appendChild(button);
@@ -189,8 +226,8 @@
     shortcuts.className = "petit-area-rail__shortcuts";
     shortcuts.innerHTML = `
       <span class="petit-area-rail__section-label">UTILITY</span>
-      <button type="button" data-shell-target="reminders"><span>Reminders</span><small>通知と履歴</small></button>
-      <button type="button" data-shell-target="settings"><span>Settings</span><small>モデルと環境</small></button>
+      <button type="button" data-shell-target="reminders" aria-label="Reminders：通知と履歴" title="Reminders"><span class="petit-area-rail__monogram" aria-hidden="true">R</span><span class="petit-area-rail__utility-label"><span>Reminders</span><small>通知と履歴</small></span></button>
+      <button type="button" data-shell-target="settings" aria-label="Settings：モデルと環境" title="Settings"><span class="petit-area-rail__monogram" aria-hidden="true">S</span><span class="petit-area-rail__utility-label"><span>Settings</span><small>モデルと環境</small></span></button>
     `;
     shortcuts.querySelectorAll("[data-shell-target]").forEach((button) => {
       button.addEventListener("click", () => activateView(button.dataset.shellTarget));
@@ -205,6 +242,7 @@
     `;
     rail.appendChild(status);
     document.body.appendChild(rail);
+    syncRailSize();
   };
 
   const installCommandPalette = () => {

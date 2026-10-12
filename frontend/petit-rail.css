@@ -1,0 +1,50 @@
+/* Width reserved for content stays compact while hover/focus opens an overlay. */
+@media (min-width: 960px) {
+  body[data-petit-rail-mode] { --petit-rail-width: 232px; }
+  body[data-petit-rail-mode="compact"] { --petit-rail-width: 72px; }
+  body[data-petit-rail-mode] .petit-area-rail {
+    width: var(--petit-rail-width); padding: 18px 12px 12px; gap: 16px;
+    overflow-x: hidden; overflow-y: auto;
+  }
+  body[data-petit-rail-mode="compact"].petit-rail-open .petit-area-rail {
+    width: 232px; box-shadow: 12px 0 32px #0004;
+  }
+  body[data-petit-rail-mode] .petit-area-rail__header { display: flex; align-items: center; gap: 4px; min-height: 78px; flex-shrink: 0; }
+  body[data-petit-rail-mode] .petit-area-rail__brand { flex: 1; min-width: 0; justify-content: flex-start; padding: 0; gap: 8px; margin: 0; }
+  body[data-petit-rail-mode] .petit-area-rail__brand span { display: grid; }
+  body[data-petit-rail-mode] .petit-area-rail__brand small { font-size: 8px; }
+  body[data-petit-rail-mode] .petit-area-rail__pin {
+    flex-shrink: 0; width: 30px; height: 30px; border: 1px solid var(--ui-line); border-radius: 8px;
+    color: var(--ui-muted); background: var(--ui-soft); font: 22px/1 sans-serif; cursor: pointer;
+  }
+  body[data-petit-rail-mode] .petit-area-rail__command { justify-content: flex-start; padding: 0 8px; }
+  body[data-petit-rail-mode] .petit-area-rail__command-icon { display: inline-block; font-size: 20px; }
+  body[data-petit-rail-mode] .petit-area-rail__command-label { display: inline; white-space: nowrap; font-size: 10px; }
+  body[data-petit-rail-mode] .petit-area-rail__command kbd { display: block; margin-left: auto; }
+  body[data-petit-rail-mode] .petit-area-rail__command::after { content: none; }
+  body[data-petit-rail-mode] .petit-area-rail__nav button,
+  body[data-petit-rail-mode] .petit-area-rail__shortcuts button { grid-template-columns: 30px minmax(0, 1fr); justify-items: stretch; padding-inline: 8px; gap: 10px; font-size: 12px; text-align: left; }
+  body[data-petit-rail-mode] .petit-area-rail__nav button > span:last-child,
+  body[data-petit-rail-mode] .petit-area-rail__utility-label,
+  body[data-petit-rail-mode] .petit-area-rail__status > span:last-child { display: grid; }
+  body[data-petit-rail-mode] .petit-area-rail__shortcuts small,
+  body[data-petit-rail-mode] .petit-area-rail__section-label { display: block; }
+  body[data-petit-rail-mode] .petit-area-rail__status { grid-template-columns: 6px minmax(0, 1fr); justify-items: stretch; }
+
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__header { flex-direction: column; gap: 6px; }
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__brand { justify-content: center; flex: none; }
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__brand span,
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__command-label,
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__command kbd,
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__nav button > span:last-child,
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__utility-label,
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__section-label,
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__status > span:last-child { display: none; }
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__nav button,
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__shortcuts button { grid-template-columns: 1fr; justify-items: center; padding-inline: 0; gap: 0; }
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__command { justify-content: center; padding: 0; }
+  body[data-petit-rail-mode="compact"]:not(.petit-rail-open) .petit-area-rail__status { grid-template-columns: 1fr; justify-items: center; }
+}
+@media (min-width: 960px) and (prefers-reduced-motion: no-preference) {
+  body[data-petit-rail-mode] .petit-area-rail { transition: width 180ms ease, box-shadow 180ms ease; }
+}
