@@ -174,7 +174,7 @@
     state.controls.minPolarAngle = Math.PI * 0.08;
     state.controls.zoomToCursor = true;
     state.controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
-    state.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+    state.controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
     state.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
     state.controls.touches.ONE = THREE.TOUCH.ROTATE;
     state.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
@@ -310,9 +310,17 @@
   };
 
   const createAtmosphere = (radius, color, opacity = 0.12) => {
-    const geometry = new THREE.SphereGeometry(radius * 1.09, 24, 16);
-    const material = new THREE.MeshBasicMaterial({
-      color,
+    const geometry = new THREE.SphereGeometry(radius * 1.38, 32, 24);
+    const material = new THREE.ShaderMaterial({
+      uniforms: { glowColor: { value: color }, glowOpacity: { value: opacity } },
+      vertexShader: `varying vec3 vNormal; varying vec3 vView;
+        void main() { vec4 p = modelViewMatrix * vec4(position, 1.0);
+          vNormal = normalize(normalMatrix * normal); vView = -p.xyz;
+          gl_Position = projectionMatrix * p; }`,
+      fragmentShader: `uniform vec3 glowColor; uniform float glowOpacity;
+        varying vec3 vNormal; varying vec3 vView;
+        void main() { float falloff = pow(abs(dot(normalize(vNormal), normalize(vView))), 3.0);
+          gl_FragColor = vec4(glowColor, glowOpacity * falloff); }`,
       transparent: true,
       opacity,
       side: THREE.BackSide,
@@ -339,6 +347,7 @@
     mesh.name = `${type}:${entry.title}`;
     mesh.userData.entry = entry;
     mesh.userData.baseEmissiveIntensity = material.emissiveIntensity;
+    mesh.userData.baseColor = color.clone();
     mesh.add(createAtmosphere(radius, color, type === "child" ? 0.08 : 0.12));
     const bodyKey = type === "core" ? "core" : `${type}:${entry.taskId}`;
     mesh.userData.entering = !state.seenBodies.has(bodyKey);
@@ -549,9 +558,10 @@
       const working = Boolean(workingTaskId && mesh.userData.entry.taskId === workingTaskId);
       const entering = mesh.userData.entering;
       const toScale = working ? 1.32 : selected ? 1.14 : 1;
-      const toGlow = mesh.userData.baseEmissiveIntensity * (working ? 3.2 : selected ? 1.85 : 1);
+      const dimmed = Boolean(workingTaskId && !working && !selected && mesh.userData.entry.taskId);
+      const toGlow = mesh.userData.baseEmissiveIntensity * (working ? 4.6 : selected ? 1.85 : dimmed ? .45 : 1);
       // Retarget from the current frame when selections change rapidly.
-      if (entering || mesh.userData.selected !== selected || mesh.userData.working !== working) {
+      if (entering || mesh.userData.selected !== selected || mesh.userData.working !== working || mesh.userData.dimmed !== dimmed) {
         const atmosphere = mesh.getObjectByName("Atmosphere");
         state.visualTweens.set(mesh, {
           startedAt: performance.now() + (entering ? Math.min(index * 35, 175) : 0),
@@ -562,7 +572,10 @@
           toGlow,
           pulse: entering || selected || working,
           atmosphere,
-          baseOpacity: mesh.userData.entry.type === "child" ? .08 : .12,
+          fromOpacity: entering ? 0 : atmosphere.material.opacity,
+          toOpacity: working ? 1.5 : selected ? .38 : dimmed ? .035 : mesh.userData.entry.type === "child" ? .08 : .12,
+          fromBrightness: mesh.userData.brightness ?? 1,
+          toBrightness: dimmed ? .5 : 1,
         });
         if (entering) {
           mesh.scale.setScalar(.72);
@@ -572,6 +585,7 @@
       mesh.userData.entering = false;
       mesh.userData.selected = selected;
       mesh.userData.working = working;
+      mesh.userData.dimmed = dimmed;
     });
     state.labels.forEach(({ element, entry }) => {
       element.classList.toggle("is-selected", Boolean(entry.taskId && entry.taskId === state.selectedTaskId));
@@ -675,6 +689,8 @@
     let suppressSelectionUntilPointersClear = false;
 
     input.addEventListener("pointerdown", (event) => {
+      // Camera gestures must never also select a planet or open its detail.
+      if (event.pointerType === "mouse" && event.button !== 0) return;
       activePointers.add(event.pointerId);
       if (!event.isPrimary || activePointers.size > 1) {
         state.pointerDown = null;
@@ -727,6 +743,7 @@
       // Keep the wheel owned by OrbitControls instead of the hidden CSS camera.
       event.stopPropagation();
     }, { passive: true });
+    input.addEventListener("auxclick", (event) => { if (event.button === 1) event.preventDefault(); });
     input.addEventListener("keydown", (event) => {
       if (event.key === "Escape" || event.key === "0") resetCamera();
       if (event.key === "+" || event.key === "=") zoomBy(0.84);
@@ -758,6 +775,10 @@
       if (Number.isFinite(tween.fromGlow) && Number.isFinite(tween.toGlow)) {
         mesh.material.emissiveIntensity = tween.fromGlow + (tween.toGlow - tween.fromGlow) * eased;
       }
+      if (Number.isFinite(tween.fromBrightness)) {
+        mesh.userData.brightness = tween.fromBrightness + (tween.toBrightness - tween.fromBrightness) * eased;
+        mesh.material.color.copy(mesh.userData.baseColor).multiplyScalar(mesh.userData.brightness);
+      }
       if (tween.fromPosition && tween.toPosition) {
         mesh.position.lerpVectors(tween.fromPosition, tween.toPosition, eased);
         state.labelsNeedUpdate = true;
@@ -765,7 +786,11 @@
       const pulse = tween.pulse && !instant ? Math.sin(progress * Math.PI) : 0;
       if (tween.atmosphere) {
         tween.atmosphere.scale.setScalar(1 + pulse * .22);
-        tween.atmosphere.material.opacity = (tween.baseOpacity ?? tween.atmosphere.material.opacity) + pulse * .14;
+        const opacity = Number.isFinite(tween.fromOpacity)
+          ? tween.fromOpacity + (tween.toOpacity - tween.fromOpacity) * eased
+          : (tween.baseOpacity ?? tween.atmosphere.material.opacity);
+        tween.atmosphere.material.opacity = opacity + pulse * .14;
+        tween.atmosphere.material.uniforms.glowOpacity.value = tween.atmosphere.material.opacity;
       }
       if (progress >= 1) {
         state.visualTweens.delete(mesh);

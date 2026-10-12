@@ -19,7 +19,7 @@ function environment() {
   const context = { console, Blob, AbortController, AbortSignal, Event,
     setTimeout, clearTimeout, navigator: {}, MediaRecorder: null,
     localStorage: { getItem: key => storage.get(key), setItem: (k, v) => storage.set(k, v) },
-    document: { getElementById: id => nodes[id], createElement: element, addEventListener() {} },
+    document: { getElementById: id => nodes[id], querySelector: () => null, createElement: element, addEventListener() {} },
     MutationObserver: class { observe() {} }, fetch: async () => ({ ok: true, json: async () => ({ configured: false }) }) };
   context.window = { isSecureContext: true, setTimeout() {}, clearTimeout() {}, addEventListener() {},
     SpeechRecognition: class extends Native { constructor() { super(); native = this; } } };

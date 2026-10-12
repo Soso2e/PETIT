@@ -1,5 +1,7 @@
 # UnivのThree.jsアニメーション
 
+v0.27.0 / Issue #318では作業中惑星の本体・周囲の光を強調し、他の未選択惑星を減光する。ミドルドラッグは平行移動へ変更。現行の表示・検証範囲は [Desktop / Web v0.27.0](desktop-v27-experience.md) を参照。
+
 Issue #260。`frontend/universe-webgl-scene.js`で実装する。
 
 - 初めて描画する天体は640msで72%から本来の大きさへ現れ、発光が立ち上がる。天体間の時間差は最大175ms。

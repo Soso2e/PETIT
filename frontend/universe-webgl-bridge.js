@@ -12,6 +12,8 @@
 
   const ensureDetailPortal = () => {
     const detail = document.querySelector("#detail-panel");
+    // Ordinary views own their work detail inside the compact session dropdown.
+    if (document.querySelector('[data-view-panel].is-active:not([hidden])')?.dataset.viewPanel !== "universe") return detail;
     if (!detail || detail.parentElement === document.body) return detail;
     if (!detailPlaceholder) {
       detailPlaceholder = document.createComment("PETIT detail panel portal");

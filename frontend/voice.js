@@ -133,7 +133,17 @@
       const option = document.createElement("option");
       option.value = value; option.textContent = text; inputModeEl.append(option);
     }
-    voiceStateEl.before(inputModeEl);
+    const chatActions = document.querySelector(".chat-head-actions");
+    if (chatActions) {
+      const options = document.createElement("details");
+      options.className = "chat-voice-options";
+      const summary = document.createElement("summary");
+      summary.textContent = "音声設定";
+      options.append(summary, inputModeEl);
+      chatActions.prepend(options);
+    } else {
+      voiceStateEl.before(inputModeEl);
+    }
     const apply = () => {
       recognition = null;
       SpeechRecognitionApi = inputModeEl.value === "recorded" ?

@@ -27,11 +27,7 @@ button:hover { color: var(--text); background: var(--soft); }
 button:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 4px #ffffff0a; }
 button:disabled { opacity: .45; cursor: default; }
 main { height: calc(100% - 50px); display: flex; flex-direction: column; padding: 0 16px 10px; }
-.presence { position: relative; flex-shrink: 0; height: 78px; display: grid; place-items: center; }
-.orb { width: 38px; height: 38px; border: 1px solid #ffffff2a; border-radius: 50%; background: radial-gradient(circle at 32% 27%, #f4f4ef, #aaa9a3 18%, #535451 47%, #1a1b1d 78%); box-shadow: 0 0 28px #ffffff12, inset -5px -8px 15px #00000078; }
-.orbit { position: absolute; width: 78px; height: 27px; border: 1px solid #ffffff28; border-radius: 50%; transform: rotate(-24deg); box-shadow: 0 0 18px #ffffff08; }
-body[data-listening='true'] .orb { animation: breathe 1.5s ease-in-out infinite; }
-.intro { text-align: center; margin-top: -3px; }
+.intro { text-align: center; margin-top: 12px; }
 .intro p { font-size: 16px; font-weight: 540; margin: 0 0 6px; letter-spacing: .025em; }
 #status { font-size: 9px; color: var(--dim); display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #messages { flex: 1; overflow: auto; padding: 14px 2px 8px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; min-height: 55px; }
@@ -65,12 +61,7 @@ header button { font-size: 11px; }
 #status, #voice-state, #desktop-version { font-size: 11px; }
 .appearing main { animation: appear .24s ease-out; }
 @media (prefers-reduced-motion: no-preference) {
-  .appearing .presence { animation: appear .4s cubic-bezier(.22, .76, .28, 1); }
   .appearing .intro { animation: appear .32s cubic-bezier(.22, .76, .28, 1); }
-  .orb { transition: box-shadow 240ms ease; }
-  body[data-listening='true'] .orbit { animation: listeningOrbit 3s ease-in-out infinite; }
 }
-@keyframes listeningOrbit { 50% { transform: rotate(-12deg) scale(1.08); opacity: .55; } }
 @keyframes appear { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes breathe { 50% { transform: scale(1.08); box-shadow: 0 0 42px #ffffff24; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

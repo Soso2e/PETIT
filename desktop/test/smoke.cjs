@@ -23,7 +23,12 @@ const server = http.createServer(async (request, response) => {
     const file = path.resolve(root, 'frontend', url.pathname.slice(8));
     if (!file.startsWith(path.join(root, 'frontend') + path.sep) || !fs.existsSync(file)) { response.writeHead(404).end(); return; }
     response.setHeader('Content-Type', mime[path.extname(file)] || 'application/octet-stream');
-    response.end(fs.readFileSync(file)); return;
+    let source = fs.readFileSync(file);
+    // Inspect real rendered camera/material state only in this isolated fixture.
+    if (url.pathname === '/static/universe-webgl-scene.js') {
+      source = source.toString().replace('const clamp =', 'window.__fixtureScene = state; const clamp =');
+    }
+    response.end(source); return;
   }
   const chunks = []; for await (const chunk of request) chunks.push(chunk);
   const raw = Buffer.concat(chunks);
@@ -43,6 +48,7 @@ const server = http.createServer(async (request, response) => {
   if (url.pathname === '/api/work-sessions/active') payload = { session: fixtureWork };
   if (url.pathname.endsWith('/fixture-work/pause')) payload = { session: fixtureWork = { ...fixtureWork, status: 'paused', paused_at: new Date().toISOString() } };
   if (url.pathname.endsWith('/fixture-work/resume')) payload = { session: fixtureWork = { ...fixtureWork, status: 'active', paused_at: null } };
+  if (url.pathname.endsWith('/fixture-work/end')) payload = { session: fixtureWork = { ...fixtureWork, status: 'ended' } };
   if (url.pathname === '/api/notifications/status') payload = { configured: false, dependency_available: false, preferences: fixturePreferences, categories: [{ id: 'work_session', label: '作業セッション' }] };
   if (url.pathname === '/api/notifications/preferences') payload = { preferences: fixturePreferences = data.preferences };
   if (url.pathname === '/api/notifications/events') payload = { events: [], unread_count: 0 };
@@ -104,6 +110,7 @@ const server = http.createServer(async (request, response) => {
     await setup.locator('button[type=submit]').click();
     const page = await opened;
     await page.waitForURL(`${origin}/static/desktop/index.html`);
+    assert.equal(await page.locator('.presence, .orb, .orbit').count(), 0, 'compact chat has no planet above the date');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     assert.equal(await page.locator('#greeting').evaluate((el) => getComputedStyle(el).animationName), 'petitMessageEnter');
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -291,11 +298,48 @@ const server = http.createServer(async (request, response) => {
     assert.ok(await rail.evaluate(el => parseFloat(getComputedStyle(el).transitionDuration) <= .001), 'reduced motion uses the shared near-zero transition');
     await workspace.emulateMedia({ reducedMotion: 'no-preference' });
     await workspace.waitForFunction(() => window.PetitUniverse?.workingTask() === '1');
+    await workspace.waitForFunction(() => window.PetitUnivWebGL?.initialized && window.__fixtureScene?.entries.size >= 2);
+    await workspace.waitForFunction(() => !window.__fixtureScene.renderFrame);
+    const workGlow = await workspace.evaluate(() => {
+      const work = window.__fixtureScene.entries.get('1').object;
+      const other = window.__fixtureScene.entries.get('2').object;
+      return { working: work.userData.working, opacity: work.getObjectByName('Atmosphere').material.uniforms.glowOpacity.value,
+        otherOpacity: other.getObjectByName('Atmosphere').material.uniforms.glowOpacity.value,
+        dimmed: other.userData.dimmed, ratio: work.material.emissiveIntensity / other.material.emissiveIntensity };
+    });
+    assert.ok(workGlow.working && workGlow.dimmed && workGlow.opacity > workGlow.otherOpacity * 10 && workGlow.ratio > 5, 'working planet itself and its persistent halo shine while other planets dim');
+    const canvas = await workspace.locator('.univ-webgl-canvas').boundingBox();
+    const cameraState = () => workspace.evaluate(() => ({ camera: window.__fixtureScene.camera.position.toArray(), target: window.__fixtureScene.controls.target.toArray(), selection: window.__fixtureScene.selectedTaskId }));
+    const beforePan = await cameraState();
+    await workspace.mouse.move(canvas.x + canvas.width * .65, canvas.y + canvas.height * .65);
+    await workspace.mouse.down({ button: 'middle' });
+    await workspace.mouse.move(canvas.x + canvas.width * .65 + 60, canvas.y + canvas.height * .65 + 30, { steps: 6 });
+    await workspace.mouse.up({ button: 'middle' });
+    const afterPan = await cameraState();
+    assert.ok(afterPan.target.some((value, i) => Math.abs(value - beforePan.target[i]) > .01), 'middle drag pans the target');
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs((afterPan.camera[i] - beforePan.camera[i]) - (afterPan.target[i] - beforePan.target[i])) < .001, 'pan preserves camera direction and distance');
+    assert.equal(afterPan.selection, beforePan.selection, 'middle drag never selects a planet');
+    const beforeAltPan = await cameraState();
+    await workspace.keyboard.down('Alt');
+    await workspace.mouse.down({ button: 'middle' });
+    await workspace.mouse.move(canvas.x + canvas.width * .65 + 90, canvas.y + canvas.height * .65 + 45, { steps: 4 });
+    await workspace.mouse.up({ button: 'middle' });
+    await workspace.keyboard.up('Alt');
+    const afterAltPan = await cameraState();
+    assert.ok(afterAltPan.target.some((value, i) => Math.abs(value - beforeAltPan.target[i]) > .01), 'Alt+Middle also pans');
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs((afterAltPan.camera[i] - beforeAltPan.camera[i]) - (afterAltPan.target[i] - beforeAltPan.target[i])) < .001);
+    await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-v27-planets.png') });
     assert.ok(await workspace.locator('[data-task-id="1"].is-working').count() > 0);
     await workspace.evaluate(() => window.PetitUniverse.selectTask('2'));
     assert.equal(await workspace.locator('[data-task-id="2"].is-working').count(), 0, 'selection does not move work focus');
     await workspace.evaluate(() => document.getElementById('work-session-pause').click());
     await workspace.waitForFunction(() => window.PetitUniverse.workingTask() === null);
+    await workspace.waitForFunction(() => document.getElementById('petit-context-session').textContent.startsWith('一時停止中：'));
+    await workspace.waitForFunction(() => !window.__fixtureScene.renderFrame);
+    assert.ok(await workspace.evaluate(() => {
+      const work = window.__fixtureScene.entries.get('1').object;
+      return !work.userData.working && Math.abs(work.getObjectByName('Atmosphere').material.uniforms.glowOpacity.value - .12) < .001;
+    }), 'pause restores the former work planet glow');
     assert.equal(await workspace.locator('[data-task-id].is-working').count(), 0, 'pause removes work emphasis');
     await workspace.evaluate(() => document.getElementById('work-session-pause').click());
     await workspace.waitForFunction(() => window.PetitUniverse.workingTask() === '1');
@@ -319,6 +363,53 @@ const server = http.createServer(async (request, response) => {
     await workspace.locator('.petit-area-rail__nav button').nth(1).click();
     await workspace.waitForTimeout(350);
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-workspace.png') });
+    const checkChatViewport = async (suffix) => {
+      await workspace.evaluate(() => window.PetitAppShell.activateView('chat'));
+      await workspace.waitForFunction(() => document.body.classList.contains('petit-chat-screen') && document.getElementById('petit-context-session').textContent === '作業中：作業中の星');
+      await workspace.waitForFunction(() => document.querySelector('[data-view-panel="chat"]').getAnimations().every(animation => animation.playState !== 'running'));
+      assert.equal(await workspace.locator('#petit-context-view, #petit-context-current, #petit-context-sync').count(), 0);
+      assert.equal(await workspace.locator('.chat-context').isVisible(), false);
+      assert.equal(await workspace.locator('select[aria-label="音声入力方式"]').isVisible(), false);
+      await workspace.locator('.chat-voice-options > summary').click();
+      assert.equal(await workspace.locator('select[aria-label="音声入力方式"]').isVisible(), true);
+      await workspace.locator('.chat-voice-options > summary').click();
+      assert.equal(await workspace.locator('#detail-panel').isVisible(), false, 'task details are initially collapsed');
+      await workspace.locator('#petit-context-bar > summary').click();
+      assert.ok(await workspace.locator('#petit-work-details #detail-panel').isVisible());
+      const bounds = await workspace.locator('#petit-work-details').boundingBox();
+      const railBounds = await workspace.locator('.petit-area-rail').boundingBox();
+      await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-v27-work-${suffix}.png`) });
+      assert.ok(bounds.x >= (railBounds ? railBounds.x + railBounds.width : 0), `work details clear the left menu: ${JSON.stringify({ bounds, railBounds })}`);
+      await workspace.locator('#petit-context-bar').press('Escape');
+      await workspace.evaluate(() => {
+        const messages = document.getElementById('messages');
+        for (let index = 0; index < 70; index++) {
+          const bubble = document.createElement('div'); bubble.className = 'message message--assistant';
+          bubble.textContent = `会話のスクロール確認 ${index}。長い会話でも入力欄を下部に残します。`; messages.appendChild(bubble);
+        }
+        messages.scrollTop = 0;
+      });
+      const composer = await workspace.locator('#chat-form').boundingBox();
+      const sessionBounds = await workspace.locator('#petit-context-bar').boundingBox();
+      await workspace.locator('#messages').hover();
+      await workspace.mouse.wheel(0, 600);
+      await workspace.waitForFunction(() => document.getElementById('messages').scrollTop > 0);
+      const afterScroll = await workspace.locator('#chat-form').boundingBox();
+      for (const key of ['x', 'y', 'width', 'height']) assert.ok(Math.abs(afterScroll[key] - composer[key]) <= 1, 'scroll keeps composer in place within one CSS pixel');
+      assert.deepEqual(await workspace.locator('#petit-context-bar').boundingBox(), sessionBounds, 'scroll keeps session header in place');
+      const dimensions = await workspace.evaluate(() => ({ height: innerHeight, width: innerWidth, scroll: document.scrollingElement.scrollTop }));
+      assert.ok(composer.y + composer.height <= dimensions.height && composer.x >= 0 && composer.x + composer.width <= dimensions.width);
+      assert.equal(dimensions.scroll, 0, 'only messages scroll');
+      const utility = await workspace.locator('.petit-utility-dock').boundingBox();
+      if (utility) assert.ok(utility.y + utility.height < composer.y, 'mobile utility buttons do not cover chat input');
+      await workspace.locator('#chat-input').fill('スクロール後も書ける下書き');
+      await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-v27-chat-${suffix}.png`) });
+      await workspace.evaluate(() => window.PetitAppShell.activateView('tasks'));
+      assert.equal(await workspace.locator('#detail-panel').isVisible(), false);
+      await workspace.evaluate(() => window.PetitAppShell.activateView('chat'));
+      assert.equal(await workspace.locator('#chat-input').inputValue(), 'スクロール後も書ける下書き');
+    };
+    await checkChatViewport('desktop');
     const originalSize = await workspace.evaluate(() => ({ width: innerWidth, height: innerHeight }));
     await workspace.evaluate(() => window.dispatchEvent(new CustomEvent('petit:navigate', { detail: { view: 'univ' } })));
     await workspace.evaluate(() => document.activeElement?.blur());
@@ -334,6 +425,12 @@ const server = http.createServer(async (request, response) => {
     assert.equal(await rail.isVisible(), false, 'mobile keeps the existing navigation instead of a sidebar');
     await workspace.waitForTimeout(220);
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-mobile.png') });
+    await checkChatViewport('mobile');
+    await workspace.locator('#petit-context-bar > summary').click();
+    await workspace.locator('#work-session-end').click();
+    await workspace.waitForFunction(() => document.getElementById('petit-context-session').textContent === '作業なし');
+    await workspace.reload();
+    await workspace.waitForFunction(() => document.getElementById('petit-context-session')?.textContent === '作業なし');
     await instance.evaluate(sizeWorkspace, originalSize);
     await workspace.close();
     // Renderer crash is distinguished from an unavailable server; draft survives.
@@ -372,7 +469,7 @@ const server = http.createServer(async (request, response) => {
     await recovered.waitForURL(`${origin}/static/desktop/index.html`);
     assert.equal(await recovered.locator('#input').inputValue(), 'クラッシュをまたぐ下書き');
     assert.deepEqual(errors, []);
-    console.log('PASS: isolated Electron chat/approval/synthetic voice, input, nudge, work focus, conflicts, notifications, compact/hover/focus/pinned rail without scene reflow, 960/390px layouts, recovery and IPC isolation.');
+    console.log('PASS: isolated Electron chat/approval/synthetic voice, v27 compact session/dropdown, fixed chat input and message scrolling, actual WebGL work glow/middle pan, voice options, 960/390px layouts, compact/hover/pinned rail, conflicts, notifications, recovery and IPC isolation.');
     console.log(`Screenshot: ${screenshot}`);
   } finally {
     if (instance) await instance.close();
