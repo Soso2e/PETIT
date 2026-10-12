@@ -1,12 +1,15 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.25.2**
+**Current Version: v0.25.3**
 
 **Last Updated: 2026-10-12**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #309: macOS v0.24.0の署名不整合は公開workflowの署名スキップが原因。開発用ad-hoc署名・署名直後/DMG完成後の検証・内容一致チェックを追加し、正式Releaseは資格情報不足時に停止。v0.24.0再作成と現行v0.25.1のDMG検証成功。Safari取得・隔離属性保持の実機起動は未公証警告で拒否。Developer ID証明書/秘密鍵と公証資格情報の登録、正式再ビルド、通常起動受入が残る。詳細は`docs/macos-distribution.md`。
+- #311 / v0.25.3: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。未公証DMGはGatekeeperで通常起動が拒否され得るため、実機受入・更新通知は未完了。
+
+
+- #309: macOS v0.24.0の署名不整合は旧workflowによる署名スキップが原因。ad-hoc署名・署名直後/DMG完成後の検証・内容一致チェックを追加済み。Safari取得した未公証DMGはGatekeeperで通常起動拒否。今後Apple公証を行わない方針（#311）で、個人端末でのインストールと更新受入は未完了。詳細は`docs/macos-distribution.md`。
 
 - #301 / v0.25.1: DesktopをPCの主入口として、Core正本のThread/Turn/Events・永続承認/結果照会、共通画面状態、ローカルCore管理、下書きのCore/thread/view別保存、起動/復旧/配布を一体設計。`docs/desktop-foundation-design.md` に現行との差分・目標API/所有権・6段階の依存/完了条件を固定。A #302から実装し、B #303、C #304、D #305、E #306、F #307で追跡。設計のみで新API/管理Coreは未実装。Conceptの目的と既存Domain/情報源/承認境界を維持し、過去Web中心設計との優先関係を明記。
 

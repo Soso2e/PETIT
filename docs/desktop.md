@@ -82,15 +82,15 @@ Wakeまたは「音声会話」で連続会話を開始する。Chat完了とTTS
 
 - PRではDesktopテストだけを実行し、インストーラーは生成しない。
 - Actionsの手動実行（`workflow_dispatch`）ではmacOS arm64 / Windows x64をビルドし、macOSはad-hoc署名、Windowsは未署名の開発用Artifactとして14日保存する。macOSの開発用ファイル名には`development`を含め、正式Release用と区別する。
-- macOS正式ReleaseはDeveloper ID署名・公証の資格情報がすべて必須。不足時はビルドを失敗させ、未署名DMGへフォールバックしない。
-- `main`の履歴上にある`v*`タグをpushすると、`desktop/package.json`とのバージョン一致を検証した上で両OSをビルドし、DMG / EXEを同名タグのGitHub Releaseへ自動添付する。workflow自身はタグを作成しない。
+- 個人利用向けmacOS ReleaseはDeveloper ID・Apple公証を要求せず、アプリ全体を明示的にad-hoc署名してDMG化する。署名後/DMG内の署名・リソース整合性検証に失敗した場合は公開しない。
+- `main`の履歴上にある`v*`タグをpushすると、`desktop/package.json`とのバージョン一致を検証した上で両OSをビルドし、ad-hoc署名DMG / Windows EXEを同名タグのGitHub Releaseへ自動添付する。workflow自身はタグを作成しない。
 - 安定版SemVer、同じOS/CPU用の`PETIT-<version>-mac-arm64.dmg`、`mac-x64.dmg`、`win-x64.exe`があるReleaseだけ候補にする。WebのみのRelease、draft/prerelease、旧版は除外。
 - 起動10秒後と24時間ごと（設定でOFF可能）、またはトレイ/設定から確認。ネットワーク失敗はアプリ起動を妨げない。自動確認は同一バージョンをプロセス内で重複通知しない。
 - 通知から公式Releaseページを開き、利用者がインストーラーを実行する。初回公開前や対応assetがないときは「利用可能なDesktop更新なし」となる。
 - Desktopのバージョンとサーバーのバージョンは別に進められる。今回の最低サーバーは小型画面の追加を含むv0.20.0。アプリ更新はPythonやユーザーデータを置換しない。サーバー更新は従来のGit等の手順を維持。
   - **サーバー・Web画面側（Python / HTML / JS等）の変更**: Desktopアプリの再インストール・再配布は不要。サーバーコードを更新・再起動するだけでDesktopアプリ内の画面・機能にも即座に反映される。
   - **Desktop本体（`desktop/`配下のElectron処理・トレイ・ショートカット等）の変更**: 専用ブランチから `main` へPRを作成してマージし、`v*` タグを push することで GitHub Release が自動作成・配信され、Desktopアプリ側へ更新通知が行く。
-- 署名・公証・鍵管理・実更新テストが揃ったらelectron-updaterのGitHub providerを評価し、署名検証付きのダウンロード＋再起動時適用へ進む。自動更新を実装済みとは扱わない。
+- 更新はGitHub Releaseの通知から利用者が手動でインストーラーを取得する方式。未公証macOSの自動更新は実装しない。将来の自動更新は配布物の検証・実機更新テストを改めて設計する。
 
 [Electron更新ガイド](https://www.electronjs.org/docs/latest/tutorial/updates)、[electron-builder配布](https://www.electron.build/publish/)、[Tauri updaterの署名要件](https://v2.tauri.app/plugin/updater/#signing-updates)を比較。今回は通知で要件を満たし、署名準備前の自己更新を避ける。
 
@@ -154,12 +154,13 @@ npm test             # OS/マイクなしの境界・録音・取消テスト
 npm run test:smoke   # 実Electron + 仮サーバー + 生成音声。実マイクは使用しない
 npm run pack         # 展開済みアプリ。macOSは署名必須（開発用は -- --mac --arm64 -c.mac.identity=- -c.mac.hardenedRuntime=false）
 npm run build        # このOS用のインストーラー。macOSは署名必須。Releaseへは公開しない
-npm run build:mac:development # macOS arm64開発用。ad-hoc署名はGatekeeperの配布承認ではない
+npm run build:mac:development # macOS arm64開発用（development名）、ad-hoc署名
+npm run build:mac:personal    # macOS arm64個人利用リリース用（通常名）、ad-hoc署名
 ```
 
 macOSはDMG、WindowsはNSIS。PRではNodeの関連テストのみ。OS別パッケージを試したい場合はActionsを手動実行し、開発用Artifactを取得する。現在の自動ビルド対象はmacOS arm64 / Windows x64。
 公開する場合だけ、`desktop/package.json`のversionと一致するSemVerタグ（例: `v0.20.0`）をmain上のコミットへ付けてpushする。タグpush後は両OSのインストーラーをビルドし、GitHub Releaseを自動作成して添付する。
-macOS Developer ID署名＋公証、Windowsコード署名が未整備の間は、原則として`workflow_dispatch`のArtifactで実機検証し、公開用タグは切らない。署名・インストール・上書き更新を確認後にRelease運用へ移行する。
+個人利用限定のためApple Developer Program・Developer ID・公証は使用しない。タグpushから個人向けGitHub Releaseを生成できる。ただしad-hoc署名DMGはAppleが検証・公証したアプリではなく、Safariダウンロード後の通常起動はGatekeeperに拒否され得る。本人が入手元を確認しmacOS「プライバシーとセキュリティ」等で個別に許可する場合がある。OSのセキュリティ機能や隔離属性を自動で無効化する処理は追加しない。実機インストール・更新確認は未完了。
 
 macOSの署名順序、証明書設定、v0.24.0再作成結果は [macOS配布検証](macos-distribution.md) を参照。
 

@@ -1,6 +1,6 @@
 {
   "name": "petit-desktop",
-  "version": "0.25.2",
+  "version": "0.25.3",
   "private": true,
   "description": "PETIT desktop companion",
   "author": "Soso2e",
@@ -13,7 +13,8 @@
     "pack": "npm run prepare:wake-model && electron-builder --dir --publish never",
     "test:smoke": "node test/smoke.cjs",
     "test:package-resources": "node test/package-resources.cjs",
-    "build:mac:development": "npm run build -- --mac --arm64 -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false -c.artifactName='PETIT-${version}-development-${os}-${arch}.${ext}'"
+    "build:mac:development": "npm run build -- --mac --arm64 -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false -c.artifactName='PETIT-${version}-development-${os}-${arch}.${ext}'",
+    "build:mac:personal": "npm run build -- --mac --arm64 -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false"
   },
   "devDependencies": {
     "electron": "44.2.0",
