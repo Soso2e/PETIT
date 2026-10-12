@@ -1,6 +1,6 @@
 # Desktop / Web v0.27.0
 
-Issue #318。`feat/v27`で実装・隔離Electron検証済み。Push・PR・Releaseは未実施。
+Issue #318。`feat/v27`で実装・隔離Electron検証済み。main反映・Releaseは未実施。実操作で見つかった後続課題は [UX調査](v27-ux-followup.md) を参照。
 
 Issue #319で[統計タブ](work-statistics.md)を追加。今日の合計、7日間のグラフ、タスク別内訳、作業記録から達成感と振り返りを支える。
 
