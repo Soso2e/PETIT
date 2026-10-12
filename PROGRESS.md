@@ -1,12 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.25.3**
+**Current Version: v0.25.4**
 
 **Last Updated: 2026-10-12**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #311 / v0.25.3: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。未公証DMGはGatekeeperで通常起動が拒否され得るため、実機受入・更新通知は未完了。
+- #311 / v0.25.4: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。手動Actionsもタグrefではdevelopment用DMGを重複生成しないよう分岐。未公証DMGはGatekeeperで通常起動が拒否され得るため、実機受入・更新通知は未完了。
 
 
 - #309: macOS v0.24.0の署名不整合は旧workflowによる署名スキップが原因。ad-hoc署名・署名直後/DMG完成後の検証・内容一致チェックを追加済み。Safari取得した未公証DMGはGatekeeperで通常起動拒否。今後Apple公証を行わない方針（#311）で、個人端末でのインストールと更新受入は未完了。詳細は`docs/macos-distribution.md`。

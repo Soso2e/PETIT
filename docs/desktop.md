@@ -81,7 +81,7 @@ Wakeまたは「音声会話」で連続会話を開始する。Chat完了とTTS
 初回は **GitHub ReleasesでDMG / NSISを配布し、Desktopから更新通知**。ストア運用や独自更新サーバーを増やさない。既存リポジトリはpublic。通知確認はGitHubの公開APIだけを使用し、PATを配布しない。
 
 - PRではDesktopテストだけを実行し、インストーラーは生成しない。
-- Actionsの手動実行（`workflow_dispatch`）ではmacOS arm64 / Windows x64をビルドし、macOSはad-hoc署名、Windowsは未署名の開発用Artifactとして14日保存する。macOSの開発用ファイル名には`development`を含め、正式Release用と区別する。
+- ブランチrefでのActions手動実行（`workflow_dispatch`）はmacOS arm64 / Windows x64の開発用Artifactを14日保存する。macOSはad-hoc署名した`development`名のDMGを生成する。タグrefの手動実行（`Create PETIT Desktop Release`経由）では個人利用向け通常名DMGのみを生成し、開発用DMGと重複させない。
 - 個人利用向けmacOS ReleaseはDeveloper ID・Apple公証を要求せず、アプリ全体を明示的にad-hoc署名してDMG化する。署名後/DMG内の署名・リソース整合性検証に失敗した場合は公開しない。
 - `main`の履歴上にある`v*`タグをpushすると、`desktop/package.json`とのバージョン一致を検証した上で両OSをビルドし、ad-hoc署名DMG / Windows EXEを同名タグのGitHub Releaseへ自動添付する。workflow自身はタグを作成しない。
 - 安定版SemVer、同じOS/CPU用の`PETIT-<version>-mac-arm64.dmg`、`mac-x64.dmg`、`win-x64.exe`があるReleaseだけ候補にする。WebのみのRelease、draft/prerelease、旧版は除外。
