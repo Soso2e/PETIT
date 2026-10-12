@@ -1,6 +1,7 @@
 // Shared PETIT chat input behavior for legacy and Universe UIs.
 (() => {
   const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.14.1";
+  const resizers = new WeakMap();
 
   const setup = ({ form, input, maxHeight = 160 }) => {
     if (!form || !input || input.dataset.petitChatInputReady === "true") return;
@@ -10,9 +11,13 @@
     let composeTimer = null;
 
     const resize = () => {
+      const cssMax = parseFloat(getComputedStyle(input).maxHeight);
+      const limit = Number.isFinite(cssMax) ? Math.min(cssMax, maxHeight) : maxHeight;
       input.style.height = "auto";
-      input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`;
+      input.style.height = `${Math.min(input.scrollHeight, limit)}px`;
+      input.style.overflowY = input.scrollHeight > limit ? "auto" : "hidden";
     };
+    resizers.set(input, resize);
 
     input.addEventListener("compositionstart", () => {
       composing = true;
@@ -31,6 +36,7 @@
       if (event.shiftKey) return;
       if (composing || event.isComposing || event.keyCode === 229) return;
       event.preventDefault();
+      if (event.repeat || form.querySelector('[type="submit"]')?.disabled) return;
       form.requestSubmit();
     }, true);
 
@@ -79,7 +85,7 @@
     }
   };
 
-  window.PetitChatInput = { setup, discover };
+  window.PetitChatInput = { setup, discover, resize: (input) => resizers.get(input)?.() };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", discover, { once: true });
   } else {

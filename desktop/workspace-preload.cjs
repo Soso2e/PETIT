@@ -1,6 +1,11 @@
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('petitWorkspace', { desktop: true });
+contextBridge.exposeInMainWorld('petitNotifications', {
+  read: () => ipcRenderer.invoke('workspace:notifications-read'),
+  enable: (value) => ipcRenderer.invoke('workspace:notifications-enable', value),
+  test: () => ipcRenderer.invoke('workspace:notifications-test'),
+});
 window.addEventListener('DOMContentLoaded', () => {
   if (!document.querySelector('.universe-shell')) return;
   const toolbar = document.createElement('nav');

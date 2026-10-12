@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -261,13 +262,13 @@ def _mark_conflict(operation: dict[str, Any], task: dict[str, Any], message: str
         )
 
 
-def _apply_remote_result(operation: dict[str, Any], remote: dict[str, Any]) -> None:
+def _apply_remote_result(operation: dict[str, Any], remote: dict[str, Any], *, connection: Any = None) -> None:
     task_id = int(operation["task_id"])
     now = db.now_iso()
     area, _ = resolve_area(remote.get("area"), remote.get("category"))
     project_external_ids = [str(item) for item in remote.get("project_external_ids") or [] if str(item).strip()]
     parent_external_ids = [str(item) for item in remote.get("parent_external_ids") or [] if str(item).strip()]
-    with db.get_connection() as conn:
+    with nullcontext(connection) if connection is not None else db.get_connection() as conn:
         conn.execute(
             "UPDATE tasks_cache SET source='notion', title=?, status=?, due_date=?, priority=?, category=?, area=?, reason=?, "
             "external_id=?, url=?, done_date=?, project_external_id=?, project_external_ids=?, assignee_external_ids=?, "
@@ -382,6 +383,13 @@ def _execute(operation: dict[str, Any]) -> None:
     external_id = str(task.get("external_id") or "").strip()
     if not external_id:
         raise NotionError("Notionページ作成が未完了のため、更新を後で再試行します。")
+    remote = notion_client.get_task_page(external_id)
+    if base and remote.get("source_updated_at") and str(base) != str(remote["source_updated_at"]):
+        with db.get_connection() as conn:
+            conn.execute("UPDATE tasks_cache SET remote_snapshot_json=?, source_updated_at=? WHERE id=?",
+                         (_json(remote), remote["source_updated_at"], task["id"]))
+        _mark_conflict(operation, task, "Notion側が再更新されました。最新の差分を確認してください。")
+        return
     _apply_remote_result(operation, _update_remote_task(external_id, payload))
 
 

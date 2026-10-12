@@ -4,6 +4,8 @@ const { serviceUrl, isOverlay, isWorkspace, isNewer, desktopRelease, RELEASES_UR
 test('workspace navigation stays on known same-origin pages', () => {
   const origin = 'https://petit.example';
   for (const url of [origin + '/', origin + '/static/universe.html', origin + '/static/universe.html#tasks']) assert.ok(isWorkspace(url, origin));
+  for (const query of ['?view=settings', '?view=tasks&task=12&notification=3']) assert.ok(isWorkspace(origin + '/static/universe.html' + query, origin));
+  for (const query of ['?view=evil', '?view=chat&view=settings', '?task=abc', '?task=-1']) assert.equal(isWorkspace(origin + '/static/universe.html' + query, origin), false);
   for (const url of [origin + '/api/chat', origin + '/static/desktop/index.html', origin + '/?token=x', 'https://evil.example/', 'file:///tmp/x', 'invalid', 'https://user@petit.example/']) assert.equal(isWorkspace(url, origin), false);
 });
 test('server trust: HTTPS and loopback only, never credentials/path/query', () => {

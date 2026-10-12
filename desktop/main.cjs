@@ -3,16 +3,15 @@ const { app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, se
   shell, dialog, Notification, powerMonitor, systemPreferences, utilityProcess, screen } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
-const { Readable } = require('node:stream');
-const { pipeline } = require('node:stream/promises');
+const { installerAsset, downloadVerified } = require('./update-download.cjs');
 const { pathToFileURL } = require('node:url');
 const { serviceUrl, isOverlay, isWorkspace, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
 const { windowState } = require('./window-state.cjs');
+const { notificationFeed } = require('./notification-feed.cjs');
 const { transcribe } = require('./transcribe.cjs');
 const { wakeError } = require('./wake-setup.cjs');
 const { prepareWakeEnvironment } = require('./wake-auto-setup.cjs');
 const SHORTCUT = 'CommandOrControl+Shift+Space';
-const MAX_UPDATE_BYTES = 350 * 1024 * 1024;
 let overlay, settingsWindow, tray, wakeProcess, config, configFile, wakeSetupController;
 let quitting = false, suspended = false, wakeFailed = false, shortcutOK = false, overlayReady = false;
 let pendingActivation = false, sttRequest = null, updateBusy = false, lastUpdate = '', lastWakeError = '';
@@ -20,11 +19,13 @@ let generation = 0;
 let wakeReady = false, wakeTimer;
 let sleeping = false, locked = false;
 let workspace, recoveryWindow, recoveryState, geometry;
+let nudgeWindow, nudgeEvent, nudgeTimer, feed, cursorFile, cursors = {}, notificationError = '';
+const nudgeUrl = pathToFileURL(path.join(__dirname, 'nudge.html')).href;
 const settingsUrl = pathToFileURL(path.join(__dirname, 'setup.html')).href;
 const recoveryUrl = pathToFileURL(path.join(__dirname, 'recovery.html')).href;
 const defaults = { serverUrl: 'http://127.0.0.1:8000', sttUrl: '', sttModel: 'whisper-1',
   wakeEnabled: false, modelPath: '', backbonePath: '', wakePythonPath: '',
-  wakeThreshold: 0.45, login: false, updates: true };
+  wakeThreshold: 0.45, login: false, updates: true, notifications: false, notificationMode: 'gentle' };
 function persistConfig(next) {
   fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
   fs.renameSync(`${configFile}.tmp`, configFile);
@@ -48,6 +49,8 @@ function readConfig() {
       wakeEnabled: raw.wakeEnabled === true && Boolean(modelPath && raw.backbonePath),
       login: raw.login === true,
       updates: raw.updates !== false,
+      notifications: raw.notifications === true,
+      notificationMode: raw.notificationMode === 'native' ? 'native' : 'gentle',
     };
     const hadLegacyWakeConfig = ['encryptedKey', 'keywordPath', 'wakeAuto', 'wakeRuntimePath'].some((key) => Object.hasOwn(raw, key));
     if (hadLegacyWakeConfig) persistConfig(value);
@@ -111,6 +114,56 @@ function refreshTray() {
     { type: 'separator' },
     { label: 'PETITを終了', click: () => app.quit() },
   ]));
+}
+function closeNudge() {
+  clearTimeout(nudgeTimer);
+  if (nudgeWindow && !nudgeWindow.isDestroyed()) nudgeWindow.destroy();
+  nudgeWindow = null; nudgeEvent = null;
+}
+function dismissNudgeLater() {
+  clearTimeout(nudgeTimer); nudgeTimer = setTimeout(closeNudge, 12000); nudgeTimer.unref();
+}
+function showNudge(event) {
+  closeNudge();
+  nudgeEvent = { title: String(event.title || 'PETIT').slice(0, 120), body: String(event.body || '').slice(0, 500) };
+  const area = screen.getPrimaryDisplay().workArea;
+  const width = Math.min(380, area.width), height = Math.min(250, area.height);
+  const win = nudgeWindow = new BrowserWindow({ width, height, x: area.x + area.width - width - 16,
+    y: area.y + area.height - height - 16, frame: false, transparent: true, resizable: false,
+    alwaysOnTop: true, skipTaskbar: true, show: false,
+    webPreferences: { preload: path.join(__dirname, 'nudge-preload.cjs'), sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  lockNavigation(win, (url) => url === nudgeUrl);
+  win.once('ready-to-show', () => { if (!win.isDestroyed()) { win.showInactive(); dismissNudgeLater(); } });
+  void win.loadURL(nudgeUrl);
+}
+function deliverDesktopNotification(event) {
+  if (suspended || quitting) return;
+  if (config.notificationMode === 'gentle') { showNudge(event); return; }
+  if (!Notification.isSupported()) throw new Error('OS通知を利用できません。「画面のすみに声かけ」を選んでください。');
+  const notification = new Notification({ title: String(event.title || 'PETIT').slice(0, 120), body: String(event.body || '').slice(0, 500), silent: true });
+  notification.on('click', () => showWorkspace());
+  notification.on('failed', () => { notificationError = 'OS通知を表示できません。OSの通知許可・集中モードを確認するか、画面の声かけを選んでください。'; });
+  notification.show();
+}
+function desktopNotificationStatus() {
+  const supported = Notification.isSupported();
+  return { enabled: config.notifications, mode: config.notificationMode, supported,
+    error: notificationError || (config.notificationMode === 'native' && !supported ? 'OS通知を利用できません。Desktop設定で「画面のすみに声かけ」を選んでください。' : '') };
+}
+async function pollNotifications() {
+  if (!feed || suspended || quitting) return;
+  const origin = config.serverUrl;
+  try {
+    await feed.poll(origin, config.notifications, () => config.notifications && config.serverUrl === origin && !suspended && !quitting);
+    if (notificationError.startsWith('通知の取得に失敗')) notificationError = '';
+  } catch { notificationError = '通知の取得に失敗しました。PETITサーバーの接続を確認してください。'; }
+}
+function setDesktopNotifications(enabled) {
+  if (typeof enabled !== 'boolean') throw new Error('通知設定が不正です。');
+  if (enabled && !config.notifications) delete cursors[config.serverUrl];
+  persistConfig({ ...config, notifications: enabled }); notificationError = '';
+  if (!enabled) closeNudge(); else void pollNotifications();
+  return desktopNotificationStatus();
 }
 function lockNavigation(win, allowed) {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -223,43 +276,31 @@ function hideOverlay(resume = true) {
   if (resume) void startWake();
 }
 function assertSender(event, kind) {
-  const win = kind === 'settings' ? settingsWindow : kind === 'workspace' ? workspace : kind === 'recovery' ? recoveryWindow : overlay;
-  const allowed = kind === 'settings' ? event.senderFrame?.url === settingsUrl :
+  const win = kind === 'nudge' ? nudgeWindow : kind === 'settings' ? settingsWindow : kind === 'workspace' ? workspace : kind === 'recovery' ? recoveryWindow : overlay;
+  const allowed = kind === 'nudge' ? event.senderFrame?.url === nudgeUrl : kind === 'settings' ? event.senderFrame?.url === settingsUrl :
     kind === 'workspace' ? isWorkspace(event.senderFrame?.url, config.serverUrl) :
     kind === 'recovery' ? event.senderFrame?.url === recoveryUrl : isOverlay(event.senderFrame?.url, config.serverUrl);
   if (!win || event.sender !== win.webContents || event.senderFrame !== event.sender.mainFrame ||
       !allowed)
     throw new Error('許可されていない呼び出しです。');
 }
-function installerAsset(release) {
-  const version = release.tag_name.replace(/^v/, '');
-  const suffix = process.platform === 'darwin' ? `mac-${process.arch}.dmg` : `win-${process.arch}.exe`;
-  const name = `PETIT-${version}-${suffix}`;
-  const asset = release.assets?.find((item) => item.name === name);
-  if (!asset) return null;
-  const expectedPrefix = `https://github.com/Soso2e/PETIT/releases/download/${encodeURIComponent(release.tag_name)}/`;
-  if (!asset.browser_download_url?.startsWith(expectedPrefix) || asset.browser_download_url !== `${expectedPrefix}${encodeURIComponent(name)}`) return null;
-  return asset;
-}
 async function downloadAndInstallWindows(release) {
   if (process.platform !== 'win32' || process.arch !== 'x64' || !app.isPackaged) throw new Error('この環境ではアプリ内更新を利用できません。');
-  const asset = installerAsset(release);
+  const asset = installerAsset(release, process.platform, process.arch);
   if (!asset) throw new Error('更新用installerを確認できませんでした。');
-  const destination = path.join(app.getPath('temp'), asset.name);
-  await fs.promises.rm(destination, { force: true }).catch(() => {});
-  const response = await fetch(asset.browser_download_url, { redirect: 'follow', signal: AbortSignal.timeout(120000) });
-  if (!response.ok || !response.body) throw new Error('更新のダウンロードに失敗しました。');
-  const size = Number(response.headers.get('content-length') || 0);
-  if (size && size > MAX_UPDATE_BYTES) throw new Error('更新ファイルのサイズが上限を超えています。');
-  let received = 0;
-  const limiter = new TransformStream({ transform(chunk, controller) {
-    received += chunk.byteLength;
-    if (received > MAX_UPDATE_BYTES) throw new Error('更新ファイルのサイズが上限を超えています。');
-    controller.enqueue(chunk);
-  } });
-  await pipeline(Readable.fromWeb(response.body.pipeThrough(limiter)), fs.createWriteStream(destination, { flags: 'wx' }));
-  const result = await shell.openPath(destination);
-  if (result) throw new Error(`installerを起動できませんでした: ${result}`);
+  const target = settingsWindow || workspace || overlay;
+  let destination;
+  try {
+    destination = await downloadVerified(asset, app.getPath('temp'), { progress: (value) => {
+      if (target && !target.isDestroyed()) target.setProgressBar(value);
+      if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.webContents.send('settings:update-progress', `更新をダウンロード中… ${Math.round(value * 100)}%`);
+    } });
+    const result = await shell.openPath(destination);
+    if (result) throw new Error('installerを起動できませんでした。Releasesから再取得してください。');
+  } catch (error) {
+    if (destination) await fs.promises.rm(path.dirname(destination), { recursive: true, force: true });
+    throw error;
+  } finally { if (target && !target.isDestroyed()) target.setProgressBar(-1); }
   quitting = true;
   app.quit();
 }
@@ -272,7 +313,7 @@ async function checkUpdates(manual = false) {
     if (!response.ok) throw new Error('release');
     const release = desktopRelease(await response.json(), app.getVersion(), process.platform, process.arch);
     if (release) {
-      const canInstall = process.platform === 'win32' && process.arch === 'x64' && app.isPackaged && installerAsset(release);
+      const canInstall = process.platform === 'win32' && process.arch === 'x64' && app.isPackaged && installerAsset(release, process.platform, process.arch);
       message = canInstall ? `${release.tag_name}を利用できます。PETITから更新できます。` :
         `${release.tag_name}を利用できます。GitHub Releasesからインストールしてください。`;
       if (manual) {
@@ -295,6 +336,20 @@ async function checkUpdates(manual = false) {
 }
 function installIpc() {
   const on = (channel, kind, handler) => ipcMain.handle(channel, (event, ...args) => { assertSender(event, kind); return handler(...args); });
+  for (const kind of ['workspace', 'desktop', 'settings']) {
+    const sender = kind === 'desktop' ? 'overlay' : kind;
+    on(`${kind}:notifications-read`, sender, desktopNotificationStatus);
+    on(`${kind}:notifications-enable`, sender, setDesktopNotifications);
+    on(`${kind}:notifications-test`, sender, () => {
+      notificationError = '';
+      deliverDesktopNotification({ title: 'PETIT 通知テスト', body: 'この形で声をかけます。届いたか確認してください。' });
+      return { message: 'テスト通知の表示を要求しました。画面・OSの通知設定で受信を確認してください。' };
+    });
+  }
+  on('nudge:read', 'nudge', () => nudgeEvent);
+  on('nudge:dismiss', 'nudge', closeNudge);
+  on('nudge:open', 'nudge', () => { closeNudge(); showWorkspace(); });
+  on('nudge:hover', 'nudge', (hover) => { if (hover === true) clearTimeout(nudgeTimer); else dismissNudgeLater(); });
   on('desktop:hide', 'overlay', () => hideOverlay());
   on('desktop:open-web', 'overlay', () => shell.openExternal(config.serverUrl));
   on('desktop:workspace', 'overlay', () => showWorkspace());
@@ -364,13 +419,16 @@ function installIpc() {
       modelPath: String(values.modelPath || ''), backbonePath: String(values.backbonePath || ''),
       wakePythonPath: config.wakePythonPath || '',
       wakeEnabled: values.wakeEnabled === true, login: values.login === true, updates: values.updates === true,
+      notifications: values.notifications === true, notificationMode: values.notificationMode === 'native' ? 'native' : 'gentle',
       wakeThreshold: threshold };
     if (next.modelPath && (!path.isAbsolute(next.modelPath) || path.extname(next.modelPath).toLowerCase() !== '.onnx' || !fs.statSync(next.modelPath).isFile())) throw new Error('ONNXモデルを選択してください。');
     if (next.backbonePath && (!path.isAbsolute(next.backbonePath) || !fs.statSync(next.backbonePath).isDirectory())) throw new Error('特徴抽出モデルのフォルダを選択してください。');
     if (next.wakeEnabled && (!next.modelPath || !next.backbonePath || !next.sttUrl)) throw new Error('音声待機にはSTT URL・ONNXモデル・backboneフォルダが必要です。');
     if (next.login && !app.isPackaged) throw new Error('ログイン時の起動はインストール版で設定してください。');
     const changedServer = next.serverUrl !== config.serverUrl;
+    if (next.notifications && (!config.notifications || changedServer)) delete cursors[next.serverUrl];
     persistConfig(next);
+    closeNudge(); notificationError = ''; void pollNotifications();
     stopWake(); cancelStt(); wakeFailed = false; lastWakeError = '';
     if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: config.login, args: ['--background'] });
     if (workspace && !workspace.isDestroyed() && changedServer) workspace.destroy();
@@ -384,9 +442,21 @@ else {
   app.on('second-instance', () => showOverlay());
   app.on('activate', () => { if (config) showOverlay(); });
   app.on('window-all-closed', () => {});
-  app.on('before-quit', () => { quitting = true; cancelWakeSetup(); stopWake(); cancelStt(); globalShortcut.unregisterAll(); });
+  app.on('before-quit', () => { quitting = true; closeNudge(); cancelWakeSetup(); stopWake(); cancelStt(); globalShortcut.unregisterAll(); });
   app.whenReady().then(() => {
     configFile = path.join(app.getPath('userData'), 'desktop.json'); config = readConfig();
+    if (process.platform === 'win32') app.setAppUserModelId('jp.soso2e.petit');
+    cursorFile = path.join(app.getPath('userData'), 'notification-cursors.json');
+    try { cursors = JSON.parse(fs.readFileSync(cursorFile, 'utf8')); if (!cursors || typeof cursors !== 'object' || Array.isArray(cursors)) cursors = {}; } catch { cursors = {}; }
+    feed = notificationFeed({
+      fetchJson: async (url) => {
+        const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(8000) });
+        if (!response.ok) throw new Error('notification'); return response.json();
+      },
+      show: deliverDesktopNotification,
+      loadCursor: (origin) => Number.isSafeInteger(cursors[origin]) && cursors[origin] >= 0 ? cursors[origin] : null,
+      saveCursor: (origin, value) => { cursors[origin] = value; fs.writeFileSync(`${cursorFile}.tmp`, JSON.stringify(cursors), { mode: 0o600 }); fs.renameSync(`${cursorFile}.tmp`, cursorFile); },
+    });
     geometry = windowState(path.join(app.getPath('userData'), 'windows.json'));
     session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
       callback(Boolean(contents === overlay?.webContents && overlay.isVisible() && isOverlay(contents.getURL(), config.serverUrl) &&
@@ -402,7 +472,7 @@ else {
     installIpc(); refreshTray();
     const syncPower = () => {
       suspended = sleeping || locked;
-      if (suspended) { cancelWakeSetup(); stopWake(); hideOverlay(false); } else void startWake();
+      if (suspended) { closeNudge(); cancelWakeSetup(); stopWake(); hideOverlay(false); } else { void startWake(); void pollNotifications(); }
     };
     powerMonitor.on('suspend', () => { sleeping = true; syncPower(); });
     powerMonitor.on('lock-screen', () => { locked = true; syncPower(); });
@@ -413,5 +483,7 @@ else {
     else showOverlay();
     setTimeout(() => { if (config.updates) void checkUpdates(); }, 10000).unref();
     setInterval(() => { if (config.updates) void checkUpdates(); }, 24 * 60 * 60 * 1000).unref();
+    void pollNotifications();
+    setInterval(() => void pollNotifications(), 15000).unref();
   });
 }

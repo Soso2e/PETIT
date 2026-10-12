@@ -87,13 +87,13 @@ Wakeまたは「音声会話」で連続会話を開始する。Chat完了とTTS
 - リリースを明示的に要求する場合のみ、`VERSION`を更新するPRのマージコミットメッセージに`[desktop-release]`を含めると、`Create PETIT Desktop Release` Actionsがタグ作成とDesktop workflowの手動dispatchを行う。**通常のmainマージではリリースしない**。Actions画面からの従来の手動`workflow_dispatch`も引き続き利用できる。GitHub ActionsのGITHUB_TOKENで作ったタグpushは新たなworkflowを通常起動しないため、明示的なworkflow dispatchを残す。
 - 安定版SemVer、同じOS/CPU用の`PETIT-<version>-mac-arm64.dmg`、`mac-x64.dmg`、`win-x64.exe`があるReleaseだけ候補にする。WebのみのRelease、draft/prerelease、旧版は除外。
 - 起動10秒後と24時間ごと（設定でOFF可能）、またはトレイ/設定から確認。ネットワーク失敗はアプリ起動を妨げない。自動確認は同一バージョンをプロセス内で重複通知しない。
-- 通知から公式Releaseページを開き、利用者がインストーラーを実行する。初回公開前や対応assetがないときは「利用可能なDesktop更新なし」となる。
+- Windows x64インストール版では更新ボタンからダウンロード・サイズ/SHA-256検証・installer起動まで進む。最後のインストール確認はinstallerで行う。macOS・開発起動・検証metadata不足では公式Releaseページから取得する。初回公開前や対応assetがないときは「利用可能なDesktop更新なし」となる。
 - Desktopのバージョンとサーバーのバージョンは別に進められる。今回の最低サーバーは小型画面の追加を含むv0.20.0。アプリ更新はPythonやユーザーデータを置換しない。サーバー更新は従来のGit等の手順を維持。
   - **サーバー・Web画面側（Python / HTML / JS等）の変更**: Desktopアプリの再インストール・再配布は不要。サーバーコードを更新・再起動するだけでDesktopアプリ内の画面・機能にも即座に反映される。
   - **Desktop本体（`desktop/`配下のElectron処理・トレイ・ショートカット等）の変更**: 専用ブランチから `main` へPRを作成してマージし、`v*` タグを push することで GitHub Release が自動作成・配信され、Desktopアプリ側へ更新通知が行く。
-- 更新はGitHub Releaseの通知から利用者が手動でインストーラーを取得する方式。未公証macOSの自動更新は実装しない。将来の自動更新は配布物の検証・実機更新テストを改めて設計する。
+- 未公証macOSの自己更新は未実装。Windows更新も実Releaseを使った旧版からの実機更新は未確認。新しい体験と受入条件は [Desktop v0.26.0](desktop-v26-experience.md) を参照。
 
-[Electron更新ガイド](https://www.electronjs.org/docs/latest/tutorial/updates)、[electron-builder配布](https://www.electron.build/publish/)、[Tauri updaterの署名要件](https://v2.tauri.app/plugin/updater/#signing-updates)を比較。今回は通知で要件を満たし、署名準備前の自己更新を避ける。
+[Electron更新ガイド](https://www.electronjs.org/docs/latest/tutorial/updates)を参照。WindowsはGitHubの検証metadataを使うinstaller引継ぎで、公証を使わないmacOSは手動導入を維持する。
 
 ## セキュリティ・設定保存
 

@@ -125,7 +125,7 @@ def _update_remote_task_with_parent(page_id: str, payload: dict[str, Any]) -> di
         reason=payload.get("reason"),
         done_date=payload.get("done_date"),
     )
-    if payload.get("parent_external_ids"):
+    if "parent_external_ids" in payload:
         props[config.NOTION_TASK_PROP_PARENT] = notion_client._relation_prop(payload.get("parent_external_ids"))
     try:
         return notion_client.parse_task_page(

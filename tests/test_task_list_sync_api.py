@@ -14,7 +14,7 @@ class TaskListSyncApiTests(unittest.TestCase):
         self.assertIn('button.id = "refresh-tasks"', recovery_script)
         self.assertIn("/api/notifications/tasks/sync", recovery_script)
         self.assertIn("/sync/retry", recovery_script)
-        self.assertIn("競合を確認して再編集", recovery_script)
+        self.assertIn("競合を比較して解消", recovery_script)
 
     def test_explicit_ui_sync_uses_incremental_mode(self) -> None:
         with patch.object(task_list_api.notion_task_sync, "sync_now", return_value={"ok": True, "synced_count": 3}) as sync:

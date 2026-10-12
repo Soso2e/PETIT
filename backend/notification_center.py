@@ -166,7 +166,7 @@ def _event_row(row: Any) -> dict[str, Any]:
     }
 
 
-def list_events(*, limit: int = 40, state: str = "open") -> dict[str, Any]:
+def list_events(*, limit: int = 40, state: str = "open", after_id: int | None = None) -> dict[str, Any]:
     init_db()
     normalized = str(state or "open").strip().casefold()
     conditions = {
@@ -182,9 +182,9 @@ def list_events(*, limit: int = 40, state: str = "open") -> dict[str, Any]:
         rows = conn.execute(
             "SELECT e.*, (SELECT d.status FROM notification_deliveries d "
             "WHERE d.event_id=e.id ORDER BY d.id DESC LIMIT 1) AS delivery_status "
-            f"FROM notification_events e WHERE {conditions[normalized]} "
-            "ORDER BY e.created_at DESC, e.id DESC LIMIT ?",
-            (bounded_limit,),
+            f"FROM notification_events e WHERE {conditions[normalized]} AND e.id > ? "
+            + ("ORDER BY e.id ASC LIMIT ?" if after_id is not None else "ORDER BY e.created_at DESC, e.id DESC LIMIT ?"),
+            (max(0, after_id or 0), bounded_limit),
         ).fetchall()
         unread_count = int(
             conn.execute(
@@ -300,9 +300,9 @@ def _dispatch_task_action(
     return result, 400
 
 
-def get_notification_events(limit: int = 40, state: str = "open") -> JSONResponse:
+def get_notification_events(limit: int = 40, state: str = "open", after_id: int | None = None) -> JSONResponse:
     try:
-        result = list_events(limit=limit, state=state)
+        result = list_events(limit=limit, state=state, after_id=after_id)
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     return JSONResponse(result)

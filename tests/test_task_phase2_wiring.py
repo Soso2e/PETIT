@@ -73,7 +73,10 @@ class TaskPhase2WiringTests(unittest.TestCase):
         }
 
         instance = worker.JobWorker(interval_seconds=0.01)
-        with patch.object(task_sync_queue, "create_task_page", return_value=remote):
+        # This verifies outbound writes; a real repair pull must not outlive the fixture DB.
+        with patch.object(task_sync_queue, "create_task_page", return_value=remote), patch.object(
+            worker, "_notion_task_sync_enabled", return_value=False
+        ):
             instance.start()
             deadline = time.monotonic() + 2
             while time.monotonic() < deadline:

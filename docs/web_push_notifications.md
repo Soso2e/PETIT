@@ -2,6 +2,8 @@
 
 Issue #92で追加した、PWA向け通知基盤の設定・運用・検証手順です。
 
+Desktop v0.26.0では別の通知経路を使用します。Desktop設定で「画面のすみに声かけ」/「OS通知」を選び、アプリとCoreの起動中に新規通知を取得します。VAPID/pywebpush/ブラウザ購読は不要です。カテゴリは作業画面Settingsで設定します。以下のVAPID手順はWeb/PWA向けです。詳細は [Desktop v0.26.0](desktop-v26-experience.md)。
+
 ## 設計
 
 通知は次の3層に分離しています。

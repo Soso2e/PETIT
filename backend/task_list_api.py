@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import config, db, notion_task_sync, notifications, task_hierarchy, task_sync_queue
+from . import task_conflict_resolution  # noqa: F401 - install explicit conflict routes
 
 _INSTALLED = False
 _OPEN_STATUS_SQL = "lower(status) NOT IN ('done', 'canceled', 'cancelled', 'chancel', '完了')"

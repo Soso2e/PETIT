@@ -38,6 +38,73 @@
 
   const refreshUniverse = () => byId("refresh-universe")?.click();
 
+  const openConflict = async (taskId = null) => {
+    const previousFocus = document.activeElement;
+    const dialog = document.createElement("dialog");
+    dialog.className = "task-conflict-dialog";
+    const heading = document.createElement("h2"); heading.textContent = "Notion同期競合を解消";
+    const status = document.createElement("p"); status.setAttribute("role", "status");
+    const content = document.createElement("div");
+    const close = document.createElement("button"); close.type = "button"; close.textContent = "閉じる";
+    close.onclick = () => dialog.close();
+    dialog.append(heading, status, content, close); document.body.append(dialog);
+    dialog.addEventListener("close", () => { dialog.remove(); previousFocus?.focus(); });
+    dialog.showModal();
+    const compare = async (id) => {
+      status.textContent = "Notionの最新状態を取得中…"; content.replaceChildren();
+      try {
+        const data = await requestJson(`/api/notifications/tasks/${id}/sync/conflict`);
+        if (!dialog.open) return;
+        status.textContent = "差分のある項目を表示しています。PETIT側は未同期の変更をNotionへ再送します。";
+        const table = document.createElement("table");
+        const labels = { title: "名前", status: "状態", due_date: "期限", priority: "優先度", area: "分野", reason: "メモ", done_date: "完了日", parent_external_ids: "親ページ", project_external_ids: "プロジェクト" };
+        const row = (...values) => { const tr = document.createElement("tr"); for (const value of values) { const td = document.createElement("td"); td.textContent = value; tr.append(td); } return tr; };
+        const header = document.createElement("tr");
+        for (const label of ["項目", "PETIT", "Notion"]) { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; header.append(th); }
+        table.append(header);
+        const display = (value) => Array.isArray(value) ? value.join(", ") || "なし" : value == null || value === "" ? "なし" : String(value);
+        for (const key of Object.keys(labels)) {
+          if (JSON.stringify(data.local[key] ?? null) === JSON.stringify(data.remote[key] ?? null)) continue;
+          const tr = row(labels[key], display(data.local[key]), display(data.remote[key]));
+          tr.classList.add("has-difference");
+          if (key === "parent_external_ids" && data.parent_titles) {
+            tr.children[1].textContent = display(data.parent_titles.local);
+            tr.children[2].textContent = display(data.parent_titles.remote);
+          }
+          table.append(tr);
+        }
+        content.append(table);
+        if (table.children.length === 1) status.textContent = "現在の値に差分はありません。未同期の変更を再送するか、Notion側を採用して取り下げるか選べます。";
+        for (const [choice, label] of [["petit", "PETIT側を残して再同期"], ["notion", "Notion側を採用（未同期の変更を取り下げる）"]]) {
+          const button = document.createElement("button"); button.type = "button"; button.textContent = label;
+          button.onclick = async () => {
+            for (const action of content.querySelectorAll("button")) action.disabled = true;
+            status.textContent = "選択を反映中…";
+            try {
+              const result = await requestJson(`/api/notifications/tasks/${id}/sync/conflict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ choice, revision: data.revision }) });
+              status.textContent = result.message; content.replaceChildren(); refreshUniverse();
+            } catch (error) {
+              status.textContent = error.message;
+              const reload = document.createElement("button"); reload.type = "button"; reload.textContent = "最新の差分を再確認"; reload.onclick = () => void compare(id); content.append(reload);
+            }
+          };
+          content.append(button);
+        }
+      } catch (error) { status.textContent = error.message; }
+    };
+    if (taskId != null) { await compare(taskId); return; }
+    status.textContent = "競合中のタスクを取得中…";
+    try {
+      const data = await requestJson("/api/notifications/tasks/sync/conflicts");
+      if (!dialog.open) return;
+      status.textContent = data.tasks.length ? "比較するタスクを選んでください。" : "同期競合はありません。";
+      for (const task of data.tasks) {
+        const button = document.createElement("button"); button.type = "button"; button.textContent = task.title;
+        button.onclick = () => void compare(task.id); content.append(button);
+      }
+    } catch (error) { status.textContent = error.message; }
+  };
+
   const ensureRefreshButton = () => {
     const existing = byId("refresh-tasks");
     if (existing) return existing;
@@ -82,20 +149,22 @@
     if (!task || !["failed", "conflict"].includes(sync)) return null;
     if (sync === "conflict") {
       if (location === "table") {
-        const hint = document.createElement("small");
+        const hint = document.createElement("button");
+        hint.type = "button";
         hint.className = "task-sync-hint";
-        hint.textContent = "再編集";
+        hint.textContent = "競合を解消";
+        hint.addEventListener("click", (event) => { event.stopPropagation(); void openConflict(taskNumericId(task)); });
         hint.dataset.taskSyncRecovery = "conflict";
         return hint;
       }
       const action = document.createElement("button");
       action.type = "button";
       action.className = "detail-sync-action";
-      action.textContent = "競合を確認して再編集";
-      action.title = "Notion側の変更を確認してから編集すると競合を解消できます";
+      action.textContent = "競合を比較して解消";
+      action.title = "PETITとNotionの差分を比較して採用する側を選びます";
       action.dataset.taskSyncRecovery = "conflict";
       action.addEventListener("click", () => {
-        showFeedback("Notion側の変更を確認し、編集して保存すると競合を解消できます。");
+        void openConflict(taskNumericId(task));
       });
       return action;
     }
@@ -168,6 +237,14 @@
   };
 
   const refreshTasksButton = ensureRefreshButton();
+  if (refreshTasksButton) {
+    const button = document.createElement("button"); button.type = "button"; button.className = "reminder-refresh";
+    button.textContent = "同期競合を確認"; button.onclick = () => void openConflict();
+    refreshTasksButton.after(button);
+  }
+  document.addEventListener("click", (event) => {
+    if (event.target.closest?.("#sync-pill, [data-rail-sync]") && event.target.textContent.includes("競合")) void openConflict();
+  });
   refreshTasksButton?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;

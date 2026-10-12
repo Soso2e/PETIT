@@ -1,0 +1,8 @@
+:root { color-scheme: dark; font: 14px/1.5 'Segoe UI', sans-serif; color: #eeeae3; }
+body { margin: 0; background: transparent; padding: 10px; }
+main { display: flex; gap: 12px; border: 1px solid #e1c28655; border-radius: 20px; padding: 18px; background: #17181ef5; box-shadow: 0 4px 20px #0005; }
+.star { color: #ffe3a4; font-size: 24px; }
+main>div { flex: 1; min-width: 0; } small { color: #c5b391; letter-spacing: .15em; } h1 { font-size: 15px; margin: 4px 0; } p { margin: 6px 0 12px; max-height: 72px; overflow: auto; overflow-wrap: anywhere; }
+button { background: #ffffff10; border: 1px solid #ffffff30; color: inherit; border-radius: 8px; padding: 7px 12px; cursor: pointer; } #dismiss { align-self: start; }
+button:focus-visible { outline: 2px solid #ffe3a4; }
+@media (prefers-reduced-motion: no-preference) { main { animation: appear 220ms ease-out; } @keyframes appear { from { opacity: 0; transform: translateY(10px); } } }
