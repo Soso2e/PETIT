@@ -15,12 +15,12 @@
 ## 修正後の順序
 
 1. モデルを準備し、アプリの全リソースを配置する。
-2. 開発用は明示的に`mac.identity=-`でアプリ/入れ子バイナリをad-hoc署名する。開発用のみHardened Runtimeを無効にする。正式配布はDeveloper ID Application、Hardened Runtime、公証を使用する。
-3. `afterSign`で`codesign --verify --deep --strict`とCodeResourcesの存在を確認し、全ファイルのSHA-256・パーミッション・symlink先を記録する。正式版はアプリ公証/stapleの後にこのhookが呼ばれる。
+2. 開発用・個人利用Releaseともに明示的に`mac.identity=-`でアプリ/入れ子バイナリをad-hoc署名し、Hardened Runtimeを無効にする。Apple Developer Program・公証は使用しない。
+3. `afterSign`で`codesign --verify --deep --strict`とCodeResourcesの存在を確認し、全ファイルのSHA-256・パーミッション・symlink先を記録する。
 4. DMG完成後、`afterAllArtifactBuild`で署名と署名直後の内容一致を再確認する。DMGを`hdiutil verify`し、読み取り専用でmountして内部アプリも検証・比較する。署名スキップや変更はビルド失敗にする。
-5. 正式版ではDMG自体も署名し、`notarytool submit --wait`、staple、stapler validate、hdiutil verify、Gatekeeper評価を通してからuploadする。
+5. タグReleaseでもad-hoc署名のアプリ/DMG内容検証を通してからuploadする。DMGのApple公証、staple、Gatekeeper許可は行わない（個人利用限定）。
 
-`npm run build:mac:development`で作成するDMGは`development`付きの名前になる。ad-hoc署名は内容の整合性検証用であり、Developer ID署名/公証の代わりにはならない。
+`npm run build:mac:development`で作成するDMGは`development`付きの名前、タグReleaseで利用する`npm run build:mac:personal`では通常の`PETIT-<version>-mac-arm64.dmg`になる。どちらもad-hoc署名であり、Appleによる開発者検証・公証やGatekeeperでの通常起動許可を意味しない。
 
 任意の生成物を再検証:
 
@@ -44,14 +44,13 @@ v0.24.0を別領域へ`git archive`で復元し、ビルド設定/検証hookだ�
 - Finderから通常起動を試行。ユーザー実機表示は「Appleは、“PETIT”にMacに損害を与えたり、プライバシーを侵害する可能性のあるマルウェアが含まれていないことを検証できませんでした」。未公証による拒否であり、起動成功には至っていない。
 - 隔離属性削除、Gatekeeper無効化、警告の回避は行っていない。既存`/Applications/PETIT.app`とユーザーデータは変更していない。公開Releaseの差し替えは未実施。
 
-## 正式配布に必要な準備
+## 個人利用リリース運用（2026-10-12決定 / #311）
 
-確認時、`security find-identity -v -p codesigning`は有効identity 0件、`gh secret list`は登録なし。`notarytool`と`stapler`はローカルで利用可能だが、署名/公証の資格情報がない。
+- PETITは本人のWindows/macOSのみで使用。Apple Developer Program・App Store公開・Developer ID証明書・公証を行わない。
+- 手動`workflow_dispatch`は従来通り`development`名の開発用DMG/EXEをActions Artifactとして14日保存する。
+- バージョン同期後、新しい`v<version>`タグをmain履歴上にpushすると`desktop.yml`で両OSのビルド・署名整合性/リソース検証・GitHub Release作成を自動実行する。既存`v0.25.2`タグは動かさない。
+- macOSタグビルドは`npm run build:mac:personal`でad-hoc署名し、`PETIT-<version>-mac-arm64.dmg`を生成する。Windowsは従来のEXE。いずれも個人利用限定のためApple/Windowsの公式コード署名はない。
+- ad-hoc署名は**改ざん検知とファイル整合性の検証**であり、開発元の認証やApple公証の代わりにはならない。Safariで取得したDMGから通常起動するとGatekeeperに拒否され得る。本人が入手元を確認し、必要な場合はmacOSの「プライバシーとセキュリティ」からそのアプリを個別に許可する。macOSのセキュリティ機能やquarantine属性を自動解除する処理は追加しない。
+- Actionsのビルド・署名検証成功は実機起動合格を意味しない。実配布DMGのFinderインストール、マイク権限、再起動、更新通知・再インストールは未確認。
 
-1. Apple Developer Programのアカウントで **Developer ID Application** 証明書を発行し、対応する秘密鍵とともにKeychainへ登録する。[Appleの証明書発行手順](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)
-2. 証明書と秘密鍵をパスワード付き`.p12`として書き出し、GitHub Actions Secretsへ`MAC_CSC_LINK`（p12のbase64等）と`MAC_CSC_KEY_PASSWORD`を登録する。証明書/秘密鍵はリポジトリへ保存しない。
-3. 公証用の`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`もSecretsへ登録する。現在のworkflowはこの5項目を必須にする。[Appleの公証ガイド](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
-4. 修正をPRでmainへ反映する際はプロジェクト規約に従いversionを更新する。正式ビルド・アプリ/DMG公証・staple・Gatekeeper検証を実施する。
-5. 公証済みDMGをブラウザでダウンロードし、隔離属性を保持してApplicationsへインストール、通常起動と設定画面まで確認する。証明書不足のため、この成功確認は未完了。
-
-v0.24.0のad-hoc再作成物は開発検証用で、正式な置換配布物として公開しない。正式配布の受入完了までは#309を完了扱いにしない。
+#309/PR #310のv0.24.0署名スキップ問題と再作成結果は、上の履歴として維持する。
