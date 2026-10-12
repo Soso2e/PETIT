@@ -124,24 +124,25 @@ jobs:
             echo "macOS release credentials found; building a signed and notarized release."
           else
             echo "HAS_MAC_RELEASE_CREDS=false" >> "$GITHUB_ENV"
-            echo "::notice::macOS release credentials are incomplete; building an unsigned personal-use DMG instead."
+            echo "::error::Developer ID certificate/private key and Apple notarization credentials are required for a macOS release."
+            exit 1
           fi
 
       - name: Build development installer
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') || matrix.platform != 'mac' }}
+        if: matrix.platform != 'mac'
         run: npm run build -- --${{ matrix.platform }} --${{ matrix.arch }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: Build unsigned macOS personal-use release
-        if: startsWith(github.ref, 'refs/tags/v') && matrix.platform == 'mac' && env.HAS_MAC_RELEASE_CREDS != 'true'
-        run: npm run build -- --mac --arm64
+      - name: Build ad-hoc macOS development installer
+        if: github.event_name == 'workflow_dispatch' && matrix.platform == 'mac'
+        run: npm run build:mac:development
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Build signed and notarized macOS release
         if: startsWith(github.ref, 'refs/tags/v') && matrix.platform == 'mac' && env.HAS_MAC_RELEASE_CREDS == 'true'
-        run: npm run build -- --mac --arm64 -c.mac.notarize=true
+        run: npm run build -- --mac --arm64 -c.mac.notarize=true -c.mac.type=distribution -c.forceCodeSigning=true -c.dmg.sign=true
         env:
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
@@ -153,6 +154,10 @@ jobs:
         run: npm run test:package-resources
 
       - name: Verify macOS signature and Gatekeeper assessment
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         if: startsWith(github.ref, 'refs/tags/v') && matrix.platform == 'mac' && env.HAS_MAC_RELEASE_CREDS == 'true'
         shell: bash
         run: |
@@ -162,13 +167,19 @@ jobs:
             exit 1
           fi
           codesign --verify --deep --strict --verbose=2 "$app_path"
+          xcrun stapler validate "$app_path"
           spctl --assess --type execute --verbose=2 "$app_path"
           dmg="$(find dist -maxdepth 1 -name '*.dmg' -print -quit)"
           if [ -z "$dmg" ]; then
             echo "::error::DMG was not found."
             exit 1
           fi
+          # electron-builder notarizes/staples the app; submit the final DMG separately.
+          xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "$dmg"
           xcrun stapler validate "$dmg"
+          hdiutil verify "$dmg"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
 
       - uses: actions/upload-artifact@v4
         with:
