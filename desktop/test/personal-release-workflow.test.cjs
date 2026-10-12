@@ -14,7 +14,8 @@ test('tag releases use ad-hoc macOS signing without Apple credentials', () => {
   assert.match(pkg.scripts['build:mac:personal'], /-c\.mac\.notarize=false/);
   assert.doesNotMatch(pkg.scripts['build:mac:personal'], /artifactName/);
   assert.match(workflow, /- name: Verify packaged Wake resources/);
-  assert.match(workflow, /pattern: PETIT-\*-release/);
+  assert.match(workflow, /name: PETIT-/);
+  assert.match(workflow, /installers=\(release-assets\/\*\.dmg release-assets\/\*\.exe\)/);
 });
 
 test('manual macOS build remains a development artifact', () => {
