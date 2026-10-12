@@ -455,8 +455,20 @@ h1 {
 }
 .space-node--active {
   border-color: var(--accent) !important;
+  outline: 2px solid #ffe3a4;
+  outline-offset: 5px;
+  box-shadow: 0 0 22px #ffc96a80, 0 0 52px #ffc96a38;
   animation: activePulse 2.4s ease-in-out infinite alternate;
 }
+.is-working .space-node__label, .is-working .universe-task__title { color: #ffe3a4; font-weight: 700; }
+.is-working .space-node__label::after, .is-working .universe-task__title::after { content: " · 作業中"; font-size: .85em; }
+
+.task-conflict-dialog { width: min(760px, 94vw); max-height: 85dvh; overflow: auto; border: 1px solid var(--accent); border-radius: 16px; padding: 24px; color: #efefec; background: #151618; }
+.task-conflict-dialog::backdrop { background: #0009; }
+.task-conflict-dialog table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+.task-conflict-dialog td, .task-conflict-dialog th { text-align: left; padding: 8px; border-bottom: 1px solid #ffffff20; overflow-wrap: anywhere; max-width: 260px; }
+.task-conflict-dialog .has-difference { background: #f5ba6330; }
+.task-conflict-dialog button { display: block; margin: 10px 0; padding: 10px 14px; color: inherit; background: #ffffff10; border: 1px solid #ffffff40; border-radius: 8px; cursor: pointer; }
 
 /* ====================================================
    Task Nodes Container
@@ -602,8 +614,8 @@ h1 {
   to   { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
 }
 @keyframes activePulse {
-  from { box-shadow: none; border-color: var(--accent); }
-  to   { box-shadow: 0 0 0 2px rgba(168, 180, 208, 0.18); border-color: var(--text); }
+  from { box-shadow: 0 0 18px #ffc96a60, 0 0 40px #ffc96a28; border-color: #ffe3a4; }
+  to   { box-shadow: 0 0 30px #ffc96a90, 0 0 60px #ffc96a48; border-color: #fff1cd; }
 }
 @keyframes selectedSignal {
   0%, 100% { box-shadow: 0 0 0 1px rgba(200,207,222,0.2); }

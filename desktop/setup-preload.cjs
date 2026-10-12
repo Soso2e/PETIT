@@ -12,4 +12,10 @@ contextBridge.exposeInMainWorld('petitSettings', {
     return () => ipcRenderer.removeListener('settings:wake-progress', listener);
   },
   checkUpdates: () => ipcRenderer.invoke('settings:updates'),
+  testNotification: () => ipcRenderer.invoke('settings:notifications-test'),
+  onUpdateProgress: (callback) => {
+    const listener = (_event, message) => callback(message);
+    ipcRenderer.on('settings:update-progress', listener);
+    return () => ipcRenderer.removeListener('settings:update-progress', listener);
+  },
 });

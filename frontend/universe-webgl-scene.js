@@ -543,13 +543,15 @@
   };
 
   const updateSelection = () => {
+    const workingTaskId = String(window.PetitUniverse?.workingTask?.() || "");
     state.animatedMeshes.forEach(({ mesh }, index) => {
       const selected = Boolean(mesh.userData.entry.taskId && mesh.userData.entry.taskId === state.selectedTaskId);
+      const working = Boolean(workingTaskId && mesh.userData.entry.taskId === workingTaskId);
       const entering = mesh.userData.entering;
-      const toScale = selected ? 1.14 : 1;
-      const toGlow = mesh.userData.baseEmissiveIntensity * (selected ? 1.85 : 1);
+      const toScale = working ? 1.32 : selected ? 1.14 : 1;
+      const toGlow = mesh.userData.baseEmissiveIntensity * (working ? 3.2 : selected ? 1.85 : 1);
       // Retarget from the current frame when selections change rapidly.
-      if (entering || mesh.userData.selected !== selected) {
+      if (entering || mesh.userData.selected !== selected || mesh.userData.working !== working) {
         const atmosphere = mesh.getObjectByName("Atmosphere");
         state.visualTweens.set(mesh, {
           startedAt: performance.now() + (entering ? Math.min(index * 35, 175) : 0),
@@ -558,7 +560,7 @@
           toScale,
           fromGlow: entering ? 0 : mesh.material.emissiveIntensity,
           toGlow,
-          pulse: entering || selected,
+          pulse: entering || selected || working,
           atmosphere,
           baseOpacity: mesh.userData.entry.type === "child" ? .08 : .12,
         });
@@ -569,11 +571,13 @@
       }
       mesh.userData.entering = false;
       mesh.userData.selected = selected;
+      mesh.userData.working = working;
     });
     state.labels.forEach(({ element, entry }) => {
       element.classList.toggle("is-selected", Boolean(entry.taskId && entry.taskId === state.selectedTaskId));
+      element.classList.toggle("is-working", Boolean(workingTaskId && entry.taskId === workingTaskId));
     });
-    requestRender({ updateLabels: false });
+    requestRender({ updateLabels: true });
   };
 
   const startCameraTween = (position, target, duration = 720) => {
@@ -797,13 +801,14 @@
       const distance = state.camera.position.distanceTo(labelWorld);
       const maxDistance = type === "child" ? 38 : 82;
       const selected = Boolean(entry.taskId && entry.taskId === state.selectedTaskId);
-      const visible = inFront && withinFrustum && (selected || distance < maxDistance);
+      const working = Boolean(entry.taskId && entry.taskId === String(window.PetitUniverse?.workingTask?.() || ""));
+      const visible = inFront && withinFrustum && (selected || working || distance < maxDistance);
       element.hidden = !visible;
       if (!visible) return;
       element.style.left = `${((labelProjected.x * 0.5) + 0.5) * width}px`;
       element.style.top = `${((-labelProjected.y * 0.5) + 0.5) * height}px`;
       const fadeStart = maxDistance * 0.6;
-      const opacity = selected ? 1 : clamp(1 - ((distance - fadeStart) / (maxDistance - fadeStart)), 0.22, 1);
+      const opacity = selected || working ? 1 : clamp(1 - ((distance - fadeStart) / (maxDistance - fadeStart)), 0.22, 1);
       element.style.opacity = opacity.toFixed(3);
       element.style.zIndex = String(Math.round((1 - labelProjected.z) * 500));
     });
@@ -909,6 +914,7 @@
     requestRebuild("scheduler-ready");
   });
   window.addEventListener("petit:universe-rendered", () => requestRebuild("universe-rendered"));
+  document.addEventListener("petit:working-task", () => { if (state.ready) updateSelection(); });
   document.addEventListener("petit:tasks-updated", () => requestRebuild("tasks-updated"));
   window.addEventListener("petit:panel-change", () => {
     resize();

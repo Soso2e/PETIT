@@ -20,6 +20,8 @@ storage/   SQLite などの実行時データ（git 管理外）
 
 ## Windows / macOS Desktop（段階導入）
 
+v0.26.0（開発ブランチ）はWindowsの更新ダウンロード/検証、作業中の星、共通入力、Notion同期競合の手動比較・採用、Desktop通知と画面のすみの声かけに対応します。新しい通知/競合APIにはv0.26.0のサーバーも必要です。実装・未確認・次の音声体験は [Desktop v0.26.0](docs/desktop-v26-experience.md) を参照。
+
 v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeをアプリ内で開けます。接続・画面停止の復旧画面、小型会話の下書き保持、待機中断、位置保持に対応。Backendは別途起動してください。使い分けと実機受入は [Desktop完成・受入台帳](docs/desktop-readiness.md) を参照。
 
 既存PETITへ接続するElectron常駐クライアントを追加しています。小型会話UI、トレイ、グローバルショートカット、更新通知、任意の日本語ウェイク検出に対応する初期実装です。

@@ -396,6 +396,7 @@ async function sendMessage(text) {
     if (waitStopEl) waitStopEl.hidden = true;
     window.PetitVoiceConversation?.finishChat(voiceTurn, voiceResult);
     inputEl.focus();
+    window.PetitChatInput?.resize(inputEl);
   }
 }
 
@@ -425,6 +426,7 @@ inputEl.addEventListener("compositionend", () => {
 
 // Enter to send after IME conversion, Shift+Enter for newline. IME confirmation must not submit.
 inputEl.addEventListener("keydown", (e) => {
+  if (inputEl.dataset.petitChatInputReady === "true" || e.defaultPrevented) return;
   if (e.key !== "Enter") return;
   if (e.shiftKey) return;
   const isComposing = e.isComposing || e.keyCode === 229 || appComposing;
@@ -436,9 +438,11 @@ inputEl.addEventListener("keydown", (e) => {
 
 // Auto-grow the textarea.
 inputEl.addEventListener("input", () => {
+  if (inputEl.dataset.petitChatInputReady === "true") return;
   inputEl.style.height = "auto";
   inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
 });
+window.PetitChatInput?.setup({ form: formEl, input: inputEl });
 
 function removeStaticGreeting() {
   const greeting = document.getElementById("greeting");

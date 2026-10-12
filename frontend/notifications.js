@@ -27,6 +27,8 @@
   window.__PETIT_NOTIFICATIONS_INITIALIZED = true;
 
   let serverStatus = null;
+  const desktop = window.petitNotifications;
+  let desktopStatus = null;
   let registration = null;
   let subscription = null;
   let unreadCount = 0;
@@ -63,9 +65,9 @@
   }
 
   function setBusy(busy) {
-    enableButton.disabled = busy;
-    testButton.disabled = busy || !subscription;
-    disableButton.disabled = busy || !subscription;
+    enableButton.disabled = busy || Boolean(desktop && desktopStatus?.enabled);
+    testButton.disabled = busy || !(desktop ? desktopStatus?.enabled : subscription);
+    disableButton.disabled = busy || !(desktop ? desktopStatus?.enabled : subscription);
     refreshButton.disabled = busy;
     for (const input of categories.querySelectorAll("input")) input.disabled = busy;
   }
@@ -103,6 +105,19 @@
   }
 
   function renderStatus() {
+    if (desktop) {
+      enableButton.textContent = "Desktop通知を有効にする";
+      disableButton.textContent = "このPCの通知を停止";
+      enableButton.disabled = Boolean(desktopStatus?.enabled);
+      enableButton.hidden = Boolean(desktopStatus?.enabled);
+      disableButton.hidden = !desktopStatus?.enabled;
+      testButton.disabled = disableButton.disabled = !desktopStatus?.enabled;
+      const label = desktopStatus?.mode === "native" ? "OS通知" : "画面のすみに声かけ";
+      setState(desktopStatus?.error || (desktopStatus?.enabled ? `${label}で受け取ります。必要な種類をONにしてください。Desktop設定で出し方を変更できます。` : "Desktop通知はOFFです。有効にするとVAPIDの設定なしで受け取れます。"), Boolean(desktopStatus?.error));
+      if (unreadBadge) unreadBadge.textContent = String(unreadCount);
+      if (unreadBadge) unreadBadge.hidden = unreadCount < 1;
+      return;
+    }
     const supported = isSupported();
     const subscribed = Boolean(subscription);
     if (toggleButton) {
@@ -360,7 +375,8 @@
   }
 
   async function loadStatus() {
-    if (isSupported()) {
+    if (desktop) desktopStatus = await desktop.read();
+    if (!desktop && isSupported()) {
       try {
         // Do not install or wait for a Service Worker during page startup.
         // An existing registration is enough to restore the local subscription;
@@ -379,6 +395,17 @@
   }
 
   async function enableNotifications() {
+    if (desktop) {
+      setBusy(true);
+      try {
+        const preferences = { ...(serverStatus?.preferences || {}), work_session: true };
+        const data = await fetchJson("/api/notifications/preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferences }) });
+        serverStatus.preferences = data.preferences;
+        desktopStatus = await desktop.enable(true); renderCategories(serverStatus); renderStatus();
+      } catch (error) { setState(`Desktop通知を有効にできませんでした: ${error.message}`, true); }
+      finally { setBusy(false); }
+      return;
+    }
     // CRITICAL: Request permission at the absolute top of user gesture handler
     // to prevent mobile Safari/Chrome from discarding user activation
     let permissionPromise = null;
@@ -446,6 +473,13 @@
   }
 
   async function disableNotifications() {
+    if (desktop) {
+      setBusy(true);
+      try { desktopStatus = await desktop.enable(false); renderStatus(); }
+      catch (error) { setState(`通知を停止できませんでした: ${error.message}`, true); }
+      finally { setBusy(false); }
+      return;
+    }
     if (!subscription) return;
     setBusy(true);
     try {
@@ -479,7 +513,7 @@
         body: JSON.stringify({ preferences }),
       });
       serverStatus.preferences = data.preferences;
-      setState("Push通知する種類を保存しました。");
+      setState(desktop ? "Desktopで通知する種類を保存しました。" : "Push通知する種類を保存しました。");
     } catch (error) {
       setState(`通知設定を保存できませんでした: ${error.message}`, true);
     } finally {
@@ -489,6 +523,13 @@
   }
 
   async function sendTestNotification() {
+    if (desktop) {
+      setBusy(true);
+      try { setState((await desktop.test()).message); }
+      catch (error) { setState(`通知テストに失敗しました: ${error.message}`, true); }
+      finally { setBusy(false); }
+      return;
+    }
     setBusy(true);
     try {
       const result = await fetchJson("/api/notifications/test", {

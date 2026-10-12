@@ -15,8 +15,12 @@ function isOverlay(url, serverUrl) {
 function isWorkspace(value, serverUrl) {
   try {
     const url = new URL(value);
-    return url.origin === serverUrl && !url.username && !url.password && !url.search &&
-      ['/', '/static/universe.html'].includes(url.pathname);
+    const views = ['univ', 'universe', 'today', 'focus', 'tasks', 'chat', 'settings', 'reminders'];
+    const params = [...url.searchParams];
+    const queryOK = params.every(([key, value]) =>
+      key === 'view' ? views.includes(value) : ['task', 'notification'].includes(key) && /^[1-9]\d*$/.test(value));
+    return url.origin === serverUrl && !url.username && !url.password && queryOK &&
+      new Set(params.map(([key]) => key)).size === params.length && ['/', '/static/universe.html'].includes(url.pathname);
   } catch { return false; }
 }
 function isNewer(candidate, current) {

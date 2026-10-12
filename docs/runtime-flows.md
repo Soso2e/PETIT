@@ -4,6 +4,35 @@
 
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
+## Desktop v0.26.0の入力・同期競合・通知
+
+```mermaid
+flowchart TD
+    input[共通チャット入力] --> ime{IME確定・Enter長押し・送信待機中?}
+    ime -->|いいえ| chat[既存chat submit / API]
+    ime -->|はい| keep[入力を保持 / 再送しない]
+    conflict[PETIT内の同期競合ボタン] --> compare[DB・更新キュー・Notion最新を比較]
+    compare --> choice[利用者がPETIT側 / Notion側を選択]
+    choice --> revision{比較revision一致?}
+    revision -->|いいえ| retry[409 / 最新差分を再確認]
+    revision -->|PETIT側| queue[未同期payloadを最新revisionでpendingへ / 監査]
+    queue --> latest{実行直前のNotion更新日時一致?}
+    latest -->|いいえ| again[競合を保持して再比較]
+    latest -->|はい| patch[既存Notion更新 / 成功時だけsynced]
+    revision -->|Notion側| adopt[未同期キュー取り下げ / DBと親関係へ採用 / 監査]
+    compare -->|404・接続失敗| blocked[共有・親ページの確認案内 / 競合保持]
+    event[CoreのReminder / Work Session等の通知イベント] --> history[SQLite通知センター]
+    history --> web[既存Web Push / VAPID・購読が必要]
+    history --> poll[Desktop Mainが15秒ごとにafter_id取得]
+    poll --> eligible{端末ON・カテゴリON・新規・未読・未解決・2分以内・ロック外?}
+    eligible -->|はい| desktop[画面のすみのカード / OS通知]
+    eligible -->|いいえ| quiet[表示せず履歴へ残す]
+    desktop --> cursor[端末へorigin別cursor保存 / 重複抑制]
+    quiet --> cursor
+```
+
+新しいThread/Turn/Core管理APIは追加していない。詳細と実機未確認は [desktop-v26-experience.md](desktop-v26-experience.md)。
+
 実装の根拠:
 
 - `backend/main.py`

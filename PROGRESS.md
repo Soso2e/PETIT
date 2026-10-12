@@ -1,14 +1,16 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.25.5**
+**Current Version: v0.26.0**
 
-**Last Updated: 2026-10-12**
+**Last Updated: 2026-10-13**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #315 / Fix/v26（未公開）: Windows更新のサイズ/SHA-256検証・進捗、作業星の強調、IME/Enter長押し/入力復元、Notion競合の差分比較と明示採用、VAPID不要のDesktop通知・ホバーで残る声かけを実装。画面切替後のWorkspace IPC拒否も修正。Desktop 60件成功・macOS限定1件skip、Frontend 17件、Python関連53件成功。Windows x64 NSIS生成・新しい同梱resource確認済み（未署名）。プロジェクトvenvへ不足していたpywebpushを導入し、稼働中APIの依存利用可能とpip checkを確認。実Notionの親404は未解消、実Push/OS通知受信・旧配布版からの更新・実音声・3D発光の実機受入は未確認。通知の音声割込み・25分間隔は後続設計。詳細は `docs/desktop-v26-experience.md`。Push/PR/Releaseは未実施。
+
 - 同期競合（2026-10-12）: 対象1件のPETIT側親子関係を残す方針でNotion更新を実行したが、親ページへのアクセスが404（連携 `nocord`）となり未解消。子ページの取得は成功、親ページ単独取得も404。ローカル親子関係と競合状態を保持。次はNotionで親ページの存在・ゴミ箱・連携共有を確認してから再反映する。更新前DBバックアップを作成済み。
 
-- #311 / v0.25.5: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。手動Actionsもタグrefではdevelopment用DMGを重複生成しないよう分岐。未公証DMGはGatekeeperで通常起動が拒否され得るため、v0.25.4タグのWindows npm testはCRLF改行を固定LFで検査する回帰テスト2件が原因で失敗（Mac DMGビルド成功）。v0.25.5でテストの改行正規化とCRLF回帰を追加。VERSION更新とマージメッセージ`[desktop-release]`の組合せでのみタグ作成・リリースを起動するオプトイン導線も追加（手動実行は維持）。実Release、実機受入・更新通知は未完了。
+- #311 / v0.25.5: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。手動Actionsもタグrefではdevelopment用DMGを重複生成しないよう分岐。未公証DMGはGatekeeperで通常起動が拒否され得るため、v0.25.4タグのWindows npm testはCRLF改行を固定LFで検査する回帰テスト2件が原因で失敗（Mac DMGビルド成功）。v0.25.5でテストの改行正規化とCRLF回帰を追加。VERSION更新とマージメッセージ`[desktop-release]`の組合せでのみタグ作成・リリースを起動するオプトイン導線も追加（手動実行は維持）。v0.25.5のWindows/macOS Release assetをAPIで確認（2026-10-13）。実機受入・更新通知は未完了。
 
 
 - #309: macOS v0.24.0の署名不整合は旧workflowによる署名スキップが原因。ad-hoc署名・署名直後/DMG完成後の検証・内容一致チェックを追加済み。Safari取得した未公証DMGはGatekeeperで通常起動拒否。今後Apple公証を行わない方針（#311）で、個人端末でのインストールと更新受入は未完了。詳細は`docs/macos-distribution.md`。
@@ -222,3 +224,4 @@
 | 2026-10-12 | 09:07 | #309 | v0.25.2: macOS配布の署名スキップを検出し、署名/DMG内容一致検証と正式Releaseの資格情報必須化を追加。ad-hoc再作成の署名検証成功、公証・通常起動は証明書不足で未完了。 |
 
 | 2026-10-12 | 11:15 | — | 同期競合のPETIT側採用を実行したが、Notion親ページの404で失敗。子取得成功・親取得404を実サービスで確認、ローカル競合/親設定保持。親の存在/連携共有確認待ち。 |
+| 2026-10-12 | 19:06 | #315 | v0.26.0未公開: Desktop更新・作業星・入力・Notion競合解消・通知/声かけを実装。関連自動回帰、Windows package、Web Push依存復旧を確認。実Notion/配布更新/実機通知/実音声は未確認。 |

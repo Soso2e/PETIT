@@ -2,6 +2,8 @@
 
 Issue: [#299](https://github.com/Soso2e/PETIT/issues/299)。実装バージョン: v0.25.0。
 
+v0.26.0 / #315では更新ファイル検証・通知/声かけ・入力・同期競合UIを追加。Windows開発installer生成と同梱resource、隔離Electronを検証する。配布済み旧版からの更新、OS通知受信、実Notion・実声・長時間常駐は引き続き実機受入が必要。詳細は [v0.26.0体験と受入](desktop-v26-experience.md)。
+
 ## 日常利用の基本構成
 
 - 小型会話: トレイ / Ctrl・Cmd + Shift + Spaceで呼び出す。短い相談、音声、既存の確認付き操作を扱う。

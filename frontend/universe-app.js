@@ -174,6 +174,12 @@
   const focusTasks = () => sortedTasks(projectTasks().filter((task) => !isRootTask(task)));
 
   const activeTask = () => state.tasks.find((task, index) => taskKey(task, index) === state.activeTaskId) || null;
+  const workingTaskId = () => {
+    const session = state.workSession;
+    if (!session?.task_id || ["paused", "ended", "auto_stopped"].includes(session.status)) return null;
+    const index = state.tasks.findIndex((task, index) => taskKey(task, index) === String(session.task_id) || String(task.external_id || "") === String(session.task_id));
+    return index >= 0 ? taskKey(state.tasks[index], index) : null;
+  };
   const selectedTask = () => state.tasks.find((task, index) => taskKey(task, index) === state.selectedTaskId) || null;
 
   const ensureSelectedProject = () => {
@@ -1061,6 +1067,15 @@
   const renderActive = () => {
     const task = activeTask();
     const session = state.workSession;
+    const workingId = workingTaskId();
+    for (const node of document.querySelectorAll(".space-node[data-task-id], .universe-task[data-task-id], .univ-task-planet[data-task-id], .univ-webgl-label[data-task-id]")) {
+      const working = workingId != null && node.dataset.taskId === String(workingId);
+      node.classList.toggle("is-working", working);
+      node.classList.toggle("space-node--active", working);
+      if (working) node.setAttribute("aria-label", `${task?.title || session.task || "タスク"} · 作業中`);
+      else if (node.getAttribute("aria-label")?.endsWith(" · 作業中")) node.removeAttribute("aria-label");
+    }
+    document.dispatchEvent(new CustomEvent("petit:working-task", { detail: { taskId: workingId } }));
     if (!session) {
       activeLabelEl.textContent = "作業は開始されていません";
       activeElapsedEl.textContent = "0分";
@@ -1189,6 +1204,7 @@
   };
 
   window.PetitUniverse = {
+    workingTask: workingTaskId,
     focusTask: (id) => focusTaskById(id),
     selectTask: (id) => {
       const key = String(id || "");
@@ -1325,6 +1341,7 @@
   });
 
   chatInputEl?.addEventListener("keydown", (event) => {
+    if (chatInputEl.dataset.petitChatInputReady === "true" || event.defaultPrevented) return;
     if (event.key !== "Enter") return;
     if (event.shiftKey) return;
     const isComposing = event.isComposing || event.keyCode === 229 || univComposing;

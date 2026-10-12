@@ -132,7 +132,9 @@ class TaskWriteQueueTests(unittest.TestCase):
             due_date="2026-07-30",
             source_updated_at="2026-07-21T11:00:00.000Z",
         )
-        with patch.object(task_sync_queue, "_update_remote_task", return_value=updated_remote):
+        with patch.object(task_sync_queue, "_update_remote_task", return_value=updated_remote), patch.object(
+            task_sync_queue.notion_client, "get_task_page", return_value=remote_task(external_id="remote-update")
+        ):
             self.assertTrue(task_sync_queue.process_next())
         cached = self._task(task_id)
         self.assertEqual(cached["title"], "編集後")
@@ -185,7 +187,9 @@ class TaskWriteQueueTests(unittest.TestCase):
             title="確認後の確定値",
             source_updated_at="2026-07-21T13:00:00.000Z",
         )
-        with patch.object(task_sync_queue, "_update_remote_task", return_value=resolved_remote):
+        with patch.object(task_sync_queue, "_update_remote_task", return_value=resolved_remote), patch.object(
+            task_sync_queue.notion_client, "get_task_page", return_value=remote_task(external_id="remote-resolve", source_updated_at="2026-07-21T12:00:00.000Z")
+        ):
             self.assertTrue(task_sync_queue.process_next())
         self.assertEqual(self._task(task_id)["sync_status"], "synced")
         self.assertEqual(self._task(task_id)["title"], "確認後の確定値")

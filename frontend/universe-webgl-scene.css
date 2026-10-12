@@ -154,3 +154,5 @@
 @media (prefers-reduced-motion: reduce) {
   .univ-webgl-label { transition: none; }
 }
+/* Work focus stays distinct from the currently selected task. */
+.univ-webgl-label.is-working { color: #ffe3a4; border-color: #ffe3a4; background: #302718; box-shadow: 0 0 20px #ffc96a70; }

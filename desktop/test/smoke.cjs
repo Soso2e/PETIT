@@ -9,6 +9,12 @@ const root = path.resolve(__dirname, '../..');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'petit-desktop-smoke-'));
 const calls = [];
 let serveOverlay = true;
+let fixtureWork = { session_id: 'fixture-work', task_id: '1', task: '作業中の星', status: 'active', started_at: new Date().toISOString() };
+const fixtureTasks = [
+  { id: 1, title: '作業中の星', status: 'Yet', priority: 'High', source: 'notion', external_id: 'fixture-1', sync_status: 'conflict', root_task_id: 1, root_title: '作業中の星' },
+  { id: 2, title: '選択だけの星', status: 'Yet', priority: 'High', source: 'notion', external_id: 'fixture-2', sync_status: 'synced', root_task_id: 2, root_title: '選択だけの星' },
+];
+let fixturePreferences = { work_session: false };
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css' };
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
@@ -33,6 +39,15 @@ const server = http.createServer(async (request, response) => {
   calls.push({ path: url.pathname, data });
   response.setHeader('Content-Type', 'application/json');
   let payload = {};
+  if (url.pathname === '/api/notifications/tasks') payload = { tasks: fixtureTasks };
+  if (url.pathname === '/api/work-sessions/active') payload = { session: fixtureWork };
+  if (url.pathname.endsWith('/fixture-work/pause')) payload = { session: fixtureWork = { ...fixtureWork, status: 'paused', paused_at: new Date().toISOString() } };
+  if (url.pathname.endsWith('/fixture-work/resume')) payload = { session: fixtureWork = { ...fixtureWork, status: 'active', paused_at: null } };
+  if (url.pathname === '/api/notifications/status') payload = { configured: false, dependency_available: false, preferences: fixturePreferences, categories: [{ id: 'work_session', label: '作業セッション' }] };
+  if (url.pathname === '/api/notifications/preferences') payload = { preferences: fixturePreferences = data.preferences };
+  if (url.pathname === '/api/notifications/events') payload = { events: [], unread_count: 0 };
+  if (url.pathname === '/api/notifications/tasks/sync/conflicts') payload = { tasks: [fixtureTasks[0]] };
+  if (url.pathname.endsWith('/1/sync/conflict')) payload = request.method === 'GET' ? { local: { title: '作業中の星', parent_external_ids: ['PETITの親'] }, remote: { title: 'Notionの星', parent_external_ids: [] }, revision: 'a'.repeat(64) } : { message: 'PETIT側の変更を再同期します。まだNotionへの反映は完了していません。', sync_status: 'pending' };
   if (url.pathname === '/api/health') payload = { chat_model: { server_ok: true, label: 'Fixture' }, agent_model: { server_ok: true, label: 'Fixture' } };
   if (url.pathname === '/api/conversations') payload = { conversations: [] };
   if (url.pathname === '/api/proactive') payload = { message: '何から始めよう？' };
@@ -74,6 +89,15 @@ const server = http.createServer(async (request, response) => {
     assert.equal(await setup.locator('[data-model=dir]').isVisible(), true);
     assert.equal(await setup.locator('#wakeThreshold').inputValue(), '0.45');
     assert.equal(await setup.locator('#wakeEnabled').isChecked(), false);
+    const nudgeOpened = instance.waitForEvent('window', { predicate: candidate => candidate !== setup });
+    await setup.locator('#notification-test').click();
+    const nudge = await nudgeOpened;
+    await nudge.waitForURL(/nudge.html$/);
+    await nudge.locator('#body').getByText('この形で声をかけます。届いたか確認してください。').waitFor();
+    assert.equal(await nudge.evaluate(() => typeof window.require), 'undefined');
+    assert.equal(await nudge.evaluate(() => typeof window.petitSettings), 'undefined');
+    await nudge.screenshot({ path: path.join(root, 'desktop/dist/smoke-nudge.png') });
+    await nudge.locator('#dismiss').click();
     await setup.locator('#serverUrl').fill(origin);
     await setup.locator('#updates').uncheck();
     const opened = instance.waitForEvent('window', { predicate: (page) => page !== setup });
@@ -86,6 +110,19 @@ const server = http.createServer(async (request, response) => {
     assert.equal(await page.locator('#greeting').evaluate((el) => getComputedStyle(el).animationName), 'none');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const errors = []; page.on('pageerror', (e) => errors.push(e.message));
+    const beforeInput = calls.filter(call => call.path === '/api/chat').length;
+    await page.locator('#input').fill('変換確定のEnter');
+    await page.evaluate(() => {
+      const input = document.getElementById('input');
+      input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+      input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+    });
+    await page.waitForTimeout(80);
+    await page.evaluate(() => document.getElementById('input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true })));
+    assert.equal(calls.filter(call => call.path === '/api/chat').length, beforeInput, 'IME confirmation and held Enter never submit');
+    await page.locator('#input').fill('複数行\n'.repeat(20));
+    assert.ok(await page.locator('#input').evaluate(el => el.clientHeight <= 90 && getComputedStyle(el).overflowY === 'auto'));
     await page.locator('#input').fill('テスト予定を追加');
     await page.locator('#send').click();
     await page.getByRole('button', { name: '実行する', exact: true }).waitFor();
@@ -230,6 +267,32 @@ const server = http.createServer(async (request, response) => {
     await workspace.getByRole('button', { name: '小型会話', exact: true }).click();
     await workspace.waitForTimeout(1000);
     assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), true, 'workspace labels remain visible at laptop width');
+    await workspace.waitForFunction(() => window.PetitUniverse?.workingTask() === '1');
+    assert.ok(await workspace.locator('[data-task-id="1"].is-working').count() > 0);
+    await workspace.evaluate(() => window.PetitUniverse.selectTask('2'));
+    assert.equal(await workspace.locator('[data-task-id="2"].is-working').count(), 0, 'selection does not move work focus');
+    await workspace.evaluate(() => document.getElementById('work-session-pause').click());
+    await workspace.waitForFunction(() => window.PetitUniverse.workingTask() === null);
+    assert.equal(await workspace.locator('[data-task-id].is-working').count(), 0, 'pause removes work emphasis');
+    await workspace.evaluate(() => document.getElementById('work-session-pause').click());
+    await workspace.waitForFunction(() => window.PetitUniverse.workingTask() === '1');
+    await workspace.evaluate(() => window.dispatchEvent(new CustomEvent('petit:navigate', { detail: { view: 'tasks' } })));
+    await workspace.getByRole('button', { name: '同期競合を確認', exact: true }).click();
+    await workspace.locator('.task-conflict-dialog').getByRole('button', { name: '作業中の星', exact: true }).click();
+    await workspace.locator('.task-conflict-dialog table').waitFor();
+    await workspace.waitForFunction(() => getComputedStyle(document.querySelector('.task-conflict-dialog')).opacity === '1');
+    await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-conflict.png') });
+    await workspace.getByRole('button', { name: 'PETIT側を残して再同期', exact: true }).click();
+    await workspace.getByText('PETIT側の変更を再同期します。まだNotionへの反映は完了していません。', { exact: true }).waitFor();
+    await workspace.locator('.task-conflict-dialog').getByRole('button', { name: '閉じる', exact: true }).click();
+    await workspace.evaluate(() => window.dispatchEvent(new CustomEvent('petit:navigate', { detail: { view: 'settings' } })));
+    await workspace.locator('#notification-enable').click();
+    await workspace.locator('#notification-disable').waitFor({ state: 'visible' });
+    assert.equal(await workspace.evaluate(async () => (await window.petitNotifications.read()).enabled), true, 'Desktop enables without VAPID');
+    assert.equal(fixturePreferences.work_session, true);
+    await workspace.locator('#notification-disable').click();
+    await workspace.locator('#notification-enable').waitFor({ state: 'visible' });
+    assert.equal(await workspace.evaluate(async () => (await window.petitNotifications.read()).enabled), false);
     await workspace.locator('.petit-area-rail__nav button').nth(1).click();
     await workspace.waitForTimeout(350);
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-workspace.png') });
@@ -270,7 +333,7 @@ const server = http.createServer(async (request, response) => {
     await recovered.waitForURL(`${origin}/static/desktop/index.html`);
     assert.equal(await recovered.locator('#input').inputValue(), 'クラッシュをまたぐ下書き');
     assert.deepEqual(errors, []);
-    console.log('PASS: isolated Electron chat/approval/synthetic voice, drafts/settings/crash/reconnect, workspace IPC isolation, no PWA registration.');
+    console.log('PASS: isolated Electron chat/approval/synthetic voice, IME/repeat/textarea, gentle nudge, work focus/pause, conflict comparison, Desktop notifications without VAPID, recovery and IPC isolation.');
     console.log(`Screenshot: ${screenshot}`);
   } finally {
     if (instance) await instance.close();

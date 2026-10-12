@@ -16,7 +16,12 @@
 <label class="check"><input id="wakeEnabled" type="checkbox">小型画面を閉じたときに、マイクで呼びかけを待つ</label>
 <p class="help">待機音声は端末内で処理し、保存・サーバー送信しません。小型画面・設定の表示中、ロック中、スリープ中は停止します。アプリ終了中は呼び出せません。</p></section>
 <label class="check"><input id="login" type="checkbox">ログイン時にバックグラウンドで起動（インストール版のみ）</label>
+<section><h2>作業を邪魔しない声かけ</h2>
+<label class="check"><input id="notifications" type="checkbox">Desktopで通知を受け取る</label>
+<label>通知の出し方<select id="notificationMode"><option value="gentle">画面のすみに声かけ</option><option value="native">OSの通知</option></select></label>
+<p class="help">VAPID・pywebpushの設定は不要です。アプリとPETITサーバーの起動中、15秒ごとに新しい通知を確認します。通知の種類は作業画面のSettingsでONにしてください。声かけは入力フォーカスを奪わず12秒で閉じ、ホバー中は残ります。ロック中は表示しません。</p>
+<button id="notification-test" type="button">保存済みの設定で通知をテスト</button><p id="notification-result" role="status"></p></section>
 <label class="check"><input id="updates" type="checkbox">GitHub Releasesを起動時・24時間ごとに確認して更新を通知</label>
-<p class="help">更新のダウンロード・インストールは自分で行います。アプリの更新で会話データを置き換えることはありません。</p>
+<p class="help">Windows x64のインストール版は、更新ボタンからダウンロード・検証・installer起動まで進められます。最後はinstallerの画面で確認します。macOSはReleasesからDMGを取得してください。接続先サーバーの更新は別途必要です。</p>
 <div class="actions"><button id="updates-check" type="button">更新を確認</button><button type="submit" class="primary">保存してPETITを開く</button></div><p id="result" role="status"></p>
 </form></main><script src="setup.js"></script></body></html>
