@@ -1,6 +1,12 @@
 name: Create PETIT Desktop Release
 
 on:
+  # Opt-in release for a main merge that bumps VERSION and uses [desktop-release].
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
   workflow_dispatch:
     inputs:
       wake_model_url:
@@ -22,6 +28,7 @@ concurrency:
 
 jobs:
   create-tag-and-start-release:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[desktop-release]')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

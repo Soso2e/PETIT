@@ -3,7 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/desktop.yml'), 'utf8');
+const normalizeLineEndings = (value) => value.replace(/\r\n?/g, '\n');
+const workflow = normalizeLineEndings(
+  fs.readFileSync(path.join(__dirname, '../../.github/workflows/desktop.yml'), 'utf8')
+);
+const releaseWorkflow = normalizeLineEndings(
+  fs.readFileSync(path.join(__dirname, '../../.github/workflows/desktop-release.yml'), 'utf8')
+);
 const pkg = require('../package.json');
 
 test('tag releases use ad-hoc macOS signing without Apple credentials', () => {
@@ -21,4 +27,19 @@ test('tag releases use ad-hoc macOS signing without Apple credentials', () => {
 test('manual branch builds use development artifacts but tagged dispatch only builds the personal release', () => {
   assert.match(workflow, /if: github\.event_name == 'workflow_dispatch' && !startsWith\(github\.ref, 'refs\/tags\/v'\) && matrix\.platform == 'mac'\n\s+run: npm run build:mac:development/);
   assert.match(pkg.scripts['build:mac:development'], /development/);
+});
+
+// Git on Windows checks out YAML as CRLF; keep assertions platform-independent.
+test('workflow assertions match the same release steps with CRLF line endings', () => {
+  const windowsWorkflow = workflow.replace(/\n/g, '\r\n');
+  const normalized = normalizeLineEndings(windowsWorkflow);
+  assert.equal(normalized, workflow);
+  assert.match(normalized, /if: startsWith\(github\.ref, 'refs\/tags\/v'\) && matrix\.platform == 'mac'\n\s+run: npm run build:mac:personal/);
+  assert.match(normalized, /if: github\.event_name == 'workflow_dispatch' && !startsWith\(github\.ref, 'refs\/tags\/v'\) && matrix\.platform == 'mac'\n\s+run: npm run build:mac:development/);
+});
+
+test('main release automation is opt-in and requires a VERSION change', () => {
+  assert.match(releaseWorkflow, /push:\n    branches:\n      - main\n    paths:\n      - 'VERSION'/);
+  assert.match(releaseWorkflow, /if: github\.event_name == 'workflow_dispatch' \|\| contains\(github\.event\.head_commit\.message, '\[desktop-release\]'\)/);
+  assert.match(releaseWorkflow, /gh workflow run desktop\.yml/);
 });

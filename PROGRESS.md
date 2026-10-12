@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.25.4**
+**Current Version: v0.25.5**
 
 **Last Updated: 2026-10-12**
 
@@ -8,7 +8,7 @@
 
 - 同期競合（2026-10-12）: 対象1件のPETIT側親子関係を残す方針でNotion更新を実行したが、親ページへのアクセスが404（連携 `nocord`）となり未解消。子ページの取得は成功、親ページ単独取得も404。ローカル親子関係と競合状態を保持。次はNotionで親ページの存在・ゴミ箱・連携共有を確認してから再反映する。更新前DBバックアップを作成済み。
 
-- #311 / v0.25.4: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。手動Actionsもタグrefではdevelopment用DMGを重複生成しないよう分岐。未公証DMGはGatekeeperで通常起動が拒否され得るため、実機受入・更新通知は未完了。
+- #311 / v0.25.5: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。手動Actionsもタグrefではdevelopment用DMGを重複生成しないよう分岐。未公証DMGはGatekeeperで通常起動が拒否され得るため、v0.25.4タグのWindows npm testはCRLF改行を固定LFで検査する回帰テスト2件が原因で失敗（Mac DMGビルド成功）。v0.25.5でテストの改行正規化とCRLF回帰を追加。VERSION更新とマージメッセージ`[desktop-release]`の組合せでのみタグ作成・リリースを起動するオプトイン導線も追加（手動実行は維持）。実Release、実機受入・更新通知は未完了。
 
 
 - #309: macOS v0.24.0の署名不整合は旧workflowによる署名スキップが原因。ad-hoc署名・署名直後/DMG完成後の検証・内容一致チェックを追加済み。Safari取得した未公証DMGはGatekeeperで通常起動拒否。今後Apple公証を行わない方針（#311）で、個人端末でのインストールと更新受入は未完了。詳細は`docs/macos-distribution.md`。
