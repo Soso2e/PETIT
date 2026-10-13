@@ -44,9 +44,9 @@
 
   const priorityLabel = (task) => {
     const value = normalize(task.priority).toLowerCase();
-    if (value === "high") return "High";
-    if (["mid", "medium"].includes(value)) return "Mid";
-    if (value === "low") return "Low";
+    if (value === "high") return "高";
+    if (["mid", "medium"].includes(value)) return "通常";
+    if (value === "low") return "低";
     return "未設定";
   };
 
@@ -68,7 +68,7 @@
     const heading = document.createElement("div");
     heading.className = "detail-children__heading";
     const label = document.createElement("span");
-    label.textContent = "CHILD TASKS";
+    label.textContent = "子タスク";
     const count = document.createElement("strong");
     count.textContent = `${children.length}件`;
     heading.append(label, count);

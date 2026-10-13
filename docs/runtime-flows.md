@@ -4,13 +4,22 @@
 
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
-## 作業統計タブ（v0.27.0 / #319）
+## 作業統計タブ（v0.28.0 / #319・#321）
 
 ```mermaid
 flowchart TD
     tab[統計タブを開く / 表示中30秒 / 手動更新] --> read[今日と直近7日の既存APIを並列取得]
     read --> today[/api/work-sessions/today]
     read --> week[/api/work-sessions/summary?days=7]
+    select[日付入力 / 日別の棒] --> day[/api/work-sessions/days/DATE]
+    day --> core
+    day --> note[日付別の振り返りとrevisionを取得]
+    today --> note
+    note --> edit[入力と未保存の下書きを保持]
+    edit --> save[明示保存 PUT days/DATE/reflection]
+    save --> check{SQLiteトランザクションでrevision一致?}
+    check -->|一致| stored[メモ保存 / revision更新]
+    check -->|不一致| conflict[409 / 入力保持 / 保存済みの再読込を案内]
     today --> core[Coreで休憩とJSTの日境界を集計]
     week --> core
     core --> display[今日の合計・件数・最長 / 日別とタスク別グラフ / 記録]
@@ -19,7 +28,21 @@ flowchart TD
     leave[タブ切替・非表示] --> cancel[未完了の取得中断 / 非表示の定期取得停止]
 ```
 
-表示は `frontend/today.js` / `frontend/statistics.css`、集計は既存 `backend/work_sessions.py`。API・DB形式は変更せず、作業記録を読み取る。[画面と検証範囲](work-statistics.md)を参照。
+表示は `frontend/today.js` / `frontend/statistics.css`、集計は既存 `backend/work_sessions.py`。既存の集計を共用し、日別取得API・振り返りの明示保存APIと専用SQLite表を追加する。今日の既存APIにも振り返りを付加し、作業記録は変更しない。[画面と検証範囲](work-statistics.md)を参照。
+
+## Desktopの画面準備と復旧（v0.28.0 / #321）
+
+```mermaid
+flowchart TD
+    navigation[main-frameの移動] --> document{同じ文書内の履歴・タブ切替?}
+    document -->|はい| keepReady[preloadのready状態を維持]
+    document -->|いいえ| resetReady[readyを解除 / 古い待機タイマーを停止]
+    resetReady --> loaded[did-finish-load / 8秒の準備待ち]
+    loaded --> ready{preloadからreadyを受信?}
+    ready -->|はい| usable[作業画面を継続]
+    ready -->|いいえ| recover[同梱復旧画面]
+    crash[renderer停止 / main-frame読込失敗] --> recover
+```
 
 ## Desktop v0.26.0の入力・同期競合・通知
 

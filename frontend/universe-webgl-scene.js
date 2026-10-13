@@ -254,6 +254,7 @@
     state.renderer.setSize(width, height, false);
     state.camera.aspect = width / height;
     state.camera.updateProjectionMatrix();
+    if (isPanelActive() && state.overviewRadius && !state.selectedTaskId) resetCamera();
     requestRender();
   };
 
@@ -496,6 +497,15 @@
     });
 
     state.selectedTaskId = previousSelection && state.entries.has(previousSelection) ? previousSelection : null;
+    const layoutKey = models.map(model => `${model.taskId}:${model.children.length}`).join("|");
+    const fitOverview = layoutKey !== state.overviewLayoutKey;
+    state.overviewLayoutKey = layoutKey;
+    state.sceneRoot.updateMatrixWorld(true);
+    state.overviewPoints = [...state.labels.values()].map(({ object }) => ({
+      position: object.getWorldPosition(new THREE.Vector3()),
+      radius: (object.geometry.parameters.radius || 1) * 1.7,
+    }));
+    state.overviewRadius = 1; // Marks a loaded layout for responsive overview fitting.
     updateSelection();
 
     // Preserve spatial continuity across task mutations. Rebuilt bodies start
@@ -523,6 +533,7 @@
     }
     clearStatus();
     document.body.classList.add("petit-univ-webgl-ready");
+    if (fitOverview && !state.selectedTaskId) resetCamera();
     window.dispatchEvent(new CustomEvent("petit:univ-webgl-rendered", {
       detail: { systems: models.length, tasks: state.entries.size },
     }));
@@ -609,6 +620,7 @@
   const focusEntry = (entry) => {
     if (!entry?.object || !state.camera || !state.controls) return false;
     const target = new THREE.Vector3();
+    state.scene.fog.density = .0115;
     entry.object.getWorldPosition(target);
     const direction = state.camera.position.clone().sub(state.controls.target);
     if (direction.lengthSq() < 0.001) direction.set(0, 0.2, 1);
@@ -624,7 +636,19 @@
     state.selectedTaskId = null;
     updateSelection();
     document.body.classList.remove("petit-univ-manage-open");
-    startCameraTween(new THREE.Vector3(0, 10, 34), new THREE.Vector3(0, 0, 0), 760);
+    const vertical = THREE.MathUtils.degToRad(state.camera.fov / 2);
+    const horizontal = Math.atan(Math.tan(vertical) * state.camera.aspect);
+    const direction = new THREE.Vector3(0, .25, 1).normalize();
+    const up = new THREE.Vector3(0, direction.z, -direction.y);
+    // Fit body positions, reserving room for the work bar/HUD and labels.
+    const distance = Math.max(32, ...(state.overviewPoints || []).map(({ position, radius }) =>
+      direction.dot(position) + Math.max(Math.abs(position.x) / (Math.tan(horizontal) * .84), Math.abs(up.dot(position)) / (Math.tan(vertical) * .56)) + radius / Math.sin(Math.min(vertical, horizontal))
+    ));
+    state.controls.maxDistance = Math.max(72, distance * 1.8);
+    state.camera.far = Math.max(240, distance * 2); state.camera.updateProjectionMatrix();
+    state.scene.fog.density = Math.min(.0115, .6 / distance);
+    startCameraTween(direction.multiplyScalar(distance), new THREE.Vector3(0, 0, 0), 760);
+    window.PetitUnivSpace?.reset?.();
   };
 
   const openDetail = () => {
@@ -650,6 +674,7 @@
     // Keep selection/detail state synchronized without re-entering the hidden
     // DOM click path, which rebuilds the Universe and WebGL scene.
     const selectedByUniverse = window.PetitUniverse?.selectTask?.(entry.taskId);
+    window.PetitUnivSpace?.focusTask?.(entry.taskId);
     if (!selectedByUniverse) {
       const domNode = entry.domNode?.isConnected
         ? entry.domNode
@@ -811,7 +836,9 @@
     const height = state.viewport.clientHeight;
     state.camera.getWorldDirection(labelForward);
 
-    state.labels.forEach(({ element, object, entry, type }) => {
+    const occupied = [];
+    const priority = ({ entry, type }) => entry.taskId === state.selectedTaskId ? 0 : type === "child" ? 3 : type === "parent" ? 1 : 2;
+    [...state.labels.values()].sort((a, b) => priority(a) - priority(b)).forEach(({ element, object, entry, type }) => {
       if (!object?.visible) {
         element.hidden = true;
         return;
@@ -824,7 +851,7 @@
         && labelProjected.x > -1.18 && labelProjected.x < 1.18
         && labelProjected.y > -1.18 && labelProjected.y < 1.18;
       const distance = state.camera.position.distanceTo(labelWorld);
-      const maxDistance = type === "child" ? 38 : 82;
+      const maxDistance = type === "child" ? 38 : Math.max(82, state.controls.maxDistance);
       const selected = Boolean(entry.taskId && entry.taskId === state.selectedTaskId);
       const working = Boolean(entry.taskId && entry.taskId === String(window.PetitUniverse?.workingTask?.() || ""));
       const visible = inFront && withinFrustum && (selected || working || distance < maxDistance);
@@ -836,6 +863,10 @@
       const opacity = selected || working ? 1 : clamp(1 - ((distance - fadeStart) / (maxDistance - fadeStart)), 0.22, 1);
       element.style.opacity = opacity.toFixed(3);
       element.style.zIndex = String(Math.round((1 - labelProjected.z) * 500));
+      const rect = element.getBoundingClientRect();
+      const overlap = occupied.some(other => rect.left < other.right + 6 && rect.right > other.left - 6 && rect.top < other.bottom + 6 && rect.bottom > other.top - 6);
+      if (type === "child" && !selected && !working && overlap) element.hidden = true;
+      else occupied.push(rect);
     });
   };
 

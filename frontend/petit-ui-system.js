@@ -78,6 +78,12 @@
       <summary aria-controls="petit-work-details"><strong id="petit-context-session">作業なし</strong><span aria-hidden="true">⌄</span></summary>
       <div id="petit-work-details" class="petit-work-details"></div>`;
     const dropdown = bar.querySelector(".petit-work-details");
+    const startLink = document.createElement("button");
+    startLink.type = "button";
+    startLink.id = "petit-work-start-link";
+    startLink.textContent = "タスクを選んで作業を始める";
+    startLink.addEventListener("click", () => { bar.open = false; window.PetitAppShell?.activateView("tasks"); });
+    dropdown.appendChild(startLink);
     const footer = document.querySelector(".focus-footer");
     if (footer) dropdown.appendChild(footer);
     const detail = byId("detail-panel");
@@ -117,6 +123,7 @@
       const copy = idle ? "作業なし" : `${paused ? "一時停止中" : "作業中"}：${activeTask}`;
       if (sessionEl.textContent !== copy) sessionEl.textContent = copy;
       contextBar.dataset.state = idle ? "idle" : paused ? "paused" : "active";
+      byId("petit-work-start-link").hidden = !idle;
     }
   };
 

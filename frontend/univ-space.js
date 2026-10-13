@@ -76,7 +76,7 @@
     if (descriptionEl) descriptionEl.textContent = description;
     if (focus) focus.disabled = !state.selectedSystemKey;
     if (manage) manage.disabled = !canManage;
-    if (mode) mode.textContent = state.mode === "focus" ? "PLANET FOCUS" : "CORE OVERVIEW";
+    if (mode) mode.textContent = state.mode === "focus" ? "選択中のタスク" : "全体表示";
   };
 
   const installTouchStyles = () => {
@@ -121,30 +121,30 @@
         <div class="univ-hud__brand">
           <span class="eyebrow">PETIT UNIVERSE</span>
           <strong>Univ</strong>
-          <small data-univ-mode-label>CORE OVERVIEW</small>
+          <small data-univ-mode-label>全体表示</small>
         </div>
         <div class="univ-hud__selection" aria-live="polite">
           <span data-univ-selected-project>PETIT</span>
           <strong data-univ-selected-title>Core</strong>
           <p data-univ-selected-description>中心の惑星から、親タスク惑星と子タスク衛星を見渡します。</p>
           <div>
-            <button type="button" data-univ-action="focus" disabled>Focus</button>
+            <button type="button" data-univ-action="focus" disabled>ここへ移動</button>
             <button type="button" data-univ-action="manage" disabled>詳細</button>
           </div>
         </div>
         <div class="univ-hud__controls" aria-label="Univ camera controls">
-          <button type="button" data-univ-action="overview" title="Coreへ戻る">Core</button>
+          <button type="button" data-univ-action="overview" title="全体へ戻る">全体</button>
           <button type="button" data-univ-action="zoom-out" aria-label="縮小">−</button>
           <button type="button" data-univ-action="zoom-in" aria-label="拡大">＋</button>
-          <button type="button" data-univ-action="reset" title="視点をリセット">Reset</button>
+          <button type="button" data-univ-action="reset" title="視点をリセット">リセット</button>
         </div>
-        <p class="univ-hud__help">Drag: orbit · Middle drag: pan · Wheel: zoom · Planet: focus</p>
+        <p class="univ-hud__help">左ドラッグ: 回転 · ミドル: 移動 · ホイール: 拡大縮小 · 惑星: 選択</p>
       `;
       frame.appendChild(hud);
     }
 
     const help = frame.querySelector(".univ-hud__help");
-    if (help && coarsePointer.matches) help.textContent = "Tap: focus · Drag: orbit · Pinch: zoom";
+    if (help && coarsePointer.matches) help.textContent = "タップ: 選択 · ドラッグ: 回転 · ピンチ: 拡大縮小";
     installTouchStyles();
 
     if (!document.querySelector(".univ-detail-dismiss")) {
@@ -484,18 +484,25 @@
     });
   };
 
-  const showUniv = ({ mode = "overview", taskId: requestedTaskId = null } = {}) => {
+  const showUniv = ({ mode = "overview", taskId: requestedTaskId = null, openDetail = false } = {}) => {
     document.body.classList.add("petit-univ-active");
     ensureHud();
     requestRender("univ-open");
     if (mode === "focus" && requestedTaskId) {
       state.selectedTaskId = String(requestedTaskId);
       window.requestAnimationFrame(() => {
+        if (window.PetitUnivWebGL?.active?.()) {
+          window.PetitUnivWebGL.selectTask?.(requestedTaskId);
+          if (openDetail) openManagement();
+          return;
+        }
         const task = selectedTask();
         focusSystem(systemNode(task), task?.classList.contains("univ-satellite") ? task : null);
+        if (openDetail) openManagement();
       });
       return;
     }
+    if (window.PetitUnivWebGL?.active?.()) window.PetitUnivWebGL.reset?.();
     resetCamera();
   };
 

@@ -574,6 +574,7 @@
 
   const selectOverviewTask = (task, index = 0) => {
     const key = taskKey(task, index);
+    const openDetail = state.overviewSelectionId === key && panels.some(panel => panel.dataset.viewPanel === "tasks" && !panel.hidden);
     selectTask(task, index);
     state.overviewSelectionId = key;
     updateOverviewSelectionUI(key);
@@ -581,6 +582,9 @@
       window.PetitUnivSpace.focusTask(key);
     }
     showFeedback(`「${text(task.title, "タスク")}」を選択しました。`);
+    if (openDetail) {
+      window.PetitAppShell?.activateView("univ", { mode: "focus", taskId: key, openDetail: true });
+    }
   };
 
   const renderProjectControls = () => {
@@ -725,13 +729,13 @@
     detailPanelEl.replaceChildren();
     const fragment = detailTemplate.content.cloneNode(true);
     fragment.querySelector('[data-detail="title"]').textContent = text(task.title, "名称未設定");
-    fragment.querySelector('[data-detail="status"]').textContent = isDone(task) ? "完了" : normalizeStatus(task.status);
-    fragment.querySelector('[data-detail="bucket"]').textContent = isLow(task) ? "あとで" : (isHigh(task) ? "重要" : "Mid");
+    fragment.querySelector('[data-detail="status"]').textContent = isDone(task) ? "完了" : ({ Yet: "未着手", Now: "進行中" }[normalizeStatus(task.status)] || normalizeStatus(task.status));
+    fragment.querySelector('[data-detail="bucket"]').textContent = isLow(task) ? "あとで" : (isHigh(task) ? "重要" : "通常");
     fragment.querySelector('[data-detail="due"]').textContent = text(task.due_date, "期限なし");
     const priorityEl = fragment.querySelector('[data-detail="priority"]');
-    if (priorityEl) priorityEl.textContent = text(task.priority, "Mid");
+    if (priorityEl) priorityEl.textContent = ({ High: "高", Mid: "通常", Low: "低" }[task.priority] || "通常");
     const areaEl = fragment.querySelector('[data-detail="area"]');
-    if (areaEl) areaEl.textContent = text(task.area, "未設定");
+    if (areaEl) areaEl.textContent = ({ personal: "個人", group: "グループ", university: "大学", work: "仕事" }[task.area] || text(task.area, "未設定"));
     fragment.querySelector('[data-detail="project"]').textContent = taskProject(task);
     fragment.querySelector('[data-detail="reason"]').textContent = text(task.reason || task.summary, "メモはありません。");
     const sync = syncClass(task);
@@ -763,10 +767,13 @@
         readViews.forEach((node) => { node.hidden = editing; });
         editForm.hidden = !editing;
         if (editToggleBtn) editToggleBtn.hidden = editing;
+        const parentField = fragment.querySelector(".detail-parent-field") || detailPanelEl.querySelector(".detail-parent-field");
+        if (parentField) parentField.hidden = !editing;
         if (editing) titleInput?.focus();
       };
 
       editToggleBtn?.addEventListener("click", () => setEditMode(true));
+      setEditMode(false);
       cancelEditBtn?.addEventListener("click", () => setEditMode(false));
       editForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -835,8 +842,8 @@
     const rows = sortedTasks(filteredTasks());
     byId("task-view-title").textContent = state.filter === "low" ? "あとでやりたいこと" : "重要なタスク";
     byId("task-view-copy").textContent = state.filter === "low"
-      ? "Lowだけを分離して表示。1回押して選択、もう1回でFocusへ移ります。"
-      : "Highだけを表示。1回押して選択、もう1回でFocusへ移ります。";
+      ? "あとで取り組むタスク。1回押して選択、もう1回で惑星の詳細を開きます。"
+      : "重要なタスク。1回押して選択、もう1回で惑星の詳細を開きます。";
     byId("task-view-count").textContent = `${rows.length}件`;
 
     if (!rows.length) {
@@ -867,7 +874,19 @@
       actionCell.appendChild(complete);
       row.appendChild(actionCell);
       appendCell(row, task.title, "task-table__title");
-      appendCell(row, task.due_date, "task-table__due");
+      const dueCell = appendCell(row, task.due_date, "task-table__due");
+      const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+      const due = String(task.due_date || "").slice(0, 10);
+      const gap = (Date.parse(`${due}T00:00:00+09:00`) - Date.parse(`${today}T00:00:00+09:00`)) / 86400000;
+      const dueState = gap < 0 ? "overdue" : gap === 0 ? "today" : gap <= 3 ? "soon" : "";
+      row.dataset.dueState = dueState;
+      dueCell.dataset.date = due;
+      if (dueState) {
+        const badge = document.createElement("small");
+        badge.className = "task-due-badge";
+        badge.textContent = { overdue: "期限切れ", today: "今日", soon: "まもなく" }[dueState];
+        dueCell.appendChild(badge);
+      }
       appendCell(row, taskProject(task));
       const syncCell = document.createElement("td");
       const sync = syncClass(task);
@@ -884,6 +903,7 @@
       row.classList.toggle("is-selected", selected);
       row.setAttribute("aria-selected", String(selected));
       row.addEventListener("keydown", (event) => {
+        if (event.target !== row) return;
         if (!["Enter", " "].includes(event.key)) return;
         event.preventDefault();
         selectOverviewTask(task, state.tasks.indexOf(task));

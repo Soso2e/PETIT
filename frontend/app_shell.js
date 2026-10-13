@@ -30,6 +30,7 @@
     // Univ is a viewport, not a document section. Keep the page lock in the
     // shell so every navigation path (tab, URL alias, and task deep link)
     // receives the same fixed-space contract.
+    if (panelView === "universe" || panelView === "chat") window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     document.body.classList.toggle("petit-univ-screen", panelView === "universe");
 
     tabs.forEach((tab) => {
@@ -82,6 +83,7 @@
           detail: {
             mode: view === "focus" ? "focus" : (detail.mode || "overview"),
             taskId: detail.taskId || null,
+            openDetail: Boolean(detail.openDetail),
           },
         }));
       }

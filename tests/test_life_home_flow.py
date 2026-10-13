@@ -36,7 +36,7 @@ class UnivHomeFlowAssetTests(unittest.TestCase):
         self.assertIn('/children`', script)
         self.assertIn("await refreshAndFocusTask(taskId(task))", script)
         self.assertIn("window.PetitUniverse.refreshAndFocusTask", script)
-        self.assertIn("この親Taskに小タスクを追加", script)
+        self.assertIn("子タスクを追加", script)
 
     def test_today_is_available_as_work_statistics(self) -> None:
         script = (FRONTEND / "today.js").read_text(encoding="utf-8")

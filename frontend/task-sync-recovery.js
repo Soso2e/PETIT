@@ -55,6 +55,7 @@
       try {
         const data = await requestJson(`/api/notifications/tasks/${id}/sync/conflict`);
         if (!dialog.open) return;
+        heading.textContent = `同期競合：${data.local.title || data.remote.title || "タスク"}`;
         status.textContent = "差分のある項目を表示しています。PETIT側は未同期の変更をNotionへ再送します。";
         const table = document.createElement("table");
         const labels = { title: "名前", status: "状態", due_date: "期限", priority: "優先度", area: "分野", reason: "メモ", done_date: "完了日", parent_external_ids: "親ページ", project_external_ids: "プロジェクト" };
@@ -74,6 +75,10 @@
           table.append(tr);
         }
         content.append(table);
+        const consequence = document.createElement("p");
+        consequence.className = "task-conflict-consequence";
+        consequence.textContent = "PETIT側を残すと再同期を予約します。Notionへの反映は別途確認が必要です。Notion側を採用すると、このタスクの未同期の変更を取り下げます。";
+        content.append(consequence);
         if (table.children.length === 1) status.textContent = "現在の値に差分はありません。未同期の変更を再送するか、Notion側を採用して取り下げるか選べます。";
         for (const [choice, label] of [["petit", "PETIT側を残して再同期"], ["notion", "Notion側を採用（未同期の変更を取り下げる）"]]) {
           const button = document.createElement("button"); button.type = "button"; button.textContent = label;

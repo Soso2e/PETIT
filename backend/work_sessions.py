@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date as CalendarDate, datetime, timedelta, timezone
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -50,6 +50,12 @@ CREATE TABLE IF NOT EXISTS work_session_events (
 );
 CREATE INDEX IF NOT EXISTS idx_work_session_events_session_time
 ON work_session_events(session_id, occurred_at, event_id);
+CREATE TABLE IF NOT EXISTS work_day_reflections (
+    date TEXT PRIMARY KEY,
+    note TEXT NOT NULL,
+    revision INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -58,6 +64,11 @@ class WorkSessionStart(BaseModel):
     task_id: str | None = Field(default=None, max_length=160)
     task: str = Field(min_length=1, max_length=160)
     project_id: str | None = Field(default=None, max_length=160)
+
+
+class WorkDayReflection(BaseModel):
+    note: str = Field(max_length=2000)
+    revision: int = Field(ge=0)
 
 
 def _now(value: datetime | None = None) -> datetime:
@@ -320,10 +331,10 @@ def session_snapshot(row: dict[str, Any] | None, *, now: datetime | None = None)
     return result
 
 
-def today_summary(*, now: datetime | None = None) -> dict[str, Any]:
+def day_summary(day: CalendarDate, *, now: datetime | None = None) -> dict[str, Any]:
     current = _now(now)
     local_now = current.astimezone(TOKYO)
-    day_start_local = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start_local = datetime.combine(day, datetime.min.time(), tzinfo=TOKYO)
     day_end_local = day_start_local + timedelta(days=1)
     day_start = day_start_local.astimezone(timezone.utc)
     day_end = day_end_local.astimezone(timezone.utc)
@@ -379,8 +390,44 @@ def today_summary(*, now: datetime | None = None) -> dict[str, Any]:
             for project, seconds in sorted(project_totals.items(), key=lambda item: item[1], reverse=True)
         ],
         "tasks": sorted(task_totals.values(), key=lambda item: item["elapsed_seconds"], reverse=True),
-        "active": active_session(now=current),
+        "active": active_session(now=current) if day == local_now.date() else None,
     }
+
+
+def today_summary(*, now: datetime | None = None) -> dict[str, Any]:
+    current = _now(now)
+    return day_summary(current.astimezone(TOKYO).date(), now=current)
+
+
+def reflection_for_day(day: CalendarDate) -> dict[str, Any]:
+    ensure_schema()
+    with db.get_connection() as conn:
+        row = conn.execute("SELECT note, revision, updated_at FROM work_day_reflections WHERE date=?", (day.isoformat(),)).fetchone()
+    return dict(row) if row else {"note": "", "revision": 0, "updated_at": None}
+
+
+def save_reflection(day: CalendarDate, body: WorkDayReflection) -> dict[str, Any]:
+    ensure_schema()
+    with db.get_connection() as conn:
+        # Serialize read/check/write so another tab cannot silently overwrite a note.
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT revision FROM work_day_reflections WHERE date=?", (day.isoformat(),)).fetchone()
+        revision = row["revision"] if row else 0
+        if revision != body.revision:
+            raise HTTPException(status_code=409, detail="別の画面で振り返りが更新されました。入力をコピーしてから更新し、内容を確認してください。")
+        updated_at = _iso(_now())
+        note = body.note.strip()
+        conn.execute(
+            "INSERT INTO work_day_reflections(date,note,revision,updated_at) VALUES (?,?,?,?) "
+            "ON CONFLICT(date) DO UPDATE SET note=excluded.note,revision=excluded.revision,updated_at=excluded.updated_at",
+            (day.isoformat(), note, revision + 1, updated_at),
+        )
+    return {"note": note, "revision": revision + 1, "updated_at": updated_at}
+
+
+def _validate_calendar_day(day: CalendarDate) -> None:
+    if day > _now().astimezone(TOKYO).date():
+        raise HTTPException(status_code=422, detail="未来の日付の作業記録はまだありません。")
 
 
 def period_summary(days: int = 7, *, now: datetime | None = None) -> dict[str, Any]:
@@ -531,12 +578,25 @@ def get_active_work_session() -> dict[str, Any]:
 
 @router.get("/today")
 def get_today_work_sessions() -> dict[str, Any]:
-    return today_summary()
+    data = today_summary()
+    return {**data, "reflection": reflection_for_day(CalendarDate.fromisoformat(data["date"]))}
 
 
 @router.get("/summary")
 def get_work_session_summary(days: int = Query(default=7, ge=1, le=90)) -> dict[str, Any]:
     return period_summary(days)
+
+
+@router.get("/days/{day}")
+def get_day_work_sessions(day: CalendarDate) -> dict[str, Any]:
+    _validate_calendar_day(day)
+    return {**day_summary(day), "reflection": reflection_for_day(day)}
+
+
+@router.put("/days/{day}/reflection")
+def put_day_reflection(day: CalendarDate, body: WorkDayReflection) -> dict[str, Any]:
+    _validate_calendar_day(day)
+    return {"reflection": save_reflection(day, body)}
 
 
 @router.get("/{session_id}")
