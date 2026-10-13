@@ -81,12 +81,12 @@ jobs:
             tests.test_tool_risk_policy \
             tests.test_task_parent_confirmation_guard \
             -v
+      # Sona Core adapter tests need the private Sona-Agent-Core dependency and run locally.
       - name: Run calendar keyword regression tests
         run: |
           python -m unittest \
             tests.test_calendar_keyword_search \
             tests.test_calendar_sync \
-            tests.test_sona_core_schedule \
             -v
       - name: Run related regression tests
         run: python -m unittest tests.test_generic_lists tests.test_task_conversation_flow tests.test_task_cancel_status -v
