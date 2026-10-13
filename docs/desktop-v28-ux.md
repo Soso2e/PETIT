@@ -1,6 +1,6 @@
 # Desktop / Web v0.28.0：作業開始と振り返り
 
-Issue #321。v27の[実操作UX調査](v27-ux-followup.md)をもとに、`fix/v27-ux-followup`で改善。main反映・配布版の更新は未実施。
+Issue #321。v27の[実操作UX調査](v27-ux-followup.md)をもとに、`fix/v27-ux-followup`からmain向けに提供。CIとマージ状態は関連PRを正とし、配布版の更新・受入は別途。
 
 ## 操作の変更
 
