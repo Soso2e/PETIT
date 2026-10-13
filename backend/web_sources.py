@@ -11,6 +11,8 @@ import xml.etree.ElementTree as ET
 
 import httpx
 
+from . import time_context
+
 HTTP_TIMEOUT = 12.0
 
 
@@ -20,7 +22,7 @@ def get_weather(location: str, target_date: str | None = None) -> dict[str, Any]
     if not location:
         return {"ok": False, "error": "location is required"}
 
-    day = (target_date or date.today().isoformat()).strip()
+    day = (target_date or time_context.current_date().isoformat()).strip()
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
         geo = client.get(
             "https://geocoding-api.open-meteo.com/v1/search",

@@ -5,7 +5,7 @@ import json
 from datetime import date
 from typing import Any
 
-from .. import config, db, project_continuity, task_sync_queue
+from .. import config, db, project_continuity, task_sync_queue, time_context
 from ..task_taxonomy import AREAS, AREA_LABELS, resolve_area
 from . import tasks as legacy_tasks
 from .registry import tool
@@ -535,7 +535,7 @@ def complete_task(
         external_id=external_id,
         title_query=title_query,
         status=config.NOTION_DONE_STATUS,
-        done_date=done_date or date.today().isoformat(),
+        done_date=done_date or time_context.current_date().isoformat(),
     )
     if not result.get("updated"):
         return {"completed": False, **result}

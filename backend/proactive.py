@@ -14,7 +14,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from . import briefing, db, work_sessions
+from . import briefing, db, time_context, work_sessions
 from .lmstudio_client import LMStudioError, chat_completion
 
 log = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ _SYSTEM = """あなたはユーザー専用アシスタント「PETIT」。相�
 
 
 def _time_of_day(now: datetime | None = None) -> str:
-    h = (now or datetime.now()).hour
+    h = (now or time_context.current_datetime()).hour
     if 5 <= h < 11:
         return "朝"
     if 11 <= h < 17:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -16,8 +16,8 @@ _RELATIVE_DATE_PATTERN = re.compile(
     r"(?:月|火|水|木|金|土|日)曜日|\d{1,2}月\d{1,2}日)"
 )
 _PRECISE_TIME_PATTERN = re.compile(
-    r"(?:今何時|現在時刻|今から|あと\s*\d+\s*(?:分|時間)|"
-    r"\d+\s*(?:分|時間)後|\d{1,2}\s*時(?:\s*\d{1,2}\s*分)?|何時|時刻)"
+    r"(?:今何時|現在時刻|現在時間|今の時間|時間(?:を?教えて|わかる)?|今から|あと\s*\d+\s*(?:分|時間)|"
+    r"\d+\s*(?:分|時間)後|\d{1,2}\s*時(?:\s*\d{1,2}\s*分)?|何時|何分|時刻)"
 )
 
 
@@ -42,6 +42,20 @@ def current_datetime(now: datetime | None = None) -> datetime:
     if now.tzinfo is None:
         return now.replace(tzinfo=zone)
     return now.astimezone(zone)
+
+
+def current_date(now: datetime | date | None = None) -> date:
+    """Return the current local date in PETIT's timezone.
+
+    Args:
+        now: Optional datetime or date. If None, uses the current local datetime.
+
+    Returns:
+        The current date in PETIT's configured timezone.
+    """
+    if isinstance(now, date) and not isinstance(now, datetime):
+        return now
+    return current_datetime(now).date()
 
 
 def snapshot(now: datetime | None = None) -> dict[str, Any]:

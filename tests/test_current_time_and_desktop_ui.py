@@ -42,6 +42,29 @@ class CurrentTimeContextTests(unittest.TestCase):
         self.assertEqual(first_date, "2026-08-02")
         self.assertEqual(second_date, "2026-08-03")
 
+    def test_current_date_respects_petit_timezone(self) -> None:
+        """time_context.current_dateがPETIT設定タイムゾーン（Asia/Tokyo）の日付を返すことを検証する。"""
+        ref_time = datetime(2026, 8, 2, 20, 0, tzinfo=timezone.utc)
+        with patch.dict(os.environ, {"PETIT_TIMEZONE": "Asia/Tokyo"}):
+            resolved = time_context.current_date(ref_time)
+        self.assertEqual(resolved.isoformat(), "2026-08-03")
+
+    def test_get_current_time_defaults_to_petit_timezone_without_utc_bleed(self) -> None:
+        """get_current_timeツールが未指定時にOSのローカルに関わらずPETITタイムゾーンの時刻を返すことを検証する。"""
+        from backend.tools.current_time import get_current_time
+        with patch.dict(os.environ, {"PETIT_TIMEZONE": "Asia/Tokyo"}):
+            result = get_current_time()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["timezone"], "Asia/Tokyo")
+        self.assertEqual(result["utc_offset"], "+0900")
+
+    def test_time_query_variations_trigger_precise_time_context(self) -> None:
+        """「今の時間」「時間教えて」「今何分」などの自然な時刻質問で時計コンテキストが必要と判定されることを検証する。"""
+        queries = ["今の時間を教えて", "いま何分？", "現在の時間わかる？", "時間教えて"]
+        for query in queries:
+            with self.subTest(query=query):
+                self.assertTrue(time_context.needs_prompt_context(query))
+
 
 class RuntimePromptWiringTests(unittest.TestCase):
     def test_router_injects_context_user_side_and_keeps_agent_prefix_static(self) -> None:
