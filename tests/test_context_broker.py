@@ -77,5 +77,39 @@ class ContextBrokerTests(unittest.TestCase):
         self.assertTrue(packet["errors"])
 
 
+    def test_calendar_keyword_is_forwarded_without_date(self) -> None:
+        received = []
+
+        def dispatch(name: str, arguments: dict) -> str:
+            received.append((name, arguments))
+            return json.dumps({
+                "events": [
+                    {"title": "カプコン MTG", "start_time": "2026-10-21T11:00:00+09:00"},
+                ],
+                "calendar_sync": {"status": "fresh"},
+            }, ensure_ascii=False)
+
+        with patch.object(context_broker.tools, "dispatch", side_effect=dispatch):
+            packet = context_broker.collect({
+                "needs": [{"source": "calendar", "query": "CAPCOM"}],
+                "goal": "カプコンのMTGはいつ？",
+            })
+
+        self.assertEqual(received, [("get_schedule", {"date": None, "query": "CAPCOM"})])
+        self.assertFalse(packet["partial"])
+        self.assertEqual(packet["sources"][0]["facts"][0]["title"], "カプコン MTG")
+
+    def test_calendar_without_date_or_keyword_does_not_return_first_history_page(self) -> None:
+        with patch.object(context_broker.tools, "dispatch") as dispatch:
+            packet = context_broker.collect({
+                "needs": [{"source": "calendar"}],
+                "goal": "条件不明の予定検索",
+            })
+        dispatch.assert_not_called()
+        self.assertTrue(packet["partial"])
+        self.assertEqual(packet["sources"][0]["error"], "date_or_query_required")
+        self.assertEqual(packet["sources"][0]["facts"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
