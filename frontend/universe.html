@@ -49,7 +49,7 @@
       </nav>
       <div class="topbar-actions">
         <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
-        <span id="sync-pill" class="sync-pill" hidden>同期確認中</span>
+        <button id="sync-pill" type="button" class="sync-pill" aria-haspopup="dialog" aria-label="接続ステータスを開く" hidden>同期確認中</button>
         <span class="version-pill" data-petit-version></span>
       </div>
     </header>
@@ -236,6 +236,11 @@
           </div>
         </div>
         <div class="settings-grid">
+          <section class="settings-card">
+            <h3>接続と同期</h3>
+            <p>各サービスの接続、同期履歴、失敗したタスクを確認できます。</p>
+            <button type="button" data-open-connections aria-haspopup="dialog">接続ステータスを開く</button>
+          </section>
           <section class="settings-card">
             <div class="settings-card__head">
               <div>
