@@ -54,6 +54,9 @@ def ensure_task_sync_schema() -> None:
             if name not in existing:
                 conn.execute(f'ALTER TABLE tasks_cache ADD COLUMN "{name}" {definition}')
         conn.executescript(_SCHEMA)
+        queue_columns = {str(row["name"]) for row in conn.execute("PRAGMA table_info(task_sync_queue)")}
+        if "last_attempt_at" not in queue_columns:
+            conn.execute("ALTER TABLE task_sync_queue ADD COLUMN last_attempt_at TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_cache_sync_status ON tasks_cache(sync_status, id)")
 
 
@@ -210,9 +213,9 @@ def _claim_next() -> dict[str, Any] | None:
             return None
         attempts = int(row["attempts"] or 0) + 1
         updated = conn.execute(
-            "UPDATE task_sync_queue SET status='processing', attempts=?, updated_at=? "
+            "UPDATE task_sync_queue SET status='processing', attempts=?, updated_at=?, last_attempt_at=? "
             "WHERE id=? AND status IN ('pending','failed')",
-            (attempts, now, row["id"]),
+            (attempts, now, now, row["id"]),
         ).rowcount
         if not updated:
             return None
