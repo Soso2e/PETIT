@@ -114,3 +114,27 @@
   border-color: var(--line-strong);
   background: rgba(200, 207, 222, 0.05);
 }
+
+/* Reminders & Notifications layout */
+.reminders-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.reminders-column,
+.notifications-column {
+  min-width: 0;
+}
+
+.notifications-column .settings-card--notifications {
+  margin-top: 0;
+}
+
+@media (max-width: 900px) {
+  .reminders-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}
