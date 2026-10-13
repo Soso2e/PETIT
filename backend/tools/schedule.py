@@ -13,6 +13,20 @@ from .. import calendar_providers, calendar_sync, db
 from .registry import tool
 
 
+def _query_variants(query: str) -> list[str]:
+    """Search literal terms, with known Japanese/English event-name aliases."""
+    term = query.strip()
+    if not term:
+        return []
+    aliases = {"capcom": "カプコン", "カプコン": "CAPCOM"}
+    alias = aliases.get(term.casefold())
+    return [term, alias] if alias else [term]
+
+
+def _like_literal(term: str) -> str:
+    return "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
 @tool(
     name="get_schedule",
     description=(
@@ -29,20 +43,6 @@ from .registry import tool
         },
     },
 )
-def _query_variants(query: str) -> list[str]:
-    """Search literal terms, with known Japanese/English event-name aliases."""
-    term = query.strip()
-    if not term:
-        return []
-    aliases = {"capcom": "カプコン", "カプコン": "CAPCOM"}
-    alias = aliases.get(term.casefold())
-    return [term, alias] if alias else [term]
-
-
-def _like_literal(term: str) -> str:
-    return "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-
-
 def get_schedule(date: str | None = None, query: str | None = None) -> dict[str, Any]:
     sync_status = calendar_sync.sync_if_configured()
     sql = "SELECT id, source, title, start_time, end_time, location FROM calendar_events_cache"
