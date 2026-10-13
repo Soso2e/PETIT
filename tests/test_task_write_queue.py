@@ -230,6 +230,41 @@ class TaskWriteQueueTests(unittest.TestCase):
         self.assertEqual(result["sync_status"], "synced")
         self.assertEqual(self._operations(task_id), [])
 
+    def test_update_task_rejects_invalid_status_values(self) -> None:
+        """不正なstatus指定（MidやHighなど）をupdate_taskが弾くことを検証する。"""
+        with patch.object(config, "notion_configured", return_value=False):
+            created = tasks_phase2.create_task("ステータステストタスク", area="personal")
+        task_id = int(created["task"]["id"])
+
+        # priorityの値（MidやHigh）がstatusとして誤って渡された場合に弾かれること
+        invalid_candidates = ["Mid", "High", "Low", "UnknownStatus", "123"]
+        for invalid_status in invalid_candidates:
+            result = tasks_phase2.update_task(task_id=task_id, status=invalid_status)
+            self.assertFalse(result["updated"])
+            self.assertIn("statusは", result["error"])
+
+    def test_update_task_accepts_and_normalizes_valid_status(self) -> None:
+        """有効なstatusおよびエイリアスが正しく正規化されて更新されることを検証する。"""
+        with patch.object(config, "notion_configured", return_value=False):
+            created = tasks_phase2.create_task("ステータス正規化タスク", area="personal")
+        task_id = int(created["task"]["id"])
+
+        # 有効なステータス "Now"
+        result_now = tasks_phase2.update_task(task_id=task_id, status="Now")
+        self.assertTrue(result_now["updated"])
+        self.assertEqual(result_now["task"]["status"], "Now")
+
+        # 日本語エイリアス "完了" -> "Done"
+        result_done = tasks_phase2.update_task(task_id=task_id, status="完了")
+        self.assertTrue(result_done["updated"])
+        self.assertEqual(result_done["task"]["status"], "Done")
+
+        # 小文字 "chancel" -> "Chancel"
+        result_cancel = tasks_phase2.update_task(task_id=task_id, status="chancel")
+        self.assertTrue(result_cancel["updated"])
+        self.assertEqual(result_cancel["task"]["status"], "Chancel")
+
 
 if __name__ == "__main__":
     unittest.main()
+
