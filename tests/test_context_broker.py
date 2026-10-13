@@ -68,7 +68,7 @@ class ContextBrokerTests(unittest.TestCase):
 
         with patch.object(context_broker.tools, "dispatch", side_effect=dispatch):
             packet = context_broker.collect(
-                {"needs": [{"source": "tasks"}, {"source": "calendar"}], "goal": "確認"}
+                {"needs": [{"source": "tasks"}, {"source": "calendar", "date": "2026-09-07"}], "goal": "確認"}
             )
 
         self.assertTrue(packet["partial"])
