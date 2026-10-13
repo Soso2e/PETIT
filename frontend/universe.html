@@ -20,6 +20,7 @@
       "/static/universe-next.css",
       "/static/notifications.css",
       "/static/today.css",
+      "/static/statistics.css",
       "/static/reminders.css",
     ]);
   </script>
@@ -38,7 +39,7 @@
         <span><strong>PETIT</strong><small>UNIVERSE · <span data-petit-version></span></small></span>
       </a>
       <nav class="view-tabs" aria-label="ビュー切り替え">
-        <button class="view-tab" data-view="today">Today</button>
+        <button class="view-tab" data-view="today">統計</button>
         <button class="view-tab is-active" data-view="focus">Focus</button>
         <button class="view-tab" data-view="universe">Core</button>
         <button class="view-tab" data-view="tasks">Tasks</button>
@@ -54,37 +55,36 @@
     </header>
 
     <main class="universe-main">
-      <section class="view" data-view-panel="today" hidden>
+      <section class="view statistics-view" data-view-panel="today" hidden>
         <div class="section-head today-section-head">
-          <div>
-            <span class="eyebrow">TODAY</span>
-            <h1 id="today-title">今日の流れ</h1>
-            <p>予定と作業実績を一緒に見て、次に動くことを決めます。</p>
-          </div>
-          <button id="refresh-today" class="icon-button" type="button" aria-label="今日の情報を更新">↻</button>
+          <div><span class="eyebrow">YOUR PROGRESS</span><h1 id="today-title">今日の積み重ね</h1><p>取り組んだ時間を、ひと目で振り返る。</p></div>
+          <button id="refresh-today" class="reminder-refresh" type="button">更新</button>
         </div>
-        <div class="today-grid">
-          <section class="today-card today-card--summary">
-            <span class="eyebrow">WORKED TODAY</span>
-            <strong id="today-total">0分</strong>
-            <p id="today-message">まだ作業記録はありません。</p>
+        <p id="stats-load-state" class="stats-load-state" role="status" aria-live="polite">作業記録を読み込み中…</p>
+        <div class="stats-grid">
+          <section class="stats-hero" aria-labelledby="stats-total-label">
+            <span id="stats-total-label" class="eyebrow">今日、取り組んだ時間</span>
+            <strong id="today-total">—</strong><p id="today-message">あなたの積み重ねをここに。</p>
+            <div class="stats-now"><span class="stats-now-dot" aria-hidden="true"></span><strong id="today-active">—</strong><span id="today-active-meta"></span></div>
           </section>
-          <section class="today-card">
-            <span class="eyebrow">NOW</span>
-            <strong id="today-active">作業中ではありません</strong>
-            <p id="today-active-meta">Focusから作業を開始すると、ここに表示されます。</p>
+          <section class="stats-metrics" aria-label="今日の作業の内訳">
+            <div><span>セッション</span><strong id="today-session-count">—</strong><small>回取り組んだ</small></div>
+            <div><span>タスク</span><strong id="today-task-count">—</strong><small>件に取り組んだ</small></div>
+            <div><span>最長セッション</span><strong id="today-longest">—</strong><small>休憩を除く作業時間</small></div>
           </section>
-          <section class="today-card today-card--wide">
-            <div class="today-card__head"><span class="eyebrow">TIMELINE</span><strong>今日の作業</strong></div>
-            <div id="today-timeline" class="today-timeline"></div>
+          <section class="stats-card stats-card--week" aria-labelledby="stats-week-title">
+            <div class="stats-card-head"><div><h2 id="stats-week-title">7日間の積み重ね</h2><p id="stats-week-period">日本時間 · 0時〜24時</p></div><span id="stats-week-total"></span></div>
+            <p id="stats-week-state" class="stats-load-state" role="status"></p>
+            <div id="stats-week-chart" class="stats-week-chart" aria-label="直近7日の作業時間"></div>
           </section>
-          <section class="today-card today-card--wide">
-            <div class="today-card__head"><span class="eyebrow">BY TASK</span><strong>タスク別</strong></div>
-            <div id="today-tasks" class="today-projects"></div>
+          <section class="stats-card" aria-labelledby="stats-tasks-title">
+            <div class="stats-card-head"><h2 id="stats-tasks-title">今日、何に取り組んだ？</h2><span>作業時間の内訳</span></div>
+            <div id="today-tasks" class="stats-task-chart"></div>
           </section>
-          <section class="today-card today-card--wide">
-            <div class="today-card__head"><span class="eyebrow">BY PROJECT</span><strong>プロジェクト別</strong></div>
-            <div id="today-projects" class="today-projects"></div>
+          <section class="stats-card stats-card--sessions" aria-labelledby="stats-sessions-title">
+            <div class="stats-card-head"><h2 id="stats-sessions-title">今日の作業記録</h2><span>日本時間（JST）</span></div>
+            <div id="today-timeline" class="stats-session-list"></div>
+            <p class="stats-note">作業セッションで記録した時間です。休憩・一時停止は合計に含みません。日をまたいだ作業は今日の分だけ集計します。タスクの完了数とは別の記録です。</p>
           </section>
         </div>
       </section>
@@ -209,16 +209,6 @@
               <button type="submit">送信</button>
             </form>
           </section>
-          <aside class="chat-context">
-            <span class="eyebrow">CURRENT CONTEXT</span>
-            <h2 id="chat-context-title">Focus未選択</h2>
-            <p id="chat-context-copy">タスクを選ぶと、その内容を意識しながら相談できます。</p>
-            <div class="quick-prompts" aria-label="クイック質問">
-              <button type="button" data-chat-prompt="今日やるべきことを優先順で整理して">今日を整理</button>
-              <button type="button" data-chat-prompt="次の予定と空いている時間を教えて">予定を見る</button>
-              <button type="button" data-chat-prompt="今進んでいるプロジェクトの状況をまとめて">進捗を確認</button>
-            </div>
-          </aside>
         </div>
       </section>
 

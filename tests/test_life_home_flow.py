@@ -38,14 +38,15 @@ class UnivHomeFlowAssetTests(unittest.TestCase):
         self.assertIn("window.PetitUniverse.refreshAndFocusTask", script)
         self.assertIn("この親Taskに小タスクを追加", script)
 
-    def test_today_dashboard_actions_remain_available(self) -> None:
+    def test_today_is_available_as_work_statistics(self) -> None:
         script = (FRONTEND / "today.js").read_text(encoding="utf-8")
-        style = (FRONTEND / "today.css").read_text(encoding="utf-8")
-        self.assertIn('id = "today-metrics"', script)
+        style = (FRONTEND / "statistics.css").read_text(encoding="utf-8")
+        shell = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
+        self.assertIn('today: "stats"', shell)
         self.assertIn("today-session-count", script)
-        self.assertIn('data-today-go="universe"', script)
-        self.assertIn(".today-card--metrics", style)
-        self.assertIn(".today-quick-actions", style)
+        self.assertIn("/api/work-sessions/summary?days=7", script)
+        self.assertIn(".stats-metrics", style)
+        self.assertIn(".stats-week-bar", style)
 
 
 if __name__ == "__main__":

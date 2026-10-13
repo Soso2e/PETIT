@@ -4,6 +4,23 @@
 
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
+## 作業統計タブ（v0.27.0 / #319）
+
+```mermaid
+flowchart TD
+    tab[統計タブを開く / 表示中30秒 / 手動更新] --> read[今日と直近7日の既存APIを並列取得]
+    read --> today[/api/work-sessions/today]
+    read --> week[/api/work-sessions/summary?days=7]
+    today --> core[Coreで休憩とJSTの日境界を集計]
+    week --> core
+    core --> display[今日の合計・件数・最長 / 日別とタスク別グラフ / 記録]
+    read -->|一部失敗| partial[成功分を表示 / 残す値は前回と明記]
+    read -->|15秒経過| timeout[取得中断 / 更新で再試行]
+    leave[タブ切替・非表示] --> cancel[未完了の取得中断 / 非表示の定期取得停止]
+```
+
+表示は `frontend/today.js` / `frontend/statistics.css`、集計は既存 `backend/work_sessions.py`。API・DB形式は変更せず、作業記録を読み取る。[画面と検証範囲](work-statistics.md)を参照。
+
 ## Desktop v0.26.0の入力・同期競合・通知
 
 ```mermaid

@@ -15,15 +15,36 @@ const fixtureTasks = [
   { id: 2, title: '選択だけの星', status: 'Yet', priority: 'High', source: 'notion', external_id: 'fixture-2', sync_status: 'synced', root_task_id: 2, root_title: '選択だけの星' },
 ];
 let fixturePreferences = { work_session: false };
+let statsFailure = '';
+let statsEmpty = false;
+const fixtureStatsDay = {
+  date: '2026-10-13', timezone: 'Asia/Tokyo', total_seconds: 9000,
+  tasks: [{ task_id: '1', task: 'PETITの改善', elapsed_seconds: 7200 }, { task_id: '2', task: '振り返り <メモ>', elapsed_seconds: 1800 }],
+  sessions: [
+    { session_id: 'stats-a', task: 'PETITの改善', started_at: '2026-10-13T01:00:00+00:00', ended_at: '2026-10-13T02:00:00+00:00', status: 'ended', elapsed_seconds: 3600 },
+    { session_id: 'stats-b', task: '振り返り <メモ>', started_at: '2026-10-13T03:00:00+00:00', ended_at: null, status: 'paused', elapsed_seconds: 1800 },
+    { session_id: 'stats-c', task: 'PETITの改善', started_at: '2026-10-13T04:00:00+00:00', ended_at: '2026-10-13T05:00:00+00:00', status: 'ended', elapsed_seconds: 3600 },
+  ],
+};
+const fixtureStatsWeek = {
+  date_from: '2026-10-07', date_to: '2026-10-13', timezone: 'Asia/Tokyo', total_seconds: 22200,
+  daily: [0, 1800, 3600, 0, 7200, 600, 9000].map((elapsed_seconds, index) => ({ date: `2026-10-${String(7 + index).padStart(2, '0')}`, elapsed_seconds })),
+};
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css' };
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
+  if (statsFailure && url.pathname === `/api/work-sessions/${statsFailure}`) { response.writeHead(503, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'fixture unavailable' })); return; }
   if (!serveOverlay && url.pathname === '/static/desktop/index.html') { response.writeHead(404).end('Not found'); return; }
   if (url.pathname.startsWith('/static/')) {
     const file = path.resolve(root, 'frontend', url.pathname.slice(8));
     if (!file.startsWith(path.join(root, 'frontend') + path.sep) || !fs.existsSync(file)) { response.writeHead(404).end(); return; }
     response.setHeader('Content-Type', mime[path.extname(file)] || 'application/octet-stream');
-    response.end(fs.readFileSync(file)); return;
+    let source = fs.readFileSync(file);
+    // Inspect real rendered camera/material state only in this isolated fixture.
+    if (url.pathname === '/static/universe-webgl-scene.js') {
+      source = source.toString().replace('const clamp =', 'window.__fixtureScene = state; const clamp =');
+    }
+    response.end(source); return;
   }
   const chunks = []; for await (const chunk of request) chunks.push(chunk);
   const raw = Buffer.concat(chunks);
@@ -41,8 +62,11 @@ const server = http.createServer(async (request, response) => {
   let payload = {};
   if (url.pathname === '/api/notifications/tasks') payload = { tasks: fixtureTasks };
   if (url.pathname === '/api/work-sessions/active') payload = { session: fixtureWork };
+  if (url.pathname === '/api/work-sessions/today') payload = statsEmpty ? { ...fixtureStatsDay, total_seconds: 0, tasks: [], sessions: [], active: null } : { ...fixtureStatsDay, active: fixtureWork };
+  if (url.pathname === '/api/work-sessions/summary') payload = statsEmpty ? { ...fixtureStatsWeek, total_seconds: 0, daily: fixtureStatsWeek.daily.map(day => ({ ...day, elapsed_seconds: 0 })) } : fixtureStatsWeek;
   if (url.pathname.endsWith('/fixture-work/pause')) payload = { session: fixtureWork = { ...fixtureWork, status: 'paused', paused_at: new Date().toISOString() } };
   if (url.pathname.endsWith('/fixture-work/resume')) payload = { session: fixtureWork = { ...fixtureWork, status: 'active', paused_at: null } };
+  if (url.pathname.endsWith('/fixture-work/end')) payload = { session: fixtureWork = { ...fixtureWork, status: 'ended' } };
   if (url.pathname === '/api/notifications/status') payload = { configured: false, dependency_available: false, preferences: fixturePreferences, categories: [{ id: 'work_session', label: '作業セッション' }] };
   if (url.pathname === '/api/notifications/preferences') payload = { preferences: fixturePreferences = data.preferences };
   if (url.pathname === '/api/notifications/events') payload = { events: [], unread_count: 0 };
@@ -104,6 +128,7 @@ const server = http.createServer(async (request, response) => {
     await setup.locator('button[type=submit]').click();
     const page = await opened;
     await page.waitForURL(`${origin}/static/desktop/index.html`);
+    assert.equal(await page.locator('.presence, .orb, .orbit').count(), 0, 'compact chat has no planet above the date');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     assert.equal(await page.locator('#greeting').evaluate((el) => getComputedStyle(el).animationName), 'petitMessageEnter');
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -291,11 +316,48 @@ const server = http.createServer(async (request, response) => {
     assert.ok(await rail.evaluate(el => parseFloat(getComputedStyle(el).transitionDuration) <= .001), 'reduced motion uses the shared near-zero transition');
     await workspace.emulateMedia({ reducedMotion: 'no-preference' });
     await workspace.waitForFunction(() => window.PetitUniverse?.workingTask() === '1');
+    await workspace.waitForFunction(() => window.PetitUnivWebGL?.initialized && window.__fixtureScene?.entries.size >= 2);
+    await workspace.waitForFunction(() => !window.__fixtureScene.renderFrame);
+    const workGlow = await workspace.evaluate(() => {
+      const work = window.__fixtureScene.entries.get('1').object;
+      const other = window.__fixtureScene.entries.get('2').object;
+      return { working: work.userData.working, opacity: work.getObjectByName('Atmosphere').material.uniforms.glowOpacity.value,
+        otherOpacity: other.getObjectByName('Atmosphere').material.uniforms.glowOpacity.value,
+        dimmed: other.userData.dimmed, ratio: work.material.emissiveIntensity / other.material.emissiveIntensity };
+    });
+    assert.ok(workGlow.working && workGlow.dimmed && workGlow.opacity > workGlow.otherOpacity * 10 && workGlow.ratio > 5, 'working planet itself and its persistent halo shine while other planets dim');
+    const canvas = await workspace.locator('.univ-webgl-canvas').boundingBox();
+    const cameraState = () => workspace.evaluate(() => ({ camera: window.__fixtureScene.camera.position.toArray(), target: window.__fixtureScene.controls.target.toArray(), selection: window.__fixtureScene.selectedTaskId }));
+    const beforePan = await cameraState();
+    await workspace.mouse.move(canvas.x + canvas.width * .65, canvas.y + canvas.height * .65);
+    await workspace.mouse.down({ button: 'middle' });
+    await workspace.mouse.move(canvas.x + canvas.width * .65 + 60, canvas.y + canvas.height * .65 + 30, { steps: 6 });
+    await workspace.mouse.up({ button: 'middle' });
+    const afterPan = await cameraState();
+    assert.ok(afterPan.target.some((value, i) => Math.abs(value - beforePan.target[i]) > .01), 'middle drag pans the target');
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs((afterPan.camera[i] - beforePan.camera[i]) - (afterPan.target[i] - beforePan.target[i])) < .001, 'pan preserves camera direction and distance');
+    assert.equal(afterPan.selection, beforePan.selection, 'middle drag never selects a planet');
+    const beforeAltPan = await cameraState();
+    await workspace.keyboard.down('Alt');
+    await workspace.mouse.down({ button: 'middle' });
+    await workspace.mouse.move(canvas.x + canvas.width * .65 + 90, canvas.y + canvas.height * .65 + 45, { steps: 4 });
+    await workspace.mouse.up({ button: 'middle' });
+    await workspace.keyboard.up('Alt');
+    const afterAltPan = await cameraState();
+    assert.ok(afterAltPan.target.some((value, i) => Math.abs(value - beforeAltPan.target[i]) > .01), 'Alt+Middle also pans');
+    for (let i = 0; i < 3; i++) assert.ok(Math.abs((afterAltPan.camera[i] - beforeAltPan.camera[i]) - (afterAltPan.target[i] - beforeAltPan.target[i])) < .001);
+    await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-v27-planets.png') });
     assert.ok(await workspace.locator('[data-task-id="1"].is-working').count() > 0);
     await workspace.evaluate(() => window.PetitUniverse.selectTask('2'));
     assert.equal(await workspace.locator('[data-task-id="2"].is-working').count(), 0, 'selection does not move work focus');
     await workspace.evaluate(() => document.getElementById('work-session-pause').click());
     await workspace.waitForFunction(() => window.PetitUniverse.workingTask() === null);
+    await workspace.waitForFunction(() => document.getElementById('petit-context-session').textContent.startsWith('一時停止中：'));
+    await workspace.waitForFunction(() => !window.__fixtureScene.renderFrame);
+    assert.ok(await workspace.evaluate(() => {
+      const work = window.__fixtureScene.entries.get('1').object;
+      return !work.userData.working && Math.abs(work.getObjectByName('Atmosphere').material.uniforms.glowOpacity.value - .12) < .001;
+    }), 'pause restores the former work planet glow');
     assert.equal(await workspace.locator('[data-task-id].is-working').count(), 0, 'pause removes work emphasis');
     await workspace.evaluate(() => document.getElementById('work-session-pause').click());
     await workspace.waitForFunction(() => window.PetitUniverse.workingTask() === '1');
@@ -319,6 +381,93 @@ const server = http.createServer(async (request, response) => {
     await workspace.locator('.petit-area-rail__nav button').nth(1).click();
     await workspace.waitForTimeout(350);
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-workspace.png') });
+    const checkChatViewport = async (suffix) => {
+      await workspace.evaluate(() => window.PetitAppShell.activateView('chat'));
+      await workspace.waitForFunction(() => document.body.classList.contains('petit-chat-screen') && document.getElementById('petit-context-session').textContent === '作業中：作業中の星');
+      await workspace.waitForFunction(() => document.querySelector('[data-view-panel="chat"]').getAnimations().every(animation => animation.playState !== 'running'));
+      assert.equal(await workspace.locator('#petit-context-view, #petit-context-current, #petit-context-sync').count(), 0);
+      assert.equal(await workspace.locator('.chat-context, .quick-prompts').count(), 0, 'Chat has no context panel or quick prompts in the DOM');
+      assert.equal(await workspace.locator('select[aria-label="音声入力方式"]').isVisible(), false);
+      await workspace.locator('.chat-voice-options > summary').click();
+      assert.equal(await workspace.locator('select[aria-label="音声入力方式"]').isVisible(), true);
+      await workspace.locator('.chat-voice-options > summary').click();
+      assert.equal(await workspace.locator('#detail-panel').isVisible(), false, 'task details are initially collapsed');
+      await workspace.locator('#petit-context-bar > summary').click();
+      assert.ok(await workspace.locator('#petit-work-details #detail-panel').isVisible());
+      const bounds = await workspace.locator('#petit-work-details').boundingBox();
+      const railBounds = await workspace.locator('.petit-area-rail').boundingBox();
+      await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-v27-work-${suffix}.png`) });
+      assert.ok(bounds.x >= (railBounds ? railBounds.x + railBounds.width : 0), `work details clear the left menu: ${JSON.stringify({ bounds, railBounds })}`);
+      await workspace.locator('#petit-context-bar').press('Escape');
+      await workspace.evaluate(() => {
+        const messages = document.getElementById('messages');
+        for (let index = 0; index < 70; index++) {
+          const bubble = document.createElement('div'); bubble.className = 'message message--assistant';
+          bubble.textContent = `会話のスクロール確認 ${index}。長い会話でも入力欄を下部に残します。`; messages.appendChild(bubble);
+        }
+        messages.scrollTop = 0;
+      });
+      const composer = await workspace.locator('#chat-form').boundingBox();
+      const sessionBounds = await workspace.locator('#petit-context-bar').boundingBox();
+      await workspace.locator('#messages').hover();
+      await workspace.mouse.wheel(0, 600);
+      await workspace.waitForFunction(() => document.getElementById('messages').scrollTop > 0);
+      const afterScroll = await workspace.locator('#chat-form').boundingBox();
+      for (const key of ['x', 'y', 'width', 'height']) assert.ok(Math.abs(afterScroll[key] - composer[key]) <= 1, 'scroll keeps composer in place within one CSS pixel');
+      assert.deepEqual(await workspace.locator('#petit-context-bar').boundingBox(), sessionBounds, 'scroll keeps session header in place');
+      const dimensions = await workspace.evaluate(() => ({ height: innerHeight, width: innerWidth, scroll: document.scrollingElement.scrollTop }));
+      assert.ok(composer.y + composer.height <= dimensions.height && composer.x >= 0 && composer.x + composer.width <= dimensions.width);
+      assert.equal(dimensions.scroll, 0, 'only messages scroll');
+      const utility = await workspace.locator('.petit-utility-dock').boundingBox();
+      if (utility) assert.ok(utility.y + utility.height < composer.y, 'mobile utility buttons do not cover chat input');
+      await workspace.locator('#chat-input').fill('スクロール後も書ける下書き');
+      await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-v27-chat-${suffix}.png`) });
+      await workspace.evaluate(() => window.PetitAppShell.activateView('tasks'));
+      assert.equal(await workspace.locator('#detail-panel').isVisible(), false);
+      await workspace.evaluate(() => window.PetitAppShell.activateView('chat'));
+      assert.equal(await workspace.locator('#chat-input').inputValue(), 'スクロール後も書ける下書き');
+    };
+    await checkChatViewport('desktop');
+    const checkStatsViewport = async (suffix) => {
+      await workspace.evaluate(() => window.PetitAppShell.activateView('stats'));
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分' && document.querySelectorAll('.stats-week-column').length === 7);
+      assert.equal(await workspace.locator('#today-session-count').textContent(), '3');
+      assert.equal(await workspace.locator('#today-task-count').textContent(), '2');
+      assert.equal(await workspace.locator('#today-longest').textContent(), '1時間0分');
+      assert.equal(await workspace.locator('#stats-week-total').textContent(), '7日間で 6時間10分');
+      assert.deepEqual(await workspace.locator('.stats-task-bar').evaluateAll(bars => bars.map(bar => bar.style.width)), ['80%', '20%']);
+      assert.equal(await workspace.locator('.stats-week-column').first().locator('.stats-week-bar').evaluate(bar => bar.style.height), '0%');
+      assert.equal(await workspace.locator('.stats-session-row').first().locator('.stats-session-time').textContent(), '10:00〜11:00');
+      assert.equal(await workspace.locator('.stats-task-label strong').nth(1).textContent(), '振り返り <メモ>');
+      assert.equal(await workspace.locator('.stats-task-label img').count(), 0);
+      assert.ok(await workspace.locator('[data-shell-area="stats"]').evaluate(button => button.getAttribute('aria-current') === 'page'));
+      assert.ok(await workspace.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'statistics fit the viewport');
+      const chartBounds = await workspace.locator('#stats-week-chart').boundingBox();
+      assert.ok(chartBounds.x >= 0 && chartBounds.x + chartBounds.width <= await workspace.evaluate(() => innerWidth));
+      await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-statistics-${suffix}.png`), fullPage: true });
+      statsFailure = 'summary';
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => document.getElementById('stats-week-state').textContent.includes('前回のグラフ'));
+      assert.equal(await workspace.locator('#today-total').textContent(), '2時間30分', 'weekly failure preserves available today summary');
+      statsFailure = 'today';
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => document.getElementById('stats-load-state').textContent.includes('前回の表示'));
+      statsFailure = ''; statsEmpty = true;
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '0分');
+      assert.equal(await workspace.locator('.stats-task-bar').count(), 0);
+      assert.ok(await workspace.locator('#today-message').textContent().then(copy => copy.includes('記録はまだありません')));
+      assert.equal(await workspace.locator('.stats-week-bar').evaluateAll(bars => bars.every(bar => bar.style.height === '0%')), true);
+      await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-statistics-empty-${suffix}.png`), fullPage: true });
+      statsEmpty = false;
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分');
+      await workspace.evaluate(() => window.PetitAppShell.activateView('tasks'));
+      const beforeInactive = calls.filter(call => ['/api/work-sessions/today', '/api/work-sessions/summary'].includes(call.path)).length;
+      await workspace.waitForTimeout(200);
+      assert.equal(calls.filter(call => ['/api/work-sessions/today', '/api/work-sessions/summary'].includes(call.path)).length, beforeInactive, 'statistics navigation does not fetch while another tab is visible');
+    };
+    await checkStatsViewport('desktop');
     const originalSize = await workspace.evaluate(() => ({ width: innerWidth, height: innerHeight }));
     await workspace.evaluate(() => window.dispatchEvent(new CustomEvent('petit:navigate', { detail: { view: 'univ' } })));
     await workspace.evaluate(() => document.activeElement?.blur());
@@ -334,6 +483,14 @@ const server = http.createServer(async (request, response) => {
     assert.equal(await rail.isVisible(), false, 'mobile keeps the existing navigation instead of a sidebar');
     await workspace.waitForTimeout(220);
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-mobile.png') });
+    await checkChatViewport('mobile');
+    await checkStatsViewport('mobile');
+    await workspace.evaluate(() => window.PetitAppShell.activateView('chat'));
+    await workspace.locator('#petit-context-bar > summary').click();
+    await workspace.locator('#work-session-end').click();
+    await workspace.waitForFunction(() => document.getElementById('petit-context-session').textContent === '作業なし');
+    await workspace.reload();
+    await workspace.waitForFunction(() => document.getElementById('petit-context-session')?.textContent === '作業なし');
     await instance.evaluate(sizeWorkspace, originalSize);
     await workspace.close();
     // Renderer crash is distinguished from an unavailable server; draft survives.
@@ -372,7 +529,7 @@ const server = http.createServer(async (request, response) => {
     await recovered.waitForURL(`${origin}/static/desktop/index.html`);
     assert.equal(await recovered.locator('#input').inputValue(), 'クラッシュをまたぐ下書き');
     assert.deepEqual(errors, []);
-    console.log('PASS: isolated Electron chat/approval/synthetic voice, input, nudge, work focus, conflicts, notifications, compact/hover/focus/pinned rail without scene reflow, 960/390px layouts, recovery and IPC isolation.');
+    console.log('PASS: isolated Electron statistics totals/7-day chart/task shares/JST/empty/partial failure, v27 session/dropdown/chat scrolling, actual WebGL work glow/middle pan, 960/390px layouts, rail, conflicts, notifications, chat/approval/voice, recovery and IPC isolation.');
     console.log(`Screenshot: ${screenshot}`);
   } finally {
     if (instance) await instance.close();

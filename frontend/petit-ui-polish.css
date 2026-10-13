@@ -146,6 +146,9 @@ body button:focus-visible, body a:focus-visible { outline: 2px solid var(--ui-fo
   body .universe-topbar .petit-corner-status { width: calc(100vw - 182px); max-width: 240px; min-height: 54px; }
 }
 @media (max-width: 640px) {
+  body .universe-topbar .petit-corner-status { width: min(164px, calc(100vw - 214px)); }
+}
+@media (max-width: 640px) {
   body .universe-main { padding-inline: 16px !important; }
   body .section-head { padding-top: 6px; }
   body .section-head p { font-size: 12px; }
@@ -202,3 +205,86 @@ body.petit-desktop-ui .voice-footer > select[aria-label="音声入力方式"] {
 body.petit-desktop-ui #voice-state { min-width: 0; flex: 1; line-height: 1.6; overflow-wrap: anywhere; }
 body.petit-desktop-ui textarea { border-radius: 7px; }
 body.petit-desktop-ui textarea:focus-visible { outline: 1px solid var(--ui-focus); outline-offset: 0; box-shadow: none; }
+
+/* v27: one compact session header; chat owns a bounded conversation viewport. */
+body:has(.universe-shell) {
+  --petit-work-top: max(12px, env(safe-area-inset-top));
+  --petit-content-left: 16px;
+}
+body:has(#petit-desktop-toolbar) { --petit-work-top: 56px; }
+body #petit-context-bar {
+  display: block !important; position: fixed; top: var(--petit-work-top);
+  left: var(--petit-content-left); right: 16px; z-index: 220;
+  width: auto; max-width: 880px; margin: 0 auto; overflow: visible;
+  border: 1px solid var(--ui-line); border-radius: 12px;
+  background: var(--ui-bg-2); box-shadow: var(--ui-shadow);
+}
+body #petit-context-bar > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 44px; padding: 10px 16px; list-style: none; cursor: pointer;
+  color: var(--ui-muted); font-size: 13px;
+}
+body #petit-context-bar > summary::-webkit-details-marker { display: none; }
+body #petit-context-session { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+body #petit-context-bar[data-state="active"] #petit-context-session { color: var(--ui-text); }
+body #petit-context-bar > summary:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 3px; border-radius: 12px; }
+body #petit-context-bar[open] > summary > span { transform: rotate(180deg); }
+body #petit-work-details {
+  position: absolute; top: 100%; left: 0; right: 0; padding: 16px;
+  max-height: calc(100dvh - var(--petit-work-top) - 76px); overflow: auto;
+  overscroll-behavior: contain; background: var(--ui-surface);
+  border: 1px solid var(--ui-line-strong); border-radius: 12px; box-shadow: var(--ui-shadow-lg);
+}
+body #petit-work-details .focus-footer { display: grid; min-height: 0; padding: 0 0 16px; border: 0; background: transparent; }
+body #petit-work-details .active-copy > .eyebrow { display: none; }
+body #petit-work-details .work-session-controls { justify-content: flex-start; }
+body #petit-work-details #detail-panel {
+  display: block !important; position: static !important; inset: auto !important;
+  width: auto !important; max-width: none !important; max-height: none !important;
+  margin: 0; padding: 16px 0 0; transform: none !important; opacity: 1 !important;
+  visibility: visible !important; pointer-events: auto !important;
+  border: 0; border-top: 1px solid var(--ui-line); border-radius: 0; background: transparent; box-shadow: none;
+}
+body.petit-univ-active.petit-univ-screen .univ-hud { top: calc(var(--petit-work-top) + 56px); }
+body:not(.petit-univ-active) .universe-main { padding-top: calc(var(--petit-work-top) + 64px) !important; }
+html:has(body.petit-chat-screen), body.petit-chat-screen { height: 100%; overflow: hidden; }
+body.petit-chat-screen { padding-bottom: 0; }
+body.petit-chat-screen [data-view-panel="chat"] {
+  position: fixed; inset: calc(var(--petit-work-top) + 60px) 16px max(12px, env(safe-area-inset-bottom)) var(--petit-content-left);
+  width: auto; max-width: 1040px; margin-inline: auto; min-height: 0; overflow: hidden;
+}
+body.petit-chat-screen .chat-layout { display: block; height: 100%; min-height: 0; }
+body.petit-chat-screen .chat-context { display: none; }
+body.petit-chat-screen .chat-panel { height: 100%; min-height: 0; overflow: hidden; border: 0; background: transparent; }
+body.petit-chat-screen .chat-panel .section-head { flex-shrink: 0; padding: 0 12px 8px; justify-content: flex-end; }
+body.petit-chat-screen .chat-panel .section-head > div:first-child { display: none; }
+body.petit-chat-screen .messages {
+  flex: 1 1 0; min-height: 0; max-height: none; overflow-y: auto;
+  overscroll-behavior: contain; padding: 12px 16px 24px; scrollbar-gutter: stable;
+}
+body.petit-chat-screen .chat-composer {
+  position: relative; bottom: auto; flex-shrink: 0; width: auto;
+  margin: 8px 0 0; padding: 12px; border: 1px solid var(--ui-line-strong);
+  border-radius: 16px; background: var(--ui-surface); box-shadow: var(--ui-shadow-lg);
+}
+body.petit-chat-screen .chat-composer textarea { max-height: min(180px, 25dvh); overflow-y: auto; }
+body.petit-chat-screen .chat-panel > .voice-state:empty { display: none; }
+body.petit-chat-screen .chat-voice-options { position: relative; font-size: 11px; color: var(--ui-muted); }
+body.petit-chat-screen .chat-voice-options > summary { cursor: pointer; padding: 8px; }
+body.petit-chat-screen .chat-voice-options > select {
+  position: absolute; top: 100%; right: 0; z-index: 10; min-width: 220px;
+  padding: 10px; background: var(--ui-surface); border: 1px solid var(--ui-line-strong); border-radius: 8px;
+}
+@media (min-width: 960px) {
+  body:has(.universe-shell) { --petit-content-left: calc(var(--petit-rail-width, 232px) + 24px); }
+  /* Reserve the expanded menu width for the header, including its transition. */
+  body #petit-context-bar { left: max(256px, var(--petit-content-left)); }
+}
+@media (max-width: 959px) {
+  body:has(.universe-shell) { --petit-work-top: calc(76px + env(safe-area-inset-top)); }
+  body:has(#petit-desktop-toolbar) { --petit-work-top: calc(120px + env(safe-area-inset-top)); }
+  body.petit-chat-screen .petit-utility-dock {
+    top: calc(var(--petit-work-top) + 52px); bottom: auto; left: 16px;
+  }
+  body.petit-chat-screen .chat-panel .section-head { min-height: 52px; padding-right: 0; }
+}

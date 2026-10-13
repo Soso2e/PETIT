@@ -5,11 +5,14 @@
     univ: { label: "Univ", title: "Universe", icon: "planet" },
     tasks: { label: "Tasks", title: "Tasks", icon: "check" },
     chat: { label: "PETIT", title: "Chat", icon: "chat" },
+    today: { label: "統計", title: "統計", icon: "chart" },
+    stats: { label: "統計", title: "統計", icon: "chart" },
     reminders: { label: "Reminders", title: "Reminders", icon: "bell" },
     settings: { label: "Settings", title: "Settings", icon: "settings" },
   };
 
   const ICONS = {
+    chart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h17M8 16v-5M13 16V6M18 16V9"></path></svg>`,
     planet: `
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="4.2"></circle>
@@ -90,7 +93,7 @@
       button.dataset.cornerDecorated = "true";
       button.innerHTML = `${iconMarkup(meta.icon)}<span class="petit-corner-nav__label">${meta.label}</span>`;
     });
-    return nav.querySelectorAll("[data-shell-area]").length === 3;
+    return nav.querySelectorAll("[data-shell-area]").length === 4;
   };
 
   const installStatus = () => {

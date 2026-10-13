@@ -14,6 +14,7 @@
     selectedTaskId: null,
     selectedSystemKey: null,
     dragging: false,
+    panning: false,
     pointerId: null,
     lastX: 0,
     lastY: 0,
@@ -137,7 +138,7 @@
           <button type="button" data-univ-action="zoom-in" aria-label="拡大">＋</button>
           <button type="button" data-univ-action="reset" title="視点をリセット">Reset</button>
         </div>
-        <p class="univ-hud__help">Drag: orbit · Wheel: zoom · Planet: focus</p>
+        <p class="univ-hud__help">Drag: orbit · Middle drag: pan · Wheel: zoom · Planet: focus</p>
       `;
       frame.appendChild(hud);
     }
@@ -369,6 +370,7 @@
 
   const stopDrag = (frame, pointerId = null) => {
     state.dragging = false;
+    state.panning = false;
     state.pointerId = null;
     frame.classList.remove("is-dragging");
     releasePointer(frame, pointerId);
@@ -388,7 +390,7 @@
 
     frame.addEventListener("pointerdown", (event) => {
       if (!isPanelActive()) return;
-      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (event.pointerType === "mouse" && ![0, 1].includes(event.button)) return;
 
       if (event.pointerType === "touch") {
         touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -403,6 +405,8 @@
       }
 
       if (event.target.closest("button, a, input, select, textarea, .life-map__core, #detail-panel")) return;
+      state.panning = event.pointerType === "mouse" && event.button === 1;
+      if (state.panning) event.preventDefault();
       state.dragging = true;
       state.pointerId = event.pointerId;
       state.lastX = event.clientX;
@@ -431,6 +435,12 @@
       const dy = event.clientY - state.lastY;
       state.lastX = event.clientX;
       state.lastY = event.clientY;
+      if (state.panning) {
+        state.panX += dx;
+        state.panY += dy;
+        applyCamera();
+        return;
+      }
       const yawSensitivity = event.pointerType === "touch" ? 0.14 : 0.11;
       const pitchSensitivity = event.pointerType === "touch" ? 0.11 : 0.09;
       state.yaw += dx * yawSensitivity;
@@ -451,6 +461,7 @@
     };
     frame.addEventListener("pointerup", endPointer);
     frame.addEventListener("pointercancel", endPointer);
+    frame.addEventListener("auxclick", (event) => { if (event.button === 1) event.preventDefault(); });
 
     frame.addEventListener("wheel", (event) => {
       if (!isPanelActive()) return;

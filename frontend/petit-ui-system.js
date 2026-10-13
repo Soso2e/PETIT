@@ -61,13 +61,6 @@
     applyTheme(currentTheme(), { persist: false });
   };
 
-  const createContextItem = (label, id) => {
-    const item = document.createElement("div");
-    item.className = "petit-context-item";
-    item.innerHTML = `<span>${label}</span><strong id="${id}">—</strong>`;
-    return item;
-  };
-
   const installContextBar = () => {
     if (byId("petit-context-bar")) {
       contextBar = byId("petit-context-bar");
@@ -77,63 +70,53 @@
     const main = document.querySelector(".universe-main");
     if (!main) return;
 
-    const bar = document.createElement("section");
+    const bar = document.createElement("details");
     bar.id = "petit-context-bar";
     bar.className = "petit-context-bar";
-    bar.setAttribute("aria-label", "現在のPETIT状態");
-    bar.append(
-      createContextItem("View", "petit-context-view"),
-      createContextItem("Current", "petit-context-current"),
-      createContextItem("Work session", "petit-context-session"),
-      createContextItem("Sync", "petit-context-sync"),
-    );
+    bar.setAttribute("aria-label", "ワークセッション");
+    bar.innerHTML = `
+      <summary aria-controls="petit-work-details"><strong id="petit-context-session">作業なし</strong><span aria-hidden="true">⌄</span></summary>
+      <div id="petit-work-details" class="petit-work-details"></div>`;
+    const dropdown = bar.querySelector(".petit-work-details");
+    const footer = document.querySelector(".focus-footer");
+    if (footer) dropdown.appendChild(footer);
+    const detail = byId("detail-panel");
+    const placeDetail = () => {
+      const view = document.querySelector('[data-view-panel].is-active:not([hidden])')?.dataset.viewPanel;
+      const spatial = ["universe", "focus"].includes(view);
+      const destination = spatial ? document.body : dropdown;
+      if (detail && destination && detail.parentElement !== destination) destination.appendChild(detail);
+      document.body.classList.toggle("petit-chat-screen", view === "chat");
+      scheduleContextUpdate();
+    };
+    window.addEventListener("petit:panel-change", () => { bar.open = false; placeDetail(); });
+    // Covers direct navigation from the original tabs and restored URLs too.
+    new MutationObserver(placeDetail).observe(document.querySelector(".universe-main"), {
+      subtree: true, attributes: true, attributeFilter: ["hidden"],
+    });
+    bar.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") { bar.open = false; bar.querySelector("summary").focus(); }
+    });
+    document.addEventListener("pointerdown", (event) => {
+      if (bar.open && !bar.contains(event.target)) bar.open = false;
+    });
     main.before(bar);
     contextBar = bar;
+    placeDetail();
   };
-
-  const activeTab = () => (
-    document.querySelector(".view-tab.is-active")
-    || document.querySelector('[aria-selected="true"]')
-  );
 
   const updateContext = () => {
     scheduled = false;
     if (!contextBar) return;
 
-    const tab = activeTab();
-    const viewName = text(tab?.textContent, "PETIT");
-    const detailTitle = text(document.querySelector('#detail-panel [data-detail="title"]')?.textContent, "");
-    const project = text(byId("focus-project-name")?.textContent, "");
     const activeTask = text(byId("active-task-label")?.textContent, "");
-    const elapsed = text(byId("active-elapsed")?.textContent, "");
-    const sync = text(byId("sync-pill")?.textContent, "同期状態を確認中");
-
-    const viewEl = byId("petit-context-view");
-    const currentEl = byId("petit-context-current");
     const sessionEl = byId("petit-context-session");
-    const syncEl = byId("petit-context-sync");
-
-    if (viewEl) viewEl.textContent = viewName;
-    if (currentEl) currentEl.textContent = detailTitle || project || "未選択";
+    const paused = byId("work-session-pause")?.textContent === "再開";
+    const idle = byId("work-session-end")?.hidden !== false;
     if (sessionEl) {
-      sessionEl.textContent = activeTask && !activeTask.includes("開始されていません")
-        ? `${activeTask}${elapsed ? ` · ${elapsed}` : ""}`
-        : "停止中";
-    }
-    if (syncEl) syncEl.textContent = sync;
-
-    const sessionItem = sessionEl?.closest(".petit-context-item");
-    const syncItem = syncEl?.closest(".petit-context-item");
-    if (sessionItem) {
-      sessionItem.dataset.state = sessionEl.textContent === "停止中" ? "idle" : "active";
-    }
-    if (syncItem) {
-      const lower = sync.toLowerCase();
-      syncItem.dataset.state = lower.includes("失敗") || lower.includes("競合")
-        ? "error"
-        : lower.includes("中") || lower.includes("確認")
-          ? "warning"
-          : "active";
+      const copy = idle ? "作業なし" : `${paused ? "一時停止中" : "作業中"}：${activeTask}`;
+      if (sessionEl.textContent !== copy) sessionEl.textContent = copy;
+      contextBar.dataset.state = idle ? "idle" : paused ? "paused" : "active";
     }
   };
 
@@ -219,6 +202,7 @@
       detailTitle,
       byId("active-task-label"),
       byId("active-elapsed"),
+      byId("work-session-pause"),
       byId("sync-pill"),
       byId("focus-project-name"),
     ].filter(Boolean);

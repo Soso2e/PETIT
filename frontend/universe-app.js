@@ -554,8 +554,6 @@
     renderOrbit();
     renderProjectControls();
     renderCurrentDetail();
-    byId("chat-context-title").textContent = text(task.title, "タスク");
-    byId("chat-context-copy").textContent = `Life › ${taskProject(task)} › ${text(task.title, "タスク")}`;
   };
 
   const updateOverviewSelectionUI = (selectedKey) => {
@@ -1388,17 +1386,6 @@
     } catch (err) {
       showFeedback(`声かけリクエスト失敗: ${err.message}`);
     }
-  });
-
-  document.querySelectorAll(".quick-prompts button[data-chat-prompt]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const promptText = btn.dataset.chatPrompt;
-      if (promptText && chatInputEl) {
-        switchView("chat");
-        chatInputEl.value = promptText;
-        chatInputEl.focus();
-      }
-    });
   });
 
   const chatModelSelectEl = byId("chat-model-select");
