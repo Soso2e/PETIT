@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from .. import config, db, project_continuity
+from .. import config, db, project_continuity, time_context
 from ..notion_client import NotionError, create_task_page, update_task_page
 from ..task_taxonomy import AREAS, AREA_LABELS, resolve_area
 from .registry import tool
@@ -301,7 +301,7 @@ def complete_task(
             "candidates": candidates,
         }
 
-    done = done_date or date.today().isoformat()
+    done = done_date or time_context.current_date().isoformat()
     if task["source"] == "notion" and task.get("external_id") and config.notion_configured():
         try:
             updated = update_task_page(

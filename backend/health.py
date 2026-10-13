@@ -29,6 +29,18 @@ from . import (
 router = APIRouter()
 
 
+@router.get("/api/connections")
+def connection_status() -> dict[str, Any]:
+    from . import connection_status as diagnostics
+    return diagnostics.snapshot()
+
+
+@router.post("/api/connections/{service}/check")
+def check_connection(service: str) -> dict[str, Any]:
+    from . import connection_status as diagnostics
+    return diagnostics.check(service)
+
+
 @router.get("/api/health")
 def health() -> dict[str, Any]:
     """Return the existing PETIT health payload unchanged."""

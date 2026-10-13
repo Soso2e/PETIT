@@ -1,0 +1,34 @@
+.connection-dialog {
+  box-sizing: border-box; width: min(720px, calc(100vw - 24px)); max-height: calc(100dvh - 32px);
+  padding: 24px; overflow: auto; border: 1px solid var(--line-strong); border-radius: 16px;
+  background: var(--bg-surface); color: var(--text); overscroll-behavior: contain;
+}
+.connection-dialog::backdrop { background: rgba(0, 0, 0, .65); }
+.connection-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.connection-header h2 { font-size: 20px; margin: 0; }
+.connection-dialog button { min-height: 44px; padding: 8px 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg-mid); color: var(--text); cursor: pointer; }
+.connection-dialog button:disabled { opacity: .55; cursor: wait; }
+.connection-dialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.connection-hint { color: var(--text-sub); font-size: 13px; line-height: 1.6; }
+.connection-services { margin-top: 16px; }
+.connection-service { border-top: 1px solid var(--line-mid); padding: 8px 0; }
+.connection-service summary { display: flex; gap: 12px; justify-content: space-between; padding: 12px 4px; min-height: 44px; box-sizing: border-box; cursor: pointer; }
+.connection-service summary::before { content: '›'; }
+.connection-service[open] summary::before { content: '⌄'; }
+.connection-service summary > span:first-of-type { flex: 1; }
+.connection-badge { font-size: 13px; color: var(--text-sub); }
+.connection-badges { display: flex; flex-direction: column; gap: 4px; }
+.connection-badge[data-state='error'], .connection-badge[data-state='conflict'] { color: var(--danger, #ef9999); }
+.connection-dialog dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px 12px; font-size: 13px; line-height: 1.6; }
+.connection-dialog dt { color: var(--text-sub); }
+.connection-dialog dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.connection-operation { border: 1px solid var(--line-mid); border-radius: 10px; padding: 12px; margin-top: 12px; }
+.connection-operation h3 { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+#sync-pill { cursor: pointer; font: inherit; }
+[data-rail-sync] { border: 0; background: transparent; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+@media (max-width: 480px) {
+  .connection-dialog { padding: 16px; }
+  .connection-dialog dl { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .connection-dialog dd { margin-bottom: 9px; }
+  .connection-service summary { flex-wrap: wrap; }
+}

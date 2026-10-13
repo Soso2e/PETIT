@@ -243,7 +243,7 @@
     status.className = "petit-area-rail__status";
     status.innerHTML = `
       <span class="petit-area-rail__status-dot" aria-hidden="true"></span>
-      <span><strong data-rail-sync>接続確認中</strong><small data-rail-version>${window.PETIT_VERSION || ""}</small></span>
+      <span><button type="button" data-rail-sync aria-haspopup="dialog" aria-label="接続ステータスを開く">接続確認中</button><small data-rail-version>${window.PETIT_VERSION || ""}</small></span>
     `;
     rail.appendChild(status);
     document.body.appendChild(rail);

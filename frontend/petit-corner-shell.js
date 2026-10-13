@@ -36,8 +36,8 @@
       </svg>`,
     settings: `
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="3.2"></circle>
-        <path d="M19 13.8v-3.6l-2-.6a7.3 7.3 0 0 0-.7-1.7l1-1.8-2.5-2.5-1.8 1a7.3 7.3 0 0 0-1.7-.7l-.6-2H7.2l-.6 2a7.3 7.3 0 0 0-1.7.7l-1.8-1L.6 6.1l1 1.8a7.3 7.3 0 0 0-.7 1.7l-2 .6v3.6l2 .6c.2.6.4 1.2.7 1.7l-1 1.8 2.5 2.5 1.8-1c.5.3 1.1.5 1.7.7l.6 2h3.6l.6-2c.6-.2 1.2-.4 1.7-.7l1.8 1 2.5-2.5-1-1.8c.3-.5.5-1.1.7-1.7l1.9-.6Z" transform="translate(2 0) scale(.83)"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
       </svg>`,
     close: `
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -143,57 +143,15 @@
         ${iconMarkup("bell")}
         <span>Remind</span>
       </button>
-      <button type="button" class="petit-utility-dock__button" data-corner-settings aria-label="設定メニュー" aria-expanded="false" title="設定">
+      <button type="button" class="petit-utility-dock__button" data-corner-settings data-corner-menu-settings aria-label="設定" title="設定">
         ${iconMarkup("settings")}
         <span>Settings</span>
       </button>
-      <section class="petit-utility-menu" data-corner-menu hidden aria-label="設定と補助機能">
-        <header>
-          <div><span>PETIT</span><strong>Settings</strong></div>
-          <button type="button" data-corner-close aria-label="閉じる">${iconMarkup("close")}</button>
-        </header>
-        <button type="button" data-corner-menu-reminders>
-          ${iconMarkup("bell")}
-          <span><strong>リマインダー</strong><small>登録内容と履歴を確認</small></span>
-        </button>
-        <button type="button" data-corner-menu-settings>
-          ${iconMarkup("settings")}
-          <span><strong>詳細設定</strong><small>モデル・通知・動作を管理</small></span>
-        </button>
-      </section>
     `;
     document.body.appendChild(dock);
 
-    const menu = dock.querySelector("[data-corner-menu]");
-    const settings = dock.querySelector("[data-corner-settings]");
-    const setOpen = (open) => {
-      menu.hidden = !open;
-      settings.setAttribute("aria-expanded", String(open));
-      dock.classList.toggle("is-open", open);
-      if (open) menu.querySelector("[data-corner-close]")?.focus();
-    };
-
     dock.querySelector("[data-corner-reminders]")?.addEventListener("click", () => activate("reminders"));
-    dock.querySelector("[data-corner-menu-reminders]")?.addEventListener("click", () => {
-      setOpen(false);
-      activate("reminders");
-    });
-    dock.querySelector("[data-corner-menu-settings]")?.addEventListener("click", () => {
-      setOpen(false);
-      activate("settings");
-    });
-    settings?.addEventListener("click", () => setOpen(menu.hidden));
-    dock.querySelector("[data-corner-close]")?.addEventListener("click", () => setOpen(false));
-
-    document.addEventListener("pointerdown", (event) => {
-      if (!menu.hidden && event.target instanceof Node && !dock.contains(event.target)) setOpen(false);
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !menu.hidden) {
-        setOpen(false);
-        settings?.focus();
-      }
-    });
+    dock.querySelector("[data-corner-settings]")?.addEventListener("click", () => activate("settings"));
   };
 
   const syncState = (requestedArea = "") => {

@@ -5,7 +5,7 @@ import logging
 from datetime import date, timedelta
 from typing import Any
 
-from . import calendar_sync, config, db, work_sessions
+from . import calendar_sync, config, db, time_context, work_sessions
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def build_context_block(user_message: str) -> str:
 
     sync_status = _sync_notion_read_only()
     calendar_status = calendar_sync.sync_if_configured()
-    today = date.today()
+    today = time_context.current_date()
     horizon = (today + timedelta(days=7)).isoformat()
     with db.get_connection() as conn:
         tasks = [dict(row) for row in conn.execute(

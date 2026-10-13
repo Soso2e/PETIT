@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 from datetime import date, timedelta
 
+from . import time_context
+
 
 _ISO_DATE_RE = re.compile(r"(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)")
 _JP_FULL_DATE_RE = re.compile(r"(?<!\d)(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日")
@@ -33,7 +35,7 @@ def parse_schedule_date(message: str, *, today: date | None = None) -> date | No
 
     Invalid dates and ambiguous expressions such as ``来週月曜`` return ``None``.
     """
-    base = today or date.today()
+    base = today or time_context.current_date()
     text = message.strip()
 
     match = _ISO_DATE_RE.search(text)

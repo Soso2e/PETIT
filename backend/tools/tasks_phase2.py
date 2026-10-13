@@ -5,14 +5,59 @@ import json
 from datetime import date
 from typing import Any
 
-from .. import config, db, project_continuity, task_sync_queue
+from .. import config, db, project_continuity, task_sync_queue, time_context
 from ..task_taxonomy import AREAS, AREA_LABELS, resolve_area
 from . import tasks as legacy_tasks
 from .registry import tool
 
 _CATEGORIES = ["JobHunt", "Sch", "Life", "Work", "Hobby", "Event", "Create", "LiT"]
 _PRIORITIES = ["Low", "Mid", "High"]
+_STATUSES = ["Yet", "Now", "ready", "Done", "Chancel"]
+_STATUS_ALIASES: dict[str, str] = {
+    "yet": "Yet",
+    "now": "Now",
+    "ready": "ready",
+    "done": "Done",
+    "chancel": "Chancel",
+    "todo": "Yet",
+    "未完了": "Yet",
+    "未着手": "Yet",
+    "doing": "Now",
+    "in_progress": "Now",
+    "進行中": "Now",
+    "complete": "Done",
+    "completed": "Done",
+    "完了": "Done",
+    "cancel": "Chancel",
+    "canceled": "Chancel",
+    "cancelled": "Chancel",
+    "キャンセル": "Chancel",
+}
 _AGENT_ROUTES_INSTALLED = False
+
+
+def _normalize_status(status_value: str | None) -> str | None:
+    """タスクステータスを正規化して有効性を判定する。
+
+    Args:
+        status_value: 検証対象のステータス文字列。
+
+    Returns:
+        正規化された有効なステータス文字列。無効な場合はNone。
+    """
+    if not status_value or not str(status_value).strip():
+        return None
+    normalized_key = str(status_value).strip().casefold()
+    if normalized_key in _STATUS_ALIASES:
+        return _STATUS_ALIASES[normalized_key]
+    configured_default = str(config.NOTION_DEFAULT_STATUS or "").strip()
+    if configured_default and normalized_key == configured_default.casefold():
+        return configured_default
+    configured_done = str(config.NOTION_DONE_STATUS or "").strip()
+    if configured_done and normalized_key == configured_done.casefold():
+        return configured_done
+    return None
+
 
 # Replace the Notion cache merge with the conflict-aware Phase 2 implementation.
 task_sync_queue.install_sync_guard()
@@ -146,6 +191,7 @@ def _notion_create_payload(
     project_external_ids: list[str] | None,
     reason: str | None,
     status: str,
+    parent_external_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
         "title": title,
@@ -156,6 +202,7 @@ def _notion_create_payload(
         "project_external_ids": project_external_ids,
         "reason": reason,
         "status": status,
+        "parent_external_ids": parent_external_ids,
     }
 
 
@@ -382,7 +429,7 @@ def _update_payload(
             "external_id": {"type": "string"},
             "title_query": {"type": "string"},
             "title": {"type": "string"},
-            "status": {"type": "string"},
+            "status": {"type": "string", "enum": _STATUSES},
             "due_date": {"type": "string"},
             "priority": {"type": "string", "enum": _PRIORITIES},
             "area": {"type": "string", "enum": list(AREAS)},
@@ -416,6 +463,9 @@ def update_task(
             "candidates": _candidates(title_query),
         }
 
+    normalized_status = _normalize_status(status) if status is not None else None
+    if status is not None and not normalized_status:
+        return {"updated": False, "error": f"statusは{'/'.join(_STATUSES)}から指定してください。"}
     normalized_priority = legacy_tasks._normalize_option(priority, _PRIORITIES) if priority else None
     if priority and not normalized_priority:
         return {"updated": False, "error": "priorityはLow/Mid/Highから指定してください。"}
@@ -439,7 +489,7 @@ def update_task(
     updates: dict[str, Any] = {}
     for key, value in {
         "title": str(title).strip() if title is not None else None,
-        "status": status,
+        "status": normalized_status,
         "due_date": due_date,
         "priority": normalized_priority,
         "area": normalized_area,
@@ -535,7 +585,7 @@ def complete_task(
         external_id=external_id,
         title_query=title_query,
         status=config.NOTION_DONE_STATUS,
-        done_date=done_date or date.today().isoformat(),
+        done_date=done_date or time_context.current_date().isoformat(),
     )
     if not result.get("updated"):
         return {"completed": False, **result}

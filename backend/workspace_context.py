@@ -14,7 +14,7 @@ from typing import Any
 
 from fastapi import APIRouter, FastAPI
 
-from . import config
+from . import config, time_context
 
 router = APIRouter(tags=["workspace-context"])
 _MAX_OUTPUT = 256_000
@@ -204,7 +204,11 @@ def build_context_block() -> str:
     if snapshot.get("stale"):
         return "【PC作業環境】観測が未取得または古いため、現在のアプリ・Git状態は不明。"
     # Bound the model packet independently from the richer diagnostic API.
-    compact = {"collected_at": snapshot["collected_at"], "foreground": snapshot["foreground"],
+    try:
+        local_collected_at = datetime.fromisoformat(snapshot["collected_at"]).astimezone(time_context.local_zone()).isoformat(timespec="seconds")
+    except Exception:
+        local_collected_at = snapshot["collected_at"]
+    compact = {"collected_at": local_collected_at, "foreground": snapshot["foreground"],
                "workspaces": [{**{key: value for key, value in item.items() if key != "files"},
                                "files": [{"path": entry["path"][:80], "status": entry["status"]}
                                          for entry in item.get("files", [])[:2]]}

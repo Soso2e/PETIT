@@ -49,7 +49,7 @@
       </nav>
       <div class="topbar-actions">
         <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
-        <span id="sync-pill" class="sync-pill" hidden>同期確認中</span>
+        <button id="sync-pill" type="button" class="sync-pill" aria-haspopup="dialog" aria-label="接続ステータスを開く" hidden>同期確認中</button>
         <span class="version-pill" data-petit-version></span>
       </div>
     </header>
@@ -209,6 +209,7 @@
                 <h1>PETITと話す</h1>
               </div>
               <div class="chat-head-actions">
+                <button id="chat-export-log-btn" type="button" class="chat-export-log-btn" data-developer-only hidden>会話ログ</button>
                 <button id="history-toggle" type="button" class="history-toggle" aria-expanded="false" hidden>履歴を見る</button>
                 <span id="chat-status" class="chat-status">接続確認中</span>
               </div>
@@ -235,6 +236,11 @@
           </div>
         </div>
         <div class="settings-grid">
+          <section class="settings-card">
+            <h3>接続と同期</h3>
+            <p>各サービスの接続、同期履歴、失敗したタスクを確認できます。</p>
+            <button type="button" data-open-connections aria-haspopup="dialog">接続ステータスを開く</button>
+          </section>
           <section class="settings-card">
             <div class="settings-card__head">
               <div>
@@ -297,6 +303,38 @@
       </section>
     </main>
   </div>
+
+  <dialog id="chat-log-dialog" class="chat-log-dialog" aria-labelledby="chat-log-dialog-title">
+    <div class="chat-log-dialog__surface">
+      <div class="chat-log-dialog__header">
+        <div>
+          <h3 id="chat-log-dialog-title">会話ログのエクスポート</h3>
+          <p class="chat-log-dialog__desc">JSONまたはテキスト形式で会話ログを取得・コピーできます。</p>
+        </div>
+        <button type="button" class="chat-log-dialog__close" data-log-close aria-label="閉じる">✕</button>
+      </div>
+      <div class="chat-log-dialog__toolbar">
+        <div class="petit-segmented-control" role="group" aria-label="エクスポート形式">
+          <button type="button" class="chat-log-tab" data-log-format="json" aria-pressed="true">JSON</button>
+          <button type="button" class="chat-log-tab" data-log-format="text" aria-pressed="false">テキスト</button>
+        </div>
+        <label class="chat-log-dialog__scope">
+          <input type="checkbox" id="chat-log-full-history" />
+          <span>全履歴を含む（サーバー保存分）</span>
+        </label>
+      </div>
+      <div class="chat-log-dialog__body">
+        <textarea id="chat-log-output" class="chat-log-output" readonly rows="14" spellcheck="false" placeholder="会話ログがありません"></textarea>
+      </div>
+      <div class="chat-log-dialog__footer">
+        <span id="chat-log-status" class="chat-log-status" role="status" aria-live="polite"></span>
+        <div class="chat-log-dialog__actions">
+          <button id="chat-log-copy" type="button" class="chat-log-btn-primary">クリップボードにコピー</button>
+          <button type="button" class="chat-log-btn-secondary" data-log-close>閉じる</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <div id="task-feedback" class="task-feedback" role="status" aria-live="polite" hidden><span data-feedback-copy></span><button type="button" data-feedback-action hidden></button></div>
 

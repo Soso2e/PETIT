@@ -1,5 +1,5 @@
-globalThis.PETIT_VERSION = "v0.28.0";
-globalThis.PETIT_ASSET_VERSION = "0.28.0";
+globalThis.PETIT_VERSION = "v0.29.0";
+globalThis.PETIT_ASSET_VERSION = "0.29.0";
 
 if (typeof window !== "undefined") {
   window.PETIT_VERSION = globalThis.PETIT_VERSION;
@@ -25,6 +25,8 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
         document.write(`<script src="${assetUrl(src)}"></script>`);
         if (src === "/static/universe-app.js") {
           document.write(`<script src="${assetUrl("/static/task-sync-recovery.js")}"></script>`);
+          document.write(`<script src="${assetUrl("/static/connection-status.js")}"></script>`);
+          document.write(`<link rel="stylesheet" href="${assetUrl("/static/connection-status.css")}" />`);
         }
       }
     };

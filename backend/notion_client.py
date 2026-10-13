@@ -277,6 +277,7 @@ def _task_properties(
     project_external_ids: list[str] | None = None,
     reason: str | None = None,
     done_date: str | None = None,
+    parent_external_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     props: dict[str, Any] = {}
     if title is not None:
@@ -293,6 +294,8 @@ def _task_properties(
         props[config.NOTION_PROP_AREA] = _select_prop(area)
     if project_external_ids is not None:
         props[config.NOTION_TASK_PROP_PROJECT] = _relation_prop(project_external_ids)
+    if parent_external_ids is not None:
+        props[config.NOTION_TASK_PROP_PARENT] = _relation_prop(parent_external_ids)
     if reason is not None:
         props[config.NOTION_PROP_REASON] = _rich_text_prop(reason)
     if done_date is not None:
@@ -389,7 +392,28 @@ def create_task_page(
     status: str | None = None,
     db_id: str | None = None,
     done_date: str | None = None,
+    parent_external_ids: list[str] | None = None,
+    **_extra: Any,
 ) -> dict[str, Any]:
+    """Notion DBへ新規タスクページを作成する。
+
+    Args:
+        title: タスク名。
+        due_date: 期限（ISO形式日付）。
+        priority: 優先度。
+        categories: 分類カテゴリのリスト。
+        area: エリア識別子。
+        project_external_ids: 関連プロジェクトのNotionページID一覧。
+        reason: タスクの背景・理由。
+        status: ステータス。
+        db_id: 作成先NotionデータベースID。
+        done_date: 完了日。
+        parent_external_ids: 親タスクのNotionページID一覧。
+        **_extra: 将来の拡張やキューマージで渡される追加キーワード引数（安全に無視）。
+
+    Returns:
+        作成されたNotionタスク辞書。
+    """
     db_id = db_id or config.NOTION_TASKS_DB_ID
     props = _task_properties(
         title=title,
@@ -401,6 +425,7 @@ def create_task_page(
         project_external_ids=project_external_ids,
         reason=reason,
         done_date=done_date,
+        parent_external_ids=parent_external_ids,
     )
     body = {
         "parent": {"database_id": db_id},
@@ -430,7 +455,27 @@ def update_task_page(
     project_external_ids: list[str] | None = None,
     reason: str | None = None,
     done_date: str | None = None,
+    parent_external_ids: list[str] | None = None,
+    **_extra: Any,
 ) -> dict[str, Any]:
+    """Notionタスクページを更新する。
+
+    Args:
+        page_id: 対象NotionページID。
+        status: ステータス。
+        due_date: 期限。
+        priority: 優先度。
+        categories: 分類カテゴリのリスト。
+        area: エリア識別子。
+        project_external_ids: 関連プロジェクトのNotionページID一覧。
+        reason: タスクの背景・理由。
+        done_date: 完了日。
+        parent_external_ids: 親タスクのNotionページID一覧。
+        **_extra: 将来の拡張やキューマージで渡される追加キーワード引数（安全に無視）。
+
+    Returns:
+        更新されたNotionタスク辞書。
+    """
     props = _task_properties(
         status=status,
         due_date=due_date,
@@ -440,6 +485,7 @@ def update_task_page(
         project_external_ids=project_external_ids,
         reason=reason,
         done_date=done_date,
+        parent_external_ids=parent_external_ids,
     )
     if not props:
         raise NotionError("更新する Notion プロパティがありません。")
