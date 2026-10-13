@@ -321,6 +321,7 @@ def _update_remote_task(page_id: str, payload: dict[str, Any]) -> dict[str, Any]
         project_external_ids=payload.get("project_external_ids"),
         reason=payload.get("reason"),
         done_date=payload.get("done_date"),
+        parent_external_ids=payload.get("parent_external_ids"),
     )
     if not props:
         raise NotionError("更新するNotionプロパティがありません。")

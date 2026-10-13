@@ -191,6 +191,7 @@ def _notion_create_payload(
     project_external_ids: list[str] | None,
     reason: str | None,
     status: str,
+    parent_external_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     return {
         "title": title,
@@ -201,6 +202,7 @@ def _notion_create_payload(
         "project_external_ids": project_external_ids,
         "reason": reason,
         "status": status,
+        "parent_external_ids": parent_external_ids,
     }
 
 
