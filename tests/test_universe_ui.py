@@ -142,6 +142,20 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn('priority: nextPriority', script)
         self.assertIn('resolve_notification: false', script)
 
+    def test_task_detail_edit_does_not_autofocus_title(self) -> None:
+        """タスク詳細の編集モード開始時にタイトル入力欄へ自動フォーカスしないことを検証する。"""
+        script = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+        self.assertIn("const setEditMode = (editing) => {", script)
+        self.assertNotIn("titleInput?.focus()", script)
+
+    def test_task_detail_form_grid_prevents_overflow(self) -> None:
+        """タスク詳細の編集フォームと閲覧グリッドがはみ出し防止用のスタイル定義を持つことを検証する。"""
+        actions_css = (FRONTEND / "universe-actions.css").read_text(encoding="utf-8")
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", actions_css)
+        self.assertIn('.detail-form-field input[type="date"]', actions_css)
+        self.assertIn("box-sizing: border-box;", actions_css)
+
+
     def test_parent_assignment_is_available_in_ui_and_chat(self) -> None:
         html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
         script = (FRONTEND / "task-flow.js").read_text(encoding="utf-8")

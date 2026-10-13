@@ -769,7 +769,6 @@
         if (editToggleBtn) editToggleBtn.hidden = editing;
         const parentField = fragment.querySelector(".detail-parent-field") || detailPanelEl.querySelector(".detail-parent-field");
         if (parentField) parentField.hidden = !editing;
-        if (editing) titleInput?.focus();
       };
 
       editToggleBtn?.addEventListener("click", () => setEditMode(true));
