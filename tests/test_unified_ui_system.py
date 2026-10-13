@@ -53,6 +53,7 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertIn('chat:', source)
         self.assertIn('data-corner-reminders', source)
         self.assertIn('data-corner-menu-settings', source)
+        self.assertIn('dock.querySelector("[data-corner-settings]")?.addEventListener("click", () => activate("settings"))', source)
         self.assertNotIn('/static/legacy.html?view=settings', source)
         self.assertIn('.petit-corner-status', style)
         self.assertIn('.petit-corner-nav', style)

@@ -143,57 +143,15 @@
         ${iconMarkup("bell")}
         <span>Remind</span>
       </button>
-      <button type="button" class="petit-utility-dock__button" data-corner-settings aria-label="設定メニュー" aria-expanded="false" title="設定">
+      <button type="button" class="petit-utility-dock__button" data-corner-settings data-corner-menu-settings aria-label="設定" title="設定">
         ${iconMarkup("settings")}
         <span>Settings</span>
       </button>
-      <section class="petit-utility-menu" data-corner-menu hidden aria-label="設定と補助機能">
-        <header>
-          <div><span>PETIT</span><strong>Settings</strong></div>
-          <button type="button" data-corner-close aria-label="閉じる">${iconMarkup("close")}</button>
-        </header>
-        <button type="button" data-corner-menu-reminders>
-          ${iconMarkup("bell")}
-          <span><strong>リマインダー</strong><small>登録内容と履歴を確認</small></span>
-        </button>
-        <button type="button" data-corner-menu-settings>
-          ${iconMarkup("settings")}
-          <span><strong>詳細設定</strong><small>モデル・通知・動作を管理</small></span>
-        </button>
-      </section>
     `;
     document.body.appendChild(dock);
 
-    const menu = dock.querySelector("[data-corner-menu]");
-    const settings = dock.querySelector("[data-corner-settings]");
-    const setOpen = (open) => {
-      menu.hidden = !open;
-      settings.setAttribute("aria-expanded", String(open));
-      dock.classList.toggle("is-open", open);
-      if (open) menu.querySelector("[data-corner-close]")?.focus();
-    };
-
     dock.querySelector("[data-corner-reminders]")?.addEventListener("click", () => activate("reminders"));
-    dock.querySelector("[data-corner-menu-reminders]")?.addEventListener("click", () => {
-      setOpen(false);
-      activate("reminders");
-    });
-    dock.querySelector("[data-corner-menu-settings]")?.addEventListener("click", () => {
-      setOpen(false);
-      activate("settings");
-    });
-    settings?.addEventListener("click", () => setOpen(menu.hidden));
-    dock.querySelector("[data-corner-close]")?.addEventListener("click", () => setOpen(false));
-
-    document.addEventListener("pointerdown", (event) => {
-      if (!menu.hidden && event.target instanceof Node && !dock.contains(event.target)) setOpen(false);
-    });
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !menu.hidden) {
-        setOpen(false);
-        settings?.focus();
-      }
-    });
+    dock.querySelector("[data-corner-settings]")?.addEventListener("click", () => activate("settings"));
   };
 
   const syncState = (requestedArea = "") => {
