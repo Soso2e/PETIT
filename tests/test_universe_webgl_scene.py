@@ -84,6 +84,18 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertNotIn("CanvasTexture", source)
         self.assertNotIn("SpriteMaterial", source)
 
+    def test_labels_pass_pointer_events_to_canvas_while_supporting_tap_selection(self) -> None:
+        source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
+
+        self.assertIn("findLabelAt", source)
+        self.assertIn("closestEntry = entry", source)
+        self.assertIn("selectEntry(labelEntry)", source)
+        self.assertIn('element.classList.toggle("is-hovered", Boolean(labelEntry && entry === labelEntry))', source)
+        self.assertIn("event.stopPropagation()", source)
+        self.assertIn(".univ-webgl-label.is-hovered", css)
+        self.assertIn("pointer-events: none;", css)
+
     def test_webgl_renders_on_demand_without_permanent_animation_loop(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         preferences = (FRONTEND / "petit-ui-preferences.js").read_text(encoding="utf-8")
