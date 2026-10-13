@@ -348,7 +348,7 @@
 
     // Zero-texture procedural points material with additive blending and fog exemption
     const material = new THREE.PointsMaterial({
-      size: 0.95,
+      size: 1.9,
       sizeAttenuation: true,
       transparent: true,
       opacity: 0.95,
