@@ -407,6 +407,12 @@
       event.stopPropagation();
       selectEntry(entry);
     });
+    element.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectEntry(entry);
+      }
+    });
     state.labelLayer.appendChild(element);
     state.labels.set(entry.taskId || `__${type}__`, { element, object, entry, type });
   };
@@ -708,12 +714,39 @@
     return state.raycaster.intersectObjects(state.interactiveMeshes, false)[0]?.object || null;
   };
 
+  const findLabelAt = (clientX, clientY) => {
+    let closestEntry = null;
+    let closestDistSq = Infinity;
+    const cameraPos = state.camera?.position;
+
+    for (const { element, entry, object } of state.labels.values()) {
+      if (!element || element.hidden || element.style.display === "none") continue;
+      const rect = element.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        if (!object || !cameraPos) return entry;
+        const distSq = object.position.distanceToSquared(cameraPos);
+        if (distSq < closestDistSq) {
+          closestDistSq = distSq;
+          closestEntry = entry;
+        }
+      }
+    }
+    return closestEntry;
+  };
+
   const installPointerInteraction = () => {
     const input = state.inputSurface;
     const activePointers = new Set();
     let suppressSelectionUntilPointersClear = false;
 
     input.addEventListener("pointerdown", (event) => {
+      // Keep pointer events owned by WebGL canvas instead of bubbling to CSS fallback.
+      event.stopPropagation();
       // Camera gestures must never also select a planet or open its detail.
       if (event.pointerType === "mouse" && event.button !== 0) return;
       activePointers.add(event.pointerId);
@@ -732,6 +765,7 @@
       };
     });
     input.addEventListener("pointerup", (event) => {
+      event.stopPropagation();
       const start = state.pointerDown;
       state.pointerDown = null;
       activePointers.delete(event.pointerId);
@@ -743,6 +777,12 @@
       const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
       const threshold = start.pointerType === "touch" ? 10 : 5;
       if (start.moved || distance > threshold || performance.now() - start.time > 550) return;
+
+      const labelEntry = findLabelAt(event.clientX, event.clientY);
+      if (labelEntry) {
+        selectEntry(labelEntry);
+        return;
+      }
       const object = raycastAt(event.clientX, event.clientY);
       if (object?.userData?.entry) selectEntry(object.userData.entry);
     });
@@ -754,8 +794,13 @@
         return;
       }
       if (activePointers.size) return;
-      const object = raycastAt(event.clientX, event.clientY);
-      input.style.cursor = object ? "pointer" : "grab";
+      const labelEntry = findLabelAt(event.clientX, event.clientY);
+      const object = labelEntry ? null : raycastAt(event.clientX, event.clientY);
+      input.style.cursor = (labelEntry || object) ? "pointer" : "grab";
+      for (const { element, entry } of state.labels.values()) {
+        if (!element) continue;
+        element.classList.toggle("is-hovered", Boolean(labelEntry && entry === labelEntry));
+      }
     }, { passive: true });
     const cancelPointer = (event) => {
       activePointers.delete(event.pointerId);

@@ -57,14 +57,15 @@
   transform: translate3d(-50%, calc(-50% + 34px), 0);
   transform-origin: 50% 50%;
   transition: opacity .18s ease, border-color .18s ease, background .18s ease;
-  /* Keep the canvas as the camera surface while allowing name-based
-     selection through the DOM label itself. */
-  pointer-events: auto;
+  /* Keep all pointer gestures on the canvas camera surface so swiping
+     over names or planets always rotates the view, while taps still select. */
+  pointer-events: none;
   cursor: pointer;
   will-change: left, top, opacity;
 }
 
 .univ-webgl-label:hover,
+.univ-webgl-label.is-hovered,
 .univ-webgl-label:focus-visible,
 .univ-webgl-label.is-selected {
   outline: none;
