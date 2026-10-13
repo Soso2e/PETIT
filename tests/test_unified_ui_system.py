@@ -101,6 +101,32 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertIn('window.PETIT_VERSION = globalThis.PETIT_VERSION', source)
         self.assertIn('updateViaCache: "none"', source)
 
+    def test_developer_options_and_chat_log_export_ui(self) -> None:
+        """開発者オプションおよび会話ログ取得UIの連携要素を検証する。"""
+        universe_html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        preferences_css = (FRONTEND / "petit-ui-preferences.css").read_text(encoding="utf-8")
+        preferences_js = (FRONTEND / "petit-ui-preferences.js").read_text(encoding="utf-8")
+        universe_app = (FRONTEND / "universe-app.js").read_text(encoding="utf-8")
+
+        # HTML: 開発者限定のログ取得ボタンとモーダルダイアログ
+        self.assertIn('id="chat-export-log-btn"', universe_html)
+        self.assertIn('data-developer-only', universe_html)
+        self.assertIn('id="chat-log-dialog"', universe_html)
+        self.assertIn('id="chat-log-output"', universe_html)
+        self.assertIn('id="chat-log-copy"', universe_html)
+
+        # CSS: 開発者モードOFF時の非表示ルールとモーダルスタイル
+        self.assertIn(':root:not([data-petit-developer="true"]) [data-developer-only]', preferences_css)
+        self.assertIn('.chat-log-dialog', preferences_css)
+
+        # JS: 開発者モード設定、トグル、およびログエクスポート制御
+        self.assertIn('petit_developer_mode', preferences_js)
+        self.assertIn('data-petit-developer-choice', preferences_js)
+        self.assertIn('setupChatLogDialog', universe_app)
+        self.assertIn('window.PetitChatLog', universe_app)
+        self.assertIn('history: () => [...state.history]', universe_app)
+
 
 if __name__ == "__main__":
     unittest.main()
+

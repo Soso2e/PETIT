@@ -1235,6 +1235,7 @@
     },
     refreshAndFocusTask: (id) => focusTaskById(id, { refresh: true }),
     tasks: () => [...state.tasks],
+    history: () => [...state.history],
   };
 
   const appendMessage = (role, message, actions = []) => {
@@ -1501,8 +1502,213 @@
     }
   };
 
+  const setupChatLogDialog = () => {
+    const dialog = byId("chat-log-dialog");
+    if (!dialog) return;
+
+    const outputEl = byId("chat-log-output");
+    const copyBtn = byId("chat-log-copy");
+    const statusEl = byId("chat-log-status");
+    const scopeCheckbox = byId("chat-log-full-history");
+    const formatButtons = dialog.querySelectorAll("[data-log-format]");
+    const closeButtons = dialog.querySelectorAll("[data-log-close]");
+
+    let currentFormat = "json";
+    let cachedRows = null;
+    let statusTimer = null;
+
+    const showStatus = (text) => {
+      if (!statusEl) return;
+      statusEl.textContent = text;
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(() => {
+        statusEl.textContent = "";
+      }, 2500);
+    };
+
+    const fetchLogs = async (fullHistory = false) => {
+      try {
+        const query = fullHistory
+          ? "/api/conversations?limit=100"
+          : `/api/conversations?limit=100&session_id=${encodeURIComponent(state.sessionId)}`;
+        const data = await requestJson(query);
+        return data.conversations || [];
+      } catch (_err) {
+        return [];
+      }
+    };
+
+    const buildRecords = (dbRows, fullHistory = false) => {
+      const records = [];
+      for (const row of dbRows) {
+        if (row.user_text) {
+          records.push({
+            role: "user",
+            content: row.user_text,
+            timestamp: row.timestamp || null,
+            ...(fullHistory && row.session_id ? { session_id: row.session_id } : {}),
+          });
+        }
+        if (row.assistant_text) {
+          let tools = [];
+          if (row.used_tools) {
+            try {
+              tools = typeof row.used_tools === "string" ? JSON.parse(row.used_tools) : row.used_tools;
+            } catch (_e) {
+              tools = [String(row.used_tools)];
+            }
+          }
+          records.push({
+            role: "assistant",
+            content: row.assistant_text,
+            timestamp: row.timestamp || null,
+            ...(tools && tools.length ? { used_tools: tools } : {}),
+            ...(fullHistory && row.session_id ? { session_id: row.session_id } : {}),
+          });
+        }
+      }
+
+      if (!fullHistory) {
+        if (!records.length && state.history.length) {
+          for (const item of state.history) {
+            records.push({
+              role: item.role,
+              content: item.content,
+            });
+          }
+        } else if (state.history.length > records.length) {
+          const diff = state.history.slice(records.length);
+          for (const item of diff) {
+            records.push({
+              role: item.role,
+              content: item.content,
+            });
+          }
+        }
+      }
+
+      return records;
+    };
+
+    const formatLogs = (records, format) => {
+      if (!records.length) {
+        return format === "json" ? "[]" : "会話ログはありません。";
+      }
+
+      if (format === "json") {
+        return JSON.stringify(records, null, 2);
+      }
+
+      return records.map((record) => {
+        const roleLabel = record.role === "user" ? "User" : "Assistant";
+        const header = record.timestamp
+          ? `[${record.timestamp}] ${roleLabel}:`
+          : `${roleLabel}:`;
+        let text = `${header}\n${record.content}`;
+        if (record.used_tools && record.used_tools.length) {
+          text += `\n(Tools: ${record.used_tools.join(", ")})`;
+        }
+        return text;
+      }).join("\n\n");
+    };
+
+    const render = async () => {
+      if (!outputEl) return;
+      outputEl.value = "読み込み中…";
+      const fullHistory = Boolean(scopeCheckbox?.checked);
+      cachedRows = await fetchLogs(fullHistory);
+      const records = buildRecords(cachedRows, fullHistory);
+      outputEl.value = formatLogs(records, currentFormat);
+    };
+
+    const open = async () => {
+      if (typeof dialog.showModal === "function") {
+        if (!dialog.open) dialog.showModal();
+      } else {
+        dialog.setAttribute("open", "");
+      }
+      await render();
+    };
+
+    const close = () => {
+      if (typeof dialog.close === "function") {
+        if (dialog.open) dialog.close();
+      } else {
+        dialog.removeAttribute("open");
+      }
+    };
+
+    window.PetitChatLog = {
+      open,
+      close,
+      render,
+    };
+
+    document.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target.closest("#chat-export-log-btn, [data-open-chat-log]") : null;
+      if (target) {
+        event.preventDefault();
+        open();
+      }
+    });
+
+    closeButtons.forEach((btn) => {
+      btn.addEventListener("click", close);
+    });
+
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) close();
+    });
+
+    formatButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const format = btn.dataset.logFormat || "json";
+        currentFormat = format;
+        formatButtons.forEach((b) => {
+          b.setAttribute("aria-pressed", String(b.dataset.logFormat === format));
+        });
+        const fullHistory = Boolean(scopeCheckbox?.checked);
+        const records = buildRecords(cachedRows || [], fullHistory);
+        outputEl.value = formatLogs(records, currentFormat);
+      });
+    });
+
+    scopeCheckbox?.addEventListener("change", async () => {
+      await render();
+    });
+
+    outputEl?.addEventListener("focus", () => {
+      outputEl.select();
+    });
+
+    copyBtn?.addEventListener("click", async () => {
+      const textToCopy = outputEl?.value || "";
+      if (!textToCopy) {
+        showStatus("コピーするログがありません");
+        return;
+      }
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(textToCopy);
+          showStatus("クリップボードにコピーしました");
+          return;
+        }
+      } catch (_e) {
+        // fallback
+      }
+      try {
+        outputEl.select();
+        const success = document.execCommand("copy");
+        showStatus(success ? "クリップボードにコピーしました" : "手動でコピーしてください");
+      } catch (_e) {
+        showStatus("手動でコピーしてください");
+      }
+    });
+  };
+
   const initialize = async () => {
     checkHealth();
+    setupChatLogDialog();
     await loadModelRouting();
     await restoreHistory();
     await loadUniverse();
