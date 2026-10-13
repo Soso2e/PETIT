@@ -16,11 +16,15 @@ _STARTUP_SYNC_REQUESTED = False
 _OUTBOX_APPLY_ORIGINAL: Any | None = None
 
 
-def _apply_outbox_with_snapshot(operation: dict[str, Any], remote: dict[str, Any]) -> None:
+def _apply_outbox_with_snapshot(operation: dict[str, Any], remote: dict[str, Any], *, connection: Any = None) -> None:
     if _OUTBOX_APPLY_ORIGINAL is None:
         raise RuntimeError("task outbox snapshot hook is not initialized")
-    _OUTBOX_APPLY_ORIGINAL(operation, remote)
-    merge.save_snapshot(remote)
+    if connection is None:
+        _OUTBOX_APPLY_ORIGINAL(operation, remote)
+        merge.save_snapshot(remote)
+    else:
+        _OUTBOX_APPLY_ORIGINAL(operation, remote, connection=connection)
+        merge.save_snapshot(remote, connection=connection)
 
 
 _apply_outbox_with_snapshot._petit_live_sync_wrapper = True  # type: ignore[attr-defined]

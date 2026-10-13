@@ -80,7 +80,10 @@ def _snapshot(conn: Any, external_id: str) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def save_snapshot(remote: dict[str, Any]) -> None:
+def save_snapshot(remote: dict[str, Any], *, connection: Any = None) -> None:
+    if connection is not None:
+        _save_snapshot(connection, remote)
+        return
     store.ensure_schema()
     with db.get_connection() as conn:
         _save_snapshot(conn, remote)

@@ -59,7 +59,8 @@ flowchart TD
     queue --> latest{実行直前のNotion更新日時一致?}
     latest -->|いいえ| again[競合を保持して再比較]
     latest -->|はい| patch[既存Notion更新 / 成功時だけsynced]
-    revision -->|Notion側| adopt[未同期キュー取り下げ / DBと親関係へ採用 / 監査]
+    revision -->|Notion側| adopt[同一トランザクションでキュー取り下げ・DBと親関係へ採用・snapshot保存・監査]
+    adopt -->|途中失敗| rollback[全体をrollback / 競合とローカル変更を保持]
     compare -->|404・接続失敗| blocked[共有・親ページの確認案内 / 競合保持]
     event[CoreのReminder / Work Session等の通知イベント] --> history[SQLite通知センター]
     history --> web[既存Web Push / VAPID・購読が必要]
@@ -823,3 +824,24 @@ flowchart TD
 ```
 
 Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧Readや失敗結果はfocusを上書きしません。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。
+
+## 接続ステータスと同期診断（#327）
+
+接続確認はユーザーの明示操作でのみ実施する。表示更新では外部API・Chroma・Vault走査・同期workerを呼び出さない。接続成功と同期成功は別々に管理し、再試行は既存の単一タスクAPI、競合は既存のrevision付き比較・採用を共用する。
+
+```mermaid
+flowchart TD
+    Entry[上部同期表示 / Settings / サイドバー] --> Saved[GET /api/connections]
+    Saved --> Local[SQLite同期履歴・診断履歴・Notion outbox/inbox]
+    Local --> Redact[公開項目のみ選択・秘密情報を伏せる]
+    Redact --> UI[サービス別の接続・同期状態とタスク詳細]
+    UI -->|明示的な接続確認| Probe[POST /api/connections/service/check]
+    Probe --> Read[対象サービスの読取診断のみ / 同期しない]
+    Read --> Cache[SQLiteへ診断結果・成功/エラー時刻を保存]
+    Cache --> Saved
+    UI -->|失敗タスク1件の再試行| Retry[既存 POST tasks/id/sync/retry]
+    Retry --> Queue[既存outboxへ戻す]
+    Queue --> Worker[既存workerが処理 / 実試行時刻を記録]
+    UI -->|競合を比較| Conflict[既存競合UI・revision確認]
+    Conflict --> Choice[PETIT側再同期 / Notion側採用を明示選択]
+```

@@ -35,6 +35,18 @@ class ConflictResolutionTests(unittest.TestCase):
         with db.get_connection() as conn:
             self.assertEqual(conn.execute("SELECT count(*) FROM ui_action_audit").fetchone()[0], 1)
 
+    def test_snapshot_failure_rolls_back_choice_and_audit(self):
+        from backend.notion_task_sync import merge
+        with patch.object(merge, "_save_snapshot", side_effect=RuntimeError("snapshot failure")):
+            with self.assertRaises(RuntimeError):
+                self.choose("notion")
+        task = task_sync_queue._task(self.task_id)
+        self.assertEqual(task["title"], "PETIT編集")
+        self.assertEqual(task["sync_status"], "conflict")
+        with db.get_connection() as conn:
+            self.assertEqual(conn.execute("SELECT status FROM task_sync_queue").fetchone()[0], "conflict")
+            self.assertEqual(conn.execute("SELECT count(*) FROM ui_action_audit").fetchone()[0], 0)
+
     def test_petit_choice_preserves_payload_and_waits_for_notion_ack(self):
         self.assertEqual(self.choose("petit").status_code, 200)
         task = task_sync_queue._task(self.task_id)
