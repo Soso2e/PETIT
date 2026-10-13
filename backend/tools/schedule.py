@@ -5,7 +5,9 @@ Apple Calendar) can populate calendar_events_cache later.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .. import calendar_providers, calendar_sync, db
 from .registry import tool
@@ -14,29 +16,64 @@ from .registry import tool
 @tool(
     name="get_schedule",
     description=(
-        "指定日の予定を取得する。"
-        "「今日の予定は？」「明日何ある？」のような発話で使う。"
-        "date は YYYY-MM-DD。省略時は全件。"
+        "指定日またはキーワードに一致する予定をカレンダーキャッシュから取得する。"
+        "「今日の予定は？」はdate、「CAPCOMのMTGはいつ？」はqueryを指定する。"
+        "dateはYYYY-MM-DD、queryは予定名などの検索語。両方指定可。"
+        "dateもqueryもない場合は全件取得するため、検索ではqueryを必ず渡す。"
     ),
     parameters={
         "type": "object",
         "properties": {
             "date": {"type": "string", "description": "対象日 YYYY-MM-DD。省略可。"},
+            "query": {"type": "string", "description": "予定名・説明・場所から検索する語。日付が不明ならこちらを指定。"},
         },
     },
 )
-def get_schedule(date: str | None = None) -> dict[str, Any]:
+def _query_variants(query: str) -> list[str]:
+    """Search literal terms, with known Japanese/English event-name aliases."""
+    term = query.strip()
+    if not term:
+        return []
+    aliases = {"capcom": "カプコン", "カプコン": "CAPCOM"}
+    alias = aliases.get(term.casefold())
+    return [term, alias] if alias else [term]
+
+
+def _like_literal(term: str) -> str:
+    return "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+
+def get_schedule(date: str | None = None, query: str | None = None) -> dict[str, Any]:
     sync_status = calendar_sync.sync_if_configured()
     sql = "SELECT id, source, title, start_time, end_time, location FROM calendar_events_cache"
+    filters: list[str] = []
     params: list[Any] = []
     if date:
-        sql += " WHERE start_time LIKE ?"
+        filters.append("start_time LIKE ?")
         params.append(f"{date}%")
-    sql += " ORDER BY start_time ASC"
+    terms = _query_variants(query or "")
+    if terms:
+        columns = ("title", "description", "location")
+        matches = []
+        for term in terms:
+            matches.append("(" + " OR ".join(
+                f"{column} LIKE ? ESCAPE '\\' COLLATE NOCASE" for column in columns
+            ) + ")")
+            params.extend([_like_literal(term)] * len(columns))
+        filters.append("(" + " OR ".join(matches) + ")")
+    if filters:
+        sql += " WHERE " + " AND ".join(filters)
+    if terms and not date:
+        # Keep future meetings visible even when years of historical events exist.
+        sql += " ORDER BY CASE WHEN substr(start_time, 1, 10) >= ? THEN 0 ELSE 1 END, start_time ASC"
+        params.append(datetime.now(ZoneInfo("Asia/Tokyo")).date().isoformat())
+    else:
+        sql += " ORDER BY start_time ASC"
     with db.get_connection() as conn:
         rows = conn.execute(sql, params).fetchall()
     events = [dict(r) for r in rows]
-    return {"date": date, "count": len(events), "events": events, "calendar_sync": sync_status}
+    return {"date": date, "query": query if terms else None, "count": len(events),
+            "events": events, "calendar_sync": sync_status}
 
 
 @tool(
