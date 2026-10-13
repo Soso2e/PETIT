@@ -134,12 +134,17 @@
       option.value = value; option.textContent = text; inputModeEl.append(option);
     }
     const chatActions = document.querySelector(".chat-head-actions");
+    const inputHelp = document.createElement("p");
+    inputHelp.className = "chat-voice-help";
     if (chatActions) {
       const options = document.createElement("details");
       options.className = "chat-voice-options";
       const summary = document.createElement("summary");
       summary.textContent = "音声設定";
-      options.append(summary, inputModeEl);
+      const settings = document.createElement("div");
+      settings.className = "chat-voice-settings";
+      settings.append(inputModeEl, inputHelp);
+      options.append(summary, settings);
       chatActions.prepend(options);
     } else {
       voiceStateEl.before(inputModeEl);
@@ -149,9 +154,10 @@
       SpeechRecognitionApi = inputModeEl.value === "recorded" ?
         (window.PetitRecordedSpeechRecognition?.supported() ? window.PetitRecordedSpeechRecognition : null) : nativeApi;
       speechRecognitionSupported = Boolean(SpeechRecognitionApi);
-      setVoiceState(inputModeEl.value === "recorded" ?
+      inputHelp.textContent = inputModeEl.value === "recorded" ?
         "録音認識: 話し終わったら■で文字起こし。最大60秒。確定後チャットへ送信します。" :
-        "ブラウザ認識: 発話終了後に送信。接続エラーが続く場合は録音認識へ切り替えてください。");
+        "ブラウザ認識: 発話終了後に送信。接続エラーが続く場合は録音認識へ切り替えてください。";
+      setVoiceState("");
       updateMicAvailability();
     };
     inputModeEl.addEventListener("change", () => {

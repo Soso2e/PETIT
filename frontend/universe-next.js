@@ -136,14 +136,14 @@
     state.selectedTaskId = taskId(task);
     const parentLabel = detailPanel.querySelector('[data-detail="project"]');
     if (parentLabel) {
-      const nextLabel = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
+      const nextLabel = isRoot(task) ? "親なし" : text(task.parent_title) || "親なし";
       if (parentLabel.textContent !== nextLabel) parentLabel.textContent = nextLabel;
     }
 
     select.replaceChildren();
     const life = document.createElement("option");
     life.value = "";
-    life.textContent = "Life直下";
+    life.textContent = "親なし";
     select.appendChild(life);
 
     parentCandidates(task).forEach((candidate) => {
@@ -161,8 +161,8 @@
     const nextHelp = lockedParent
       ? "このタスクは子タスクを持つ親です。親子階層は2段までに制限しています。"
       : task.source === "notion"
-        ? "Life直下のNotionタスクを選び、「親Taskを変更」で保存します。"
-        : "Life直下または別の親Taskを選び、明示的に保存します。";
+        ? "親なしのNotionタスクを選び、「親Taskを変更」で保存します。"
+        : "親なしまたは別の親Taskを選び、明示的に保存します。";
     if (help.textContent !== nextHelp) help.textContent = nextHelp;
     select.dataset.ready = "1";
     select.addEventListener("click", (event) => event.stopPropagation());
@@ -223,7 +223,7 @@
       const children = state.tasks.filter((task) => Number(task.parent_task_id) === Number(root.id));
       const counts = card.querySelector(".constellation-card__counts");
       if (counts) {
-        const nextCounts = hasChildren ? `${children.length} Child Task` : "単独Task";
+        const nextCounts = hasChildren ? `${children.length} 子タスク` : "子タスクなし";
         if (counts.textContent !== nextCounts) counts.textContent = nextCounts;
       }
 
@@ -255,10 +255,11 @@
       const cells = row.querySelectorAll("td");
       if (cells.length < 4) return;
       const title = text(row.querySelector(".task-table__title")?.textContent);
-      const due = text(row.querySelector(".task-table__due")?.textContent).replace("—", "");
+      const dueCell = row.querySelector(".task-table__due");
+      const due = dueCell?.dataset.date ?? text(dueCell?.textContent).replace("—", "");
       const task = findTask({ title, due });
       if (!task) return;
-      const nextText = isRoot(task) ? "Life直下" : text(task.parent_title) || "Life直下";
+      const nextText = isRoot(task) ? "親なし" : text(task.parent_title) || "親なし";
       if (cells[3].textContent !== nextText) cells[3].textContent = nextText;
       const nextRoot = rootTitle(task);
       if (cells[3].dataset.rootTitle !== nextRoot) cells[3].dataset.rootTitle = nextRoot;

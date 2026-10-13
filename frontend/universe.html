@@ -60,6 +60,10 @@
           <div><span class="eyebrow">YOUR PROGRESS</span><h1 id="today-title">今日の積み重ね</h1><p>取り組んだ時間を、ひと目で振り返る。</p></div>
           <button id="refresh-today" class="reminder-refresh" type="button">更新</button>
         </div>
+        <div class="stats-date-controls">
+          <label for="stats-date">振り返る日</label><input id="stats-date" type="date" aria-label="振り返る日" disabled>
+          <button id="stats-go-today" type="button" disabled>今日に戻る</button>
+        </div>
         <p id="stats-load-state" class="stats-load-state" role="status" aria-live="polite">作業記録を読み込み中…</p>
         <div class="stats-grid">
           <section class="stats-hero" aria-labelledby="stats-total-label">
@@ -86,6 +90,16 @@
             <div id="today-timeline" class="stats-session-list"></div>
             <p class="stats-note">作業セッションで記録した時間です。休憩・一時停止は合計に含みません。日をまたいだ作業は今日の分だけ集計します。タスクの完了数とは別の記録です。</p>
           </section>
+          <section class="stats-card stats-card--reflection" aria-labelledby="stats-reflection-title">
+            <h2 id="stats-reflection-title">できたことを残そう</h2>
+            <form id="stats-reflection-form">
+              <label for="stats-reflection-note">進めたこと・気づいたこと・次の一歩</label>
+              <textarea id="stats-reflection-note" maxlength="2000" rows="3" placeholder="小さな一歩も、あなたの成果。" disabled></textarea>
+              <button id="stats-reflection-save" type="submit" disabled>振り返りを保存</button>
+              <button id="stats-reflection-reload" type="button" disabled>保存済みを読み直す</button>
+              <p id="stats-reflection-state" role="status" aria-live="polite"></p>
+            </form>
+          </section>
         </div>
       </section>
 
@@ -98,7 +112,7 @@
                 <div id="focus-breadcrumb" class="focus-breadcrumb" aria-label="現在の階層">
                   <button type="button" data-life-root>Core</button>
                   <span>›</span>
-                  <strong id="focus-project-name">親Task</strong>
+                  <strong id="focus-project-name">親タスク</strong>
                 </div>
                 <h1 id="focus-title">今日のFocus</h1>
                 <p class="section-copy">Core直下の親タスクを中心に、その子タスクへ集中します。</p>
@@ -106,7 +120,7 @@
               <div class="focus-project-switcher" aria-label="親タスク切り替え">
                 <button id="focus-project-prev" class="icon-button" type="button" aria-label="前の親タスク">‹</button>
                 <label>
-                  <span>親Task</span>
+                  <span>親タスク</span>
                   <select id="focus-project-select" aria-label="親タスクを選択"></select>
                 </label>
                 <button id="focus-project-next" class="icon-button" type="button" aria-label="次の親タスク">›</button>
@@ -177,7 +191,7 @@
           <div><span class="eyebrow">TASKS</span><h1 id="task-view-title">重要なタスク</h1><p id="task-view-copy">今やる必要があるHighタスクだけを表示します。</p></div>
           <div class="task-filter-wrap"><span id="task-view-count" class="task-count">0件</span><div class="task-filters" role="group" aria-label="タスク表示切り替え"><button class="filter-chip is-active" data-filter="high">重要</button><button class="filter-chip" data-filter="low">あとで</button></div></div>
         </div>
-        <div class="task-table-wrap"><table class="task-table"><thead><tr><th>完了</th><th>名前</th><th>期限</th><th>親Task</th><th>同期</th></tr></thead><tbody id="task-table-body"></tbody></table></div>
+        <div class="task-table-wrap"><table class="task-table"><thead><tr><th>完了</th><th>名前</th><th>期限</th><th>親タスク</th><th>同期</th></tr></thead><tbody id="task-table-body"></tbody></table></div>
       </section>
 
       <section class="view" data-view-panel="reminders" hidden>
@@ -293,6 +307,10 @@
         <button type="button" class="detail-edit-toggle" data-action="toggle-edit">編集</button>
       </div>
       <h2 data-detail="title"></h2>
+      <div class="detail-actions detail-actions--start">
+        <button type="button" data-action="activate">作業開始</button>
+        <button type="button" data-action="chat">PETITに相談</button>
+      </div>
       
       <div class="detail-grid detail-grid--simple" data-detail-view="read">
         <div><span>状態</span><strong data-detail="status"></strong></div>
@@ -300,7 +318,7 @@
         <div><span>期限</span><strong data-detail="due"></strong></div>
         <div><span>優先度</span><strong data-detail="priority"></strong></div>
         <div><span>エリア</span><strong data-detail="area"></strong></div>
-        <div><span>親Task</span><strong data-detail="project"></strong></div>
+        <div><span>親タスク</span><strong data-detail="project"></strong></div>
       </div>
       <p data-detail="reason" class="detail-reason" data-detail-view="read"></p>
 
@@ -313,9 +331,9 @@
           <label class="detail-form-field">
             <span>状態</span>
             <select name="status">
-              <option value="Yet">Yet</option>
-              <option value="Now">Now</option>
-              <option value="Done">Done</option>
+              <option value="Yet">未着手</option>
+              <option value="Now">進行中</option>
+              <option value="Done">完了</option>
             </select>
           </label>
           <label class="detail-form-field">
@@ -325,9 +343,9 @@
           <label class="detail-form-field">
             <span>優先度</span>
             <select name="priority">
-              <option value="High">High</option>
-              <option value="Mid">Mid</option>
-              <option value="Low">Low</option>
+              <option value="High">高</option>
+              <option value="Mid">通常</option>
+              <option value="Low">低</option>
             </select>
           </label>
           <label class="detail-form-field">
@@ -354,8 +372,8 @@
       <div class="detail-parent-field">
         <span>親子関係</span>
         <div class="detail-parent-field__controls">
-          <select data-action="parent" aria-label="Taskの親を選択"></select>
-          <button type="button" data-action="parent-apply" disabled>親Taskを変更</button>
+          <select data-action="parent" aria-label="タスクの親を選択"></select>
+          <button type="button" data-action="parent-apply" disabled>親タスクを変更</button>
         </div>
         <small data-parent-help>親タスクを読み込んでいます。</small>
       </div>
@@ -364,10 +382,6 @@
       <div class="detail-actions detail-actions--primary">
         <button type="button" data-action="complete">完了にする</button>
         <button type="button" data-action="bucket">あとでに移す</button>
-      </div>
-      <div class="detail-actions detail-actions--secondary">
-        <button type="button" data-action="activate">作業開始</button>
-        <button type="button" data-action="chat">PETITに相談</button>
       </div>
     </div>
   </template>

@@ -205,26 +205,26 @@
   };
 
   const createChildComposer = (task) => {
-    const section = document.createElement("section");
+    const section = document.createElement("details");
     section.className = "detail-child-create";
     section.dataset.parentTaskId = taskId(task);
     section.innerHTML = `
-      <div class="detail-child-create__head">
-        <div><span class="eyebrow">CHILD TASK</span><strong>この親Taskに小タスクを追加</strong></div>
-        <small>追加後も、この親TaskのFocusに留まります。</small>
-      </div>
+      <summary class="detail-child-create__head">
+        <div><strong>子タスクを追加</strong></div>
+      </summary>
+      <p>追加後も、この親タスクの画面に留まります。</p>
       <form data-child-form>
         <div class="detail-child-create__fields">
           <input name="title" type="text" maxlength="200" autocomplete="off" placeholder="小タスク名" aria-label="小タスク名" required />
           <select name="priority" aria-label="優先度">
-            <option value="High">High</option>
-            <option value="Mid">Mid</option>
-            <option value="Low">Low</option>
+            <option value="High">高</option>
+            <option value="Mid">通常</option>
+            <option value="Low">低</option>
           </select>
         </div>
-        <button type="submit">追加してFocusに表示</button>
+        <button type="submit">追加する</button>
       </form>
-      <div class="detail-child-create__status" data-child-status>親Taskを分けずに、ここへ実行単位を追加できます。</div>
+      <div class="detail-child-create__status" data-child-status>親タスクを分けずに、ここへ実行単位を追加できます。</div>
     `;
     return section;
   };

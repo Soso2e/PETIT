@@ -64,3 +64,15 @@ body .statistics-view .section-head p { margin-top: 6px; }
   .stats-session-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
   .stats-session-time { grid-column: 1 / -1; font-size: 11px; }
 }
+.stats-date-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0 20px; }
+.stats-date-controls label, #stats-reflection-form label { font-size: 13px; color: var(--ui-muted); }
+.stats-date-controls input, .stats-date-controls button { min-height: 40px; }
+body .stats-week-column { background: transparent; border: 1px solid transparent; padding: 5px 2px; border-radius: 8px; color: var(--ui-text); cursor: pointer; min-width: 0; }
+body .stats-week-column[aria-pressed="true"] { border-color: var(--ui-line-strong); background: var(--ui-bg-2); }
+body .stats-week-column:focus-visible { outline: 2px solid var(--ui-focus); }
+body .stats-now[hidden] { display: none; }
+.stats-card--reflection { grid-column: 1 / -1; }
+#stats-reflection-form { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+#stats-reflection-form label, #stats-reflection-note, #stats-reflection-state { width: 100%; }
+#stats-reflection-note { resize: vertical; min-height: 100px; padding: 12px; background: var(--ui-bg-2); color: var(--ui-text); border: 1px solid var(--ui-line-strong); border-radius: 10px; font: inherit; font-size: 14px; line-height: 1.6; }
+#stats-reflection-state { color: var(--ui-muted); font-size: 13px; line-height: 1.6; }

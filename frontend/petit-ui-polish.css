@@ -245,7 +245,7 @@ body #petit-work-details #detail-panel {
   visibility: visible !important; pointer-events: auto !important;
   border: 0; border-top: 1px solid var(--ui-line); border-radius: 0; background: transparent; box-shadow: none;
 }
-body.petit-univ-active.petit-univ-screen .univ-hud { top: calc(var(--petit-work-top) + 56px); }
+body.petit-univ-active.petit-univ-screen .univ-hud { position: fixed; top: calc(var(--petit-work-top) + 56px); left: var(--petit-content-left); right: 16px; }
 body:not(.petit-univ-active) .universe-main { padding-top: calc(var(--petit-work-top) + 64px) !important; }
 html:has(body.petit-chat-screen), body.petit-chat-screen { height: 100%; overflow: hidden; }
 body.petit-chat-screen { padding-bottom: 0; }
@@ -288,3 +288,28 @@ body.petit-chat-screen .chat-voice-options > select {
   }
   body.petit-chat-screen .chat-panel .section-head { min-height: 52px; padding-right: 0; }
 }
+/* v27 UX follow-up: native hidden must win over component display rules. */
+body #detail-panel [hidden] { display: none !important; }
+body #detail-panel .detail-actions--start { margin: 10px 0 18px; }
+body #detail-panel .detail-actions--start [data-action="activate"] { background: var(--ui-accent); color: var(--ui-bg); font-weight: 650; min-height: 44px; }
+body .task-table__due { white-space: nowrap; }
+body .task-due-badge { display: block; font-size: 11px; color: var(--ui-text); }
+body tr[data-due-state="overdue"] .task-due-badge { color: var(--ui-danger, #f5a8a8); }
+body tr[data-due-state="today"] .task-due-badge { color: var(--ui-accent); font-weight: 650; }
+body #petit-context-bar[data-state="idle"] #petit-work-details .focus-footer,
+body #petit-context-bar[data-state="idle"] #petit-work-details #detail-panel { display: none !important; }
+body #petit-work-start-link { min-height: 44px; width: 100%; }
+body #petit-work-start-link[hidden] { display: none !important; }
+body.petit-chat-screen .chat-voice-settings { position: absolute; top: 100%; right: 0; z-index: 10; width: min(300px, 80vw); padding: 14px; background: var(--ui-surface); border: 1px solid var(--ui-line-strong); border-radius: 12px; box-shadow: var(--ui-shadow-lg); }
+body.petit-chat-screen .chat-voice-settings select { width: 100%; }
+body.petit-chat-screen .chat-voice-help { margin: 10px 0 0; font-size: 12px; line-height: 1.65; color: var(--ui-muted); }
+body .univ-hud__selection > span, body .univ-hud__selection > p { font-size: 12px; color: var(--ui-muted); }
+body .univ-webgl-label--child { font-size: 11px; }
+body.petit-univ-active #detail-panel .detail-header-row { padding-right: 82px; }
+html:has(.universe-shell) { scroll-padding-top: 84px; }
+html:has(#petit-desktop-toolbar) { scroll-padding-top: 140px; }
+body:not(.petit-univ-screen):not(.petit-chat-screen) .universe-main :is(button, input, textarea, select) { scroll-margin-top: calc(var(--petit-work-top) + 76px); scroll-margin-bottom: 24px; }
+body #detail-panel .detail-child-create > summary { cursor: pointer; margin-bottom: 0; min-height: 40px; }
+body #detail-panel .detail-child-create > p { font-size: 12px; color: var(--ui-muted); line-height: 1.6; margin: 12px 0; }
+body #detail-panel .detail-child-create > summary::after { content: '⌄'; margin-left: auto; color: var(--ui-muted); }
+body #detail-panel .detail-child-create[open] > summary::after { transform: rotate(180deg); }

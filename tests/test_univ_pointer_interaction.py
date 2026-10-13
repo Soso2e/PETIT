@@ -49,7 +49,7 @@ class UnivPointerInteractionTests(unittest.TestCase):
         self.assertIn('@media (pointer: coarse)', source)
         self.assertIn("min-width: 44px", source)
         self.assertIn("min-height: 44px", source)
-        self.assertIn("Tap: focus · Drag: orbit · Pinch: zoom", source)
+        self.assertIn("タップ: 選択 · ドラッグ: 回転 · ピンチ: 拡大縮小", source)
 
 
 if __name__ == "__main__":

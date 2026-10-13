@@ -11,12 +11,14 @@ const calls = [];
 let serveOverlay = true;
 let fixtureWork = { session_id: 'fixture-work', task_id: '1', task: '作業中の星', status: 'active', started_at: new Date().toISOString() };
 const fixtureTasks = [
-  { id: 1, title: '作業中の星', status: 'Yet', priority: 'High', source: 'notion', external_id: 'fixture-1', sync_status: 'conflict', root_task_id: 1, root_title: '作業中の星' },
+  { id: 1, title: '作業中の星', status: 'Yet', priority: 'High', source: 'notion', external_id: 'fixture-1', sync_status: 'conflict', due_date: '2020-01-01', root_task_id: 1, root_title: '作業中の星' },
   { id: 2, title: '選択だけの星', status: 'Yet', priority: 'High', source: 'notion', external_id: 'fixture-2', sync_status: 'synced', root_task_id: 2, root_title: '選択だけの星' },
 ];
 let fixturePreferences = { work_session: false };
 let statsFailure = '';
 let statsEmpty = false;
+const fixtureReflections = new Map();
+let reflectionConflict = false;
 const fixtureStatsDay = {
   date: '2026-10-13', timezone: 'Asia/Tokyo', total_seconds: 9000,
   tasks: [{ task_id: '1', task: 'PETITの改善', elapsed_seconds: 7200 }, { task_id: '2', task: '振り返り <メモ>', elapsed_seconds: 1800 }],
@@ -63,6 +65,18 @@ const server = http.createServer(async (request, response) => {
   if (url.pathname === '/api/notifications/tasks') payload = { tasks: fixtureTasks };
   if (url.pathname === '/api/work-sessions/active') payload = { session: fixtureWork };
   if (url.pathname === '/api/work-sessions/today') payload = statsEmpty ? { ...fixtureStatsDay, total_seconds: 0, tasks: [], sessions: [], active: null } : { ...fixtureStatsDay, active: fixtureWork };
+  if (url.pathname === '/api/work-sessions/today') payload.reflection = fixtureReflections.get(fixtureStatsDay.date) || { note: '', revision: 0 };
+  if (url.pathname.startsWith('/api/work-sessions/days/')) {
+    const date = url.pathname.split('/')[4];
+    const reflection = fixtureReflections.get(date) || { note: '', revision: 0 };
+    if (url.pathname.endsWith('/reflection')) {
+      if (reflectionConflict || data.revision !== reflection.revision) { response.writeHead(409).end(JSON.stringify({ detail: '別の画面で更新されました。' })); return; }
+      payload = { reflection: { note: data.note.trim(), revision: reflection.revision + 1 } };
+      fixtureReflections.set(date, payload.reflection);
+    } else {
+      payload = { ...fixtureStatsDay, date, total_seconds: 1800, tasks: [{ task: '前日の仕上げ', elapsed_seconds: 1800 }], sessions: [{ task: '前日の仕上げ', started_at: '2026-10-12T01:00:00Z', ended_at: '2026-10-12T01:30:00Z', elapsed_seconds: 1800 }], active: null, reflection };
+    }
+  }
   if (url.pathname === '/api/work-sessions/summary') payload = statsEmpty ? { ...fixtureStatsWeek, total_seconds: 0, daily: fixtureStatsWeek.daily.map(day => ({ ...day, elapsed_seconds: 0 })) } : fixtureStatsWeek;
   if (url.pathname.endsWith('/fixture-work/pause')) payload = { session: fixtureWork = { ...fixtureWork, status: 'paused', paused_at: new Date().toISOString() } };
   if (url.pathname.endsWith('/fixture-work/resume')) payload = { session: fixtureWork = { ...fixtureWork, status: 'active', paused_at: null } };
@@ -279,6 +293,7 @@ const server = http.createServer(async (request, response) => {
     const workspaceOpened = instance.waitForEvent('window');
     await voicePage.locator('#open-workspace').click();
     const workspace = await workspaceOpened;
+
     await workspace.waitForURL(`${origin}/static/universe.html`);
     await workspace.locator('#petit-desktop-toolbar').waitFor();
     assert.equal(await workspace.evaluate(() => typeof require), 'undefined');
@@ -318,6 +333,13 @@ const server = http.createServer(async (request, response) => {
     await workspace.waitForFunction(() => window.PetitUniverse?.workingTask() === '1');
     await workspace.waitForFunction(() => window.PetitUnivWebGL?.initialized && window.__fixtureScene?.entries.size >= 2);
     await workspace.waitForFunction(() => !window.__fixtureScene.renderFrame);
+    assert.ok(await workspace.evaluate(() => {
+      const scene = window.__fixtureScene;
+      return scene.overviewPoints.every(({ position, radius }) => {
+        const p = position.clone().project(scene.camera);
+        return Math.abs(p.x) < .86 && Math.abs(p.y) < .72 && p.z > -1 && p.z < 1;
+      });
+    }), 'overview fits every planet/satellite center with room for HUD');
     const workGlow = await workspace.evaluate(() => {
       const work = window.__fixtureScene.entries.get('1').object;
       const other = window.__fixtureScene.entries.get('2').object;
@@ -362,10 +384,33 @@ const server = http.createServer(async (request, response) => {
     await workspace.evaluate(() => document.getElementById('work-session-pause').click());
     await workspace.waitForFunction(() => window.PetitUniverse.workingTask() === '1');
     await workspace.evaluate(() => window.dispatchEvent(new CustomEvent('petit:navigate', { detail: { view: 'tasks' } })));
+    assert.equal(await workspace.locator('tr[data-due-state="overdue"] .task-due-badge').textContent(), '期限切れ');
+    await workspace.locator('#task-table-body .task-table__title').filter({ hasText: '作業中の星' }).click();
+    const rowTitle = workspace.locator('#task-table-body .task-table__title').filter({ hasText: '選択だけの星' });
+    await rowTitle.click();
+    assert.ok(await workspace.locator('[data-view-panel="tasks"]').isVisible());
+    await rowTitle.locator('..').press('Enter');
+    await workspace.waitForFunction(() => document.body.classList.contains('petit-univ-manage-open') && window.__fixtureScene.selectedTaskId === '2', null, { timeout: 5000 }).catch(async error => {
+      console.log('UX selection diagnostic:', await workspace.evaluate(() => ({ classes: document.body.className, selected: window.__fixtureScene.selectedTaskId, hud: document.querySelector('[data-univ-selected-title]').textContent, camera: window.__fixtureScene.camera.position.toArray(), radius: window.__fixtureScene.overviewRadius })));
+      await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-ux-failure.png') }); throw error;
+    });
+    assert.equal(await workspace.locator('[data-univ-selected-title]').textContent(), '選択だけの星');
+    assert.equal(await workspace.locator('[data-univ-action="manage"]').isEnabled(), true);
+    assert.equal(await workspace.locator('#detail-panel [data-detail-form]').isVisible(), false);
+    await workspace.locator('#detail-panel [data-action="toggle-edit"]').click();
+    assert.equal(await workspace.locator('#detail-panel [data-detail-form]').isVisible(), true);
+    assert.equal(await workspace.locator('#detail-panel [data-detail-view="read"]').first().isVisible(), false);
+    await workspace.locator('#detail-panel [data-action="cancel-edit"]').click();
+    const startBounds = await workspace.locator('#detail-panel [data-action="activate"]').boundingBox();
+    const detailBounds = await workspace.locator('#detail-panel').boundingBox();
+    assert.ok(startBounds && startBounds.y < detailBounds.y + 180, 'work start is visible near the detail title');
+    await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-ux-detail.png') });
+    await workspace.evaluate(() => window.PetitAppShell.activateView('tasks'));
     await workspace.getByRole('button', { name: '同期競合を確認', exact: true }).click();
     await workspace.locator('.task-conflict-dialog').getByRole('button', { name: '作業中の星', exact: true }).click();
     await workspace.locator('.task-conflict-dialog table').waitFor();
     await workspace.waitForFunction(() => getComputedStyle(document.querySelector('.task-conflict-dialog')).opacity === '1');
+    assert.equal(await workspace.locator('.task-conflict-dialog h2').textContent(), '同期競合：作業中の星');
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-conflict.png') });
     await workspace.getByRole('button', { name: 'PETIT側を残して再同期', exact: true }).click();
     await workspace.getByText('PETIT側の変更を再同期します。まだNotionへの反映は完了していません。', { exact: true }).waitFor();
@@ -445,6 +490,46 @@ const server = http.createServer(async (request, response) => {
       const chartBounds = await workspace.locator('#stats-week-chart').boundingBox();
       assert.ok(chartBounds.x >= 0 && chartBounds.x + chartBounds.width <= await workspace.evaluate(() => innerWidth));
       await workspace.screenshot({ path: path.join(root, `desktop/dist/smoke-statistics-${suffix}.png`), fullPage: true });
+      await workspace.locator('.stats-week-column').nth(5).click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '30分');
+      assert.equal(await workspace.locator('#stats-date').inputValue(), '2026-10-12');
+      assert.equal(await workspace.locator('.stats-task-label strong').textContent(), '前日の仕上げ');
+      assert.equal(await workspace.locator('.stats-now').isVisible(), false);
+      await workspace.locator('#stats-reflection-note').fill('仕上げが進んだ <script>');
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => !document.getElementById('refresh-today').disabled);
+      assert.equal(await workspace.locator('#stats-reflection-note').inputValue(), '仕上げが進んだ <script>', 'polling preserves unsaved reflection');
+      await workspace.locator('#stats-go-today').click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分');
+      await workspace.locator('.stats-week-column').nth(5).click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '30分');
+      assert.equal(await workspace.locator('#stats-reflection-note').inputValue(), '仕上げが進んだ <script>', 'date switching preserves draft');
+      reflectionConflict = true;
+      await workspace.locator('#stats-reflection-save').click();
+      await workspace.waitForFunction(() => document.getElementById('stats-reflection-state').textContent.includes('入力はこの画面に残っています'));
+      assert.equal(await workspace.locator('#stats-reflection-note').inputValue(), '仕上げが進んだ <script>');
+      await workspace.locator('#refresh-today').click();
+      await workspace.waitForFunction(() => !document.getElementById('refresh-today').disabled);
+      assert.ok((await workspace.locator('#stats-reflection-state').textContent()).includes('入力はこの画面に残っています'), 'refresh does not hide save failures');
+      reflectionConflict = false;
+      await workspace.locator('#stats-reflection-save').click();
+      await workspace.waitForFunction(() => document.getElementById('stats-reflection-state').textContent === '振り返りを保存しました。');
+      await workspace.locator('#stats-go-today').click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分');
+      await workspace.locator('#stats-date').fill('2026-10-12');
+      await workspace.locator('#stats-date').dispatchEvent('change');
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '30分');
+      assert.equal(await workspace.locator('#stats-reflection-note').inputValue(), '仕上げが進んだ <script>');
+      await workspace.locator('#stats-go-today').click();
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分');
+      await workspace.evaluate(() => window.PetitAppShell.activateView('univ'));
+      await workspace.waitForFunction(() => !window.__fixtureScene.renderFrame);
+      assert.equal(await workspace.evaluate(() => scrollY), 0);
+      const hud = await workspace.locator('.univ-hud__selection').boundingBox();
+      const sessionBar = await workspace.locator('#petit-context-bar').boundingBox();
+      assert.ok(hud.y >= sessionBar.y + sessionBar.height, 'HUD clears session bar after statistics scrolling');
+      await workspace.evaluate(() => window.PetitAppShell.activateView('stats'));
+      await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分');
       statsFailure = 'summary';
       await workspace.locator('#refresh-today').click();
       await workspace.waitForFunction(() => document.getElementById('stats-week-state').textContent.includes('前回のグラフ'));
@@ -464,7 +549,7 @@ const server = http.createServer(async (request, response) => {
       await workspace.waitForFunction(() => document.getElementById('today-total').textContent === '2時間30分');
       await workspace.evaluate(() => window.PetitAppShell.activateView('tasks'));
       const beforeInactive = calls.filter(call => ['/api/work-sessions/today', '/api/work-sessions/summary'].includes(call.path)).length;
-      await workspace.waitForTimeout(200);
+      await workspace.waitForTimeout(suffix === 'desktop' ? 9000 : 200);
       assert.equal(calls.filter(call => ['/api/work-sessions/today', '/api/work-sessions/summary'].includes(call.path)).length, beforeInactive, 'statistics navigation does not fetch while another tab is visible');
     };
     await checkStatsViewport('desktop');
@@ -489,6 +574,10 @@ const server = http.createServer(async (request, response) => {
     await workspace.locator('#petit-context-bar > summary').click();
     await workspace.locator('#work-session-end').click();
     await workspace.waitForFunction(() => document.getElementById('petit-context-session').textContent === '作業なし');
+    assert.equal(await workspace.locator('#petit-work-details .focus-footer').isVisible(), false);
+    assert.equal(await workspace.locator('#petit-work-start-link').isVisible(), true);
+    await workspace.locator('#petit-work-start-link').click();
+    assert.ok(await workspace.locator('[data-view-panel="tasks"]').isVisible());
     await workspace.reload();
     await workspace.waitForFunction(() => document.getElementById('petit-context-session')?.textContent === '作業なし');
     await instance.evaluate(sizeWorkspace, originalSize);
@@ -529,7 +618,7 @@ const server = http.createServer(async (request, response) => {
     await recovered.waitForURL(`${origin}/static/desktop/index.html`);
     assert.equal(await recovered.locator('#input').inputValue(), 'クラッシュをまたぐ下書き');
     assert.deepEqual(errors, []);
-    console.log('PASS: isolated Electron statistics totals/7-day chart/task shares/JST/empty/partial failure, v27 session/dropdown/chat scrolling, actual WebGL work glow/middle pan, 960/390px layouts, rail, conflicts, notifications, chat/approval/voice, recovery and IPC isolation.');
+    console.log('PASS: isolated Electron task second-click/HUD/edit/start placement, calendar statistics/reflection save/draft/conflict, tab readiness after 9 seconds, responsive HUD/workbar, existing WebGL/chat/voice/recovery regressions.');
     console.log(`Screenshot: ${screenshot}`);
   } finally {
     if (instance) await instance.close();

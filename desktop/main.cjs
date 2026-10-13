@@ -207,7 +207,13 @@ function watchClient(win, kind) {
   win.webContents.on('did-fail-load', (_event, code, _description, _url, mainFrame) => {
     if (mainFrame && code !== -3) failed();
   });
-  win.webContents.on('did-start-loading', () => { win.petitReady = false; });
+  // Tab changes use replaceState and do not rerun the preload's ready handshake.
+  // Only a new main-frame document invalidates renderer readiness.
+  win.webContents.on('did-start-navigation', (details) => {
+    if (details.isMainFrame && !details.isSameDocument) {
+      clearTimeout(readyTimer); win.petitReady = false;
+    }
+  });
   win.webContents.on('did-finish-load', () => {
     clearTimeout(readyTimer); readyTimer = setTimeout(() => { if (!win.petitReady) failed(); }, 8000);
   });
