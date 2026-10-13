@@ -81,8 +81,10 @@ def sync() -> dict[str, Any]:
             if public_source == "timetree" and google_calendar_push.enabled():
                 try:
                     counts = google_calendar_push.sync_events(unique)
+                    db.record_sync_success("google_calendar_push", counts.get("created", 0) + counts.get("updated", 0))
                     google_push_result = {"ok": True, "source": "google_calendar_push", **counts, "error": None}
                 except Exception:
+                    db.record_sync_failure("google_calendar_push", "Google Calendarへの書込同期に失敗しました。OAuth設定・対象カレンダーのアクセス権を確認してください。")
                     google_push_result = {"ok": False, "source": "google_calendar_push", "created": 0,
                                           "updated": 0, "skipped": 0,
                                           "error": "Google Calendar への同期に失敗しました"}

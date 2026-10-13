@@ -68,6 +68,20 @@ class ConnectionStatusTests(unittest.TestCase):
         self.assertIsNone(service["last_sync_success_at"])
         self.assertEqual(probe.call_count, 1)
 
+    def test_configuration_change_invalidates_previous_connection_success(self):
+        with patch.object(connections, "_configured", return_value=True), patch.object(connections, "_probe"):
+            self.client.post("/api/connections/github/check")
+            self.assertEqual(self.service("github")["connection_status"], "connected")
+            with patch.object(connections.github_config, "TOKEN", "changed-private-token"):
+                service = self.service("github")
+                self.assertEqual(service["connection_status"], "unverified")
+                self.assertIsNone(service["last_connection_success_at"])
+                self.assertNotIn("changed-private-token", json.dumps(service))
+                with patch.object(connections, "_probe", side_effect=RuntimeError("failed")):
+                    result = self.client.post("/api/connections/github/check").json()
+                self.assertEqual(result["connection_status"], "error")
+                self.assertIsNone(result["last_connection_success_at"])
+
     def test_http_error_redacts_body_and_isolated_from_other_services(self):
         response = httpx.Response(403, request=httpx.Request("GET", "https://example.org?token=secret"), text="super-secret")
         exc = httpx.HTTPStatusError("super-secret", request=response.request, response=response)
@@ -139,6 +153,37 @@ class ConnectionStatusTests(unittest.TestCase):
                 self.assertEqual(self.client.post("/api/connections/github/check").status_code, 409)
         finally:
             connections._LOCKS["github"].release()
+
+    def test_inbox_failure_and_active_pull_are_visible(self):
+        from backend.notion_task_sync import store
+        store.ensure_schema()
+        with patch.object(config, "notion_configured", return_value=True):
+            with db.get_connection() as conn:
+                conn.execute("UPDATE notion_task_sync_state SET last_started_at=?", (db.now_iso(),))
+            self.assertEqual(self.service("notion")["sync_status"], "syncing")
+            store.enqueue_webhook_event({"id": "event1", "type": "page.created"})
+            store.finish_inbox("event1", "failed", error="HTTP 403 token=private-token")
+            service = self.service("notion")
+        self.assertEqual(service["sync_status"], "error")
+        self.assertIn("Webhook", service["error"])
+        self.assertNotIn("private-token", json.dumps(service))
+
+    def test_malformed_success_response_is_not_connected(self):
+        response = httpx.Response(200, json={"error": "private-token"}, request=httpx.Request("GET", "http://fixture"))
+        with patch("httpx.Client.get", return_value=response):
+            with self.assertRaises(ValueError):
+                connections._probe("lmstudio")
+
+    def test_google_oauth_configuration_and_probe_do_not_sync_or_refresh_tokens(self):
+        token_file = Path(self.tmp.name) / "oauth.json"
+        token_file.write_text('{"token":"private-token"}', encoding="utf-8")
+        response = httpx.Response(200, json={"id": "primary"}, request=httpx.Request("GET", "http://fixture"))
+        with patch.object(config, "CALENDAR_ICS_URLS", []), patch.object(connections.google_calendar_push, "enabled", return_value=True), patch.object(connections.google_calendar_push, "token_file", return_value=token_file), patch("httpx.Client.get", return_value=response) as get:
+            self.assertTrue(connections._configured("calendar"))
+            connections._probe("calendar")
+            self.assertEqual(get.call_count, 1)
+            self.assertEqual(token_file.read_text(), '{"token":"private-token"}')
+            self.assertNotIn("private-token", json.dumps(connections.snapshot()))
 
 
 if __name__ == "__main__":

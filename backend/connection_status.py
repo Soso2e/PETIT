@@ -1,18 +1,21 @@
 """On-demand connection diagnostics; opening the menu never contacts a provider."""
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import threading
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from fastapi import HTTPException
 
-from . import config, db, github_config, linkraft_config, task_sync_queue
+from . import config, db, github_config, google_calendar_push, linkraft_config, task_sync_queue
 
-NAMES = {"lmstudio": "LM Studio", "notion": "Notion", "calendar": "Google Calendar (ICS)",
+NAMES = {"lmstudio": "LM Studio", "notion": "Notion", "calendar": "Google Calendar",
          "github": "GitHub", "linkraft": "Linkraft", "aivis": "AivisSpeech", "brain": "BRAIN"}
 _LOCKS = {key: threading.Lock() for key in NAMES}
 
@@ -40,6 +43,25 @@ def _ensure_schema() -> None:
     with db.get_connection() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS connection_diagnostics (service TEXT PRIMARY KEY, "
                      "checked_at TEXT, last_success_at TEXT, last_failure_at TEXT, error TEXT, error_code TEXT)")
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(connection_diagnostics)")}
+        if "config_hash" not in columns:
+            conn.execute("ALTER TABLE connection_diagnostics ADD COLUMN config_hash TEXT")
+
+
+def _config_hash(service: str) -> str:
+    """Invalidate diagnostic cache after connection settings change; never expose this hash."""
+    token_path = google_calendar_push.token_file()
+    settings = {
+        "lmstudio": [config.LM_BASE_URL, config.LM_API_KEY],
+        "notion": [config.NOTION_API_KEY, config.NOTION_TASKS_DB_ID],
+        "calendar": [config.CALENDAR_ICS_URLS, google_calendar_push.enabled(), google_calendar_push.calendar_id(),
+                     str(token_path), token_path.stat().st_mtime_ns if token_path.is_file() else None],
+        "github": [github_config.API_URL, github_config.TOKEN],
+        "linkraft": [linkraft_config.BASE_URL, linkraft_config.READ_TOKEN],
+        "aivis": [config.TTS_PROVIDER, config.TTS_BASE_URL],
+        "brain": [str(path) for path in config.OBSIDIAN_VAULT_DIRS],
+    }
+    return hashlib.sha256(json.dumps(settings[service], sort_keys=True).encode()).hexdigest()
 
 
 def _old(at: str | None, ttl: float = 300) -> bool:
@@ -56,14 +78,14 @@ def _old(at: str | None, ttl: float = 300) -> bool:
 
 def _configured(service: str) -> bool:
     return {"lmstudio": lambda: bool(config.LM_BASE_URL), "notion": config.notion_configured,
-            "calendar": lambda: bool(config.CALENDAR_ICS_URLS), "github": github_config.configured,
+            "calendar": lambda: bool(config.CALENDAR_ICS_URLS or (google_calendar_push.enabled() and google_calendar_push.token_file().is_file())), "github": github_config.configured,
             "linkraft": linkraft_config.configured,
             "aivis": lambda: config.TTS_PROVIDER == "aivis" and bool(config.TTS_BASE_URL),
             "brain": lambda: bool(config.OBSIDIAN_VAULT_DIRS)}[service]()
 
 
 def _histories(service: str) -> list[dict[str, Any]]:
-    prefixes = {"notion": ("notion:tasks",), "calendar": ("google_ics:",),
+    prefixes = {"notion": ("notion:tasks",), "calendar": ("google_ics:", "google_calendar_push"),
                 "github": ("github:repo:",), "linkraft": ("linkraft:",)}
     states = [row for row in db.all_sync_states() if row["source"].startswith(prefixes.get(service, ("__none__",)))]
     if service == "notion":
@@ -106,14 +128,24 @@ def _service(service: str) -> dict[str, Any]:
     with db.get_connection() as conn:
         row = conn.execute("SELECT * FROM connection_diagnostics WHERE service=?", (service,)).fetchone()
     diag = dict(row or {})
+    if diag.get("config_hash") != _config_hash(service):
+        diag = {}
     success = max((s["last_success_at"] for s in histories if s.get("last_success_at")), default=None)
     failures = [s for s in histories if s.get("last_error")]
     failure = max(failures, key=lambda s: s.get("last_failure_at") or "", default={})
     error = failure.get("last_error")
     counts: dict[str, int] = {}
     operations = []
+    inbox_failed = 0
     if service == "notion":
         operations, counts = _notion_operations()
+        with db.get_connection() as conn:
+            inbox_failed = conn.execute("SELECT count(*) FROM notion_task_inbox WHERE status='failed'").fetchone()[0]
+            inbox = conn.execute("SELECT last_error, updated_at FROM notion_task_inbox WHERE status='failed' "
+                                 "ORDER BY updated_at DESC LIMIT 1").fetchone()
+        if inbox:
+            failure = dict(inbox)
+            error = "Webhook受信処理：" + str(inbox["last_error"] or "処理に失敗しました。")
         failed = [o for o in operations if o.get("last_error")]
         if failed:
             failure = max(failed, key=lambda o: o["updated_at"] or "")
@@ -122,6 +154,12 @@ def _service(service: str) -> dict[str, Any]:
                   else "error" if diag.get("error") else "stale" if _old(diag["checked_at"]) else "connected")
     syncing = counts.get("pending", 0) + counts.get("processing", 0)
     ttl = config.NOTION_TASK_PULL_INTERVAL_SECONDS * 2 if service == "notion" else 300
+    if service == "notion":
+        pull = histories[-1]
+        started = pull.get("last_started_at")
+        finished = max(filter(None, [pull.get("last_success_at"), pull.get("last_failure_at")]), default="")
+        if started and started > finished and not _old(started, ttl):
+            syncing += 1
     sync = ("unconfigured" if not configured else "conflict" if counts.get("conflict") else "error" if error
             else "syncing" if syncing else "unverified" if not success
             else "stale" if _old(success, ttl) else "healthy") if service in {"notion", "calendar", "github", "linkraft"} else None
@@ -130,9 +168,13 @@ def _service(service: str) -> dict[str, Any]:
             "last_connection_success_at": diag.get("last_success_at"), "checked_at": diag.get("checked_at"),
             "last_sync_success_at": success, "last_error_at": max(filter(None, [diag.get("last_failure_at"), failure.get("last_failure_at") or failure.get("updated_at")]), default=None),
             "error": safe_text(error or diag.get("error")), "error_code": _code(error) or diag.get("error_code"),
+            "cache_status": "unverified" if not success else "stale" if error or _old(success, ttl) else "healthy",
             "failed_count": counts.get("failed", 0) or len(failures), "conflict_count": counts.get("conflict", 0),
+            "inbox_failed_count": inbox_failed,
             "operations": operations, "can_check": configured,
-            "note": "接続確認は同期を実行しません。履歴のない時刻は未記録です。"}
+            "note": ("ICS読取と有効なOAuth連携を確認します。ICSのHEAD非対応やOAuth期限切れは再設定が必要です。" if service == "calendar" else
+                     "BRAINのVaultフォルダと検索索引へのアクセスを確認します。索引更新は実行しません。" if service == "brain" else
+                     "接続確認は同期を実行しません。履歴のない時刻は未記録です。")}
 
 
 def snapshot() -> dict[str, Any]:
@@ -148,7 +190,7 @@ def snapshot() -> dict[str, Any]:
 
 
 def _probe(service: str) -> None:
-    """One bounded read request; never run an integration sync or a task write."""
+    """Bounded read requests; never run an integration sync or a task write."""
     if service == "brain":
         if not all(path.is_dir() for path in config.OBSIDIAN_VAULT_DIRS):
             raise ValueError("BRAINの保存フォルダが見つかりません。Vault設定を確認してください。")
@@ -183,6 +225,17 @@ def _probe(service: str) -> None:
             with httpx.Client(timeout=5, follow_redirects=True) as client:
                 response = client.head(url)
                 response.raise_for_status()
+        if google_calendar_push.enabled():
+            credentials = json.loads(google_calendar_push.token_file().read_text(encoding="utf-8"))
+            token = credentials.get("token")
+            if not token:
+                raise ValueError("Google Calendar OAuthを再設定してください。")
+            url = "https://www.googleapis.com/calendar/v3/calendars/" + quote(google_calendar_push.calendar_id(), safe="")
+            with httpx.Client(timeout=5) as client:
+                response = client.get(url, headers={"Authorization": f"Bearer {token}"})
+                response.raise_for_status()
+                if not isinstance(response.json(), dict) or not response.json().get("id"):
+                    raise ValueError("Google Calendar APIの応答が不正です。")
         return
     with httpx.Client(timeout=5) as client:
         response = client.get(url, headers=headers)
@@ -207,8 +260,9 @@ def check(service: str) -> dict[str, Any]:
     try:
         _ensure_schema()
         with db.get_connection() as conn:
-            previous = conn.execute("SELECT checked_at FROM connection_diagnostics WHERE service=?", (service,)).fetchone()
-        if previous and not _old(previous["checked_at"], 10):
+            previous = conn.execute("SELECT checked_at, config_hash FROM connection_diagnostics WHERE service=?", (service,)).fetchone()
+        fingerprint = _config_hash(service)
+        if previous and previous["config_hash"] == fingerprint and not _old(previous["checked_at"], 10):
             return _service(service)
         error = code = None
         try:
@@ -223,12 +277,14 @@ def check(service: str) -> dict[str, Any]:
             code, error = "invalid_response", "接続確認に失敗しました。応答形式または保存フォルダのアクセス権を確認してください。"
         now = db.now_iso()
         with db.get_connection() as conn:
-            conn.execute("INSERT INTO connection_diagnostics(service, checked_at, last_success_at, last_failure_at, error, error_code) "
-                         "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(service) DO UPDATE SET checked_at=excluded.checked_at, "
-                         "last_success_at=COALESCE(excluded.last_success_at, connection_diagnostics.last_success_at), "
-                         "last_failure_at=COALESCE(excluded.last_failure_at, connection_diagnostics.last_failure_at), "
+            conn.execute("INSERT INTO connection_diagnostics(service, checked_at, last_success_at, last_failure_at, error, error_code, config_hash) "
+                         "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(service) DO UPDATE SET checked_at=excluded.checked_at, config_hash=excluded.config_hash, "
+                         "last_success_at=CASE WHEN connection_diagnostics.config_hash=excluded.config_hash "
+                         "THEN COALESCE(excluded.last_success_at, connection_diagnostics.last_success_at) ELSE excluded.last_success_at END, "
+                         "last_failure_at=CASE WHEN connection_diagnostics.config_hash=excluded.config_hash "
+                         "THEN COALESCE(excluded.last_failure_at, connection_diagnostics.last_failure_at) ELSE excluded.last_failure_at END, "
                          "error=excluded.error, error_code=excluded.error_code",
-                         (service, now, None if error else now, now if error else None, error, code))
+                         (service, now, None if error else now, now if error else None, error, code, fingerprint))
         return _service(service)
     finally:
         _LOCKS[service].release()
