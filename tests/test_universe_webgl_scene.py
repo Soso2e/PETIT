@@ -178,6 +178,16 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn('THREE_CDN_PREFIX = "/three@0.185.1"', source)
         self.assertIn("isThreeModule", source)
 
+    def test_star_field_renders_circular_galaxy_particles_without_heavy_textures(self) -> None:
+        """WebGLの星フィールドがテクスチャ負荷をかけずに円形ライトの銀河パーティクルを構築していることを検証する。"""
+        source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        self.assertIn("createStarField", source)
+        self.assertIn("PETIT_Star_Field", source)
+        self.assertIn("gl_PointCoord", source)
+        self.assertIn("if (dist > 0.5) discard;", source)
+        self.assertIn("THREE.AdditiveBlending", source)
+
 
 if __name__ == "__main__":
     unittest.main()
+

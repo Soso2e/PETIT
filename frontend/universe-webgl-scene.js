@@ -215,33 +215,147 @@
   })();
 
   const createStarField = () => {
-    const count = window.matchMedia("(max-width: 640px)").matches ? 420 : 900;
+    const isMobile = window.matchMedia("(max-width: 640px)").matches;
+    const count = isMobile ? 1300 : 2600;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
+
+    // Galaxy plane tilt angles (subtle rotation to create a 3D traversing band across the sky)
+    const tiltX = 0.36;
+    const tiltZ = 0.22;
+    const cosX = Math.cos(tiltX);
+    const sinX = Math.sin(tiltX);
+    const cosZ = Math.cos(tiltZ);
+    const sinZ = Math.sin(tiltZ);
+
+    const spiralCount = Math.floor(count * 0.60);
+    const bulgeCount = Math.floor(count * 0.22);
+
     for (let index = 0; index < count; index += 1) {
-      const radius = 62 + seededRandom() * 92;
-      const theta = seededRandom() * Math.PI * 2;
-      const phi = Math.acos((seededRandom() * 2) - 1);
-      positions[index * 3] = radius * Math.sin(phi) * Math.cos(theta);
-      positions[index * 3 + 1] = radius * Math.cos(phi);
-      positions[index * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
-      const brightness = 0.55 + seededRandom() * 0.45;
-      colors[index * 3] = brightness * 0.82;
-      colors[index * 3 + 1] = brightness * 0.88;
-      colors[index * 3 + 2] = brightness;
+      let x0 = 0;
+      let y0 = 0;
+      let z0 = 0;
+      let rCol = 1.0;
+      let gCol = 1.0;
+      let bCol = 1.0;
+      let brightness = 0.6 + seededRandom() * 0.4;
+
+      if (index < spiralCount) {
+        // Spiral arms & galactic disk
+        const arm = index % 2;
+        const radius = 20 + Math.pow(seededRandom(), 1.15) * 115;
+        const twist = 0.042;
+        const baseAngle = arm * Math.PI + radius * twist;
+        const jitter = (seededRandom() + seededRandom() - 1.0) * (0.28 + radius * 0.003);
+        const theta = baseAngle + jitter;
+
+        x0 = radius * Math.cos(theta);
+        z0 = radius * Math.sin(theta);
+        y0 = (seededRandom() + seededRandom() - 1.0) * (2.4 + radius * 0.038);
+
+        // Color palette based on distance: core is warm gold/white, arms have young blue/cyan/purple stars
+        const t = clamp((radius - 20) / 100, 0, 1);
+        const colorVariant = seededRandom();
+        if (t < 0.25) {
+          // Warm core transition
+          rCol = 1.0;
+          gCol = 0.90 + seededRandom() * 0.08;
+          bCol = 0.78 + seededRandom() * 0.18;
+        } else if (colorVariant < 0.38) {
+          // Cyan / ice blue
+          rCol = 0.58;
+          gCol = 0.82;
+          bCol = 1.0;
+        } else if (colorVariant < 0.68) {
+          // Deep sapphire / blue-white
+          rCol = 0.72;
+          gCol = 0.82;
+          bCol = 1.0;
+        } else if (colorVariant < 0.85) {
+          // Soft violet / magenta hints in nebulae
+          rCol = 0.86;
+          gCol = 0.72;
+          bCol = 1.0;
+        } else {
+          // Brilliant white
+          rCol = 0.98;
+          gCol = 0.98;
+          bCol = 1.0;
+        }
+      } else if (index < spiralCount + bulgeCount) {
+        // Galactic bulge / central core cluster
+        const radius = 10 + Math.pow(seededRandom(), 1.8) * 44;
+        const theta = seededRandom() * Math.PI * 2;
+        const phi = Math.acos((seededRandom() * 2) - 1);
+
+        x0 = radius * Math.sin(phi) * Math.cos(theta);
+        y0 = radius * Math.cos(phi) * 0.62;
+        z0 = radius * Math.sin(phi) * Math.sin(theta);
+
+        // Golden warm white bulge stars
+        brightness = 0.75 + seededRandom() * 0.35;
+        rCol = 1.0;
+        gCol = 0.92 + seededRandom() * 0.08;
+        bCol = 0.80 + seededRandom() * 0.15;
+      } else {
+        // Outer spherical halo stars
+        const radius = 65 + seededRandom() * 95;
+        const theta = seededRandom() * Math.PI * 2;
+        const phi = Math.acos((seededRandom() * 2) - 1);
+
+        x0 = radius * Math.sin(phi) * Math.cos(theta);
+        y0 = radius * Math.cos(phi);
+        z0 = radius * Math.sin(phi) * Math.sin(theta);
+
+        brightness = 0.45 + seededRandom() * 0.45;
+        rCol = 0.76;
+        gCol = 0.84;
+        bCol = 1.0;
+      }
+
+      // Apply galactic plane tilt
+      const x1 = x0 * cosZ - y0 * sinZ;
+      const y1 = x0 * sinZ + y0 * cosZ;
+      const finalX = x1;
+      const finalY = y1 * cosX - z0 * sinX;
+      const finalZ = y1 * sinX + z0 * cosX;
+
+      positions[index * 3] = finalX;
+      positions[index * 3 + 1] = finalY;
+      positions[index * 3 + 2] = finalZ;
+
+      colors[index * 3] = rCol * brightness;
+      colors[index * 3 + 1] = gCol * brightness;
+      colors[index * 3 + 2] = bCol * brightness;
     }
+
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+    // Circular soft light particle shader via onBeforeCompile (avoids textures and preserves low draw call)
     const material = new THREE.PointsMaterial({
-      size: 0.24,
+      size: 0.85,
       sizeAttenuation: true,
       transparent: true,
-      opacity: 0.76,
+      opacity: 0.85,
       vertexColors: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
+    material.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <clipping_planes_fragment>",
+        `#include <clipping_planes_fragment>
+        vec2 coord = gl_PointCoord - vec2(0.5);
+        float dist = length(coord);
+        if (dist > 0.5) discard;
+        float soft = clamp(1.0 - dist * 2.0, 0.0, 1.0);
+        float glow = pow(soft, 1.8);
+        gl_FragColor.a *= glow;`
+      );
+    };
+
     const stars = new THREE.Points(geometry, material);
     stars.name = "PETIT_Star_Field";
     state.scene.add(stars);
