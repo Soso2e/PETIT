@@ -18,7 +18,7 @@
 
 - #315 / Fix/v26（未公開）: Windows更新のサイズ/SHA-256検証・進捗、作業星の強調、IME/Enter長押し/入力復元、Notion競合の差分比較と明示採用、VAPID不要のDesktop通知・ホバーで残る声かけを実装。画面切替後のWorkspace IPC拒否も修正。Desktop 60件成功・macOS限定1件skip、Frontend 17件、Python関連53件成功。Windows x64 NSIS生成・新しい同梱resource確認済み（未署名）。プロジェクトvenvへ不足していたpywebpushを導入し、稼働中APIの依存利用可能とpip checkを確認。実Notionの親404は未解消、実Push/OS通知受信・旧配布版からの更新・実音声・3D発光の実機受入は未確認。通知の音声割込み・25分間隔は後続設計。詳細は `docs/desktop-v26-experience.md`。Push/PR/Releaseは未実施。
 
-- 同期競合（2026-10-12）: 対象1件のPETIT側親子関係を残す方針でNotion更新を実行したが、親ページへのアクセスが404（連携 `nocord`）となり未解消。子ページの取得は成功、親ページ単独取得も404。ローカル親子関係と競合状態を保持。次はNotionで親ページの存在・ゴミ箱・連携共有を確認してから再反映する。更新前DBバックアップを作成済み。
+- 同期競合（2026-10-12 / 解消 2026-10-13）: 親ページ「音楽活動」のNotion 404に対し、NotionタスクDBへ「音楽活動」を新規再作成して新external_idを発行。子タスク「あなたといたい」の親RelationをNotionへ正常同期。誤ステータス"Mid"で400エラーとなっていた「dotsテスト」もstatus='Yet'へ修正・同期完了し、未解消の同期エラーは全件解消。更新前DBバックアップを作成済み。
 
 - #311 / v0.25.5: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。手動Actionsもタグrefではdevelopment用DMGを重複生成しないよう分岐。未公証DMGはGatekeeperで通常起動が拒否され得るため、v0.25.4タグのWindows npm testはCRLF改行を固定LFで検査する回帰テスト2件が原因で失敗（Mac DMGビルド成功）。v0.25.5でテストの改行正規化とCRLF回帰を追加。VERSION更新とマージメッセージ`[desktop-release]`の組合せでのみタグ作成・リリースを起動するオプトイン導線も追加（手動実行は維持）。v0.25.5のWindows/macOS Release assetをAPIで確認（2026-10-13）。実機受入・更新通知は未完了。
 
