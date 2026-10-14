@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.29.0**
+**Current Version: v0.30.0**
 
-**Last Updated: 2026-10-13**
+**Last Updated: 2026-10-14**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- PR #331 / v0.30.0（CI確認中・実機受入未確認）: Univ Three.js遠景星を恒星色・大小表現へ変更し、WebGLと旧CSSカメラのポインター干渉を抑制。通知センターをSettingsからRemindersへ移動し回帰テストを追加。最終コミットの星点サイズ10は実画面/スマホで視認性・負荷の確認が必要。Desktop通知のPR #330、TimeTree検索のPR #326は別途統合・検証対象。
 
 - #327 / feat/v29: 接続ステータスを上部同期表示・Settings・PCサイドバーへ追加。保存済み診断と同期履歴を表示し、接続確認だけを明示実行する。Notion対象別の再試行・既存競合UIを共用し、ライブ同期hookと競合採用の共有トランザクション不整合も修正。Backend関連53件・UI関連63件/31サブテスト・Frontend17件・Desktop62件成功。隔離Braveで1440/390/320pxと実UniverseのSettings/サイドバー導線、単一再試行・競合採用・部分障害・フォーカス復元を確認。実サービスの再試行/採用・実iPhone/PWA/配布Desktopは未確認。Push/PR/main反映は未実施。詳細は `docs/connection-status.md`。
 
