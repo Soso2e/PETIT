@@ -3,7 +3,10 @@
 (() => {
   const isUniverse = Boolean(document.querySelector(".universe-shell"));
   const toggleButton = document.getElementById("notification-toggle");
-  const panel = document.getElementById("notification-panel") || document.querySelector("[data-view-panel=\"settings\"]");
+  const panel = document.getElementById("notification-panel")
+    || document.querySelector(".settings-card--notifications")
+    || document.querySelector("[data-view-panel=\"reminders\"]")
+    || document.querySelector("[data-view-panel=\"settings\"]");
   const state = document.getElementById("notification-state");
   const enableButton = document.getElementById("notification-enable");
   const testButton = document.getElementById("notification-test");
@@ -575,7 +578,7 @@
     const params = new URLSearchParams(window.location.search);
     const notificationId = params.get("notification");
     if (isUniverse && (notificationId || params.get("view") === "notifications")) {
-      window.dispatchEvent(new CustomEvent("petit:navigate", { detail: { view: "settings" } }));
+      window.dispatchEvent(new CustomEvent("petit:navigate", { detail: { view: "reminders" } }));
     }
     if (notificationId && /^\d+$/.test(notificationId)) {
       await patchEvent(Number(notificationId), { read: true }).catch(() => undefined);
@@ -588,5 +591,11 @@
   }).catch((error) => {
     setState(`通知状態を取得できませんでした: ${error.message}`, true);
     renderStatus();
+  });
+
+  window.addEventListener("petit:navigate", (event) => {
+    if (event.detail?.view === "reminders") {
+      loadEvents().catch(() => undefined);
+    }
   });
 })();

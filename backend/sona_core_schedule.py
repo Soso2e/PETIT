@@ -74,7 +74,10 @@ class PetitGetScheduleAdapter:
         description="PETITの指定日の予定を読み取り専用で取得する。",
         input_schema={
             "type": "object",
-            "properties": {"date": {"type": "string", "description": "対象日 YYYY-MM-DD。省略可。"}},
+            "properties": {
+                "date": {"type": "string", "description": "対象日 YYYY-MM-DD。省略可。"},
+                "query": {"type": "string", "description": "予定名・説明・場所を検索する語。省略可。"},
+            },
         },
         output_schema={"type": "object"},
         version="1",
@@ -94,7 +97,13 @@ class PetitGetScheduleAdapter:
             date_value = invocation.call.arguments.get("date")
             if date_value is not None and not isinstance(date_value, str):
                 raise ValueError("date must be a string")
-            data = self._legacy_get_schedule(date=date_value)
+            query_value = invocation.call.arguments.get("query")
+            if query_value is not None and not isinstance(query_value, str):
+                raise ValueError("query must be a string")
+            arguments = {"date": date_value}
+            if query_value is not None:
+                arguments["query"] = query_value
+            data = self._legacy_get_schedule(**arguments)
         except Exception as exc:  # noqa: BLE001 - convert adapter failures to a Core result
             return ToolResult(
                 tool_call_id=invocation.call.tool_call_id,

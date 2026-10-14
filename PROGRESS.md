@@ -1,12 +1,16 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.29.1**
+**Current Version: v0.30.2**
 
 **Last Updated: 2026-10-14**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #329: OS通知音を明示ONにする設定と通知テストの要求/表示イベント/失敗の区別を追加。Web権限は変更せず、Desktop独立経路を継続。Desktop単体65件、Backend関連17件、隔離Electron通知専用smoke、Mac開発DMG生成/署名整合/同梱検証成功。全体smokeは音声/統計/入力で失敗し未完了。生成物は利用者依頼で削除。使用中Mac版のバージョン/OS許可/Focus/実音/実受信は未確認。詳細は `docs/desktop-notification-diagnostics.md`。
+- #329 / PR #330 / v0.30.2（配布・OS通知実機未確認）: Desktop OS通知音の明示ON（既定無音）と、通知表示要求/show/failed診断を追加。Native通知の寿命保持・既存Web PushとDesktop権限の分離を維持。CI全テストは成功、Desktop関連の単体65件・Backend通知関連17件成功、隔離通知専用smoke成功。一方、全体smokeには音声確認ボタン・統計画面のtimeoutと入力文字列不一致による失敗が残るため、全体E2E成功とは扱わない。Mac/WindowsのOS通知受信・実音・Focus・正式配布DMGインストールは未確認。診断は `docs/desktop-notification-diagnostics.md`。
+
+- #325 / PR #326 / v0.30.1（実TimeTree未確認）: Context Brokerから予定検索queryを渡し、TimeTree予定キャッシュの題名・説明・場所を検索。CAPCOM/カプコン別名、未来優先・無条件全履歴検索の抑止を追加。関連CI通過後にmain反映。実TimeTree・実LLM会話と非公開Sona CoreのE2Eは未確認。
+
+- PR #331 / v0.30.0（CI確認中・実機受入未確認）: Univ Three.js遠景星を恒星色・大小表現へ変更し、WebGLと旧CSSカメラのポインター干渉を抑制。通知センターをSettingsからRemindersへ移動し回帰テストを追加。最終コミットの星点サイズ10は実画面/スマホで視認性・負荷の確認が必要。Desktop通知のPR #330、TimeTree検索のPR #326は別途統合・検証対象。
 
 - #327 / feat/v29: 接続ステータスを上部同期表示・Settings・PCサイドバーへ追加。保存済み診断と同期履歴を表示し、接続確認だけを明示実行する。Notion対象別の再試行・既存競合UIを共用し、ライブ同期hookと競合採用の共有トランザクション不整合も修正。Backend関連53件・UI関連63件/31サブテスト・Frontend17件・Desktop62件成功。隔離Braveで1440/390/320pxと実UniverseのSettings/サイドバー導線、単一再試行・競合採用・部分障害・フォーカス復元を確認。実サービスの再試行/採用・実iPhone/PWA/配布Desktopは未確認。Push/PR/main反映は未実施。詳細は `docs/connection-status.md`。
 
@@ -252,5 +256,3 @@
 | 2026-10-13 | 04:45 | #321 | v0.28.0: 選択/HUD・詳細の開始/編集・期限/競合/音声説明を改善し、日別統計とrevision付き振り返り保存を追加。Desktop同一文書切替のready誤解除も修正。関連158件と隔離Electron、実Web読取で確認。実データの変更・配布版/実端末受入は未実施。 |
 
 | 2026-10-13 | 11:49 | #327 | v0.29.0: 保存済みの接続・同期診断メニューと明示接続確認、Notion失敗対象/再試行/競合導線を追加。秘密情報の伏せ字と部分障害を検証し、競合採用のsnapshot/監査を同一トランザクションへ修正。実サービス・実端末受入は未確認。 |
-
-| 2026-10-14 | 10:55 | #329 | v0.29.1: Desktop OS通知音の明示設定と表示イベント/失敗の診断を追加。古いDesktopと現行Webの組合せ・Mac OS権限/Focus/署名の切り分けを記録。実端末受入は未確認。 |
