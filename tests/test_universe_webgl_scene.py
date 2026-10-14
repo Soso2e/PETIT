@@ -187,6 +187,14 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn("if (dist > 0.5) discard;", source)
         self.assertIn("THREE.AdditiveBlending", source)
 
+    def test_pointer_release_bubbles_to_orbit_controls_and_css_space_is_guarded(self) -> None:
+        """pointerupがOrbitControlsのドラッグ解除のためにdocumentへ伝播し、WebGL稼働時にCSSカメラが干渉しないことを検証する。"""
+        scene_source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        space_source = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
+
+        self.assertIn('input.addEventListener("pointerup", (event) => {\n      const start = state.pointerDown;', scene_source)
+        self.assertIn('if (document.body.classList.contains("petit-univ-webgl-ready")', space_source)
+
 
 if __name__ == "__main__":
     unittest.main()

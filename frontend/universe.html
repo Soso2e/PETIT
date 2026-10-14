@@ -195,9 +195,48 @@
       </section>
 
       <section class="view" data-view-panel="reminders" hidden>
-        <div class="section-head reminder-section-head"><div><span class="eyebrow">REMINDERS</span><h1>忘れないための約束</h1><p>Chatで登録したリマインダーを確認し、完了・延期・取消できます。</p></div><div class="reminder-toolbar"><div class="reminder-filters" role="group" aria-label="リマインダー表示切り替え"><button class="reminder-filter is-active" type="button" data-reminder-filter="upcoming">未完了</button><button class="reminder-filter" type="button" data-reminder-filter="history">履歴</button><button class="reminder-filter" type="button" data-reminder-filter="all">すべて</button></div><button id="refresh-reminders" class="reminder-refresh" type="button">更新</button></div></div>
-        <div class="reminder-summary-line"><span id="reminder-count">0件</span><span id="reminder-status" class="reminder-status" aria-live="polite">読み込み中</span></div>
-        <div id="reminder-list" class="reminder-list" aria-live="polite"></div>
+        <div class="reminders-grid">
+          <div class="reminders-column">
+            <div class="section-head reminder-section-head">
+              <div>
+                <span class="eyebrow">REMINDERS</span>
+                <h1>忘れないための約束</h1>
+                <p>Chatで登録したリマインダーを確認し、完了・延期・取消できます。</p>
+              </div>
+              <div class="reminder-toolbar">
+                <div class="reminder-filters" role="group" aria-label="リマインダー表示切り替え">
+                  <button class="reminder-filter is-active" type="button" data-reminder-filter="upcoming">未完了</button>
+                  <button class="reminder-filter" type="button" data-reminder-filter="history">履歴</button>
+                  <button class="reminder-filter" type="button" data-reminder-filter="all">すべて</button>
+                </div>
+                <button id="refresh-reminders" class="reminder-refresh" type="button">更新</button>
+              </div>
+            </div>
+            <div class="reminder-summary-line"><span id="reminder-count">0件</span><span id="reminder-status" class="reminder-status" aria-live="polite">読み込み中</span></div>
+            <div id="reminder-list" class="reminder-list" aria-live="polite"></div>
+          </div>
+
+          <div class="notifications-column">
+            <section class="settings-card settings-card--notifications" aria-labelledby="notification-center-title">
+              <div class="settings-card__head">
+                <div>
+                  <h3 id="notification-center-title">通知センター</h3>
+                  <p>未解決の通知や、PETITからの確認をここで確認します。</p>
+                </div>
+                <span id="notification-unread" class="notification-panel__badge">未読なし</span>
+              </div>
+              <div class="notification-inbox" aria-live="polite">
+                <div class="notification-filters" role="group" aria-label="通知の表示切り替え">
+                  <button type="button" class="notification-filter notification-filter--active" data-notification-state="open">未解決</button>
+                  <button type="button" class="notification-filter" data-notification-state="resolved">解決済み</button>
+                  <button id="notification-refresh" type="button" class="notification-panel__refresh">更新</button>
+                </div>
+                <p id="notification-empty" class="notification-empty">通知はまだありません。</p>
+                <div id="notification-list" class="notification-list"></div>
+              </div>
+            </section>
+          </div>
+        </div>
       </section>
 
       <section class="view" data-view-panel="chat" hidden>
@@ -263,24 +302,6 @@
             </div>
           </section>
 
-          <section class="settings-card settings-card--notifications" aria-labelledby="notification-center-title">
-            <div class="settings-card__head">
-              <div>
-                <h3 id="notification-center-title">通知センター</h3>
-                <p>未解決の通知や、PETITからの確認をここで確認します。</p>
-              </div>
-              <span id="notification-unread" class="notification-panel__badge">未読なし</span>
-            </div>
-            <div class="notification-inbox" aria-live="polite">
-              <div class="notification-filters" role="group" aria-label="通知の表示切り替え">
-                <button type="button" class="notification-filter notification-filter--active" data-notification-state="open">未解決</button>
-                <button type="button" class="notification-filter" data-notification-state="resolved">解決済み</button>
-                <button id="notification-refresh" type="button" class="notification-panel__refresh">更新</button>
-              </div>
-              <p id="notification-empty" class="notification-empty">通知はまだありません。</p>
-              <div id="notification-list" class="notification-list"></div>
-            </div>
-          </section>
 
           <section class="settings-card">
             <div class="settings-card__head">
