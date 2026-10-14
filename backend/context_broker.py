@@ -58,6 +58,12 @@ def _dispatch(source: str, need: dict[str, Any]) -> dict[str, Any]:
         name, arguments = "get_tasks", {"limit": 40}
     elif source == "calendar":
         name, arguments = "get_schedule", {"date": _resolve_date(need)}
+        query = str(need.get("query") or "").strip()
+        if query:
+            arguments["query"] = query
+        elif not arguments["date"]:
+            # Without a filter, 20 earliest events look like failed keyword search.
+            return {"error": "date_or_query_required"}
     elif source in {"memory", "brain"}:
         query = need.get("query", "").strip()
         if not query:
@@ -158,7 +164,7 @@ def _normalize_source(source: str, need: dict[str, Any], result: dict[str, Any])
         if isinstance(provider, dict):
             incomplete |= bool(provider.get("error") or provider.get("ok") is False)
             stale |= bool(provider.get("stale"))
-    known_error = error if error in {"query_required", "invalid_tool_result", "timeout", "source_busy", "read_boundary_violation"} else None
+    known_error = error if error in {"query_required", "date_or_query_required", "invalid_tool_result", "timeout", "source_busy", "read_boundary_violation"} else None
     freshness = {key: sync[key] for key in ("last_synced_at", "last_success_at", "cached")
                  if isinstance(sync.get(key), (str, bool))}
     freshness["status"] = "historical" if source in {"memory", "brain", "handoff"} else (

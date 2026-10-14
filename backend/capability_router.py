@@ -70,6 +70,7 @@ _ROUTER_SYSTEM_PROMPT = CORE_SYSTEM_PROMPT + """
 request_contextではTool名を選ばず、必要な情報の種類だけを最大4件指定してください。
 source: tasks=タスク、calendar=予定、memory=関連記憶・過去会話、brain=BRAINノート、work=現在/今日の作業、reminders=未完了リマインダー、handoff=再開メモ。
 memory/brainには検索queryが必須。handoffのqueryには特定した作業名を指定し、省略時は全作業の直近メモです。
+calendarで「カプコン/CAPCOMの予定は？」「MTGを探して」のように名前で探す場合は、calendar needのqueryに予定名の短い検索語を必ず指定してください。日付が不明ならdateは省略してqueryで探します。「今日/明日」はdateまたはscopeを指定します。日付も検索語も省略すると検索できません。
 「何から再開する？」「忘れてない？」等は文脈に応じてwork/handoff/tasks/calendar/remindersから必要なものを組み合わせます。
 現在の作業を無関係な別タスクで置き換えず、今やる1個を短く提案してください。
 """
@@ -92,7 +93,7 @@ _REQUEST_CONTEXT_SCHEMA: dict[str, Any] = {
                             "scope": {"type": "string", "description": "today/tomorrow等の必要範囲"},
                             "priority": {"type": "string", "enum": ["High", "Mid", "Low", "all"]},
                             "date": {"type": "string", "description": "必要ならYYYY-MM-DD"},
-                            "query": {"type": "string", "description": "memory/brainの検索語。handoffでは対象の作業名。最大500文字。"},
+                            "query": {"type": "string", "description": "memory/brainの検索語。calendarは予定名の検索語（例 CAPCOM）、handoffは対象の作業名。最大500文字。"},
                         },
                         "required": ["source"],
                         "additionalProperties": False,

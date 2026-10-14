@@ -21,6 +21,14 @@ on:
       - "backend/agent_state.py"
       - "backend/agent_progress.py"
       - "backend/capability_router.py"
+      - "backend/context_broker.py"
+      - "backend/tools/schedule.py"
+      - "backend/sona_core_schedule.py"
+      - "backend/calendar_sync.py"
+      - "tests/test_context_broker.py"
+      - "tests/test_calendar_keyword_search.py"
+      - "tests/test_sona_core_schedule.py"
+      - "tests/test_calendar_sync.py"
       - "backend/tools/agent_actions.py"
       - "backend/tools/__init__.py"
       - "backend/tools/registry.py"
@@ -72,6 +80,13 @@ jobs:
             tests.test_contextual_agent_runtime \
             tests.test_tool_risk_policy \
             tests.test_task_parent_confirmation_guard \
+            -v
+      # Sona Core adapter tests need the private Sona-Agent-Core dependency and run locally.
+      - name: Run calendar keyword regression tests
+        run: |
+          python -m unittest \
+            tests.test_calendar_keyword_search \
+            tests.test_calendar_sync \
             -v
       - name: Run related regression tests
         run: python -m unittest tests.test_generic_lists tests.test_task_conversation_flow tests.test_task_cancel_status -v

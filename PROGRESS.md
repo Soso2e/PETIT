@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.30.0**
+**Current Version: v0.30.1**
 
 **Last Updated: 2026-10-14**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #325 / PR #326 / v0.30.1（実TimeTree未確認）: Context Brokerから予定検索queryを渡し、TimeTree予定キャッシュの題名・説明・場所を検索。CAPCOM/カプコン別名、未来優先・無条件全履歴検索の抑止を追加。関連CI通過後にmain反映。実TimeTree・実LLM会話と非公開Sona CoreのE2Eは未確認。
 
 - PR #331 / v0.30.0（CI確認中・実機受入未確認）: Univ Three.js遠景星を恒星色・大小表現へ変更し、WebGLと旧CSSカメラのポインター干渉を抑制。通知センターをSettingsからRemindersへ移動し回帰テストを追加。最終コミットの星点サイズ10は実画面/スマホで視認性・負荷の確認が必要。Desktop通知のPR #330、TimeTree検索のPR #326は別途統合・検証対象。
 

@@ -156,5 +156,19 @@ class SonaCoreScheduleTests(unittest.TestCase):
         legacy.assert_not_called()
 
 
+    def test_core_forwards_keyword_query_to_legacy_schedule_reader(self) -> None:
+        reader = Mock(return_value={"count": 1, "events": [{
+            "source": "timetree", "title": "カプコン MTG",
+            "start_time": "2026-10-21T11:00:00+09:00",
+        }], "calendar_sync": {"ok": True}})
+        result = asyncio.run(sona_core_schedule.execute_get_schedule(
+            {"query": "CAPCOM"},
+            adapter=sona_core_schedule.PetitGetScheduleAdapter(reader),
+        ))
+        self.assertEqual(result.status, "success")
+        reader.assert_called_once_with(date=None, query="CAPCOM")
+        self.assertEqual(result.data["events"][0]["title"], "カプコン MTG")
+
+
 if __name__ == "__main__":
     unittest.main()
