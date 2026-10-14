@@ -27,7 +27,7 @@ Issue #315 / ブランチ `Fix/v26`（未公開）。新しい通知/競合API�
 - 画面のすみのカードはフォーカスを奪わず12秒で消える。ホバー中は残し、「PETITを開く」で作業画面へ戻る。
 - ロック/スリープ中は表示しない。初回ON時の過去通知、2分以上古い通知、既読/解決済み通知、OFFのカテゴリは表示しない。
 - Desktop Mainが15秒ごとに通知イベントを取得し、接続先ごとのcursorを端末へ保存する。小型画面を閉じても動作する。アプリ終了・Core停止・オフライン中は受信しない。
-- OS通知は音を鳴らさず、実際の表示はOS許可/集中モード/署名状態に依存する。通知テストは「表示要求」と表現し、受信成功を断定しない。
+- v0.26.0のOS通知は音を鳴らさず、実際の表示はOS許可/集中モード/署名状態に依存する。通知テストは「表示要求」と表現し、受信成功を断定しない。
 - カードを開いても通知を自動解決しない。全通知の履歴と対応は作業画面へ残す。現在は個別タスクへのDesktop deep linkではなく作業画面を開く。
 - 既存の作業継続確認は20分のまま。「25分たったよ」は次の設定可能なFocus intervalとして検討する。
 
@@ -49,3 +49,5 @@ Windows x64 NSISを生成し、新しい通知画面・Main modulesの同梱検�
 実機で残る確認: 旧配布版から新Releaseへのインストール更新、Windows/macOSのOS通知、長時間常駐・複数画面、実Notion採用・404復旧、実IMEの操作感、実LLM/STT/TTS。今回Release/Push/PRは行わない。
 
 参考: [Electron通知](https://www.electronjs.org/docs/latest/tutorial/notifications)、[Electron更新](https://www.electronjs.org/docs/latest/tutorial/updates)、[GitHub asset digest](https://docs.github.com/en/rest/releases/assets)。
+
+通知音の明示設定とMac切り分けは [Desktop通知診断](desktop-notification-diagnostics.md) を参照（v0.29.1）。

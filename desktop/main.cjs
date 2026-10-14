@@ -7,6 +7,8 @@ const { installerAsset, downloadVerified } = require('./update-download.cjs');
 const { pathToFileURL } = require('node:url');
 const { serviceUrl, isOverlay, isWorkspace, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
 const { windowState } = require('./window-state.cjs');
+const { nativeNotifications, deliveryMessage } = require('./native-notifications.cjs');
+const nativeDelivery = nativeNotifications({ Notification, open: () => showWorkspace() });
 const { notificationFeed } = require('./notification-feed.cjs');
 const { transcribe } = require('./transcribe.cjs');
 const { wakeError } = require('./wake-setup.cjs');
@@ -25,7 +27,7 @@ const settingsUrl = pathToFileURL(path.join(__dirname, 'setup.html')).href;
 const recoveryUrl = pathToFileURL(path.join(__dirname, 'recovery.html')).href;
 const defaults = { serverUrl: 'http://127.0.0.1:8000', sttUrl: '', sttModel: 'whisper-1',
   wakeEnabled: false, modelPath: '', backbonePath: '', wakePythonPath: '',
-  wakeThreshold: 0.45, login: false, updates: true, notifications: false, notificationMode: 'gentle' };
+  wakeThreshold: 0.45, login: false, updates: true, notifications: false, notificationMode: 'gentle', notificationSound: false };
 function persistConfig(next) {
   fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
   fs.renameSync(`${configFile}.tmp`, configFile);
@@ -51,6 +53,7 @@ function readConfig() {
       updates: raw.updates !== false,
       notifications: raw.notifications === true,
       notificationMode: raw.notificationMode === 'native' ? 'native' : 'gentle',
+      notificationSound: raw.notificationSound === true,
     };
     const hadLegacyWakeConfig = ['encryptedKey', 'keywordPath', 'wakeAuto', 'wakeRuntimePath'].some((key) => Object.hasOwn(raw, key));
     if (hadLegacyWakeConfig) persistConfig(value);
@@ -139,16 +142,13 @@ function showNudge(event) {
 function deliverDesktopNotification(event) {
   if (suspended || quitting) return;
   if (config.notificationMode === 'gentle') { showNudge(event); return; }
-  if (!Notification.isSupported()) throw new Error('OS通知を利用できません。「画面のすみに声かけ」を選んでください。');
-  const notification = new Notification({ title: String(event.title || 'PETIT').slice(0, 120), body: String(event.body || '').slice(0, 500), silent: true });
-  notification.on('click', () => showWorkspace());
-  notification.on('failed', () => { notificationError = 'OS通知を表示できません。OSの通知許可・集中モードを確認するか、画面の声かけを選んでください。'; });
-  notification.show();
+  return nativeDelivery.deliver(event, config.notificationSound);
 }
 function desktopNotificationStatus() {
   const supported = Notification.isSupported();
-  return { enabled: config.notifications, mode: config.notificationMode, supported,
-    error: notificationError || (config.notificationMode === 'native' && !supported ? 'OS通知を利用できません。Desktop設定で「画面のすみに声かけ」を選んでください。' : '') };
+  return { enabled: config.notifications, mode: config.notificationMode, sound: config.notificationSound, supported,
+    permission: 'unknown', delivery: nativeDelivery.read().delivery,
+    error: notificationError || nativeDelivery.read().error || (config.notificationMode === 'native' && !supported ? 'OS通知を利用できません。Desktop設定で「画面のすみに声かけ」を選んでください。' : '') };
 }
 async function pollNotifications() {
   if (!feed || suspended || quitting) return;
@@ -156,12 +156,12 @@ async function pollNotifications() {
   try {
     await feed.poll(origin, config.notifications, () => config.notifications && config.serverUrl === origin && !suspended && !quitting);
     if (notificationError.startsWith('通知の取得に失敗')) notificationError = '';
-  } catch { notificationError = '通知の取得に失敗しました。PETITサーバーの接続を確認してください。'; }
+  } catch { notificationError = nativeDelivery.read().error || (!Notification.isSupported() && config.notificationMode === 'native' ? 'OS通知を利用できません。画面の声かけを選んでください。' : '通知の取得に失敗しました。PETITサーバーの接続を確認してください。'); }
 }
 function setDesktopNotifications(enabled) {
   if (typeof enabled !== 'boolean') throw new Error('通知設定が不正です。');
   if (enabled && !config.notifications) delete cursors[config.serverUrl];
-  persistConfig({ ...config, notifications: enabled }); notificationError = '';
+  persistConfig({ ...config, notifications: enabled }); notificationError = ''; nativeDelivery.reset();
   if (!enabled) closeNudge(); else void pollNotifications();
   return desktopNotificationStatus();
 }
@@ -346,10 +346,11 @@ function installIpc() {
     const sender = kind === 'desktop' ? 'overlay' : kind;
     on(`${kind}:notifications-read`, sender, desktopNotificationStatus);
     on(`${kind}:notifications-enable`, sender, setDesktopNotifications);
-    on(`${kind}:notifications-test`, sender, () => {
+    on(`${kind}:notifications-test`, sender, async () => {
       notificationError = '';
-      deliverDesktopNotification({ title: 'PETIT 通知テスト', body: 'この形で声をかけます。届いたか確認してください。' });
-      return { message: 'テスト通知の表示を要求しました。画面・OSの通知設定で受信を確認してください。' };
+      if (suspended || quitting) throw new Error('ロック・スリープ・終了中は通知をテストできません。');
+      const result = await deliverDesktopNotification({ title: 'PETIT 通知テスト', body: 'この形で声をかけます。届いたか確認してください。' });
+      return { ...desktopNotificationStatus(), message: config.notificationMode === 'native' ? deliveryMessage(result) : '画面の声かけを要求しました。このモードは無音です。表示を確認してください。' };
     });
   }
   on('nudge:read', 'nudge', () => nudgeEvent);
@@ -426,6 +427,7 @@ function installIpc() {
       wakePythonPath: config.wakePythonPath || '',
       wakeEnabled: values.wakeEnabled === true, login: values.login === true, updates: values.updates === true,
       notifications: values.notifications === true, notificationMode: values.notificationMode === 'native' ? 'native' : 'gentle',
+      notificationSound: values.notificationSound === true,
       wakeThreshold: threshold };
     if (next.modelPath && (!path.isAbsolute(next.modelPath) || path.extname(next.modelPath).toLowerCase() !== '.onnx' || !fs.statSync(next.modelPath).isFile())) throw new Error('ONNXモデルを選択してください。');
     if (next.backbonePath && (!path.isAbsolute(next.backbonePath) || !fs.statSync(next.backbonePath).isDirectory())) throw new Error('特徴抽出モデルのフォルダを選択してください。');
@@ -434,7 +436,7 @@ function installIpc() {
     const changedServer = next.serverUrl !== config.serverUrl;
     if (next.notifications && (!config.notifications || changedServer)) delete cursors[next.serverUrl];
     persistConfig(next);
-    closeNudge(); notificationError = ''; void pollNotifications();
+    closeNudge(); notificationError = ''; nativeDelivery.reset(); void pollNotifications();
     stopWake(); cancelStt(); wakeFailed = false; lastWakeError = '';
     if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: config.login, args: ['--background'] });
     if (workspace && !workspace.isDestroyed() && changedServer) workspace.destroy();

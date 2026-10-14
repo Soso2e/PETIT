@@ -19,6 +19,8 @@
 <section><h2>作業を邪魔しない声かけ</h2>
 <label class="check"><input id="notifications" type="checkbox">Desktopで通知を受け取る</label>
 <label>通知の出し方<select id="notificationMode"><option value="gentle">画面のすみに声かけ</option><option value="native">OSの通知</option></select></label>
+<label class="check"><input id="notificationSound" type="checkbox">OS通知で音を鳴らす（OS側のサウンド許可も必要）</label>
+<p class="help">画面の声かけは無音です。OS通知はシステム設定 → 通知 → PETITで通知とサウンドを許可し、集中モードの許可対象も確認してください。Web側の通知許可とは独立しています。</p>
 <p class="help">VAPID・pywebpushの設定は不要です。アプリとPETITサーバーの起動中、15秒ごとに新しい通知を確認します。通知の種類は作業画面のSettingsでONにしてください。声かけは入力フォーカスを奪わず12秒で閉じ、ホバー中は残ります。ロック中は表示しません。</p>
 <button id="notification-test" type="button">保存済みの設定で通知をテスト</button><p id="notification-result" role="status"></p></section>
 <label class="check"><input id="updates" type="checkbox">GitHub Releasesを起動時・24時間ごとに確認して更新を通知</label>

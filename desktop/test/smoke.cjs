@@ -127,6 +127,8 @@ const server = http.createServer(async (request, response) => {
     assert.equal(await setup.locator('[data-model=dir]').isVisible(), true);
     assert.equal(await setup.locator('#wakeThreshold').inputValue(), '0.45');
     assert.equal(await setup.locator('#wakeEnabled').isChecked(), false);
+    assert.equal(await setup.locator('#notificationSound').isChecked(), false);
+    await setup.locator('#notificationSound').check();
     const nudgeOpened = instance.waitForEvent('window', { predicate: candidate => candidate !== setup });
     await setup.locator('#notification-test').click();
     const nudge = await nudgeOpened;
@@ -143,6 +145,30 @@ const server = http.createServer(async (request, response) => {
     const page = await opened;
     await page.waitForURL(`${origin}/static/desktop/index.html`);
     assert.equal(await page.locator('.presence, .orb, .orbit').count(), 0, 'compact chat has no planet above the date');
+    if (process.env.PETIT_SMOKE_SCOPE === 'notifications') {
+      const workspaceOpened = instance.waitForEvent('window');
+      await page.locator('#open-workspace').click();
+      const workspace = await workspaceOpened;
+      await workspace.waitForURL(`${origin}/static/universe.html`);
+      await workspace.locator('#petit-desktop-toolbar').waitFor();
+      await workspace.evaluate(() => window.PetitAppShell.activateView('settings'));
+      await workspace.locator('#notification-enable').click();
+      await workspace.locator('#notification-disable').waitFor({ state: 'visible' });
+      const status = await workspace.evaluate(() => window.petitNotifications.read());
+      assert.equal(status.enabled, true); assert.equal(status.sound, true);
+      assert.equal(status.permission, 'unknown');
+      assert.equal(fixturePreferences.work_session, true);
+      assert.equal(await workspace.evaluate(() => Notification.permission), 'denied');
+      assert.doesNotMatch(await workspace.locator('#notification-state').textContent(), /ブラウザ設定で拒否/);
+      await workspace.locator('#notification-test').click();
+      await workspace.waitForFunction(() => document.querySelector('#notification-state').textContent.includes('無音'));
+      await workspace.locator('#notification-disable').click();
+      await workspace.locator('#notification-enable').waitFor({ state: 'visible' });
+      assert.equal(await workspace.evaluate(async () => (await window.petitNotifications.read()).enabled), false);
+      console.log('Desktop notification smoke OK: persisted sound opt-in, denied Web permission, independent Desktop enable/test/disable');
+      return;
+    }
+
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     assert.equal(await page.locator('#greeting').evaluate((el) => getComputedStyle(el).animationName), 'petitMessageEnter');
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -419,6 +445,9 @@ const server = http.createServer(async (request, response) => {
     await workspace.locator('#notification-enable').click();
     await workspace.locator('#notification-disable').waitFor({ state: 'visible' });
     assert.equal(await workspace.evaluate(async () => (await window.petitNotifications.read()).enabled), true, 'Desktop enables without VAPID');
+    assert.equal(await workspace.evaluate(async () => (await window.petitNotifications.read()).sound), true, 'sound setting persisted through settings save');
+    assert.equal(await workspace.evaluate(async () => (await window.petitNotifications.read()).permission), 'unknown');
+    assert.equal(await workspace.evaluate(() => Notification.permission), 'denied', 'Web permission remains denied while Desktop notifications work');
     assert.equal(fixturePreferences.work_session, true);
     await workspace.locator('#notification-disable').click();
     await workspace.locator('#notification-enable').waitFor({ state: 'visible' });

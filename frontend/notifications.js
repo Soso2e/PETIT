@@ -116,7 +116,7 @@
       disableButton.hidden = !desktopStatus?.enabled;
       testButton.disabled = disableButton.disabled = !desktopStatus?.enabled;
       const label = desktopStatus?.mode === "native" ? "OS通知" : "画面のすみに声かけ";
-      setState(desktopStatus?.error || (desktopStatus?.enabled ? `${label}で受け取ります。必要な種類をONにしてください。Desktop設定で出し方を変更できます。` : "Desktop通知はOFFです。有効にするとVAPIDの設定なしで受け取れます。"), Boolean(desktopStatus?.error));
+      setState(desktopStatus?.error || (desktopStatus?.enabled ? `${label}が有効です。${desktopStatus?.mode === "native" ? (desktopStatus.sound ? "通知音ON。" : "通知音OFF。") + "OSの通知許可・集中モードと実際の受信は通知テストで確認してください。" : "このモードは無音です。"} 必要な種類をONにしてください。Desktop設定で出し方を変更できます。` : "Desktop通知はOFFです。有効にするとVAPIDの設定なしで受け取れます。"), Boolean(desktopStatus?.error));
       if (unreadBadge) unreadBadge.textContent = String(unreadCount);
       if (unreadBadge) unreadBadge.hidden = unreadCount < 1;
       return;
@@ -528,7 +528,7 @@
   async function sendTestNotification() {
     if (desktop) {
       setBusy(true);
-      try { setState((await desktop.test()).message); }
+      try { const result = await desktop.test(); desktopStatus = result; setState(result.message, Boolean(result.error)); }
       catch (error) { setState(`通知テストに失敗しました: ${error.message}`, true); }
       finally { setBusy(false); }
       return;

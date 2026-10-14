@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.30.1**
+**Current Version: v0.30.2**
 
 **Last Updated: 2026-10-14**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #329 / PR #330 / v0.30.2（配布・OS通知実機未確認）: Desktop OS通知音の明示ON（既定無音）と、通知表示要求/show/failed診断を追加。Native通知の寿命保持・既存Web PushとDesktop権限の分離を維持。CI全テストは成功、Desktop関連の単体65件・Backend通知関連17件成功、隔離通知専用smoke成功。一方、全体smokeには音声確認ボタン・統計画面のtimeoutと入力文字列不一致による失敗が残るため、全体E2E成功とは扱わない。Mac/WindowsのOS通知受信・実音・Focus・正式配布DMGインストールは未確認。診断は `docs/desktop-notification-diagnostics.md`。
 
 - #325 / PR #326 / v0.30.1（実TimeTree未確認）: Context Brokerから予定検索queryを渡し、TimeTree予定キャッシュの題名・説明・場所を検索。CAPCOM/カプコン別名、未来優先・無条件全履歴検索の抑止を追加。関連CI通過後にmain反映。実TimeTree・実LLM会話と非公開Sona CoreのE2Eは未確認。
 
