@@ -10,7 +10,7 @@ DesktopをPCの主入口にする全体の目標・会話/実行の正本・起�
 この MVP は **ブラウザ（localhost）で動くテキストチャット** で、
 LLM は **LM Studio**（OpenAI 互換のローカルサーバー）を利用します。
 
-v0.29.0（開発版）は上部同期表示・Settingsから接続ステータスとNotion同期失敗の詳細を確認できます。保存済み状態を表示し、接続確認・再試行は明示操作で実行します。[接続ステータス](docs/connection-status.md)を参照。
+v0.29.1（開発版）は上部同期表示・Settingsから接続ステータスとNotion同期失敗の詳細を確認できます。保存済み状態を表示し、接続確認・再試行は明示操作で実行します。[接続ステータス](docs/connection-status.md)を参照。
 
 ## 構成
 
@@ -401,3 +401,5 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
 - 全Python構文確認: `python -m compileall backend tests scripts`
 - 変更のたびに`PROGRESS.md`へ追記する。
 - ルール詳細は[`CLAUDE.md`](./CLAUDE.md)。
+
+Mac Desktopの通知音・権限・Focusの切り分けは [Desktop通知診断](docs/desktop-notification-diagnostics.md) を参照。

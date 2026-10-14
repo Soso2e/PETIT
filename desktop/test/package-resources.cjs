@@ -14,7 +14,7 @@ const resources = findResources();
 assert.ok(resources, 'packaged resources directory was not found');
 const asar = require('@electron/asar');
 const appFiles = asar.listPackage(path.join(resources, 'app.asar')).map(file => file.replaceAll('\\', '/'));
-for (const file of ['recovery.html', 'recovery.js', 'recovery-preload.cjs', 'workspace-preload.cjs', 'workspace.css', 'window-state.cjs', 'nudge.html', 'nudge.js', 'nudge.css', 'nudge-preload.cjs', 'notification-feed.cjs', 'update-download.cjs']) {
+for (const file of ['recovery.html', 'recovery.js', 'recovery-preload.cjs', 'workspace-preload.cjs', 'workspace.css', 'window-state.cjs', 'nudge.html', 'nudge.js', 'nudge.css', 'nudge-preload.cjs', 'notification-feed.cjs', 'native-notifications.cjs', 'update-download.cjs']) {
   assert.ok(appFiles.includes('/' + file), `missing offline Desktop resource: ${file}`);
 }
 const wake = path.join(resources, 'wakeword');
