@@ -11,13 +11,13 @@
   const publicApi = {
     initialized: false,
     active: () => false,
-    rebuild: () => {},
-    reset: () => {},
+    rebuild: () => { },
+    reset: () => { },
     focusTask: () => false,
     selectTask: () => false,
     animateTaskExit: async () => false,
-    zoomIn: () => {},
-    zoomOut: () => {},
+    zoomIn: () => { },
+    zoomOut: () => { },
   };
   window.PetitUnivWebGL = publicApi;
 
@@ -348,7 +348,7 @@
 
     // Zero-texture procedural points material with additive blending and fog exemption
     const material = new THREE.PointsMaterial({
-      size: 1.9,
+      size: 10,
       sizeAttenuation: true,
       transparent: true,
       opacity: 0.95,
