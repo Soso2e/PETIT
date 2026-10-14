@@ -11,13 +11,13 @@
   const publicApi = {
     initialized: false,
     active: () => false,
-    rebuild: () => {},
-    reset: () => {},
+    rebuild: () => { },
+    reset: () => { },
     focusTask: () => false,
     selectTask: () => false,
     animateTaskExit: async () => false,
-    zoomIn: () => {},
-    zoomOut: () => {},
+    zoomIn: () => { },
+    zoomOut: () => { },
   };
   window.PetitUnivWebGL = publicApi;
 
@@ -136,7 +136,7 @@
     state.scene = new THREE.Scene();
     state.scene.fog = new THREE.FogExp2(0x02040d, 0.0115);
 
-    state.camera = new THREE.PerspectiveCamera(46, 1, 0.1, 240);
+    state.camera = new THREE.PerspectiveCamera(46, 1, 0.1, 480);
     state.camera.position.set(0, 10, 34);
 
     state.renderer = new THREE.WebGLRenderer({
@@ -215,33 +215,205 @@
   })();
 
   const createStarField = () => {
-    const count = window.matchMedia("(max-width: 640px)").matches ? 420 : 900;
+    const isMobile = window.matchMedia("(max-width: 640px)").matches;
+    const count = isMobile ? 1200 : 2400;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    const spikes = new Float32Array(count);
+
+    // Galaxy plane tilt angles (subtle rotation to create a 3D traversing band across the sky)
+    const tiltX = 0.38;
+    const tiltZ = 0.24;
+    const cosX = Math.cos(tiltX);
+    const sinX = Math.sin(tiltX);
+    const cosZ = Math.cos(tiltZ);
+    const sinZ = Math.sin(tiltZ);
+
+    const diskCount = Math.floor(count * 0.65);
+
     for (let index = 0; index < count; index += 1) {
-      const radius = 62 + seededRandom() * 92;
-      const theta = seededRandom() * Math.PI * 2;
-      const phi = Math.acos((seededRandom() * 2) - 1);
-      positions[index * 3] = radius * Math.sin(phi) * Math.cos(theta);
-      positions[index * 3 + 1] = radius * Math.cos(phi);
-      positions[index * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
-      const brightness = 0.55 + seededRandom() * 0.45;
-      colors[index * 3] = brightness * 0.82;
-      colors[index * 3 + 1] = brightness * 0.88;
-      colors[index * 3 + 2] = brightness;
+      let x0 = 0;
+      let y0 = 0;
+      let z0 = 0;
+
+      // Color selection based on realistic stellar classifications + cosmic accents
+      const colorRoll = seededRandom();
+      let rCol = 1.0;
+      let gCol = 1.0;
+      let bCol = 1.0;
+
+      if (colorRoll < 0.24) {
+        // High-temperature blue / cyan stars (Rigel / Vega blue)
+        rCol = 0.58 + seededRandom() * 0.12;
+        gCol = 0.78 + seededRandom() * 0.12;
+        bCol = 1.0;
+      } else if (colorRoll < 0.56) {
+        // Pure diamond white / crisp white (Sirius white)
+        rCol = 0.94 + seededRandom() * 0.06;
+        gCol = 0.96 + seededRandom() * 0.04;
+        bCol = 1.0;
+      } else if (colorRoll < 0.80) {
+        // Warm golden / soft amber stars (Capella / Sun-like)
+        rCol = 1.0;
+        gCol = 0.86 + seededRandom() * 0.08;
+        bCol = 0.62 + seededRandom() * 0.16;
+      } else if (colorRoll < 0.93) {
+        // Sunset ruby / salmon amber stars (Betelgeuse / red giants)
+        rCol = 1.0;
+        gCol = 0.56 + seededRandom() * 0.10;
+        bCol = 0.40 + seededRandom() * 0.10;
+      } else if (colorRoll < 0.97) {
+        // Nebula violet / amethyst accent stars
+        rCol = 0.88 + seededRandom() * 0.08;
+        gCol = 0.62 + seededRandom() * 0.10;
+        bCol = 1.0;
+      } else {
+        // Emerald mint / aurora teal accent stars
+        rCol = 0.55 + seededRandom() * 0.10;
+        gCol = 0.98;
+        bCol = 0.86 + seededRandom() * 0.10;
+      }
+
+      // Star magnitude / size classes:
+      // 82% faint delicate star dust, 14% medium prominent stars, 4% brilliant 1st-magnitude stars
+      const magRoll = seededRandom();
+      let starSize = 0.60;
+      let spikeIntensity = 0.0;
+      let brightness = 0.65 + seededRandom() * 0.35;
+
+      if (magRoll > 0.96) {
+        // Bright 1st magnitude star with subtle diffraction spikes
+        starSize = 1.8 + seededRandom() * 0.7;
+        spikeIntensity = 0.80 + seededRandom() * 0.35;
+        brightness = 1.0;
+      } else if (magRoll > 0.82) {
+        // Medium prominent star
+        starSize = 1.0 + seededRandom() * 0.35;
+        spikeIntensity = seededRandom() > 0.6 ? 0.3 : 0.0;
+        brightness = 0.85 + seededRandom() * 0.15;
+      } else {
+        // Faint delicate star dust
+        starSize = 0.45 + seededRandom() * 0.35;
+        spikeIntensity = 0.0;
+      }
+
+      if (index < diskCount) {
+        // Galactic disk & spiral bands (far field: radius 140 to 280)
+        const arm = index % 2;
+        const radius = 140 + Math.pow(seededRandom(), 1.1) * 140;
+        const twist = 0.016;
+        const baseAngle = arm * Math.PI + radius * twist;
+        const jitter = (seededRandom() + seededRandom() - 1.0) * (0.35 + radius * 0.001);
+        const theta = baseAngle + jitter;
+
+        x0 = radius * Math.cos(theta);
+        z0 = radius * Math.sin(theta);
+        y0 = (seededRandom() + seededRandom() - 1.0) * (5.5 + radius * 0.035);
+      } else {
+        // Spherical outer celestial dome (far field: radius 145 to 280)
+        const radius = 145 + seededRandom() * 135;
+        const theta = seededRandom() * Math.PI * 2;
+        const phi = Math.acos((seededRandom() * 2) - 1);
+
+        x0 = radius * Math.sin(phi) * Math.cos(theta);
+        y0 = radius * Math.cos(phi);
+        z0 = radius * Math.sin(phi) * Math.sin(theta);
+      }
+
+      // Apply galactic plane tilt
+      const x1 = x0 * cosZ - y0 * sinZ;
+      const y1 = x0 * sinZ + y0 * cosZ;
+      const finalX = x1;
+      const finalY = y1 * cosX - z0 * sinX;
+      const finalZ = y1 * sinX + z0 * cosX;
+
+      positions[index * 3] = finalX;
+      positions[index * 3 + 1] = finalY;
+      positions[index * 3 + 2] = finalZ;
+
+      colors[index * 3] = rCol * brightness;
+      colors[index * 3 + 1] = gCol * brightness;
+      colors[index * 3 + 2] = bCol * brightness;
+
+      sizes[index] = starSize;
+      spikes[index] = spikeIntensity;
     }
+
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute("aSpike", new THREE.BufferAttribute(spikes, 1));
+
+    // Zero-texture procedural points material with additive blending and fog exemption
     const material = new THREE.PointsMaterial({
-      size: 0.24,
+      size: 10,
       sizeAttenuation: true,
       transparent: true,
-      opacity: 0.76,
+      opacity: 0.95,
       vertexColors: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      fog: false,
     });
+
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = `
+        attribute float aSize;
+        attribute float aSpike;
+        varying float vSpike;
+        ${shader.vertexShader}
+      `.replace(
+        "void main() {",
+        `void main() {
+          vSpike = aSpike;`
+      ).replace(
+        "gl_PointSize = size;",
+        "gl_PointSize = size * aSize;"
+      );
+
+      const fragmentInjectionTarget = shader.fragmentShader.includes("#include <premultiplied_alpha_fragment>")
+        ? "#include <premultiplied_alpha_fragment>"
+        : "#include <opaque_fragment>";
+
+      shader.fragmentShader = `
+        varying float vSpike;
+        ${shader.fragmentShader}
+      `.replace(
+        "#include <clipping_planes_fragment>",
+        `#include <clipping_planes_fragment>
+        vec2 coord = gl_PointCoord - vec2(0.5);
+        float dist = length(coord);
+        if (dist > 0.5) discard;`
+      ).replace(
+        fragmentInjectionTarget,
+        `${fragmentInjectionTarget}
+        // Sharp luminous hot core
+        float core = clamp(1.0 - dist * 4.6, 0.0, 1.0);
+        core = core * core * core;
+
+        // Soft outer corona glow
+        float corona = clamp(1.0 - dist * 2.0, 0.0, 1.0);
+        corona = pow(corona, 2.2);
+
+        // Elegant cross-diffraction spike for prominent stars
+        float spike = 0.0;
+        if (vSpike > 0.05) {
+          float spikeX = exp(-abs(coord.x) * 36.0) * exp(-abs(coord.y) * 4.8);
+          float spikeY = exp(-abs(coord.y) * 36.0) * exp(-abs(coord.x) * 4.8);
+          spike = max(spikeX, spikeY) * vSpike;
+        }
+
+        // Center saturates to pure brilliant white, outer corona keeps stellar tint
+        vec3 starColor = mix(gl_FragColor.rgb, vec3(1.0), core * 0.85);
+        float intensity = core * 1.15 + corona * 0.52 + spike * 0.72;
+
+        gl_FragColor.rgb = starColor * intensity;
+        gl_FragColor.a = clamp(intensity, 0.0, 1.0) * 0.95;`
+      );
+    };
+
     const stars = new THREE.Points(geometry, material);
     stars.name = "PETIT_Star_Field";
     state.scene.add(stars);
@@ -765,7 +937,6 @@
       };
     });
     input.addEventListener("pointerup", (event) => {
-      event.stopPropagation();
       const start = state.pointerDown;
       state.pointerDown = null;
       activePointers.delete(event.pointerId);

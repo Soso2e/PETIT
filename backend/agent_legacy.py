@@ -11,7 +11,7 @@ import re
 from datetime import date
 from typing import Any
 
-from . import config, db, model_router, project_router, recall, situation, tools  # recall/situation kept import-compatible; never used for chat
+from . import config, db, model_router, project_router, recall, situation, time_context, tools  # recall/situation kept import-compatible; never used for chat
 from .date_parser import has_schedule_date_expression, parse_schedule_date
 from .lmstudio_client import LMStudioError, chat_completion
 
@@ -54,7 +54,7 @@ _GREETING_REPLIES = {
 # patterns may expose a bounded read-only set so the agent model can choose the
 # necessary source without loading every source first.
 _TOOL_SIGNALS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("get_current_time", ("今何時", "現在時刻", "今の時間", "今日何日", "日付")),
+    ("get_current_time", ("今何時", "現在時刻", "現在時間", "今の時間", "時間教えて", "今何時何分", "何時ですか", "今日何日", "日付")),
     ("get_tasks", ("タスク", "やること", "todo", "やる事")),
     ("get_schedule", ("予定", "カレンダー", "明日何ある", "今日何ある")),
     ("search_memory", ("過去", "記憶", "覚えてる", "どこまで", "前に", "思い出")),
@@ -414,7 +414,7 @@ def _direct_brain_append(user_message: str) -> dict[str, Any] | None:
 def _run_planning_consultation(user_message: str, history: list[dict[str, str]] | None) -> dict[str, Any]:
     calls = [
         ("get_tasks", {"limit": 10}),
-        ("get_schedule", {"date": date.today().isoformat()}),
+        ("get_schedule", {"date": time_context.current_date().isoformat()}),
         ("search_brain_notes", {"query": user_message, "limit": 3}),
     ]
     results: list[dict[str, str]] = []
@@ -461,7 +461,7 @@ def _run_forced_read(
                     "tools": [],
                 },
             }
-        args = {"date": (target or date.today()).isoformat()}
+        args = {"date": (target or time_context.current_date()).isoformat()}
     elif name == "get_tasks":
         limit_match = re.search(r"(\d+)件", user_message)
         args = {"limit": int(limit_match.group(1))} if limit_match else {"limit": 10}

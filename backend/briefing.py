@@ -10,7 +10,7 @@ from datetime import date as date_type
 from datetime import datetime
 from typing import Any
 
-from . import calendar_sync, db, github_daily_review
+from . import calendar_sync, db, github_daily_review, time_context
 from .lmstudio_client import LMStudioError, chat_completion
 
 log = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def _recent_context(limit: int = 2) -> list[dict[str, Any]]:
 
 def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
     """Create a compact daily briefing for target_date (YYYY-MM-DD)."""
-    day = target_date or date_type.today().isoformat()
+    day = target_date or time_context.current_date().isoformat()
     notion_sync = _sync_notion()
     calendar_sync_status = calendar_sync.sync_if_configured()
     events = _events_for(day)

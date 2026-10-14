@@ -8,7 +8,7 @@ from typing import Literal
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from . import db, notion_client, notifications, task_sync_queue, task_hierarchy
+from . import db, notion_client, notion_task_sync, notifications, task_sync_queue, task_hierarchy
 
 
 class ConflictChoice(BaseModel):
@@ -35,6 +35,7 @@ def _revision(task, operations, remote):
 
 def preview(task_id: int) -> JSONResponse:
     task_hierarchy.ensure_task_hierarchy_schema()
+    notion_task_sync.ensure_schema()
     try:
         with db.get_connection() as conn:
             task, operations = _read(conn, task_id)
@@ -70,6 +71,7 @@ def list_conflicts() -> dict:
 
 def resolve(task_id: int, payload: ConflictChoice) -> JSONResponse:
     task_hierarchy.ensure_task_hierarchy_schema()
+    notion_task_sync.ensure_schema()
     notifications.init_db()
     try:
         with db.get_connection() as conn:

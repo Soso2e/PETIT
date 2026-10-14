@@ -6,10 +6,12 @@
   const STORAGE = {
     theme: "petit_ui_theme",
     performance: "petit_ui_performance",
+    developer: "petit_developer_mode",
   };
 
   const normalizeTheme = (value) => (value === "light" ? "light" : "dark");
   const normalizePerformance = (value) => (value === "standard" ? "standard" : "lite");
+  const normalizeDeveloper = (value) => (value === "true" || value === "on" ? "on" : "off");
 
   const defaultPerformance = () => {
     const mobile = window.matchMedia("(max-width: 760px)").matches;
@@ -20,6 +22,7 @@
   const state = {
     theme: normalizeTheme(localStorage.getItem(STORAGE.theme) || "dark"),
     performance: normalizePerformance(localStorage.getItem(STORAGE.performance) || defaultPerformance()),
+    developer: normalizeDeveloper(localStorage.getItem(STORAGE.developer) || "off"),
   };
 
   const syncMetaThemeColor = () => {
@@ -30,6 +33,7 @@
   const apply = () => {
     root.dataset.petitTheme = state.theme;
     root.dataset.petitPerformance = state.performance;
+    root.dataset.petitDeveloper = state.developer === "on" ? "true" : "false";
     root.style.colorScheme = state.theme;
     syncMetaThemeColor();
 
@@ -38,6 +42,15 @@
     });
     document.querySelectorAll("[data-petit-performance-choice]").forEach((button) => {
       button.setAttribute("aria-pressed", String(button.dataset.petitPerformanceChoice === state.performance));
+    });
+    document.querySelectorAll("[data-petit-developer-choice]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.petitDeveloperChoice === state.developer));
+    });
+
+    const isDev = state.developer === "on";
+    document.querySelectorAll("[data-developer-only]").forEach((el) => {
+      if (isDev) el.removeAttribute("hidden");
+      else el.setAttribute("hidden", "");
     });
   };
 
@@ -53,6 +66,15 @@
     apply();
     window.dispatchEvent(new CustomEvent("petit:performance-change", {
       detail: { performance: state.performance },
+    }));
+  };
+
+  const setDeveloper = (developer) => {
+    state.developer = normalizeDeveloper(developer);
+    localStorage.setItem(STORAGE.developer, state.developer === "on" ? "true" : "false");
+    apply();
+    window.dispatchEvent(new CustomEvent("petit:developer-mode-change", {
+      detail: { developer: state.developer, enabled: state.developer === "on" },
     }));
   };
 
@@ -74,10 +96,12 @@
       button.type = "button";
       button.textContent = text;
       if (kind === "theme") button.dataset.petitThemeChoice = value;
-      else button.dataset.petitPerformanceChoice = value;
+      else if (kind === "performance") button.dataset.petitPerformanceChoice = value;
+      else if (kind === "developer") button.dataset.petitDeveloperChoice = value;
       button.addEventListener("click", () => {
         if (kind === "theme") setTheme(value);
-        else setPerformance(value);
+        else if (kind === "performance") setPerformance(value);
+        else if (kind === "developer") setDeveloper(value);
       });
       control.appendChild(button);
     });
@@ -96,7 +120,7 @@
 
     const head = document.createElement("div");
     head.className = "settings-card__head";
-    head.innerHTML = "<div><h3>表示</h3><p>OSの外観設定とは切り離し、PETIT側で見た目と描画負荷を固定します。</p></div>";
+    head.innerHTML = "<div><h3>表示・開発</h3><p>外観・描画負荷および開発者向けオプションを設定します。</p></div>";
 
     const groups = document.createElement("div");
     groups.className = "petit-preference-groups";
@@ -116,12 +140,35 @@
         { value: "standard", text: "標準" },
       ],
     }));
+    groups.appendChild(preferenceGroup({
+      label: "開発者オプション",
+      kind: "developer",
+      values: [
+        { value: "off", text: "OFF" },
+        { value: "on", text: "ON" },
+      ],
+    }));
+
+    const devActions = document.createElement("div");
+    devActions.className = "petit-preference-dev-actions";
+    devActions.setAttribute("data-developer-only", "");
+    if (state.developer !== "on") devActions.setAttribute("hidden", "");
+
+    const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
+    exportBtn.className = "petit-preference-export-btn";
+    exportBtn.setAttribute("data-open-chat-log", "");
+    exportBtn.textContent = "会話ログを取得";
+    exportBtn.addEventListener("click", () => {
+      window.PetitChatLog?.open?.();
+    });
+    devActions.appendChild(exportBtn);
 
     const note = document.createElement("p");
     note.className = "petit-preference-note";
-    note.textContent = "軽量表示では背景・軌道の常時アニメーションと一部ぼかしを抑えます。Coreの3D機能自体は維持します。";
+    note.textContent = "軽量表示では背景・軌道の常時アニメーションと一部ぼかしを抑えます。開発者オプションをONにすると会話ログ取得UIが有効になります。";
 
-    card.append(head, groups, note);
+    card.append(head, groups, devActions, note);
     grid.prepend(card);
     apply();
   };
@@ -157,8 +204,10 @@
     initialized: true,
     theme: () => state.theme,
     performance: () => state.performance,
+    developer: () => state.developer === "on",
     setTheme,
     setPerformance,
+    setDeveloper,
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });

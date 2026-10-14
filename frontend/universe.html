@@ -49,7 +49,7 @@
       </nav>
       <div class="topbar-actions">
         <button id="voice-toggle" type="button" class="voice-toggle" aria-pressed="false">音声応答 OFF</button>
-        <span id="sync-pill" class="sync-pill" hidden>同期確認中</span>
+        <button id="sync-pill" type="button" class="sync-pill" aria-haspopup="dialog" aria-label="接続ステータスを開く" hidden>同期確認中</button>
         <span class="version-pill" data-petit-version></span>
       </div>
     </header>
@@ -195,9 +195,48 @@
       </section>
 
       <section class="view" data-view-panel="reminders" hidden>
-        <div class="section-head reminder-section-head"><div><span class="eyebrow">REMINDERS</span><h1>忘れないための約束</h1><p>Chatで登録したリマインダーを確認し、完了・延期・取消できます。</p></div><div class="reminder-toolbar"><div class="reminder-filters" role="group" aria-label="リマインダー表示切り替え"><button class="reminder-filter is-active" type="button" data-reminder-filter="upcoming">未完了</button><button class="reminder-filter" type="button" data-reminder-filter="history">履歴</button><button class="reminder-filter" type="button" data-reminder-filter="all">すべて</button></div><button id="refresh-reminders" class="reminder-refresh" type="button">更新</button></div></div>
-        <div class="reminder-summary-line"><span id="reminder-count">0件</span><span id="reminder-status" class="reminder-status" aria-live="polite">読み込み中</span></div>
-        <div id="reminder-list" class="reminder-list" aria-live="polite"></div>
+        <div class="reminders-grid">
+          <div class="reminders-column">
+            <div class="section-head reminder-section-head">
+              <div>
+                <span class="eyebrow">REMINDERS</span>
+                <h1>忘れないための約束</h1>
+                <p>Chatで登録したリマインダーを確認し、完了・延期・取消できます。</p>
+              </div>
+              <div class="reminder-toolbar">
+                <div class="reminder-filters" role="group" aria-label="リマインダー表示切り替え">
+                  <button class="reminder-filter is-active" type="button" data-reminder-filter="upcoming">未完了</button>
+                  <button class="reminder-filter" type="button" data-reminder-filter="history">履歴</button>
+                  <button class="reminder-filter" type="button" data-reminder-filter="all">すべて</button>
+                </div>
+                <button id="refresh-reminders" class="reminder-refresh" type="button">更新</button>
+              </div>
+            </div>
+            <div class="reminder-summary-line"><span id="reminder-count">0件</span><span id="reminder-status" class="reminder-status" aria-live="polite">読み込み中</span></div>
+            <div id="reminder-list" class="reminder-list" aria-live="polite"></div>
+          </div>
+
+          <div class="notifications-column">
+            <section class="settings-card settings-card--notifications" aria-labelledby="notification-center-title">
+              <div class="settings-card__head">
+                <div>
+                  <h3 id="notification-center-title">通知センター</h3>
+                  <p>未解決の通知や、PETITからの確認をここで確認します。</p>
+                </div>
+                <span id="notification-unread" class="notification-panel__badge">未読なし</span>
+              </div>
+              <div class="notification-inbox" aria-live="polite">
+                <div class="notification-filters" role="group" aria-label="通知の表示切り替え">
+                  <button type="button" class="notification-filter notification-filter--active" data-notification-state="open">未解決</button>
+                  <button type="button" class="notification-filter" data-notification-state="resolved">解決済み</button>
+                  <button id="notification-refresh" type="button" class="notification-panel__refresh">更新</button>
+                </div>
+                <p id="notification-empty" class="notification-empty">通知はまだありません。</p>
+                <div id="notification-list" class="notification-list"></div>
+              </div>
+            </section>
+          </div>
+        </div>
       </section>
 
       <section class="view" data-view-panel="chat" hidden>
@@ -209,6 +248,7 @@
                 <h1>PETITと話す</h1>
               </div>
               <div class="chat-head-actions">
+                <button id="chat-export-log-btn" type="button" class="chat-export-log-btn" data-developer-only hidden>会話ログ</button>
                 <button id="history-toggle" type="button" class="history-toggle" aria-expanded="false" hidden>履歴を見る</button>
                 <span id="chat-status" class="chat-status">接続確認中</span>
               </div>
@@ -236,6 +276,11 @@
         </div>
         <div class="settings-grid">
           <section class="settings-card">
+            <h3>接続と同期</h3>
+            <p>各サービスの接続、同期履歴、失敗したタスクを確認できます。</p>
+            <button type="button" data-open-connections aria-haspopup="dialog">接続ステータスを開く</button>
+          </section>
+          <section class="settings-card">
             <div class="settings-card__head">
               <div>
                 <h3>AIモデル</h3>
@@ -257,24 +302,6 @@
             </div>
           </section>
 
-          <section class="settings-card settings-card--notifications" aria-labelledby="notification-center-title">
-            <div class="settings-card__head">
-              <div>
-                <h3 id="notification-center-title">通知センター</h3>
-                <p>未解決の通知や、PETITからの確認をここで確認します。</p>
-              </div>
-              <span id="notification-unread" class="notification-panel__badge">未読なし</span>
-            </div>
-            <div class="notification-inbox" aria-live="polite">
-              <div class="notification-filters" role="group" aria-label="通知の表示切り替え">
-                <button type="button" class="notification-filter notification-filter--active" data-notification-state="open">未解決</button>
-                <button type="button" class="notification-filter" data-notification-state="resolved">解決済み</button>
-                <button id="notification-refresh" type="button" class="notification-panel__refresh">更新</button>
-              </div>
-              <p id="notification-empty" class="notification-empty">通知はまだありません。</p>
-              <div id="notification-list" class="notification-list"></div>
-            </div>
-          </section>
 
           <section class="settings-card">
             <div class="settings-card__head">
@@ -297,6 +324,38 @@
       </section>
     </main>
   </div>
+
+  <dialog id="chat-log-dialog" class="chat-log-dialog" aria-labelledby="chat-log-dialog-title">
+    <div class="chat-log-dialog__surface">
+      <div class="chat-log-dialog__header">
+        <div>
+          <h3 id="chat-log-dialog-title">会話ログのエクスポート</h3>
+          <p class="chat-log-dialog__desc">JSONまたはテキスト形式で会話ログを取得・コピーできます。</p>
+        </div>
+        <button type="button" class="chat-log-dialog__close" data-log-close aria-label="閉じる">✕</button>
+      </div>
+      <div class="chat-log-dialog__toolbar">
+        <div class="petit-segmented-control" role="group" aria-label="エクスポート形式">
+          <button type="button" class="chat-log-tab" data-log-format="json" aria-pressed="true">JSON</button>
+          <button type="button" class="chat-log-tab" data-log-format="text" aria-pressed="false">テキスト</button>
+        </div>
+        <label class="chat-log-dialog__scope">
+          <input type="checkbox" id="chat-log-full-history" />
+          <span>全履歴を含む（サーバー保存分）</span>
+        </label>
+      </div>
+      <div class="chat-log-dialog__body">
+        <textarea id="chat-log-output" class="chat-log-output" readonly rows="14" spellcheck="false" placeholder="会話ログがありません"></textarea>
+      </div>
+      <div class="chat-log-dialog__footer">
+        <span id="chat-log-status" class="chat-log-status" role="status" aria-live="polite"></span>
+        <div class="chat-log-dialog__actions">
+          <button id="chat-log-copy" type="button" class="chat-log-btn-primary">クリップボードにコピー</button>
+          <button type="button" class="chat-log-btn-secondary" data-log-close>閉じる</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
 
   <div id="task-feedback" class="task-feedback" role="status" aria-live="polite" hidden><span data-feedback-copy></span><button type="button" data-feedback-action hidden></button></div>
 

@@ -130,14 +130,20 @@
     if (id == null) return;
     button.disabled = true;
     try {
-      await requestJson(`/api/notifications/tasks/${encodeURIComponent(id)}/sync/retry`, { method: "POST" });
+      await retrySync(id);
       showFeedback("同期を再試行キューへ戻しました。");
-      refreshUniverse();
     } catch (error) {
       showFeedback(`同期を再試行できませんでした: ${error.message}`);
       button.disabled = false;
     }
   };
+
+  const retrySync = async (id) => {
+    const result = await requestJson(`/api/notifications/tasks/${encodeURIComponent(id)}/sync/retry`, { method: "POST" });
+    refreshUniverse();
+    return result;
+  };
+  window.PetitTaskSyncRecovery = { openConflict, retrySync };
 
   const visibleTasks = () => {
     const filter = document.querySelector("[data-filter].is-active")?.dataset.filter === "low" ? "low" : "high";
@@ -247,9 +253,6 @@
     button.textContent = "同期競合を確認"; button.onclick = () => void openConflict();
     refreshTasksButton.after(button);
   }
-  document.addEventListener("click", (event) => {
-    if (event.target.closest?.("#sync-pill, [data-rail-sync]") && event.target.textContent.includes("競合")) void openConflict();
-  });
   refreshTasksButton?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
     button.disabled = true;

@@ -390,6 +390,7 @@
 
     frame.addEventListener("pointerdown", (event) => {
       if (!isPanelActive()) return;
+      if (document.body.classList.contains("petit-univ-webgl-ready") || event.target.closest(".univ-webgl-stage, .univ-webgl-label-layer, canvas")) return;
       if (event.pointerType === "mouse" && ![0, 1].includes(event.button)) return;
 
       if (event.pointerType === "touch") {
@@ -464,14 +465,14 @@
     frame.addEventListener("auxclick", (event) => { if (event.button === 1) event.preventDefault(); });
 
     frame.addEventListener("wheel", (event) => {
-      if (!isPanelActive()) return;
+      if (!isPanelActive() || document.body.classList.contains("petit-univ-webgl-ready")) return;
       event.preventDefault();
       state.zoom = clamp(state.zoom - (event.deltaY * 0.0012), 0.68, 1.72);
       applyCamera();
     }, { passive: false });
 
     frame.addEventListener("keydown", (event) => {
-      if (!isPanelActive()) return;
+      if (!isPanelActive() || document.body.classList.contains("petit-univ-webgl-ready")) return;
       if (event.key === "Escape") resetCamera();
       if (event.key === "ArrowLeft") state.yaw -= 4;
       if (event.key === "ArrowRight") state.yaw += 4;

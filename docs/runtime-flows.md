@@ -59,7 +59,8 @@ flowchart TD
     queue --> latest{実行直前のNotion更新日時一致?}
     latest -->|いいえ| again[競合を保持して再比較]
     latest -->|はい| patch[既存Notion更新 / 成功時だけsynced]
-    revision -->|Notion側| adopt[未同期キュー取り下げ / DBと親関係へ採用 / 監査]
+    revision -->|Notion側| adopt[同一トランザクションでキュー取り下げ・DBと親関係へ採用・snapshot保存・監査]
+    adopt -->|途中失敗| rollback[全体をrollback / 競合とローカル変更を保持]
     compare -->|404・接続失敗| blocked[共有・親ページの確認案内 / 競合保持]
     event[CoreのReminder / Work Session等の通知イベント] --> history[SQLite通知センター]
     history --> web[既存Web Push / VAPID・購読が必要]
@@ -215,7 +216,7 @@ flowchart TD
 
 日時はsystem promptへ毎ターン結合せず、相対日付・相対時刻があるターンだけuser側へ注入します。active / pausedのWork Sessionがある場合だけ、小さいuser contextをConversation Entryへ付加します。
 
-Context Brokerは `tasks` / `calendar` / `memory` / `brain` / `work` / `reminders` / `handoff` に対応します。 Calendar Readは日付またはキーワード`query`を`get_schedule`へ渡し、両方未指定なら過去予定の無制限取得を避けて`date_or_query_required`を返します。`get_schedule(query=...)`は同期済みTimeTree等のSQLiteキャッシュに対して予定名・説明・場所を検索し、検索時は未来の予定を優先します。Brokerは具体Tool名をLLMへ大量公開せず、固定したRead処理へ変換し、Toolのriskも実行直前に検証します。独立sourceは最大4件を並列取得し、各source約2500文字のfacts、記録時刻、鮮度、切詰めの有無を返します。詳細なsource対応表は [jarvis-agent.md](jarvis-agent.md) を参照。
+Context Brokerは `tasks` / `calendar` / `memory` / `brain` / `work` / `reminders` / `handoff` に対応します。 Calendar Readは日付またはキーワード`query`を`get_schedule`へ渡し、両方未指定なら`date_or_query_required`を返します。TimeTree等のSQLiteキャッシュの題名・説明・場所を検索し、日付未指定の検索では未来を優先します。Brokerは具体Tool名をLLMへ大量公開せず、固定したRead処理へ変換し、Toolのriskも実行直前に検証します。独立sourceは最大4件を並列取得し、各source約2500文字のfacts、記録時刻、鮮度、切詰めの有無を返します。詳細なsource対応表は [jarvis-agent.md](jarvis-agent.md) を参照。
 
 `PETIT_CONTEXT_BROKER_TIMEOUT_SECONDS`（既定10秒）を超えたReadを待ち続けず、取得済みの部分結果を返します。実行中のproviderは強制停止できないため終了まで共有枠を占有し、新規要求は枠がなければ`source_busy`。実行待ちのキューを無制限に積みません。不正応答、providerエラー、staleを0件の成功として扱いません。2回目Callにも入口のactive work等を引き継ぎます。
 
@@ -823,3 +824,24 @@ flowchart TD
 ```
 
 Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧Readや失敗結果はfocusを上書きしません。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。
+
+## 接続ステータスと同期診断（#327）
+
+接続確認はユーザーの明示操作でのみ実施する。表示更新では外部API・Chroma・Vault走査・同期workerを呼び出さない。接続成功と同期成功は別々に管理し、再試行は既存の単一タスクAPI、競合は既存のrevision付き比較・採用を共用する。
+
+```mermaid
+flowchart TD
+    Entry[上部同期表示 / Settings / サイドバー] --> Saved[GET /api/connections]
+    Saved --> Local[SQLite同期履歴・診断履歴・Notion outbox/inbox]
+    Local --> Redact[公開項目のみ選択・秘密情報を伏せる]
+    Redact --> UI[サービス別の接続・同期状態とタスク詳細]
+    UI -->|明示的な接続確認| Probe[POST /api/connections/service/check]
+    Probe --> Read[対象サービスの読取診断のみ / 同期しない]
+    Read --> Cache[SQLiteへ診断結果・成功/エラー時刻を保存]
+    Cache --> Saved
+    UI -->|失敗タスク1件の再試行| Retry[既存 POST tasks/id/sync/retry]
+    Retry --> Queue[既存outboxへ戻す]
+    Queue --> Worker[既存workerが処理 / 実試行時刻を記録]
+    UI -->|競合を比較| Conflict[既存競合UI・revision確認]
+    Conflict --> Choice[PETIT側再同期 / Notion側採用を明示選択]
+```

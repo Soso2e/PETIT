@@ -1,12 +1,16 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.28.0**
+**Current Version: v0.30.1**
 
-**Last Updated: 2026-10-13**
+**Last Updated: 2026-10-14**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #325 / PR #326（修正PR作成済み・実TimeTree未確認）: TimeTree 10/21のCAPCOM MTGが日付指定では取得できるのに、キーワード検索で2016〜17年の予定20件が出る問題を修正。原因はContext Brokerの`query`未伝搬と`get_schedule`の日付限定検索。TimeTree同期済みSQLiteキャッシュの題名/説明/場所検索、英字大小とCAPCOM/カプコン別名、未来優先、Sona CoreとRouter対応、回帰テストを追加。実TimeTree接続・会話E2Eは未確認。Sona Core回帰は非公開依存により標準CI対象外。
+- #325 / PR #326 / v0.30.1（実TimeTree未確認）: Context Brokerから予定検索queryを渡し、TimeTree予定キャッシュの題名・説明・場所を検索。CAPCOM/カプコン別名、未来優先・無条件全履歴検索の抑止を追加。関連CI通過後にmain反映。実TimeTree・実LLM会話と非公開Sona CoreのE2Eは未確認。
+
+- PR #331 / v0.30.0（CI確認中・実機受入未確認）: Univ Three.js遠景星を恒星色・大小表現へ変更し、WebGLと旧CSSカメラのポインター干渉を抑制。通知センターをSettingsからRemindersへ移動し回帰テストを追加。最終コミットの星点サイズ10は実画面/スマホで視認性・負荷の確認が必要。Desktop通知のPR #330、TimeTree検索のPR #326は別途統合・検証対象。
+
+- #327 / feat/v29: 接続ステータスを上部同期表示・Settings・PCサイドバーへ追加。保存済み診断と同期履歴を表示し、接続確認だけを明示実行する。Notion対象別の再試行・既存競合UIを共用し、ライブ同期hookと競合採用の共有トランザクション不整合も修正。Backend関連53件・UI関連63件/31サブテスト・Frontend17件・Desktop62件成功。隔離Braveで1440/390/320pxと実UniverseのSettings/サイドバー導線、単一再試行・競合採用・部分障害・フォーカス復元を確認。実サービスの再試行/採用・実iPhone/PWA/配布Desktopは未確認。Push/PR/main反映は未実施。詳細は `docs/connection-status.md`。
 
 - #321 / v0.28.0（配布版受入未確認）: v27実操作UX課題を改善。Tasks再クリック/Enterで惑星詳細、WebGL選択とHUD同期、閲覧/編集切替・上部の作業開始・子追加の開閉、固定バー/HUDとスクロールの調整、期限の識別・作業なしの開始導線・競合対象名、音声説明の設定集約を実装。統計は日別内訳/振り返り保存を追加し、Coreの既存集計を共用。新規SQLite表とrevision一致のトランザクションで上書きを防ぎ、未保存の入力と失敗案内を保持。Desktopの同一文書内切替でreadyを失う不具合も修正。Python80件・Frontend17件・Desktop61件成功（macOS限定1件skip）、隔離実Electronの390px/960px・日別保存/409/下書き・9秒経過後の継続と既存復旧/WebGLを確認。実WebのTasks→惑星詳細/HUDと期限表示、稼働APIの今日/過去日を読取確認。実データへの変更・同期競合採用は未実施。多天体/長いラベルの配置、macOS/実iPhone/PWA/配布版/実音声/LLMの受入は残る。詳細は `docs/desktop-v28-ux.md`。関連PRのCI・main反映状態はGitHubを正とする。配布更新と実端末受入は別途。
 
@@ -20,7 +24,7 @@
 
 - #315 / Fix/v26（未公開）: Windows更新のサイズ/SHA-256検証・進捗、作業星の強調、IME/Enter長押し/入力復元、Notion競合の差分比較と明示採用、VAPID不要のDesktop通知・ホバーで残る声かけを実装。画面切替後のWorkspace IPC拒否も修正。Desktop 60件成功・macOS限定1件skip、Frontend 17件、Python関連53件成功。Windows x64 NSIS生成・新しい同梱resource確認済み（未署名）。プロジェクトvenvへ不足していたpywebpushを導入し、稼働中APIの依存利用可能とpip checkを確認。実Notionの親404は未解消、実Push/OS通知受信・旧配布版からの更新・実音声・3D発光の実機受入は未確認。通知の音声割込み・25分間隔は後続設計。詳細は `docs/desktop-v26-experience.md`。Push/PR/Releaseは未実施。
 
-- 同期競合（2026-10-12）: 対象1件のPETIT側親子関係を残す方針でNotion更新を実行したが、親ページへのアクセスが404（連携 `nocord`）となり未解消。子ページの取得は成功、親ページ単独取得も404。ローカル親子関係と競合状態を保持。次はNotionで親ページの存在・ゴミ箱・連携共有を確認してから再反映する。更新前DBバックアップを作成済み。
+- 同期競合（2026-10-12 / 解消 2026-10-13）: 親ページ「音楽活動」のNotion 404に対し、NotionタスクDBへ「音楽活動」を新規再作成して新external_idを発行。子タスク「あなたといたい」の親RelationをNotionへ正常同期。誤ステータス"Mid"で400エラーとなっていた「dotsテスト」もstatus='Yet'へ修正・同期完了し、未解消の同期エラーは全件解消。更新前DBバックアップを作成済み。
 
 - #311 / v0.25.5: PETITは個人利用に限定し、Apple Developer契約・公証を利用しない方針を確定。タグpush時のmacOSはad-hoc署名で、afterSign/DMG内部の署名・リソース一致検証を必須とする。Windows EXEは従来通り、手動Actionsはdevelopment名を維持。v0.25.2タグは動かさない。手動Actionsもタグrefではdevelopment用DMGを重複生成しないよう分岐。未公証DMGはGatekeeperで通常起動が拒否され得るため、v0.25.4タグのWindows npm testはCRLF改行を固定LFで検査する回帰テスト2件が原因で失敗（Mac DMGビルド成功）。v0.25.5でテストの改行正規化とCRLF回帰を追加。VERSION更新とマージメッセージ`[desktop-release]`の組合せでのみタグ作成・リリースを起動するオプトイン導線も追加（手動実行は維持）。v0.25.5のWindows/macOS Release assetをAPIで確認（2026-10-13）。実機受入・更新通知は未完了。
 
@@ -248,3 +252,5 @@
 | 2026-10-12 | 20:59 | — | v27の実Web操作UX調査。Tasksの2回目クリック不一致、選択とHUD不一致、詳細の閲覧/編集混在と開始ボタン埋没、切替後HUD重なり、統計/競合の導線を記録。コード修正なし、実Desktop/音声/狭幅は未確認。証拠はstorage/ux-audit-2026-10-13/report.md。 |
 
 | 2026-10-13 | 04:45 | #321 | v0.28.0: 選択/HUD・詳細の開始/編集・期限/競合/音声説明を改善し、日別統計とrevision付き振り返り保存を追加。Desktop同一文書切替のready誤解除も修正。関連158件と隔離Electron、実Web読取で確認。実データの変更・配布版/実端末受入は未実施。 |
+
+| 2026-10-13 | 11:49 | #327 | v0.29.0: 保存済みの接続・同期診断メニューと明示接続確認、Notion失敗対象/再試行/競合導線を追加。秘密情報の伏せ字と部分障害を検証し、競合採用のsnapshot/監査を同一トランザクションへ修正。実サービス・実端末受入は未確認。 |

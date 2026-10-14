@@ -15,10 +15,18 @@ class ReminderUiTests(unittest.TestCase):
         self.assertIn('data-view="reminders"', html)
         self.assertIn('data-view-panel="reminders"', html)
         self.assertIn('id="reminder-list"', html)
+        self.assertIn('id="notification-center-title"', html)
+        self.assertIn('id="notification-list"', html)
         self.assertIn('/static/reminders.css', html)
         self.assertIn('/static/reminders.js', html)
         self.assertTrue((FRONTEND / "reminders.css").is_file())
         self.assertTrue((FRONTEND / "reminders.js").is_file())
+
+        # 通知センターがremindersビュー内にあり、settingsビュー内から移行されていること
+        reminders_panel = html.split('data-view-panel="reminders"')[1].split('</section>')[0]
+        settings_panel = html.split('data-view-panel="settings"')[1].split('</section>')[0]
+        self.assertIn('notification-center-title', reminders_panel)
+        self.assertNotIn('notification-center-title', settings_panel)
 
     def test_reminder_ui_uses_safe_dom_and_backend_contract(self) -> None:
         script = (FRONTEND / "reminders.js").read_text(encoding="utf-8")

@@ -160,7 +160,7 @@
    ==================================================== */
 .detail-grid--simple {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -171,6 +171,8 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   background: rgba(200, 207, 222, 0.02);
+  min-width: 0;
+  overflow: hidden;
 }
 .detail-grid--simple span {
   font-size: 10px;
@@ -183,6 +185,9 @@
   font-size: 13px;
   font-weight: 500;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .detail-reason {
   margin: 0;
@@ -691,6 +696,7 @@
   border: 1px solid var(--line);
   border-radius: 6px;
   margin-top: 8px;
+  box-sizing: border-box;
 }
 .detail-form-field {
   display: flex;
@@ -698,17 +704,25 @@
   gap: 4px;
   font-size: 11px;
   color: var(--text-sub);
+  min-width: 0;
 }
 .detail-form-field input,
 .detail-form-field select,
 .detail-form-field textarea {
+  box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 6px 10px;
   background: rgba(5, 6, 13, 0.8);
   border: 1px solid var(--line-mid);
   border-radius: 4px;
   color: var(--text);
   font-size: 12px;
+}
+.detail-form-field input[type="date"] {
+  padding: 6px 6px 6px 8px;
+  color-scheme: dark;
 }
 .detail-form-field input:focus,
 .detail-form-field select:focus,
@@ -718,7 +732,7 @@
 }
 .detail-form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .detail-form-actions {

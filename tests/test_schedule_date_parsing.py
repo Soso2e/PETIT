@@ -66,6 +66,7 @@ class ForcedScheduleReadTests(unittest.TestCase):
         self.assertEqual(json.loads(result["used_tools"][0]["arguments"])["date"], "2026-07-13")
 
     def test_today_and_tomorrow_keep_existing_behavior(self) -> None:
+        fixed_today = date(2026, 7, 21)
         captured: list[str] = []
 
         def fake_dispatch(name: str, arguments: dict[str, str]) -> str:
@@ -73,14 +74,15 @@ class ForcedScheduleReadTests(unittest.TestCase):
             return self._schedule_result(arguments["date"])
 
         with (
+            patch("backend.date_parser.time_context.current_date", return_value=fixed_today),
             patch.object(agent.tools, "dispatch", side_effect=fake_dispatch),
             patch.object(agent, "_complete", return_value=({"content": "確認しました"}, "agent", None)),
         ):
             agent._run_forced_read("今日の予定を教えて", [], "get_schedule")
             agent._run_forced_read("明日の予定を教えて", [], "get_schedule")
 
-        self.assertEqual(captured[0], date.today().isoformat())
-        self.assertEqual(captured[1], (date.today() + timedelta(days=1)).isoformat())
+        self.assertEqual(captured[0], fixed_today.isoformat())
+        self.assertEqual(captured[1], (fixed_today + timedelta(days=1)).isoformat())
 
     def test_invalid_or_ambiguous_date_requests_confirmation_without_dispatch(self) -> None:
         for message in ("2026-02-30の予定を教えて", "来週月曜の予定を教えて"):
