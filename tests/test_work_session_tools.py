@@ -75,6 +75,27 @@ class WorkSessionToolTests(unittest.TestCase):
         self.assertEqual(tools.risk_for("start_work_session"), "low_risk_write")
         self.assertEqual(tools.risk_for("update_work_session"), "low_risk_write")
 
+    def test_start_same_paused_task_resumes_instead_of_reporting_already_active(self) -> None:
+        task_id = self.add_task("HERE")
+        started = self.dispatch("start_work_session", {"task_id": str(task_id)})
+        self.dispatch("update_work_session", {"action": "pause"})
+        resumed = self.dispatch("start_work_session", {"task_id": str(task_id)})
+        self.assertTrue(resumed["resumed"])
+        self.assertFalse(resumed["started"])
+        self.assertEqual(resumed["session"]["status"], "active")
+        self.assertEqual(resumed["session"]["session_id"], started["session"]["session_id"])
+        repeated = self.dispatch("start_work_session", {"task_id": str(task_id)})
+        self.assertTrue(repeated["already_active"])
+
+    def test_resume_failure_does_not_claim_success(self) -> None:
+        task_id = self.add_task("HERE")
+        self.dispatch("start_work_session", {"task_id": str(task_id)})
+        self.dispatch("update_work_session", {"action": "pause"})
+        with patch("backend.work_sessions.resume_session", return_value=None):
+            result = self.dispatch("start_work_session", {"task_id": str(task_id)})
+        self.assertFalse(result["resumed"])
+        self.assertNotIn("already_active", result)
+
 
 class WorkSessionRoutingTests(unittest.TestCase):
     def test_work_time_question_cannot_bypass_tools(self) -> None:

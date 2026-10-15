@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.30.2**
+**Current Version: v0.30.3**
 
-**Last Updated: 2026-10-14**
+**Last Updated: 2026-10-15**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #332 / v0.30.3（実装済み・稼働アプリ未確認）: 「HERE再開／HEREタスク再開／HERE作業再開」をProject Continuityより先に既存未完了Taskと照合。同じTaskのpausedセッションは経過時間を保持して再開、activeは重複作成せず継続、終了済み記録は保持。複数候補・Task/Project同名は書き込まず選択を案内。関連unittest 86件成功（隔離SQLiteとHTTP `/api/chat` の会話保存・承認不要・LLM 0 Callを含む）。TestClient依存の非推奨警告あり。実データ／稼働Backend／配布Desktopの操作確認は未実施。次はBackend再起動後に実HEREタスクの再開を確認する。ユーザー指定でmainへローカルコミット、Push・PR作成は対象外。
 
 - #329 / PR #330 / v0.30.2（配布・OS通知実機未確認）: Desktop OS通知音の明示ON（既定無音）と、通知表示要求/show/failed診断を追加。Native通知の寿命保持・既存Web PushとDesktop権限の分離を維持。CI全テストは成功、Desktop関連の単体65件・Backend通知関連17件成功、隔離通知専用smoke成功。一方、全体smokeには音声確認ボタン・統計画面のtimeoutと入力文字列不一致による失敗が残るため、全体E2E成功とは扱わない。Mac/WindowsのOS通知受信・実音・Focus・正式配布DMGインストールは未確認。診断は `docs/desktop-notification-diagnostics.md`。
 
@@ -256,3 +258,5 @@
 | 2026-10-13 | 04:45 | #321 | v0.28.0: 選択/HUD・詳細の開始/編集・期限/競合/音声説明を改善し、日別統計とrevision付き振り返り保存を追加。Desktop同一文書切替のready誤解除も修正。関連158件と隔離Electron、実Web読取で確認。実データの変更・配布版/実端末受入は未実施。 |
 
 | 2026-10-13 | 11:49 | #327 | v0.29.0: 保存済みの接続・同期診断メニューと明示接続確認、Notion失敗対象/再試行/競合導線を追加。秘密情報の伏せ字と部分障害を検証し、競合採用のsnapshot/監査を同一トランザクションへ修正。実サービス・実端末受入は未確認。 |
+
+| 2026-10-15 | 02:39 | #332 | v0.30.3: Task再開のProject誤認と同一Taskのpaused再開を修正。関連86件と隔離HTTP会話の保存・LLM不要を動作確認済み、稼働アプリ/実データは未確認。ユーザー指定でmainへローカルコミット。 |

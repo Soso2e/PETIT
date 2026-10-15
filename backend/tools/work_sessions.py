@@ -40,7 +40,9 @@ def _public_task(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def resolve_task(*, task_id: str | None = None, task: str | None = None) -> dict[str, Any]:
+def resolve_task(
+    *, task_id: str | None = None, task: str | None = None, allow_partial: bool = True,
+) -> dict[str, Any]:
     rows = _active_task_rows()
     identifier = _normalize(task_id)
     if identifier:
@@ -60,7 +62,7 @@ def resolve_task(*, task_id: str | None = None, task: str | None = None) -> dict
     if not query:
         return {"error": "作業を開始するタスク名またはtask_idを指定してください。"}
     exact = [row for row in rows if _normalize(row.get("title")) == query]
-    matches = exact or [row for row in rows if query in _normalize(row.get("title"))]
+    matches = exact or ([row for row in rows if query in _normalize(row.get("title"))] if allow_partial else [])
     if len(matches) == 1:
         return {"task": _public_task(matches[0])}
     if not matches:
@@ -116,6 +118,7 @@ def get_work_report(days: int = 7) -> dict[str, Any]:
         "既存の未完了タスクを選んで作業計測を開始する。task_idを優先し、タスク名は完全一致、"
         "正規化一致、一意な部分一致だけ開始する。0件・複数件なら開始せず候補を返す。"
         "進行中の別セッションがある場合は終了して切り替える。新規タスクは作成しない。"
+        "同じタスクが一時停止中なら既存セッションを再開し、作業中なら計測を継続する。"
     ),
     parameters={
         "type": "object",
@@ -135,6 +138,11 @@ def start_work_session(task_id: str | None = None, task: str | None = None) -> d
     active = work_sessions.active_session()
     selected_id = str(selected["task_id"])
     if active and str(active.get("task_id") or "") == selected_id:
+        if active.get("status") == "paused":
+            session = work_sessions.resume_session(str(active["session_id"]))
+            if not session:
+                return {"started": False, "resumed": False, "error": "作業セッションを再開できませんでした。"}
+            return {"started": False, "resumed": True, "session": session}
         return {"started": False, "already_active": True, "session": active}
 
     previous = active

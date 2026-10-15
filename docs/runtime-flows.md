@@ -91,6 +91,7 @@ flowchart TD
 - `backend/time_context.py`
 - `backend/work_sessions.py`
 - `backend/tools/work_sessions.py`
+- `backend/task_work_intent.py`
 - `backend/tools/registry.py`
 - `backend/agent_state.py`
 - `backend/agent_progress.py`
@@ -113,6 +114,8 @@ flowchart TD
 
     namedTask{名前付きタスク完了か}
     namedTaskRoute[SQLiteの tasks_cache で候補解決]
+    taskResume{名前付きTask再開か}
+    taskResumeRoute[Task名を照合し一意なら作業計測を再開]
     projectRoute{Project Continuity系か}
     projectHandle[登録 完了 切替 復帰を決定論的に処理]
     exactTime{現在時刻だけの依頼か}
@@ -147,7 +150,9 @@ flowchart TD
     dialogueHandle -.->|Tool成功時| dialogueSave --> response
     dialogue -->|いいえ| namedTask
     namedTask -->|はい| namedTaskRoute --> response
-    namedTask -->|いいえ| projectRoute
+    namedTask -->|いいえ| taskResume
+    taskResume -->|既存Task またはTask明示| taskResumeRoute --> response
+    taskResume -->|対象外 またはTaskなしのProject候補| projectRoute
     projectRoute -->|はい| projectHandle --> response
     projectRoute -->|いいえ| exactTime
     exactTime -->|はい| timeTool --> response
@@ -277,6 +282,9 @@ flowchart LR
     resolve{既存未完了Taskを1件に解決}
     ambiguous[0件または複数候補を返す]
     start[start_work_session]
+    current{同じTaskのセッション状態}
+    resumePaused[同じセッションをresume_sessionで再開]
+    keepActive[計測を継続し重複作成しない]
     sqlite[(work_sessions と work_session_events)]
     active[GET active 経過秒を計算]
     update[一時停止 再開 続行 終了]
@@ -289,7 +297,10 @@ flowchart LR
 
     request --> resolve
     resolve -->|失敗| ambiguous
-    resolve -->|成功| start --> sqlite
+    resolve -->|成功| start --> current
+    current -->|paused| resumePaused --> sqlite
+    current -->|active| keepActive
+    current -->|別Task またはセッションなし| sqlite
     update --> sqlite
     sqlite --> active --> ui
     sqlite --> report --> ui
@@ -300,6 +311,8 @@ flowchart LR
 ```
 
 Notion Task DBへ作業時間プロパティは追加しません。SQLiteのセッションへPETIT内部`task_id`を保存し、Notionを含むタスク正本と参照で結びます。開始・一時停止・再開・終了はイベントとして残すため、日付をまたぐ休憩も暦日単位で集計できます。`start_work_session`と`update_work_session`は明示依頼時の低リスク書き込み、`get_work_status`と`get_work_report`は読み取りです。
+
+「HERE再開」「HEREタスク再開」「HERE作業再開」はProject判定より前にSQLiteの既存未完了Taskを照合します。入力どおりの完全一致、末尾の「タスク／作業」を除いた完全一致、一意な部分一致の順で解決し、複数候補では書き込みません。Task明示で0件ならTaskが見つからない旨を返し、Project登録へ流しません。Projectを明示した入力は従来経路を維持し、同名TaskとProjectがある省略入力は選択を求めます。終了済みの作業は保持して新しい計測を開始し、Taskの状態自体は変更しません。
 
 ---
 
@@ -558,7 +571,11 @@ flowchart TD
     resume[checkpointや外部sourceから復帰文を生成]
 
     guard[Dialogue State入口でTask確認回答を先に処理]
-    input --> guard --> registration
+    workGuard{名前付きTask再開に該当するか}
+    workHandle[Task照合と作業セッション再開 または候補確認]
+    input --> guard --> workGuard
+    workGuard -->|はい| workHandle
+    workGuard -->|いいえ| registration
     registration -->|はい| registrationHandle
     registration -->|いいえ| completionDraft
     completionDraft -->|はい| completionHandle
