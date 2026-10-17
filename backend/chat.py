@@ -7,11 +7,14 @@ import time
 from uuid import uuid4
 from typing import Literal
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from . import (
     agent,
+    attachments,
+    brain_runtime,
+    vision,
     calendar_sync,
     chroma_client,
     conversation_state,
@@ -31,7 +34,8 @@ _artifact_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="petit
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = ""
+    attachment_ids: list[str] = Field(default_factory=list, max_length=4)
     history: list[dict[str, str]] | None = None
     request_id: str | None = None
     session_id: str | None = None
@@ -43,14 +47,20 @@ def chat(req: ChatRequest) -> ChatResponse:
     request_id = (req.request_id or "").strip() or uuid4().hex
     session_id = (req.session_id or "").strip() or None
     message = (req.message or "").strip()
-    if not message:
+    if not message and not req.attachment_ids:
         return ChatResponse(reply="", error="メッセージが空です。", request_id=request_id)
 
     started = time.monotonic()
     try:
         with request_context.bind(request_id=request_id, session_id=session_id, conversation_mode=req.conversation_mode):
             with lmstudio_client.observe_turn() as turn_metrics:
-                result = agent.run(message, history=req.history)
+                if req.attachment_ids:
+                    observations = vision.analyze(req.attachment_ids, session_id)
+                    result = brain_runtime.run_with_images(message, observations, history=req.history)
+                else:
+                    result = agent.run(message, history=req.history)
+    except HTTPException as exc:
+        return ChatResponse(reply="", error=str(exc.detail), request_id=request_id)
     except LMStudioError as exc:
         return ChatResponse(reply="", error=str(exc), request_id=request_id)
     except Exception as exc:  # noqa: BLE001
@@ -88,6 +98,7 @@ def chat(req: ChatRequest) -> ChatResponse:
         "base_url_id": model_route.get("base_url_id"),
         "tools": tool_names,
         "llm_calls": turn_metrics["llm_calls"],
+        "usage": turn_metrics.get("usage", []),
         "embedding_calls": 0,
         "notion_sync": __import__("backend.tools.notion", fromlist=["status"]).status(),
         "notion_task_live_sync": notion_task_sync.status(),
@@ -122,7 +133,7 @@ def chat(req: ChatRequest) -> ChatResponse:
     used_tools_str = ", ".join(t["name"] for t in used_tools) or None
     if result.get("persist", True):
         conv_id = db.save_conversation(
-            user_text=message,
+            user_text=message + ("\n[画像: " + ", ".join(req.attachment_ids) + "]" if req.attachment_ids else ""),
             assistant_text=reply,
             used_tools=used_tools_str,
             session_id=session_id,
@@ -137,7 +148,10 @@ def chat(req: ChatRequest) -> ChatResponse:
             except Exception:  # noqa: BLE001
                 # State is an optimization. It must never make a successful chat fail.
                 log.exception("conversation state update failed session_id=%s", session_id)
-        _artifact_executor.submit(_persist_chat_artifacts, conv_id, message, reply, used_tools_str)
+        if req.attachment_ids:
+            attachments.save_observations(conv_id, session_id, observations)
+        else:
+            _artifact_executor.submit(_persist_chat_artifacts, conv_id, message, reply, used_tools_str)
 
     return ChatResponse(
         reply=reply,

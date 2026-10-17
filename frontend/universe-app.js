@@ -1305,11 +1305,19 @@
   };
 
   const sendChat = async (message) => {
+    const attachmentIds = window.PetitChatAttachments?.ids() || [];
+    const submit = chatFormEl.querySelector('[type="submit"]');
+    submit.disabled = true;
+    window.PetitChatAttachments?.lock(true);
     const requestId = randomId();
-    appendMessage("user", message);
-    const workCommand = classifyWorkCommand(message);
+    appendMessage("user", message + (attachmentIds.length ? `\n[画像 ${attachmentIds.length}枚]` : ""));
+    const workCommand = attachmentIds.length ? null : classifyWorkCommand(message);
     if (workCommand) {
-      await handleWorkCommand(workCommand);
+      try { await handleWorkCommand(workCommand); }
+      finally {
+        submit.disabled = false;
+        window.PetitChatAttachments?.lock(false);
+      }
       return;
     }
     const pending = appendMessage("assistant", "考え中…");
@@ -1322,8 +1330,9 @@
       const data = await requestJson("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history: state.history, request_id: requestId, session_id: state.sessionId }),
+        body: JSON.stringify({ message, attachment_ids: attachmentIds, history: state.history, request_id: requestId, session_id: state.sessionId }),
       });
+      window.PetitChatAttachments?.complete(attachmentIds);
       pending.remove();
       appendMessage("assistant", data.reply || "返答がありませんでした。", data.pending_actions || []);
       state.history.push({ role: "user", content: message }, { role: "assistant", content: data.reply || "" });
@@ -1332,13 +1341,18 @@
       pending.classList.remove("is-loading");
       pending.classList.add("message--error");
       pending.textContent = `通信に失敗しました: ${error.message}`;
+      if (!chatInputEl.value) chatInputEl.value = message;
+    } finally {
+      submit.disabled = false;
+      window.PetitChatAttachments?.lock(false);
     }
   };
 
   chatFormEl?.addEventListener("submit", (event) => {
     event.preventDefault();
     const message = String(chatInputEl.value || "").trim();
-    if (!message) return;
+    if (chatFormEl.querySelector('[type="submit"]').disabled || (window.PetitChatAttachments && !window.PetitChatAttachments.ready())) return;
+    if (!message && !window.PetitChatAttachments?.ids().length) return;
     chatInputEl.value = "";
     sendChat(message);
   });

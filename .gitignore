@@ -18,6 +18,8 @@ storage/chroma/
 storage/AI_Daily/
 storage/AI_Memory/
 storage/audit/
+storage/attachments/
+storage/vision-ui/
 
 # OS / editor
 .DS_Store

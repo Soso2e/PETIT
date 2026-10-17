@@ -346,11 +346,13 @@ async function checkHealth() {
 }
 
 async function sendMessage(text) {
+  const attachmentIds = window.PetitChatAttachments?.ids() || [];
+  window.PetitChatAttachments?.lock(true);
   const voiceTurn = window.PetitVoiceConversation?.beginTurn();
   let voiceResult = null;
   const requestId = crypto.randomUUID();
   activeRequestId = requestId;
-  addMessage("user", text);
+  addMessage("user", text + (attachmentIds.length ? `\n[画像 ${attachmentIds.length}枚]` : ""));
 
   setTyping(true);
   sendEl.disabled = true;
@@ -361,7 +363,7 @@ async function sendMessage(text) {
     const data = await chatJson("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history, request_id: requestId, session_id: sessionId,
+      body: JSON.stringify({ message: text, attachment_ids: attachmentIds, history, request_id: requestId, session_id: sessionId,
         conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }),
     });
     setTyping(false);
@@ -374,6 +376,7 @@ async function sendMessage(text) {
       if (desktopChatState && !inputEl.value) { inputEl.value = text; saveDraft(); }
     } else {
       desktopChatState?.complete(text);
+      window.PetitChatAttachments?.complete(attachmentIds);
       voiceResult = data;
       history.push({ role: "user", content: text });
       if (data.reply) {
@@ -393,6 +396,7 @@ async function sendMessage(text) {
   } finally {
     if (activeRequestId === requestId) activeRequestId = null;
     sendEl.disabled = false;
+    window.PetitChatAttachments?.lock(false);
     if (waitStopEl) waitStopEl.hidden = true;
     window.PetitVoiceConversation?.finishChat(voiceTurn, voiceResult);
     inputEl.focus();
@@ -403,8 +407,9 @@ async function sendMessage(text) {
 formEl.addEventListener("submit", (e) => {
   e.preventDefault();
   if (sendEl.disabled) return;
+  if (window.PetitChatAttachments && !window.PetitChatAttachments.ready()) return;
   const text = inputEl.value.trim();
-  if (!text) return;
+  if (!text && !window.PetitChatAttachments?.ids().length) return;
   inputEl.value = "";
   inputEl.style.height = "auto";
   sendMessage(text);
