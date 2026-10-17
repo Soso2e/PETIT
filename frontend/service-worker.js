@@ -15,6 +15,8 @@ const assetUrl = (path) => {
 };
 
 const SHELL = [
+  "/static/chat_attachments.js",
+  "/static/chat_attachments.css",
   "/static/connection-status.js",
   "/static/connection-status.css",
   "/",

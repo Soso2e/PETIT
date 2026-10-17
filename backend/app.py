@@ -4,6 +4,8 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from . import (
+    attachments,
+    vision,
     chat,
     frontend_api,
     health,
@@ -28,6 +30,8 @@ def build_modules() -> tuple[ModuleDefinition, ...]:
         ModuleDefinition(id="builtin-tools", registrars=(tools.register_builtin_tools,)),
         ModuleDefinition(id="health", routers=(health.router,)),
         ModuleDefinition(id="model-routing", routers=(model_routing_api.router,)),
+        ModuleDefinition(id="attachments", routers=(attachments.router,)),
+        ModuleDefinition(id="vision", routers=(vision.router,)),
         ModuleDefinition(id="notion-webhook", routers=(notion_webhook.router,)),
         ModuleDefinition(id="notifications", routers=(notifications.router,)),
         ModuleDefinition(

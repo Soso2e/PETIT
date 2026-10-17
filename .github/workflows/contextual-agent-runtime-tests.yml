@@ -8,6 +8,13 @@ on:
       - "backend/conversation_state.py"
       - "backend/brain_runtime.py"
       - "backend/chat.py"
+      - "backend/attachments.py"
+      - "backend/vision.py"
+      - "backend/vision_calculations.py"
+      - "tests/test_vision.py"
+      - "tests/test_vision_calculations.py"
+      - "tests/fixtures/vision/**"
+      - "frontend/chat_attachments.js"
       - "backend/pending_actions.py"
       - "backend/project_router.py"
       - "backend/task_completion_intent.py"
@@ -59,13 +66,16 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter
+          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter pytest 'Pillow>=11.3,<13'
       - name: Compile Python sources
         run: python -m compileall backend tests
       - name: Check frontend syntax
         run: |
           node --check frontend/app.js
           node --check frontend/action_confirm.js
+          node --check frontend/chat_attachments.js
+      - name: Run image intake and Vision regressions
+        run: python -m pytest tests/test_vision.py tests/test_vision_calculations.py tests/test_chat_router.py tests/test_module_registry.py -q
       - name: Run contextual Agent tests
         run: |
           python -m unittest \

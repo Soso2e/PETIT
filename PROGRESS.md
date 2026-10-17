@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.30.2**
+**Current Version: v0.31.0（開発ブランチ・未マージ）**
 
-**Last Updated: 2026-10-14**
+**Last Updated: 2026-10-17**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #333 / v0.31.0（実装済み・実Provider未確認）: 安全なPNG/JPEG/WebP添付受付、会話IDに束縛したopaque ID、向き/解像度/形式/件数/容量検査、24時間TTLと削除、DeepSeek Flash Vision観測→共通Brain回答のRead専用経路を追加。画像・認識内容のクラウド送信は設定による明示許可がある場合だけ（既定OFF）。LM Studioは選択モデルのvision能力を実照会できる場合だけ。Steamの既知比率はDecimalで検証。Web/小型Desktop/旧UIの添付・失敗保持・再試行・削除を隔離Chromeで390/1440px確認。関連Core pytest125件+11 subtests、Desktop単体64件成功/1 skip。実DeepSeek/LM Studio画像精度・実Discord・配布版/macOS/PWA実機は未確認。画像Project/GitHub照合は#245/#246、共通Thread/Turnは#303/#304が後続。計画: docs/multimodal-discord-plan.md、20件の受入設計: docs/multimodal-acceptance.md。ローカルmainの未Push修正dc865feと既存storageは保持。
 
 - #329 / PR #330 / v0.30.2（配布・OS通知実機未確認）: Desktop OS通知音の明示ON（既定無音）と、通知表示要求/show/failed診断を追加。Native通知の寿命保持・既存Web PushとDesktop権限の分離を維持。CI全テストは成功、Desktop関連の単体65件・Backend通知関連17件成功、隔離通知専用smoke成功。一方、全体smokeには音声確認ボタン・統計画面のtimeoutと入力文字列不一致による失敗が残るため、全体E2E成功とは扱わない。Mac/WindowsのOS通知受信・実音・Focus・正式配布DMGインストールは未確認。診断は `docs/desktop-notification-diagnostics.md`。
 
@@ -256,3 +258,5 @@
 | 2026-10-13 | 04:45 | #321 | v0.28.0: 選択/HUD・詳細の開始/編集・期限/競合/音声説明を改善し、日別統計とrevision付き振り返り保存を追加。Desktop同一文書切替のready誤解除も修正。関連158件と隔離Electron、実Web読取で確認。実データの変更・配布版/実端末受入は未実施。 |
 
 | 2026-10-13 | 11:49 | #327 | v0.29.0: 保存済みの接続・同期診断メニューと明示接続確認、Notion失敗対象/再試行/競合導線を追加。秘密情報の伏せ字と部分障害を検証し、競合採用のsnapshot/監査を同一トランザクションへ修正。実サービス・実端末受入は未確認。 |
+
+| 2026-10-17 | 14:16 | #333 | v0.31.0: 画像添付/Vision観測/Read専用Brain回答とPython比率検証、明示cloud同意・TTL・session境界を実装。関連125件と11 subtests、Desktop64件、隔離Chromeの3 UI×2幅成功。実Provider/Discord/実端末は未確認。 |

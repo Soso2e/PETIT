@@ -10,6 +10,14 @@ DesktopをPCの主入口にする全体の目標・会話/実行の正本・起�
 この MVP は **ブラウザ（localhost）で動くテキストチャット** で、
 LLM は **LM Studio**（OpenAI 互換のローカルサーバー）を利用します。
 
+v0.31.0の開発ブランチでは、Web/旧UI/Desktop小型会話に画像添付を追加します。PNG/JPEG/WebPを4枚・各8MiBまで、画像だけでも送信できます。観測と考察を分離し、既知のSteam指標はPythonで比率を検証します。実Providerの画像認識品質・配布Desktop/macOS/PWA実機は未確認です。[設計とフェーズ](docs/multimodal-discord-plan.md)、[受入セット](docs/multimodal-acceptance.md)を参照。
+
+画像はCoreに24時間保存します。クラウドへの画像・認識内容送信は既定OFFです。利用者が明示許可する場合だけ、サーバーの`.env`に `PETIT_ALLOW_CLOUD_IMAGES=true` を追加しBackendを再起動してください。Visionは既存の `PETIT_DEEPSEEK_API_KEY` / `PETIT_DEEPSEEK_FLASH_MODEL=deepseek-flash` を使用します。APIキーをClientやGitへ置かないでください。Chatの回答Providerは既存設定を使用します。
+
+ローカル画像認識は `PETIT_VISION_PROFILE=local` とし、Chat側のLM Studioモデルを画像対応モデルに設定します。選択モデルの `GET /api/v1/models` が `capabilities.vision=true` を返す場合だけ利用できます。能力不明の旧LM Studioは更新してください。外部ホスト名のLM Studio接続もクラウド送信許可の対象です。ローカルはlocalhost・プライベートIP・`.local`ホストを使用します。
+
+HTTP契約は `POST /api/attachments` に画像実体（multipart不要）、`X-PETIT-Session` に既存会話ID（16〜200文字）を送り、返された`id`を `/api/chat` の `attachment_ids` で参照します。参照と削除も同じheaderで `GET / DELETE /api/attachments/{id}`。既存の文字だけの `/api/chat` は維持します。会話IDはローカルClientの境界でありユーザー認証の代わりではありません。無認証のCoreをインターネット公開しない構成を維持してください。
+
 v0.30.0ではUnivの遠景星空・ドラッグ操作とRemindersの通知センター配置を改善しました。 v0.30.1では予定名のキーワード検索とCAPCOM/カプコン別名に対応しました。 v0.30.2ではDesktopのOS通知音を任意で有効化でき、通知の表示診断を改善しました（OS上の受信・実音は未確認）。v0.29.0から、上部同期表示・Settingsから接続ステータスとNotion同期失敗の詳細を確認できます。保存済み状態を表示し、接続確認・再試行は明示操作で実行します。[接続ステータス](docs/connection-status.md)を参照。
 
 ## 構成

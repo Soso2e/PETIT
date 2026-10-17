@@ -1,10 +1,13 @@
-from backend import chat, main, shortcut_voice
+from backend import app as app_module, chat, main, shortcut_voice
 
 
 def _chat_routes():
     return [
         route
-        for route in main.app.routes
+        # FastAPI 0.139 keeps included routers lazy; inspect the explicit registry.
+        for module in app_module.build_modules()
+        for router in module.routers
+        for route in router.routes
         if getattr(route, "path", None) == "/api/chat"
         and "POST" in (getattr(route, "methods", None) or set())
     ]
@@ -14,6 +17,7 @@ def test_chat_route_is_registered_once() -> None:
     routes = _chat_routes()
 
     assert len(routes) == 1
+    assert "post" in main.app.openapi()["paths"]["/api/chat"]
     assert routes[0].endpoint is chat.chat
 
 
