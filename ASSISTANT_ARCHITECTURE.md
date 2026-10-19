@@ -281,6 +281,15 @@ to work. State reads/updates are best effort, and the existing `history` API sta
 compatible. See [conversation-state.md](docs/conversation-state.md) for bounds,
 TTL, deterministic expressions, limitations, and acceptance checks.
 
+The first Conversation-to-Action reliability slice (#335) extends this same
+Task-owned clarification to work-session starts. Stable references, failed
+operations, and the saved active work session are separate evidence. Explicit
+starts use the existing Registry and SQLite transaction; repeated starts reuse
+the same active/paused session. Brain read requests may continue into the
+existing Agent only when an unfinished action and capabilities are explicit.
+Read-only turns keep their two-call path and ordinary chat stays one-call.
+See [reproduction and acceptance limits](docs/conversation-action-reliability.md).
+
 The four responsibility layers are Turn History, Dialogue Working Memory,
 Episodic Memory, and Knowledge/Sources. The future Backend thread should own
 messages, Tool calls/results and approval events, accepting `message + session_id`

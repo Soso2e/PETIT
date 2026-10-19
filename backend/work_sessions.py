@@ -157,12 +157,26 @@ def start_session(
     task_id: str | None = None,
     project_id: str | None = None,
     now: datetime | None = None,
+    reuse_task: bool = False,
 ) -> dict[str, Any]:
     ensure_schema()
     current = _now(now)
     current_iso = _iso(current)
     next_check = _iso(current + timedelta(minutes=CHECK_INTERVAL_MINUTES))
     with db.get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if reuse_task and task_id:
+            existing = conn.execute("SELECT * FROM work_sessions WHERE task_id=? AND status IN ('active', 'paused') ORDER BY updated_at DESC LIMIT 1", (str(task_id),)).fetchone()
+            if existing:
+                if existing["status"] == "paused":
+                    paused = _parse(existing["paused_at"]) or current
+                    seconds = int(existing["paused_total_seconds"] or 0) + max(0, int((current - paused).total_seconds()))
+                    conn.execute("UPDATE work_sessions SET status='active', paused_at=NULL, paused_total_seconds=?, next_check_at=?, awaiting_response_since=NULL, updated_at=? WHERE session_id=?",
+                                 (seconds, next_check, current_iso, existing["session_id"]))
+                    _record_event(conn, existing["session_id"], "resumed", current_iso)
+                saved = dict(conn.execute("SELECT * FROM work_sessions WHERE session_id=?", (existing["session_id"],)).fetchone())
+                conn.commit()
+                return session_snapshot(saved, now=current) or {}
         replaced = conn.execute(
             "SELECT session_id FROM work_sessions WHERE status IN ('active', 'paused') AND session_id<>?",
             (session_id,),

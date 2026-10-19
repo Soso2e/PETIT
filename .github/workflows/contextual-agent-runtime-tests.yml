@@ -16,6 +16,12 @@ on:
       - "tests/test_project_router_context_guard.py"
       - "tests/test_conversation_state.py"
       - "tests/test_brain_runtime.py"
+      - "tests/test_action_reliability.py"
+      - "tests/test_one_pass_router.py"
+      - "backend/work_sessions.py"
+      - "backend/tools/work_sessions.py"
+      - "backend/notion_task_sync/store.py"
+      - "backend/petit_prompt.py"
       - "backend/agent.py"
       - "backend/agent_runtime.py"
       - "backend/agent_state.py"
@@ -69,6 +75,10 @@ jobs:
       - name: Run contextual Agent tests
         run: |
           python -m unittest \
+            tests.test_action_reliability \
+            tests.test_one_pass_router \
+            tests.test_work_session_tools \
+            tests.test_work_sessions \
             tests.test_dialogue_state \
             tests.test_dialogue_resolution \
             tests.test_project_router_context_guard \

@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.30.2**
+**Current Version: v0.30.3（開発ブランチ・未マージ）**
 
-**Last Updated: 2026-10-14**
+**Last Updated: 2026-10-19**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #335 / v0.30.3（実装済み・実モデル未確認）: Session開始の失敗会話を5テストで先に再現し、既存Dialogue/Brain/Registry/Agentを接続。stable ID・TTL付き失敗再試行、保存結果照合、active/paused再利用、同時開始の原子性、Context→Actionの条件付き継続、未実行/失敗の誤成功防止を追加。通常雑談1 Call・明示Session操作0 Call、Broker Read専用・既存承認を維持。隔離HTTPと関連自動テスト、Vision差分を重ねた回帰を検証。実LM Studioは接続不可、実Notion/配布Desktop/実モデル応答時間は未確認。変更前origin/mainでも失敗する旧テスト5件は#336で追跡。feat/multimodal-vision・既存storage・ローカルmainの未Push作業は保持。詳細: docs/conversation-action-reliability.md。次は実モデル受入、Task以外の永続Action契約は#303で後続。PR/CI結果はGitHubを正とする。
 
 - #329 / PR #330 / v0.30.2（配布・OS通知実機未確認）: Desktop OS通知音の明示ON（既定無音）と、通知表示要求/show/failed診断を追加。Native通知の寿命保持・既存Web PushとDesktop権限の分離を維持。CI全テストは成功、Desktop関連の単体65件・Backend通知関連17件成功、隔離通知専用smoke成功。一方、全体smokeには音声確認ボタン・統計画面のtimeoutと入力文字列不一致による失敗が残るため、全体E2E成功とは扱わない。Mac/WindowsのOS通知受信・実音・Focus・正式配布DMGインストールは未確認。診断は `docs/desktop-notification-diagnostics.md`。
 
@@ -256,3 +258,5 @@
 | 2026-10-13 | 04:45 | #321 | v0.28.0: 選択/HUD・詳細の開始/編集・期限/競合/音声説明を改善し、日別統計とrevision付き振り返り保存を追加。Desktop同一文書切替のready誤解除も修正。関連158件と隔離Electron、実Web読取で確認。実データの変更・配布版/実端末受入は未実施。 |
 
 | 2026-10-13 | 11:49 | #327 | v0.29.0: 保存済みの接続・同期診断メニューと明示接続確認、Notion失敗対象/再試行/競合導線を追加。秘密情報の伏せ字と部分障害を検証し、競合採用のsnapshot/監査を同一トランザクションへ修正。実サービス・実端末受入は未確認。 |
+
+| 2026-10-19 | 10:52 | #335 | v0.30.3: 会話からSession開始の原因を先に再現し、既存Dialogue/Brain/Agentで対象ID・失敗再試行・実行結果照合・同時開始を改善。隔離HTTP/自動回帰とVision重ね合わせを検証、実モデル/実Notion/配布Desktopは未確認。変更前の旧テスト失敗は#336、一般Action契約は#303で後続。 |
