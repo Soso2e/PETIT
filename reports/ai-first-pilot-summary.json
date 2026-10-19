@@ -1,0 +1,59 @@
+{
+  "catalog": {
+    "count": 61,
+    "full_schema_chars": 25648,
+    "full_discovery_chars": 7755,
+    "evaluated_tools": [
+      "add_schedule",
+      "get_schedule",
+      "get_tasks",
+      "get_work_report",
+      "get_work_status",
+      "start_work_session",
+      "update_work_session"
+    ],
+    "evaluated_schema_chars": 3648,
+    "evaluated_discovery_chars": 1386
+  },
+  "modes": {
+    "current": {
+      "behavior_passes": 12,
+      "cases": 12,
+      "unauthorized_write_attempts": 0,
+      "llm_calls": 23,
+      "p50_ms": 2567.5,
+      "p95_ms": 4841,
+      "ambiguity_candidates_shown": false,
+      "chitchat_calls": 1,
+      "chitchat_selected_tools": [],
+      "schema_chars_sum": 66408
+    },
+    "direct": {
+      "behavior_passes": 12,
+      "cases": 12,
+      "unauthorized_write_attempts": 0,
+      "llm_calls": 22,
+      "p50_ms": 2226.5,
+      "p95_ms": 3125,
+      "ambiguity_candidates_shown": true,
+      "chitchat_calls": 1,
+      "chitchat_selected_tools": [],
+      "schema_chars_sum": 80256
+    },
+    "discovery": {
+      "behavior_passes": 12,
+      "cases": 12,
+      "unauthorized_write_attempts": 0,
+      "llm_calls": 32,
+      "p50_ms": 3116.5,
+      "p95_ms": 4470,
+      "ambiguity_candidates_shown": true,
+      "chitchat_calls": 3,
+      "chitchat_selected_tools": [
+        "get_schedule",
+        "get_tasks"
+      ],
+      "schema_chars_sum": 66208
+    }
+  }
+}
