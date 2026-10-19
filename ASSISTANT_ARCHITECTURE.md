@@ -4,6 +4,8 @@ Desktopの入口、共有Thread/Turn、起動・復旧の目標は
 [`docs/desktop-foundation-design.md`](docs/desktop-foundation-design.md) に定義する。
 本書の情報源・Domainの正本は維持する。新契約は未実装で、現行Runtimeを置き換えたとは扱わない。
 
+2026-10-19の設計方針: DeepSeekを中心とするLLMが意図・文脈・情報取得・Tool選択・複数工程を判断し、Pythonは実行・権限・検証・承認・状態・冪等性・結果保証を担う。意図判定regexを拡張する方向へ進めない。現行/直接Tool Calling/Discoveryの比較は [AI-First設計・隔離PoC](docs/ai-first-agent-design.md) を参照。PoCは本番未接続で、#337の安全契約と既存APIを維持する。
+
 ## Goal
 
 PETIT is a source-aware personal assistant, not a generic chat wrapper. It should
