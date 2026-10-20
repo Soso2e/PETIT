@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.30.3（開発ブランチ・未マージ）**
+**Current Version: v0.31.0（統合検証ブランチ・未マージ）**
 
-**Last Updated: 2026-10-19**
+**Last Updated: 2026-10-20**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #333 / v0.31.0（実装済み・実Provider未確認）: 安全なPNG/JPEG/WebP添付受付、会話IDに束縛したopaque ID、向き/解像度/形式/件数/容量検査、24時間TTLと削除、DeepSeek Flash Vision観測→共通Brain回答のRead専用経路を追加。画像・認識内容のクラウド送信は設定による明示許可がある場合だけ（既定OFF）。LM Studioは選択モデルのvision能力を実照会できる場合だけ。Steamの既知比率はDecimalで検証。Web/小型Desktop/旧UIの添付・失敗保持・再試行・削除を隔離Chromeで390/1440px確認。関連Core pytest125件+11 subtests、Desktop単体64件成功/1 skip。実DeepSeek/LM Studio画像精度・実Discord・配布版/macOS/PWA実機は未確認。画像Project/GitHub照合は#245/#246、共通Thread/Turnは#303/#304が後続。計画: docs/multimodal-discord-plan.md、20件の受入設計: docs/multimodal-acceptance.md。ローカルmainの未Push修正dc865feと既存storageは保持。
 
 - #338（調査・隔離PoC、本番未移行）: DeepSeek中心で意図/文脈/Tool/複数工程を判断し、Pythonは権限/検証/承認/状態/冪等性/結果保証を担う方針をConcept/Architectureへ明記。#337の安全機能と公開PRは保持。実DeepSeek Flashの合成12ケース×3方式で、実行/停止条件は現行11/12・直接12/12・Discovery12/12、Call合計26/23/30、誤Write試行0/5ずつ。直接方式には引用文翻訳の失敗、Discoveryのpilotには雑談3 Callがあり、一般的な優位性・本番移行の条件は未達。既存61 Toolの全件公開は内部承認Toolを含むため不採用。詳細は docs/ai-first-agent-design.md、結果は reports/ai-first-evaluation.json。次は小さな直接公開集合でnative protocolと既存Pending/承認/結果契約を接続する設計・未調整ケース評価。汎用MCP接続、実データ操作、61 Tool選択精度、実Desktopは未確認。
 
@@ -264,3 +266,4 @@
 | 2026-10-19 | 10:52 | #335 | v0.30.3: 会話からSession開始の原因を先に再現し、既存Dialogue/Brain/Agentで対象ID・失敗再試行・実行結果照合・同時開始を改善。隔離HTTP/自動回帰とVision重ね合わせを検証、実モデル/実Notion/配布Desktopは未確認。変更前の旧テスト失敗は#336、一般Action契約は#303で後続。 |
 
 | 2026-10-19 | 11:24 | #338 | AI-First責務分担と3方式を調査・比較し、本番未接続PoCを追加。実DeepSeekの合成12ケース×3方式で直接経路に改善を観測したが、引用翻訳の失敗等が残るため本番移行は見送り。PR #337の安全機能・元checkoutは保持。結果/手順/未確認は docs/ai-first-agent-design.md。 |
+| 2026-10-17 | 14:16 | #333 | v0.31.0: 画像添付/Vision観測/Read専用Brain回答とPython比率検証、明示cloud同意・TTL・session境界を実装。関連125件と11 subtests、Desktop64件、隔離Chromeの3 UI×2幅成功。実Provider/Discord/実端末は未確認。 |

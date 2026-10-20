@@ -105,6 +105,35 @@ flowchart TD
 
 ## 1. 会話全体フロー
 
+### 画像添付のRead専用経路（v0.31.0 / #333）
+
+```mermaid
+flowchart TD
+    file[Web / Desktop: 画像実体] --> intake[POST /api/attachments: 8MiB・30秒上限]
+    intake --> check[実体decode / PNG JPEG WebP / 画素と辺の上限]
+    check --> normalize[EXIF向き補正・metadata除去・長辺4096pxまで]
+    normalize --> store[Core非公開storage + SQLite / session hash + opaque ID]
+    store --> request[POST /api/chat: attachment_ids + 任意message]
+    request --> owner{同じsession・期限内・4枚以下}
+    owner -->|不一致・欠落| error[error応答 / 認識したふりをしない]
+    owner -->|一致| consent{画像・認識内容の外部送信許可}
+    consent -->|外部・許可なし| error
+    consent -->|許可あり またはlocal| capability{モデル画像能力}
+    capability -->|Flash対応 / LM Studio selected model vision=true| vision[Vision Adapter: 観測JSONを1 Callで抽出]
+    capability -->|非対応・不明・通信失敗| error
+    vision --> validated{JSON schema / 画像ID対応 / 上限}
+    validated -->|失敗| error
+    validated -->|成功| calc[Decimalによる既知Steam比率検証 / 不明・重複値は計算しない]
+    calc --> brain[Core Promptで観測と考察を分けて回答 / 通常1 Call]
+    brain --> saved[既存conversations + TTL付き観測JSON / 添付ID保持]
+    saved --> reply[自然な返答 / usage・実Call数]
+    store --> ttl[24時間で参照拒否 / 60秒周期と起動時cleanup / 明示DELETE]
+```
+
+画像経路は `agent.run` / Capability選択 / Tool Loopへ入らず、画像内の命令からWrite・承認を生成しない。外部送信は `PETIT_ALLOW_CLOUD_IMAGES` が既定OFF。VisionのProviderは既存DeepSeek Flashを優先し、`PETIT_VISION_PROFILE=local` の場合はLM Studio `/api/v1/models` の選択モデル `capabilities.vision=true` が必要。未確認モデルは失敗にする。観測の回答生成先が外部の場合も同意を再検査する。通常2 Call、空出力再試行は最大各1回。HTTP timeoutは画像経路で各45秒。画像経路のMarkdown/Chroma自動exportは停止し、認識JSONは24時間で削除する。既存会話の返答/添付IDは既存履歴の保持方針に従う。
+
+画像とProject/GitHubの自動照合、Discord、新Thread/Turn APIはこの経路に未接続。後続は [計画](multimodal-discord-plan.md) と #245/#246/#303/#304を参照する。session IDは既存ローカルClientの会話境界であり、インターネット公開用のユーザー認証ではない。
+
 ```mermaid
 flowchart TD
     input[/ユーザー入力/]
