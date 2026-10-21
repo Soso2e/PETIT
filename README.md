@@ -38,6 +38,12 @@ v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeを
 
 AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
 
+## ローカル開発状況の参照（#341 / 開発ブランチ）
+
+既存PC観測をOpt-inで拡張し、登録済みローカルGitリポジトリのHEAD・ブランチ・ahead/behind・直近コミットと、直下の`Concept.md`・`PROGRESS.md`・`README.md`を読み取り専用で参照します。PETITのDesktop・iPhone PWAからの会話でも、同じCoreの観測キャッシュを利用できます。文書記載は実装・動作検証を証明しません。Git fetchは行いません。
+
+`PETIT_WORKSPACE_CONTEXT_ENABLED=1`、`PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1`、`PETIT_WORKSPACE_CONTEXT_DIRS`（最大8件の明示したGitルート）が必要。既定OFFで、自動フォルダ探索や任意パス読取はありません。設定、API、テスト、制限は[ローカル開発環境の読取](docs/local-development-insight.md)を参照。
+
 ## セットアップ
 
 1. 依存をインストール:
