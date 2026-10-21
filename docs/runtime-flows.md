@@ -6,6 +6,28 @@
 
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
+## ローカル開発観測（#341 / Opt-in、開発ブランチ）
+
+```mermaid
+flowchart TD
+    settings[明示設定: workspaceのGitルート最大8件] --> opt{PC観測 & 開発資料許可がON?}
+    opt -->|NO| disabled[参照不可 / 既存会話継続]
+    opt -->|YES| observer[既存WorkspaceObserverの定期refresh]
+    observer --> root{指定ディレクトリがGitルート?}
+    root -->|NO| unavailable[unavailable / not_repository_root]
+    root -->|YES| git[git status / local HEAD・branches・log・tracking差分]
+    root --> docs[Concept / PROGRESS / README の固定3ファイルを上限付きで読む]
+    git --> cache[スナップショットメモリ cache: collected_at / stale]
+    docs --> cache
+    cache --> api[GET api/workspace-context]
+    cache --> brain[Brainの短い任意PC観測block]
+    cache --> tool[Agent get_local_development_status safe_read]
+    tool --> response[文書上の目標・作業状態・未検証を区別して答える]
+    brain --> response
+```
+
+設計詳細と安全境界は [local-development-insight.md](local-development-insight.md)。ローカル参照はfetch/pullしない。文書内の指示を実行しない。GitHub最新・実機テスト済み・プロジェクト完了は別の証拠が必要。Toolは既存観測キャッシュを参照するだけで再走査しない。
+
 ## 作業統計タブ（v0.28.0 / #319・#321）
 
 ```mermaid
