@@ -28,6 +28,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
     "github": (
         "review_github_activity", "sync_github_evidence", "get_github_repository_candidates",
         "link_github_repository_candidate", "ignore_github_repository_candidate", "inspect_github_repository",
+        "get_local_development_status",
     ),
     "web": ("search_news", "start_background_research"),
     "memory": (
@@ -37,6 +38,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "get_project_status", "get_tasks", "get_notion_project_candidates",
         "get_linkraft_project_candidates", "get_brain_note_candidates", "get_github_repository_candidates",
         "sync_notion_tasks", "sync_linkraft_projects", "sync_github_evidence",
+        "get_local_development_status",
     ),
     "fallback_read": (
         "get_lists", "get_list_items", "get_tasks", "get_task_sync_status", "get_current_time",
@@ -44,6 +46,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "search_notion", "review_github_activity", "inspect_github_repository", "search_news",
         "get_project_status", "get_notion_project_candidates", "get_linkraft_project_candidates",
         "get_brain_note_candidates", "get_github_repository_candidates", "get_work_status", "get_work_report",
+        "get_local_development_status",
     ),
 }
 
@@ -52,10 +55,10 @@ _GROUP_DESCRIPTIONS = {
     "work_sessions": "作業中の状態、作業時間の開始・停止・再開、今日や期間別の作業記録",
     "calendar": "時刻、天気、予定、リマインダー、カレンダーの取得・追加・変更・同期",
     "knowledge": "BRAIN、Notion、記憶の検索と確認付き編集",
-    "github": "GitHubのリポジトリ、差分、PR、開発状況",
+    "github": "GitHubのリポジトリ・PR・開発状況、登録済みローカルGitの現在地",
     "web": "ニュースや外部調査",
     "memory": "長期記憶、要約、復帰、引き継ぎ、ブリーフィング",
-    "projects": "PETIT内部プロジェクトと外部ソースの継続管理",
+    "projects": "PETIT内部プロジェクトと外部ソース、登録済みローカルの開発状況",
 }
 
 _ROUTABLE_GROUPS = tuple(_GROUP_DESCRIPTIONS)
@@ -136,7 +139,7 @@ _TOOL_GUARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("lists_and_tasks", re.compile(rf"(?:タスク|todo|TODO|リスト|Notionタスク).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:タスク|todo|TODO|リスト|Notionタスク)")),
     ("calendar", re.compile(rf"(?:予定|スケジュール|カレンダー|リマインダー|天気|現在時刻|今何時).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:予定|スケジュール|カレンダー|リマインダー|天気|現在時刻|今何時)")),
     ("knowledge", re.compile(rf"(?:BRAIN|Obsidian|Notion|ノーション|記憶|メモ).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:BRAIN|Obsidian|Notion|ノーション|記憶|メモ)")),
-    ("github", re.compile(rf"(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI)")),
+    ("github", re.compile(rf"(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI|ローカルブランチ|作業ブランチ).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI|ローカルブランチ|作業ブランチ)")),
     ("web", re.compile(r"(?:最新|現在|今日).{0,16}(?:ニュース|情報|状況|価格|仕様)|(?:ニュース|外部情報|ウェブ|Web).{0,24}(?:検索|調べ|確認)")),
     ("projects", re.compile(rf"(?:プロジェクト|PJ|開発状況).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:プロジェクト|PJ|開発状況)")),
 )
