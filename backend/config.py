@@ -55,7 +55,9 @@ def _list_from_env(name: str) -> list[str]:
 
 # PC observations stay opt-in and in memory. No directory is inferred.
 WORKSPACE_CONTEXT_ENABLED = os.getenv("PETIT_WORKSPACE_CONTEXT_ENABLED", "0") not in ("0", "false", "False")
-WORKSPACE_CONTEXT_DIRS = _path_list_from_env("PETIT_WORKSPACE_CONTEXT_DIRS")[:3]
+WORKSPACE_CONTEXT_DIRS = _path_list_from_env("PETIT_WORKSPACE_CONTEXT_DIRS")[:8]
+# Secondary opt-in: only pre-approved root-level design/progress documents are read.
+WORKSPACE_LOCAL_DEVELOPMENT_ENABLED = os.getenv("PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED", "0") not in ("0", "false", "False")
 WORKSPACE_CONTEXT_FOREGROUND_ENABLED = os.getenv("PETIT_WORKSPACE_CONTEXT_FOREGROUND_ENABLED", "0") not in ("0", "false", "False")
 WORKSPACE_CONTEXT_INTERVAL_SECONDS = max(15.0, float(os.getenv("PETIT_WORKSPACE_CONTEXT_INTERVAL_SECONDS", "30")))
 WORKSPACE_CONTEXT_MAX_AGE_SECONDS = max(15.0, float(os.getenv("PETIT_WORKSPACE_CONTEXT_MAX_AGE_SECONDS", "90")))
