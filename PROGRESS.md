@@ -2,9 +2,12 @@
 
 **Current Version: v0.30.2**
 
-**Last Updated: 2026-10-14**
+**Last Updated: 2026-10-21**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #341（PRレビュー前・main未反映）: Opt-in既存workspace観測に、登録GitルートのHEAD・local branch/commit・tracking比較とConcept/PROGRESS/README限定抜粋を追加。キャッシュ参照のsafe_read Toolを会話Capabilityへ登録。フォルダ・コマンド・ファイル取得はallowlist/固定名のread-only、fresh/staleと未確認文書を区別。コード単体テストを追加したが、実Windows/macOS PC上の観測と実LLM/iPhone/PWA会話は未確認。後続はソースコード部分読取・内部Project IDとの明示紐付け・追加UI。現行mainの公開Versionはv0.30.2のまま（関連Draft #340のv0.31.0とは未統合）。
+
 
 - #329 / PR #330 / v0.30.2（配布・OS通知実機未確認）: Desktop OS通知音の明示ON（既定無音）と、通知表示要求/show/failed診断を追加。Native通知の寿命保持・既存Web PushとDesktop権限の分離を維持。CI全テストは成功、Desktop関連の単体65件・Backend通知関連17件成功、隔離通知専用smoke成功。一方、全体smokeには音声確認ボタン・統計画面のtimeoutと入力文字列不一致による失敗が残るため、全体E2E成功とは扱わない。Mac/WindowsのOS通知受信・実音・Focus・正式配布DMGインストールは未確認。診断は `docs/desktop-notification-diagnostics.md`。
 
