@@ -18,6 +18,7 @@ _BUILTIN_MODULES = (
     "backend.tools.context",
     "backend.tools.current_time",
     "backend.tools.github",
+    "backend.tools.local_development",
     "backend.tools.linkraft",
     "backend.tools.lists",
     "backend.tools.memory",

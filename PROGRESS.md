@@ -1,10 +1,13 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.31.0（統合検証ブランチ・未マージ）**
+**Current Version: v0.31.0**
 
-**Last Updated: 2026-10-20**
+**Last Updated: 2026-10-21**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #341（main統合候補・実機未確認）: Opt-in既存workspace観測に、登録GitルートのHEAD・local branch/commit・tracking比較とConcept/PROGRESS/README限定抜粋を追加。キャッシュ参照のsafe_read Toolを会話Capabilityへ登録。フォルダ・コマンド・ファイル取得はallowlist/固定名のread-only、fresh/staleと未確認文書を区別。コード単体テストを追加したが、実Windows/macOS PC上の観測と実LLM/iPhone/PWA会話は未確認。後続はソースコード部分読取・内部Project IDとの明示紐付け・追加UI。統合済みv0.31.0との回帰と実Windows/macOS/iPhoneの受入はIssue #343で追跡。
+
 
 - #333 / v0.31.0（実装済み・実Provider未確認）: 安全なPNG/JPEG/WebP添付受付、会話IDに束縛したopaque ID、向き/解像度/形式/件数/容量検査、24時間TTLと削除、DeepSeek Flash Vision観測→共通Brain回答のRead専用経路を追加。画像・認識内容のクラウド送信は設定による明示許可がある場合だけ（既定OFF）。LM Studioは選択モデルのvision能力を実照会できる場合だけ。Steamの既知比率はDecimalで検証。Web/小型Desktop/旧UIの添付・失敗保持・再試行・削除を隔離Chromeで390/1440px確認。関連Core pytest125件+11 subtests、Desktop単体64件成功/1 skip。実DeepSeek/LM Studio画像精度・実Discord・配布版/macOS/PWA実機は未確認。画像Project/GitHub照合は#245/#246、共通Thread/Turnは#303/#304が後続。計画: docs/multimodal-discord-plan.md、20件の受入設計: docs/multimodal-acceptance.md。ローカルmainの未Push修正dc865feと既存storageは保持。
 
