@@ -19,6 +19,8 @@ def register(app: FastAPI) -> None:
 
 def startup() -> None:
     db.init_db()
+    from . import attachments
+    attachments.start_cleanup()
     notifications.init_db()
     # Sync existing SQLite data into Chroma in background (best-effort)
     threading.Thread(target=_chroma_sync, daemon=True).start()
@@ -29,6 +31,8 @@ def startup() -> None:
 
 
 def shutdown() -> None:
+    from . import attachments
+    attachments.stop_cleanup()
     if config.AUTO_SUMMARY_ENABLED:
         scheduler.get_scheduler().stop()
     worker.get_worker().stop()

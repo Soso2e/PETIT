@@ -8,6 +8,13 @@ on:
       - "backend/conversation_state.py"
       - "backend/brain_runtime.py"
       - "backend/chat.py"
+      - "backend/attachments.py"
+      - "backend/vision.py"
+      - "backend/vision_calculations.py"
+      - "tests/test_vision.py"
+      - "tests/test_vision_calculations.py"
+      - "tests/fixtures/vision/**"
+      - "frontend/chat_attachments.js"
       - "backend/pending_actions.py"
       - "backend/project_router.py"
       - "backend/task_completion_intent.py"
@@ -16,6 +23,12 @@ on:
       - "tests/test_project_router_context_guard.py"
       - "tests/test_conversation_state.py"
       - "tests/test_brain_runtime.py"
+      - "tests/test_action_reliability.py"
+      - "tests/test_one_pass_router.py"
+      - "backend/work_sessions.py"
+      - "backend/tools/work_sessions.py"
+      - "backend/notion_task_sync/store.py"
+      - "backend/petit_prompt.py"
       - "backend/agent.py"
       - "backend/agent_runtime.py"
       - "backend/agent_state.py"
@@ -41,6 +54,8 @@ on:
       - "docs/contextual_agent_runtime.md"
       - "docs/generic_lists.md"
       - "docs/runtime-flows.md"
+      - "experiments/**"
+      - "tests/test_ai_first_poc.py"
       - ".github/workflows/contextual-agent-runtime-tests.yml"
 
 concurrency:
@@ -59,16 +74,24 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter
+          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter pytest 'Pillow>=11.3,<13'
       - name: Compile Python sources
-        run: python -m compileall backend tests
+        run: python -m compileall backend tests experiments
       - name: Check frontend syntax
         run: |
           node --check frontend/app.js
           node --check frontend/action_confirm.js
+          node --check frontend/chat_attachments.js
+      - name: Run image intake and Vision regressions
+        run: python -m pytest tests/test_vision.py tests/test_vision_calculations.py tests/test_chat_router.py tests/test_module_registry.py -q
       - name: Run contextual Agent tests
         run: |
           python -m unittest \
+            tests.test_action_reliability \
+            tests.test_ai_first_poc \
+            tests.test_one_pass_router \
+            tests.test_work_session_tools \
+            tests.test_work_sessions \
             tests.test_dialogue_state \
             tests.test_dialogue_resolution \
             tests.test_project_router_context_guard \

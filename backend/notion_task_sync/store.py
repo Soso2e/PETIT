@@ -108,6 +108,7 @@ def due(last_at: str | None, interval_seconds: float) -> bool:
 def ensure_schema() -> None:
     task_sync_queue.ensure_task_sync_schema()
     with db.get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")  # Serialize first-use column migration across chat requests.
         existing = {str(row["name"]) for row in conn.execute("PRAGMA table_info(tasks_cache)").fetchall()}
         if "remote_deleted_at" not in existing:
             conn.execute('ALTER TABLE tasks_cache ADD COLUMN "remote_deleted_at" TEXT')

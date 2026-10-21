@@ -2,6 +2,8 @@
 
 この文書は実装済みのフローを示す。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）のThread/Turn/Events・管理Coreは目標であり、実装する各PRで本書を更新する。
 
+[AI-First設計と比較PoC](ai-first-agent-design.md)（#338）は本番未接続の実験であり、以下の実装済みフローは今回変更していない。
+
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
 ## 作業統計タブ（v0.28.0 / #319・#321）
@@ -103,6 +105,35 @@ flowchart TD
 
 ## 1. 会話全体フロー
 
+### 画像添付のRead専用経路（v0.31.0 / #333）
+
+```mermaid
+flowchart TD
+    file[Web / Desktop: 画像実体] --> intake[POST /api/attachments: 8MiB・30秒上限]
+    intake --> check[実体decode / PNG JPEG WebP / 画素と辺の上限]
+    check --> normalize[EXIF向き補正・metadata除去・長辺4096pxまで]
+    normalize --> store[Core非公開storage + SQLite / session hash + opaque ID]
+    store --> request[POST /api/chat: attachment_ids + 任意message]
+    request --> owner{同じsession・期限内・4枚以下}
+    owner -->|不一致・欠落| error[error応答 / 認識したふりをしない]
+    owner -->|一致| consent{画像・認識内容の外部送信許可}
+    consent -->|外部・許可なし| error
+    consent -->|許可あり またはlocal| capability{モデル画像能力}
+    capability -->|Flash対応 / LM Studio selected model vision=true| vision[Vision Adapter: 観測JSONを1 Callで抽出]
+    capability -->|非対応・不明・通信失敗| error
+    vision --> validated{JSON schema / 画像ID対応 / 上限}
+    validated -->|失敗| error
+    validated -->|成功| calc[Decimalによる既知Steam比率検証 / 不明・重複値は計算しない]
+    calc --> brain[Core Promptで観測と考察を分けて回答 / 通常1 Call]
+    brain --> saved[既存conversations + TTL付き観測JSON / 添付ID保持]
+    saved --> reply[自然な返答 / usage・実Call数]
+    store --> ttl[24時間で参照拒否 / 60秒周期と起動時cleanup / 明示DELETE]
+```
+
+画像経路は `agent.run` / Capability選択 / Tool Loopへ入らず、画像内の命令からWrite・承認を生成しない。外部送信は `PETIT_ALLOW_CLOUD_IMAGES` が既定OFF。VisionのProviderは既存DeepSeek Flashを優先し、`PETIT_VISION_PROFILE=local` の場合はLM Studio `/api/v1/models` の選択モデル `capabilities.vision=true` が必要。未確認モデルは失敗にする。観測の回答生成先が外部の場合も同意を再検査する。通常2 Call、空出力再試行は最大各1回。HTTP timeoutは画像経路で各45秒。画像経路のMarkdown/Chroma自動exportは停止し、認識JSONは24時間で削除する。既存会話の返答/添付IDは既存履歴の保持方針に従う。
+
+画像とProject/GitHubの自動照合、Discord、新Thread/Turn APIはこの経路に未接続。後続は [計画](multimodal-discord-plan.md) と #245/#246/#303/#304を参照する。session IDは既存ローカルClientの会話境界であり、インターネット公開用のユーザー認証ではない。
+
 ```mermaid
 flowchart TD
     input[/ユーザー入力/]
@@ -139,7 +170,7 @@ flowchart TD
     input --> api --> validate
     validate -->|はい| output
     validate -->|いいえ| bind --> agentEntry
-    dialogue{Pending Dialogue / Task照応 / 明示Taskか}
+    dialogue{Pending Dialogue / Task照応 / 明示Task・Session操作か}
     dialogueHandle[候補確認またはstable IDでTask Tool実行]
     dialogueSave[Tool Registry成功hookでfocusを更新]
     agentEntry --> dialogue
@@ -153,7 +184,9 @@ flowchart TD
     exactTime -->|はい| timeTool --> response
     exactTime -->|いいえ| brain --> selector --> route
     route -->|reply| directReply --> response
-    route -->|request_context| context --> parallel --> packet --> second --> response
+    route -->|request_context| context --> parallel --> packet --> unfinished{元の依頼に未実行ActionとCapabilityがあるか}
+    unfinished -->|いいえ| second --> response
+    unfinished -->|はい| capability
     route -->|route_to_agent| capability --> agentLoop --> response
     response --> pending --> persist
     persist -->|はい| save --> artifacts --> output
@@ -210,7 +243,9 @@ flowchart TD
     parallel --> calendar --> packet
     parallel --> personal --> packet
     parallel --> handoff --> packet
-    packet --> partial --> second --> final
+    packet --> partial --> actionLeft{continue_actionとCapabilityが明示されているか}
+    actionLeft -->|いいえ| second --> final
+    actionLeft -->|はい| reuse[元の依頼と取得済みPacketを既存Agentへ引継ぎ] --> map
     result -->|route_to_agent| route --> parse --> map --> agent
 ```
 
@@ -313,7 +348,7 @@ flowchart TD
     answer[回答本文を取得]
     empty{回答が空か}
     fallbackAnswer[言い換えを求める固定文]
-    incomplete{作業予告またはRuntime外の確認だけか}
+    incomplete{作業予告・重複確認またはActionにWrite実行結果がないか}
     retryUsed{再実行済みか}
     forceTool[このターンでTool callするよう再指示]
     deferredFail[未実行を明示した失敗回答]
@@ -344,7 +379,7 @@ flowchart TD
     hasCalls -->|いいえ| answer --> empty
     empty -->|はい| fallbackAnswer --> incomplete
     empty -->|いいえ| incomplete
-    incomplete -->|いいえ| finalizing --> final
+    incomplete -->|いいえ| evidence[実行結果を優先 / 失敗・部分成功を固定文で報告] --> finalizing --> final
     incomplete -->|はい| retryUsed
     retryUsed -->|いいえ| forceTool --> call
     retryUsed -->|はい| deferredFail --> finalizing
@@ -395,7 +430,7 @@ flowchart TD
     error{例外や実行時エラーか}
     errorText[[error]文字列]
     result[JSONまたは文字列]
-    observe[Task成功結果だけsessionのfocusとlast_actionへ / best effort]
+    observe[Task成功 / Workの対象IDと実行状態をfocusとlast_actionへ / best effort]
 
     decorator --> riskInput
     riskInput -->|はい| explicit --> register
@@ -812,18 +847,23 @@ flowchart TD
     Claim --> Valid[stable IDで現在のTaskとsourceを再確認]
     Pending -->|cancel| Cancel[Pendingのみ解除]
     Pending -->|明示した別の話題| Clear[Pending解除 / 通常入口へ]
-    Pending -->|未解決の短い回答| Ask[候補質問を維持]
+    Pending -->|未解決の短い回答| Ask[Task候補質問を維持 / Work補足は再実行せず通常Brainへ]
     Pending -->|なし| Focus[24時間以内のfocus / 最大8件]
     Focus --> Unique{同一turnで一意か}
     Unique -->|いいえ| Save[操作と候補を保存 / 短く確認]
     Unique -->|はい| Valid
     Valid --> Risk[既存low_risk_write / Task hierarchy検証]
-    Risk --> Tool[既存create update complete set_parent]
-    Tool --> Hook[Registry共通hook / 成功だけfocusとlast_action更新]
+    Risk --> Tool[既存create update complete set_parent start_work_session]
+    Tool --> Hook[Registry共通hook / Task成功・Work結果と対象IDを記録]
     Hook --> Reply[結果を返す / 外部同期と部分失敗を区別]
+    Tool --> Work[Work開始はSQLite BEGIN IMMEDIATEで同一Taskのactive・pausedを再利用]
+    Work --> Verify[返却session IDと保存済みactive Taskを照合]
+    Verify -->|一致| Reply
+    Verify -->|失敗・不一致| Retry[10分TTLの既存Pendingへ元依頼・対象ID・failed状態を保持]
+    Retry -->|明示した再試行だけ| Claim
 ```
 
-Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧Readや失敗結果はfocusを上書きしません。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。
+Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧ReadやTask失敗結果はfocusを上書きしません。Work開始失敗は再試行対象としてIDを保持しますが、成功した作業状態とは区別します。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。明示的な話題転換・キャンセル後は短い開始だけで旧対象を再実行しません。詳細と検証範囲は [Conversation-to-Action Reliability](conversation-action-reliability.md)。
 
 ## 接続ステータスと同期診断（#327）
 

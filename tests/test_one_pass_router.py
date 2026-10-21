@@ -67,9 +67,9 @@ class OnePassRouterTests(unittest.TestCase):
         with patch.object(capability_router, "chat_completion", return_value=response):
             route = capability_router.choose("今日の予定を教えて", history=[])
 
-        self.assertEqual(route["type"], "agent")
-        self.assertEqual(route["capabilities"], ["calendar"])
-        self.assertEqual(route["source"], "forced_tool_guard")
+        self.assertEqual(route["type"], "context")
+        self.assertEqual(route["context_request"]["needs"], [{"source": "calendar", "scope": "today"}])
+        self.assertEqual(route["source"], "forced_context_guard")
 
     def test_explicit_write_reply_is_forced_to_write_capability(self) -> None:
         response = {"content": "追加しました。", "tool_calls": []}
@@ -169,8 +169,8 @@ class OnePassRouterTests(unittest.TestCase):
 
     def test_agent_prompt_keeps_safety_rules_and_allows_minimal_markdown(self) -> None:
         prompt = agent.AGENT_SYSTEM_PROMPT
-        self.assertIn("Tool結果にない外部事実を作らない", prompt)
-        self.assertIn("確認表示と実行はRuntimeに任せる", prompt)
+        self.assertIn("取得していない個人データ・現在情報・外部情報を推測で作らない", prompt)
+        self.assertIn("書き込み確認と実行制御はRuntimeに任せる", prompt)
         self.assertIn("最小限のMarkdown", prompt)
         self.assertNotIn("Markdownは使わない", prompt)
 

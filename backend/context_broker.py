@@ -109,6 +109,9 @@ def _task_facts(result: dict[str, Any], need: dict[str, Any]) -> list[dict[str, 
             continue
         facts.append(
             {
+                "id": task.get("id"),
+                "external_id": task.get("external_id"),
+                "source": task.get("source"),
                 "title": task.get("title"),
                 "priority": task.get("priority"),
                 "due_date": task.get("due_date"),

@@ -207,6 +207,10 @@ def render_for_model(state: dict[str, Any] | None, *, max_chars: int = 1600) -> 
     if not state:
         return ""
     lines = ["[Conversation State]"]
+    if state.get("last_action"):
+        lines.append("last_action: " + json.dumps(state["last_action"], ensure_ascii=False))
+    if state.get("pending_dialogue"):
+        lines.append("pending_operation: " + json.dumps(state["pending_dialogue"], ensure_ascii=False))
     if state.get("focus_stack"):
         lines.append("task_focus: " + json.dumps(state["focus_stack"][-3:], ensure_ascii=False))
     if state.get("current_topic"):

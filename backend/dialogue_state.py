@@ -54,7 +54,7 @@ def load(session_id: str | None) -> dict[str, Any]:
         if (not isinstance(pending, dict) or not _fresh(pending.get("created_at"), PENDING_TTL_SECONDS)
                 or pending.get("owner") != "tasks" or not pending.get("id")
                 or not isinstance(pending.get("operation"), dict)
-                or pending["operation"].get("kind") not in {"create_child_task", "update_task", "complete_task", "select_task"}
+                or pending["operation"].get("kind") not in {"create_child_task", "update_task", "complete_task", "select_task", "start_work_session"}
                 or (pending["operation"].get("kind") == "create_child_task"
                     and not isinstance(pending["operation"].get("title"), str))
                 or (pending["operation"].get("kind") in {"update_task", "complete_task"}
@@ -134,6 +134,28 @@ def take_pending(session_id: str | None, pending_id: str) -> bool:
 
 
 def observe_tool_result(*, session_id: str | None, tool: str, arguments: dict[str, Any], result: Any) -> None:
+    if session_id and tool in {"start_work_session", "update_work_session"}:
+        try:
+            from . import task_hierarchy, work_sessions
+            data = json.loads(result) if isinstance(result, str) else result
+            if not isinstance(data, dict):
+                return
+            session = data.get("session") or {}
+            task = task_hierarchy._find_task(session.get("task_id") or arguments.get("task_id"))
+            if not task:
+                return
+            saved = work_sessions._row(str(session.get("session_id") or ""))
+            success = bool(saved and saved.get("task_id") == str(task["id"]) and not data.get("error")
+                           and (data.get("started") is True or data.get("already_active") is True or data.get("updated") is True))
+            turn_id = request_context.current_ids()[0] or uuid4().hex
+            item = entity(task, "last_selected" if success else "mentioned", turn_id=turn_id)
+            if item:
+                remember(session_id, [item], {"tool": tool, "entity_type": "task", "entity_id": item["entity_id"],
+                         "session_id": session.get("session_id"), "status": "succeeded" if success else "failed",
+                         "turn_id": turn_id, "updated_at": db.now_iso()})
+        except Exception:
+            log.exception("work result observation failed tool=%s", tool)
+        return
     success_key = {"create_task": "created", "update_task": "updated", "complete_task": "completed", "set_task_parent": "updated"}.get(tool)
     if not session_id or not success_key:
         return
