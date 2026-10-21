@@ -34,6 +34,13 @@ on:
       - "backend/agent_state.py"
       - "backend/agent_progress.py"
       - "backend/capability_router.py"
+      - "backend/workspace_context.py"
+      - "backend/local_development.py"
+      - "backend/config.py"
+      - "backend/tools/local_development.py"
+      - "backend/tools/builtins.py"
+      - "tests/test_workspace_context.py"
+      - "tests/test_local_development.py"
       - "backend/context_broker.py"
       - "backend/tools/schedule.py"
       - "backend/sona_core_schedule.py"
@@ -104,6 +111,8 @@ jobs:
             tests.test_tool_risk_policy \
             tests.test_task_parent_confirmation_guard \
             -v
+      - name: Run local development observation regressions
+        run: python -m unittest tests.test_workspace_context tests.test_local_development -v
       # Sona Core adapter tests need the private Sona-Agent-Core dependency and run locally.
       - name: Run calendar keyword regression tests
         run: |
