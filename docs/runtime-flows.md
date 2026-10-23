@@ -37,9 +37,9 @@ flowchart TD
 詳細・障害復旧・データ保護・検証境界は[renaissance-core.md](renaissance-core.md)。
 
 
-この文書は実装済みのフローを示す。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）のThread/Turn/Events・管理Coreは目標であり、実装する各PRで本書を更新する。
+Thread/Turn/Eventsの現行経路は上図を参照する。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）全体の端末・管理機能の完成を示すものではない。
 
-[AI-First設計と比較PoC](ai-first-agent-design.md)（#338）は本番未接続の実験であり、以下の実装済みフローは今回変更していない。
+[AI-First設計と比較PoC](ai-first-agent-design.md)（#338）の実験を経て、通常text経路を上図へ移行した。以下の旧会話図は移行前の参考資料である。
 
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
@@ -57,10 +57,8 @@ flowchart TD
     git --> cache[スナップショットメモリ cache: collected_at / stale]
     docs --> cache
     cache --> api[GET api/workspace-context]
-    cache --> brain[Brainの短い任意PC観測block]
     cache --> tool[Agent get_local_development_status safe_read]
     tool --> response[文書上の目標・作業状態・未検証を区別して答える]
-    brain --> response
 ```
 
 設計詳細と安全境界は [local-development-insight.md](local-development-insight.md)。ローカル参照はfetch/pullしない。文書内の指示を実行しない。GitHub最新・実機テスト済み・プロジェクト完了は別の証拠が必要。Toolは既存観測キャッシュを参照するだけで再走査しない。

@@ -6,7 +6,7 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #345 / #303（実装済み・実機未確認）: 単一native Brain Tool Loop、永続Thread/Turn/承認/receipt、既存chat/画像/作業開始接続と明示Thread切替を追加。本文は既存conversations、旧session/ID/データを維持し、初回追加schema前にSQLiteバックアップを作成。旧ルーティングは本番text/Worker経路から除外。旧agent_legacy.run・Taskの重複登録・idle自動分割・fetch差替えを撤去。再送/並行/ロールバック/承認再開/ローカル専用の隔離検証を実施。実Providerの一般的な言語理解、実Notion、配布Desktop/iPhoneは未確認。新会話契約はdocs/renaissance-core.md。次は元発言の横断検索・記憶鮮度・Projectの確認済みフォルダ対応を接続する。
+- #345 / #303（実装済み・実機未確認）: 単一native Brain Tool Loop、永続Thread/Turn/承認/receipt、既存chat/画像/作業開始接続と明示Thread切替を追加。本文は既存conversations、旧session/ID/データを維持し、初回追加schema前にSQLiteバックアップを作成。旧ルーティングは本番text/Worker経路から除外。旧agent_legacy.run・Taskの重複登録・idle自動分割・fetch差替えを撤去。再送/並行/ロールバック/承認再開/ローカル専用の隔離検証を実施。後続#347/#348との結合状態で実DeepSeek Flash・合成7ケースのTool実行と保存結果を確認（7/7、初期6/7の失敗記録も保持）。実Providerの一般的な理解精度、実Notion/Discord、配布Desktop/iPhoneは未確認。新会話契約はdocs/renaissance-core.md。次は3 PRのレビューと実データ受入、Discord本人確認/配信adapter。
 
 - #341（main統合候補・実機未確認）: Opt-in既存workspace観測に、登録GitルートのHEAD・local branch/commit・tracking比較とConcept/PROGRESS/README限定抜粋を追加。キャッシュ参照のsafe_read Toolを会話Capabilityへ登録。フォルダ・コマンド・ファイル取得はallowlist/固定名のread-only、fresh/staleと未確認文書を区別。コード単体テストを追加したが、実Windows/macOS PC上の観測と実LLM/iPhone/PWA会話は未確認。後続はソースコード部分読取・内部Project IDとの明示紐付け・追加UI。統合済みv0.31.0との回帰と実Windows/macOS/iPhoneの受入はIssue #343で追跡。
 

@@ -46,6 +46,10 @@ Core所有のThread/Turnと単一native Tool Loopを使用する。
 
 合成Tool会話・障害注入・一時DB・隔離HTTPで受付/再送/同時操作/承認/停止/保存結果を確認する。
 Mockは実Providerの自然言語理解を証明しない。
+Memory / ProjectフォルダPRを結合した実DeepSeek Flash・合成データの評価は7/7。
+保存結果で進捗参照・記憶の保存/訂正/重複回避・作業開始・元発言検索・引用の非実行を確認した。
+初回と方針改善後の6/7も残し、検索候補改善後の結果はreports/renaissance-evaluation.jsonに記録した。
+この有限ケースの成功を、あらゆる言い回しや実サービスの受入成功とは扱わない。
 配布Desktop・実iPhone/PWA・実音声・Notion等の実データ操作は別の受入として記録する。
 
 今回の記録: Core/関連回帰118件+3 subtests、Thread ClientのNodeテスト4件、隔離Chromium 1440/390px（実HTTP・一時DB・合成Provider）を確認。全pytestは既存venvのsona_agent_coreでSQLiteApprovalStoreをimportできずcollection中断。依存を勝手に更新せず、実機受入と区別する。
