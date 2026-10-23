@@ -215,6 +215,13 @@ def sync_structured_data(memory_rows: list[dict[str, Any]], episode_rows: list[d
     ]
     counts: dict[str, int] = {"memory": 0, "episodes": 0}
     for label, rows, prefix, key, text_of, meta_of, mark in specs:
+        if label == "petit_memory":
+            visible = [r for r in rows if r.get("visibility", "standard") != "local_only"
+                       and not r.get("superseded_by") and (not r.get("valid_until") or r["valid_until"] > db.now_iso())]
+            blocked = [f"{prefix}{r[key]}" for r in rows if r not in visible]
+            if blocked:
+                delete_ids(label, blocked)
+            rows = visible
         ids = [f"{prefix}{row[key]}" for row in rows]
         existing = _existing_metadata(label, ids)
         docs: list[tuple[str, str, dict[str, Any]]] = []

@@ -41,6 +41,14 @@ def _add_local(
     description: str | None = None,
 ) -> dict[str, Any]:
     with db.get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        existing = conn.execute(
+            "SELECT id FROM calendar_events_cache WHERE source='local' AND title=? AND start_time=? "
+            "AND end_time IS ? AND location IS ? AND description IS ?",
+            (title, start_time, end_time, location, description)).fetchone()
+        if existing:
+            return {"added": False, "already_exists": True, "destination": "local",
+                    "id": existing["id"], "title": title, "start_time": start_time}
         cur = conn.execute(
             "INSERT INTO calendar_events_cache "
             "(source, title, start_time, end_time, location, description, updated_at) "

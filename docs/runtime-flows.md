@@ -944,3 +944,26 @@ flowchart TD
     UI -->|競合を比較| Conflict[既存競合UI・revision確認]
     Conflict --> Choice[PETIT側再同期 / Notion側採用を明示選択]
 ```
+
+
+## Renaissance: 元発言検索と長期記憶（#345）
+
+```mermaid
+flowchart TD
+    Brain[Brainが必要性を判断] -->|原文が必要| Search[search_conversations / bounded query]
+    Search --> Scope[Threadのprivacy / source / 時間 / roleを検査]
+    Scope --> Original[既存conversationsの入力と出力]
+    Original --> Citation[元ID / Thread / 日時 / 発言元 / 原文抜粋]
+    Citation --> Brain
+    Brain -->|長期知識が必要| Memory[search_memory]
+    Memory --> Canonical[SQLite正本で置換・期限・visibilityを検査]
+    Canonical --> Results[通常文脈は最大5項目 / 必要なら追加検索]
+    Results --> Brain
+    Brain -->|記録・訂正| Save[save_memory / 正規化重複を原子的に再利用]
+    Save --> History[旧行を削除せずsuperseded_byと有効期限を保存]
+    Save -->|standardの新規知識のみ| Index[該当1件だけ索引更新]
+```
+
+元発言検索は履歴の暗黙結合ではない。NULL旧sessionは出典不明のまま保持する。
+local_onlyの元発言・記憶はstandard会話の検索から除外。local_only検索はembeddingへも送信しない。
+詳細: [renaissance-memory.md](renaissance-memory.md)。
