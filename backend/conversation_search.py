@@ -23,7 +23,10 @@ def search(query: str = "", *, limit=5, offset=0, thread_id=None, role="any", so
     with db.get_connection() as connection:
         has_threads = bool(connection.execute("SELECT 1 FROM sqlite_master WHERE name='threads'").fetchone())
         join = " LEFT JOIN threads t ON t.id=c.session_id" if has_threads else ""
-        source_sql = "COALESCE(t.source,'unknown')" if has_threads else "'unknown'"
+        has_source = any(r["name"] == "source" for r in connection.execute("PRAGMA table_info(conversations)"))
+        fallback = "COALESCE(NULLIF(t.source,'legacy'),'unknown')" if has_threads else "'unknown'"
+        source_sql = "COALESCE(c.source," + fallback + ")" if has_source else fallback
+        source_basis_sql = "CASE WHEN c.source IS NOT NULL THEN 'utterance' ELSE 'thread_metadata_or_unknown' END" if has_source else "'thread_metadata_or_unknown'"
         columns = ["c.user_text"] if role == "user" else ["c.assistant_text"] if role == "assistant" else ["c.user_text", "c.assistant_text"]
         where = ["substr(c.user_text,1,22) <> '[PETIT_INTERNAL_EVENT]'"]
         args = []
@@ -48,7 +51,7 @@ def search(query: str = "", *, limit=5, offset=0, thread_id=None, role="any", so
         total = connection.execute("SELECT COUNT(*)" + base, args).fetchone()[0]
         rows = connection.execute(
             "SELECT c.id,c.timestamp,c.session_id,c.user_text,c.assistant_text," + source_sql +
-            " AS source" + base + " ORDER BY c.timestamp DESC,c.id DESC LIMIT ? OFFSET ?",
+            " AS source," + source_basis_sql + " AS source_basis" + base + " ORDER BY c.timestamp DESC,c.id DESC LIMIT ? OFFSET ?",
             [*args, limit, offset]).fetchall()
     matches = []
     text_offset = max(0, min(int(text_offset), 1000000))
@@ -57,6 +60,7 @@ def search(query: str = "", *, limit=5, offset=0, thread_id=None, role="any", so
         matches.append({
             "conversation_id": row["id"], "thread_id": row["session_id"], "timestamp": row["timestamp"],
             "source": row["source"], "reference": f"conversation:{row['id']}",
+            "source_basis": row["source_basis"],
             "input_role": "user", "output_role": "assistant",
             "input": input_text[text_offset:text_offset + 1800], "output": output_text[text_offset:text_offset + 1800],
             "text_offset": text_offset, "next_text_offset": text_offset + 1800,

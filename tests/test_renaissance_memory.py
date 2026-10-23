@@ -51,6 +51,17 @@ class RenaissanceMemoryTests(unittest.TestCase):
         self.assertEqual(search.search("決定", role="user")["total_count"], 0)
         self.assertEqual(search.search("決定", role="assistant")["total_count"], 1)
 
+    def test_utterance_source_overrides_thread_creation_surface(self):
+        row = db.save_conversation("Desktopからの卒研相談", "確認", session_id="web")
+        with db.get_connection() as connection:
+            connection.execute("UPDATE conversations SET source='desktop' WHERE id=?", (row,))
+        result = search.search("卒研", source="desktop")
+        self.assertEqual(result["total_count"], 1)
+        self.assertEqual(result["matches"][0]["source"], "desktop")
+        self.assertEqual(result["matches"][0]["thread_id"], "web")
+        self.assertEqual(result["matches"][0]["source_basis"], "utterance")
+        self.assertEqual(search.search("卒研", source="web")["total_count"], 0)
+
     def test_literal_search_and_paging_do_not_turn_percent_into_all_history(self):
         for i in range(7):
             db.save_conversation("卒研 " + str(i), "返答", session_id="web")
