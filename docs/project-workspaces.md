@@ -24,12 +24,14 @@ Refs #345 / #341。新しい進捗台帳は作らず、Project Continuityのproj
 - documents.source: workspace_idとルート相対ファイル名。
 - documents.verification: 文書中の記述は未検証の主張であることを示す。
 - head_sha / branch / changed_entries等: 実際のローカルGit観測。
-- ahead/behindは手元のtracking refsとの比較。fetchやGitHub最新確認は行わない。
+- upstream_ahead/behindは手元の追跡refとの比較。main_comparisonはbase_kindでlocal_branchとremote_tracking_cacheを区別する。upstreamが不明・未設定なら差分数を0で補わない。fetchやGitHub最新確認は行わない。
 
 読む文書は既存と同じConcept.md / PROGRESS.md / README.mdだけ。
 サイズ上限・秘密情報の伏せ字・symlink除外を維持し、読取中の変更も区別する。
 
-Core PR #346の公開Tool集合へそのまま接続できる。Discord adapterも同じCoreを利用する想定であり、
+Core PR #346と記憶検索PR #347を取り込み、公開Tool集合へ接続済み。Discord adapterも同じCoreを利用する想定であり、
 このPRでDiscord Botや別の進捗管理サーバーを追加するものではない。
 
-検証: 関連pytest 34件成功。Windowsの一時Gitリポジトリと一時SQLiteで実際のHEAD/未コミット/文書mtimeを照合した。本人の実Project・実登録フォルダ・Provider会話・配布端末の受入は未確認。
+検証: 結合状態の関連pytest154件+3 subtests、Node4件、Chrome 1440/390px（実HTTP/一時DB/合成Provider）成功。Windowsの一時GitとSQLiteで実際のHEAD/未コミット/文書mtimeを照合した。実DeepSeek Flash・合成データは7/7でTool実行と保存結果を確認。初期6/7の失敗記録も保持する。本人の実Project・実登録フォルダ・実Discord/Notion・配布端末の受入は未確認。
+
+全pytestは既存venvのsona_agent_coreでSQLiteApprovalStoreをimportできずcollection中断。既存Notion fixtureの旧API参照と旧mobile acceptanceのindex/表示契約も未解消として区別し、全テスト成功とは扱わない。mainと利用中DBは変更せず、#346 → #347 → #348のレビュー順で導入する（全PR base=main、後続は前の変更を含む）。
