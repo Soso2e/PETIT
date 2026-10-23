@@ -148,6 +148,29 @@ class RenaissanceCoreTests(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         model.assert_not_called()
 
+    def test_provider_boundary_also_protects_non_chat_private_calls(self):
+        from backend import request_context, lmstudio_client
+        store.create_thread("a", privacy="local_only")
+        target = {"provider": "deepseek", "base_url": "https://api.deepseek.com"}
+        with request_context.bind(request_id="r", session_id="a"), patch.object(lmstudio_client.httpx, "post") as http:
+            with self.assertRaises(lmstudio_client.LMStudioError):
+                lmstudio_client.chat_completion([{"role": "user", "content": "private"}], target_override=target)
+        http.assert_not_called()
+
+    def test_private_memory_never_becomes_public_on_partial_rollout(self):
+        from backend import request_context
+        store.create_thread("a", privacy="local_only")
+        store.accept("a", "r", {"message": "個人の記憶"})
+        store.claim("r")
+        with request_context.bind(request_id="r", session_id="a"):
+            raw = brain.execute("r", call("save_memory", {"content": "個人の記憶"}), {"content": "個人の記憶"})
+        with db.get_connection() as connection:
+            rows = connection.execute("SELECT * FROM memory").fetchall()
+            if rows:
+                self.assertEqual(rows[0]["visibility"], "local_only")
+            else:
+                self.assertIn("private_memory_storage_unavailable", raw)
+
     def test_restart_restores_approval_and_consumes_it_once(self):
         args = {"title": "発表", "start_time": "2026-11-02T10:00:00+09:00"}
         result, _ = self.turn([{"tool_calls": [call("add_schedule", args)]}])
@@ -172,6 +195,7 @@ class RenaissanceCoreTests(unittest.TestCase):
             raw = brain.execute("r", call("add_schedule"), {})
         self.assertIn("effect_result_unknown", raw)
         self.assertEqual(store.result("r")["status"], "interrupted")
+        self.assertTrue(store.result("r")["error"])
         self.assertEqual(store.result("r")["effects"][0]["status"], "unknown")
 
     def test_memory_context_has_five_items_but_storage_is_unbounded(self):

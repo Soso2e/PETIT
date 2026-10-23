@@ -99,8 +99,9 @@ def main() -> int:
                        "calendar_rows": calendar_count, "replaced_memory_rows": replaced,
                        "elapsed_ms": round((time.monotonic() - started) * 1000),
                        "error": result.get("error"), "reply": result.get("reply", "")}
+                row["tool_calls"] = result.get("used_tools", [])
                 rows.append(row)
-                print(json.dumps(row, ensure_ascii=False), flush=True)
+                print(json.dumps({k: v for k, v in row.items() if k not in {"reply", "tool_calls"}}, ensure_ascii=False), flush=True)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps({"provider": "configured_deepseek_flash", "data": "synthetic",
             "external_sync_and_embedding": "disabled", "real_discord_and_devices": "not_tested",

@@ -32,6 +32,8 @@ Core所有のThread/Turnと単一native Tool Loopを使用する。
 
 - 初期実装は単一Coreプロセス（uvicorn workers=1）。受付後の再送は同じIDを使用する。
 - local_only Threadでは外部Providerへの送信前に停止する。自動Provider fallbackは導入しない。
+- proactive openerもThreadの公開範囲を継承する。Memory拡張前の段階導入ではprivate記憶の保存を止め、通常記憶として漏らさない。
+- Coreが現在時刻を毎Turn提示する。再起動による中断は結果照会とUIの最新依頼欄から確認できる。
 - 他Threadの履歴は通常文脈へ入れない。横断検索は別Toolで明示取得する。
 - 長期記憶の保存件数に固定上限はない。通常のTool結果として渡す記憶は合計最大5項目。
 - local_only会話は自動episode要約の入力から除外し、通常会話の自動export/index処理も行わない。

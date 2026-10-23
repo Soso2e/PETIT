@@ -263,6 +263,11 @@ def chat_completion(
         return prefetched
 
     target = target_override or endpoint(route)
+    from . import request_context
+    if request_context.local_only() and (
+        target.get("provider") != "lm_studio" or image_egress_is_external(target)
+    ):
+        raise LMStudioError("ローカル専用Threadの文脈を外部Providerへ送信しません。")
     has_images = any(isinstance(item.get("content"), list) and any(
         block.get("type") in {"image_url", "file"} for block in item["content"] if isinstance(block, dict))
         for item in messages)
