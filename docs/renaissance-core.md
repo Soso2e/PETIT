@@ -11,6 +11,7 @@ Core所有のThread/Turnと単一native Tool Loopを使用する。
 - 終了した会話本文の正本は既存conversations。TurnはそのIDを参照し、本文の二重保存を残さない。
 - 旧session IDはそのままThreadに対応。NULL/空の旧sessionは推測で割り当てない。
 - Threadは明示操作で作成・選択。2時間idleによる分割とfetch monkeypatchを廃止。
+- Web/Desktopの既定Threadキーは別々。旧Desktopの会話本文は移動せず、会話一覧から選択できる。明示して同じThreadを開いた場合も各元発言の実際のsourceを保存する。Discordは共通APIのsourceとして受付可能で、Botの本人確認・配送は後続。
 - Threadごとの履歴を最大12往復/9000文字で取得。進捗Eventsはモデルhistoryへ入れない。
 - BrainがToolを直接選択。公開集合はbrain.PUBLIC_TOOLSで固定し、内部execute_agent_write等は公開しない。
 - assistant tool_calls / role=tool / tool_call_id / reasoning_contentを維持。12 Tool calls・8 roundsで停止。

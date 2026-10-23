@@ -60,6 +60,15 @@ class RenaissanceCoreTests(unittest.TestCase):
         self.assertNotIn("request_context", names)
         self.assertNotIn("execute_agent_write", names)
 
+    def test_explicit_shared_thread_preserves_each_utterance_source(self):
+        with patch.object(brain.lmstudio_client, "chat_completion", return_value={"content": "返答"}):
+            api.submit("shared", "web-r", "Webから", source="web")
+            api.submit("shared", "desktop-r", "Desktopから", source="desktop")
+            api.submit("discord-thread", "discord-r", "Discordから", source="discord")
+        with db.get_connection() as connection:
+            self.assertEqual([r["source"] for r in connection.execute("SELECT source FROM conversations ORDER BY id")],
+                             ["web", "desktop", "discord"])
+
     def test_actual_work_session_and_receipt_survive_response_replay(self):
         task = self.task()
         result, model = self.turn([

@@ -20,7 +20,7 @@ _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="petit-turn")
 class ThreadCreate(BaseModel):
     id: str | None = Field(default=None, min_length=1, max_length=200)
     title: str = Field(default="", max_length=160)
-    source: Literal["web", "desktop", "voice"] = "web"
+    source: Literal["web", "desktop", "voice", "discord"] = "web"
     privacy: Literal["standard", "local_only"] = "standard"
 
 
@@ -71,6 +71,7 @@ def submit(thread_id: str, request_id: str, message: str, *, source="web", conve
            attachment_ids: list[str] | None = None, background=False) -> dict:
     store.create_thread(thread_id, source=source)
     row, created = store.accept(thread_id, request_id, {"message": message, "conversation_mode": conversation_mode,
+                                                     "source": source,
                                                      "attachment_ids": attachment_ids or []})
     if created:
         if background:

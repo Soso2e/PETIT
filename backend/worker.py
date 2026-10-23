@@ -116,7 +116,7 @@ def _run_agent_followup(payload: dict[str, Any]) -> str:
     from . import conversation_api, request_context
     from uuid import uuid4
     request_id, session_id = request_context.current_ids()
-    result = conversation_api.submit(session_id or uuid4().hex, request_id or uuid4().hex, message)
+    result = conversation_api.submit(session_id or uuid4().hex, request_id or uuid4().hex, message, source="worker")
     if result.get("error"):
         raise RuntimeError(result["error"])
     return result.get("reply", "")
