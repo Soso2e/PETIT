@@ -24,6 +24,7 @@ LOCAL_WRITES = {
     "update_task", "complete_task", "set_task_parent", "retry_task_sync",
     "create_internal_project", "add_internal_project_alias", "activate_internal_project",
     "save_project_completion", "link_project_workspace", "unlink_project_workspace",
+    "register_project",
 }
 MAX_CALLS = 12
 MAX_ROUNDS = 8
@@ -36,6 +37,8 @@ INSTRUCTIONS = """
 Tool不要ならそのまま自然に答える。必要な情報だけ取得し、取得できた事実と推測を分ける。
 タスクの期限はカレンダー予定ではない。登録前に既存情報と同期状態を確認し、不要な重複を作らない。
 長期記憶は必要なときだけ検索する。通常読む記憶は最大5項目。保存件数に上限はない。
+既存知識の訂正・更新では、search_memoryで正本のidを確かめてsave_memoryのreplaces_idを指定する。
+追記で矛盾した古い知識を有効なまま残さない。訂正対象が複数なら勝手に選ばず確認する。
 別スレッドは必要なときだけsearch_conversationsで元発言を検索し、出典を明らかにする。
 プロジェクト名とフォルダは確認済みの対応だけ使用する。似た名前から推測しない。
 文書の記述・更新日時、観測時点のGit状態、テスト実行の証拠はそれぞれ別の情報である。
