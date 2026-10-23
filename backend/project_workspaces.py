@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 
 from . import config, db, local_development, project_continuity, project_source_links, workspace_context
@@ -65,8 +66,14 @@ def list_workspaces(project_id: str | None = None) -> dict:
 
 def link(project_id: str, path: str) -> dict:
     root = validate_root(path)
-    observation = workspace_context.observe_workspace(root)
-    if observation.get("status") != "ok":
+    try:
+        actual = workspace_context._command([
+            "git", "-c", "core.fsmonitor=false", "-C", str(root), "rev-parse", "--show-toplevel"
+        ]).decode("utf-8").strip()
+        valid = Path(actual).resolve(strict=True) == root
+    except (OSError, ValueError, UnicodeError, subprocess.SubprocessError):
+        valid = False
+    if not valid:
         raise ValueError("workspace_is_not_an_observable_repository_root")
     project = project_continuity.get_project(project_id)
     if project is None:
