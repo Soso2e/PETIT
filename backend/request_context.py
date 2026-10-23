@@ -30,6 +30,8 @@ def current_ids() -> tuple[str | None, str | None]:
 
 def current_conversation_mode() -> str:
     return _conversation_mode.get()
+
+
 def local_only() -> bool:
     """Read the current Thread's disclosure mode without creating any schema."""
     _request_id, session_id = current_ids()
@@ -44,4 +46,3 @@ def local_only() -> bool:
             return False
         row = connection.execute("SELECT privacy FROM threads WHERE id=?", (session_id,)).fetchone()
     return bool(row and row["privacy"] == "local_only")
-

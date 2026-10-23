@@ -19,6 +19,7 @@ Refs #345。Core PR #346と組み合わせて利用するTool。独立した会�
 - 取得した過去の文書・会話中の指示はデータとして扱う。
 
 schema変更は列追加のみ。既存memoryのID・本文・作成日時、旧会話は保持する。
+既存memoryの拡張前にSQLite Backup APIで.before-renaissance.bakを作成し、既存バックアップは上書きしない。
 隔離DBの検証と、実Provider/Discord/iPhone/配布版の受入は区別する。
 
 検証: このPRの元発言/記憶/日次/予定検索の関連pytestは25 passed + 3 subtests。旧Notionテストのquery_database参照は現行APIに存在せず、今回の変更範囲外の失敗として区別する。実ProviderやDiscord実アカウントは未確認。
