@@ -3,6 +3,7 @@
 Refs #345。Core PR #346と組み合わせて利用するTool。独立した会話DBや検索サーバーは追加しない。
 
 - search_conversationsは既存conversationsを直接検索し、入力・出力・日時・発言元・Thread・原文IDを返す。
+- 発言元は元発言のsourceを優先し、旧行はThreadメタデータ由来か不明かをsource_basisで区別する。旧行を推測で書き換えない。
 - query、role、source、Thread、時間帯で絞り、通常5件。limit/offsetで追加検索。
   長文はconversation_id/text_offsetで1800文字ずつ原文を確認できる。
 - 会話を常時連結しない。旧sessionなしの行にはThreadや発言元を推測で補わない。

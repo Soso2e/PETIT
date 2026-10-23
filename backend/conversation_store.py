@@ -208,10 +208,10 @@ def finish(request_id: str, data: dict, *, status="completed") -> dict:
                                    (reply, encode(data.get("used_tools", [])), conversation_id))
             else:
                 cursor = connection.execute(
-                    "INSERT INTO conversations(timestamp,user_text,assistant_text,used_tools,session_id) VALUES(?,?,?,?,?)",
+                    "INSERT INTO conversations(timestamp,user_text,assistant_text,used_tools,session_id,source) VALUES(?,?,?,?,?,?)",
                     (db.now_iso(), payload.get("message", "") + (
                         "\n[画像: " + ", ".join(payload["attachment_ids"]) + "]" if payload.get("attachment_ids") else ""), reply,
-                     encode(data.get("used_tools", [])), row["thread_id"]))
+                     encode(data.get("used_tools", [])), row["thread_id"], payload.get("source")))
                 conversation_id = cursor.lastrowid
         metadata = {k: v for k, v in data.items() if k not in {"reply", "pending_actions", "messages"}}
         connection.execute(

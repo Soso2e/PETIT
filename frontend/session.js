@@ -1,6 +1,7 @@
-// Explicit, stable conversation identity shared by Web and Desktop.
+// Explicit, stable conversation identity per client surface.
 (() => {
-  const key = 'petit_session_id';
+  const source = (window.petitDesktop || window.petitWorkspace?.desktop) ? 'desktop' : 'web';
+  const key = source === 'desktop' ? 'petit_desktop_session_id' : 'petit_session_id';
   const params = new URLSearchParams(window.location.search);
   const requested = params.get('thread');
   const id = requested || localStorage.getItem(key) || crypto.randomUUID();
@@ -35,7 +36,7 @@
     // The pending input is kept only on this client until a result is known.
     const previous = readPending();
     if (previous) throw new Error('前の依頼の結果を先に再取得してください。重複送信を防いでいます。');
-    const request = { ...payload, session_id: id, source: window.petitDesktop ? 'desktop' : 'web' };
+    const request = { ...payload, session_id: id, source };
     localStorage.setItem(pendingKey() + ':last', request.request_id);
     remember(request);
     try {
@@ -95,7 +96,7 @@
     create.onclick = async () => {
       try {
         const thread = await json('/api/threads', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: window.petitDesktop ? 'desktop' : 'web', privacy: local.checked ? 'local_only' : 'standard' }) });
+          body: JSON.stringify({ source, privacy: local.checked ? 'local_only' : 'standard' }) });
         open(thread.id);
       } catch (e) { showError(e); }
     };
