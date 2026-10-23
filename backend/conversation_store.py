@@ -299,6 +299,8 @@ def recover() -> None:
     ensure_schema()
     with db.write_transaction() as connection:
         connection.execute("UPDATE effect_receipts SET status='unknown' WHERE status='running'")
-        connection.execute(
-            "UPDATE turns SET status='interrupted',updated_at=? WHERE status IN ('queued','running')",
-            (db.now_iso(),))
+        for row in connection.execute("SELECT request_id,result_json FROM turns WHERE status IN ('queued','running')").fetchall():
+            data = json.loads(row["result_json"])
+            data["error"] = "Coreの再起動で処理が中断しました。保存済みの実行結果を確認してください。自動再実行はしていません。"
+            connection.execute("UPDATE turns SET status='interrupted',result_json=?,updated_at=? WHERE request_id=?",
+                               (encode(data), db.now_iso(), row["request_id"]))

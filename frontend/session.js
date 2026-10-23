@@ -36,6 +36,7 @@
     const previous = readPending();
     if (previous) throw new Error('前の依頼の結果を先に再取得してください。重複送信を防いでいます。');
     const request = { ...payload, session_id: id, source: window.petitDesktop ? 'desktop' : 'web' };
+    localStorage.setItem(pendingKey() + ':last', request.request_id);
     remember(request);
     try {
       const data = await transport('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
@@ -54,8 +55,9 @@
     stopped = false;
     // Resubmit the exact request; Core either accepts it once or returns its receipt.
     const data = await json('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
-    if (['queued', 'running'].includes(data.status)) await waitFor(request.request_id, json);
+    const final = ['queued', 'running'].includes(data.status) ? await waitFor(request.request_id, json) : data;
     remember(null);
+    if (final.error) throw new Error(final.error);
     location.reload();
   }
   function open(threadId) {
@@ -98,6 +100,21 @@
       } catch (e) { showError(e); }
     };
     controls.append(select, refresh, create, label);
+    const last = document.createElement('details');
+    const summary = document.createElement('summary'); summary.textContent = '最新の依頼';
+    const result = document.createElement('pre');
+    result.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto';
+    last.append(summary, result);
+    last.ontoggle = async () => {
+      if (!last.open) return;
+      const requestId = localStorage.getItem(pendingKey() + ':last');
+      if (!requestId) { result.textContent = 'この端末からの依頼はまだありません。'; return; }
+      try {
+        const data = await json('/api/turns/' + encodeURIComponent(requestId));
+        result.textContent = JSON.stringify({ status: data.status, error: data.error, effects: data.effects }, null, 2);
+      } catch (e) { result.textContent = e.message; }
+    };
+    controls.append(last);
     if (readPending()) {
       const restoreButton = document.createElement('button'); restoreButton.type = 'button'; restoreButton.textContent = '依頼の結果を再取得';
       restoreButton.onclick = () => restore().catch(showError); controls.append(restoreButton);

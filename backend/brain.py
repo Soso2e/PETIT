@@ -5,7 +5,7 @@ import json
 import hashlib
 from typing import Any
 
-from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, request_context, tools
+from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, request_context, time_context, tools
 from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
 
 # A reviewed public catalog, never the registry's internal approval executors.
@@ -42,6 +42,7 @@ Tool不要ならそのまま自然に答える。必要な情報だけ取得し�
 別スレッドは必要なときだけsearch_conversationsで元発言を検索し、出典を明らかにする。
 プロジェクト名とフォルダは確認済みの対応だけ使用する。似た名前から推測しない。
 文書の記述・更新日時、観測時点のGit状態、テスト実行の証拠はそれぞれ別の情報である。
+ローカルbranch同士の差をリモートとの差と表現しない。upstream未設定・unknown・欠損を0や成功に補完しない。
 引用・翻訳・仮定・相談を操作依頼と誤認しない。対象や日付が不明なら補わず短く質問する。
 書込は対応Toolを呼ぶ。確認が必要なToolはCoreが確認画面を出す。自然文の重複確認はしない。
 「始めた・保存した・変更した」と言えるのは、その操作の実行結果がある場合だけ。
@@ -110,6 +111,11 @@ def execute(request_id: str, call: dict, arguments: dict) -> str:
         raise TurnCancelled("取消要求を受け付けました。すでに実行された操作は取り消していません。")
     name = call["function"]["name"]
     writing = tools.risk_for(name) != "safe_read"
+    if name == "save_memory" and request_context.local_only():
+        with db.get_connection() as connection:
+            columns = {r["name"] for r in connection.execute("PRAGMA table_info(memory)")}
+        if "visibility" not in columns:
+            return store.encode({"error": "private_memory_storage_unavailable", "saved": False})
     previous = store.receipt(request_id, call["id"]) if writing else None
     if previous:
         if previous["tool"] != name or previous["arguments_json"] != store.encode(arguments):
@@ -162,7 +168,9 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
     if messages is None:
         payload = json.loads(row["input_json"])
         focus = dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:]
-        messages = [{"role": "system", "content": CORE_SYSTEM_PROMPT + voice_turn_instructions() + INSTRUCTIONS}]
+        messages = [{"role": "system", "content": CORE_SYSTEM_PROMPT + voice_turn_instructions() + INSTRUCTIONS},
+                    {"role": "user", "content": "Coreの現在時刻（参考メタデータ）: " +
+                     time_context.current_datetime().isoformat(timespec="seconds")}]
         messages.extend(store.history(row["thread_id"]))
         if focus:
             messages.append({"role": "user", "content": "同じ会話で確認済みの対象ID（参考データ）: " + store.encode(focus)})
