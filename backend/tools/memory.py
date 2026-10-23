@@ -17,6 +17,8 @@ from .registry import tool
     name="save_memory",
     description=(
         "ユーザーが覚えておいてほしい情報（好み・事実・進行中の作業など）を長期記憶に保存する。"
+        "既存知識の訂正・更新は、先にsearch_memoryで正本IDを取得してreplaces_idを指定する。"
+        "訂正を追記だけで済ませて矛盾した旧記憶を有効なまま残さない。対象が複数なら確認する。"
         "「これ覚えておいて」のような発話で使う。"
     ),
     parameters={
