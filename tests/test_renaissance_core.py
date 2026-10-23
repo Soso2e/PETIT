@@ -89,6 +89,20 @@ class RenaissanceCoreTests(unittest.TestCase):
         self.assertIsNone(work_sessions.active_session())
         self.assertIsNone(store.receipt("r", "call-1"))
 
+    def test_handler_failure_does_not_commit_its_partial_local_write(self):
+        from backend.tools import registry
+        store.create_thread("a")
+        store.accept("a", "r", {"message": "記録"})
+        def broken(**kwargs):
+            db.save_memory_item("保存途中の値", "note", "explicit")
+            raise ValueError("failed after domain write")
+        with patch.object(registry._REGISTRY["save_memory"], "handler", side_effect=broken):
+            raw = brain.execute("r", call("save_memory", {"content": "x"}), {"content": "x"})
+        self.assertTrue(brain.failed(raw))
+        with db.get_connection() as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM memory").fetchone()[0], 0)
+        self.assertEqual(store.receipt("r", "call-1")["status"], "failed")
+
     def test_duplicate_write_with_different_call_id_is_not_repeated(self):
         args = {"content": "卒研の発表日は11月2日", "type": "fact"}
         result, _ = self.turn([

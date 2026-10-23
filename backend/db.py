@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from uuid import uuid4
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -25,9 +26,14 @@ class _BorrowedConnection:
         self.connection = connection
 
     def __enter__(self):
+        self.savepoint = "service_" + uuid4().hex
+        self.connection.execute("SAVEPOINT " + self.savepoint)
         return self
 
-    def __exit__(self, *_args):
+    def __exit__(self, exc_type, *_args):
+        if exc_type:
+            self.connection.execute("ROLLBACK TO " + self.savepoint)
+        self.connection.execute("RELEASE " + self.savepoint)
         return False
 
     def execute(self, sql, parameters=()):

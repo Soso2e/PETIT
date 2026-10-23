@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from typing import Any
 
 from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, request_context, tools
@@ -66,10 +67,13 @@ def failed(raw: str) -> bool:
         value = json.loads(raw)
     except ValueError:
         return False
-    return isinstance(value, dict) and (
-        bool(value.get("error")) or any(value.get(k) is False
-        for k in ("ok", "created", "saved", "updated", "completed", "added"))
-    )
+    if not isinstance(value, dict):
+        return False
+    if value.get("error") or value.get("ok") is False:
+        return True
+    if any(value.get(k) is True for k in ("saved", "updated", "completed", "added", "already_exists", "already_active", "reused")):
+        return False
+    return any(value.get(k) is False for k in ("created", "saved", "updated", "completed", "added", "started"))
 
 
 def compact(raw: str, tool_name: str) -> str:
@@ -118,9 +122,13 @@ def execute(request_id: str, call: dict, arguments: dict) -> str:
         return same["result"] or store.encode({"error": "effect_result_unknown", "retry_allowed": False})
     if name in LOCAL_WRITES:
         # The existing service, its outbox entries and the receipt commit together.
-        with db.write_transaction():
+        with db.write_transaction() as connection:
             store.begin_effect(request_id, call, arguments)
+            connection.execute("SAVEPOINT tool_effect")
             raw = tools.dispatch(name, arguments)
+            if failed(raw):
+                connection.execute("ROLLBACK TO tool_effect")
+            connection.execute("RELEASE tool_effect")
             store.end_effect(request_id, call["id"], raw, "failed" if failed(raw) else "applied")
             return raw
     store.begin_effect(request_id, call, arguments)
@@ -138,6 +146,13 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
     row = store.load_turn(request_id)
     thread = store.thread(row["thread_id"])
     target = check_provider(thread)
+    provider_key = hashlib.sha256(store.encode({k: target.get(k) for k in
+        ("provider", "profile", "model", "base_url")}).encode()).hexdigest()
+    with db.get_connection() as connection:
+        pinned = connection.execute("SELECT provider_key FROM turns WHERE request_id=?", (request_id,)).fetchone()[0]
+        if pinned and pinned != provider_key:
+            raise lmstudio_client.LMStudioError("依頼中にProviderが変更されました。保存した文脈を別Providerへ自動再送しません。")
+        connection.execute("UPDATE turns SET provider_key=? WHERE request_id=?", (provider_key, request_id))
     catalog = schemas()
     allowed = {item["function"]["name"] for item in catalog}
     used = list(used_tools or [])

@@ -65,6 +65,7 @@ def ensure_schema() -> None:
                     if destination.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                         raise RuntimeError("renaissance_backup_check_failed")
         connection.executescript(SCHEMA)
+        db._ensure_columns(connection, "turns", {"provider_key": "TEXT"})
         connection.execute(
             "INSERT OR IGNORE INTO threads(id,source,created_at) "
             "SELECT session_id,'legacy',MIN(timestamp) FROM conversations "
