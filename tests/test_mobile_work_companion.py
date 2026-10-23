@@ -154,11 +154,12 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
             self.assertTrue(data.startswith(b"\x89PNG\r\n\x1a\n"))
             self.assertEqual(data[-12:], b"\x00\x00\x00\x00IEND\xaeB`\x82")
 
-    def test_session_split_and_internal_prompt_filter_are_present(self) -> None:
+    def test_explicit_threads_and_core_internal_prompt_filter_are_present(self) -> None:
         source = (FRONTEND / "session.js").read_text(encoding="utf-8")
-        self.assertIn("2 * 60 * 60 * 1000", source)
+        self.assertNotIn("IDLE_SPLIT_MS", source)
         self.assertIn("[PETIT_INTERNAL_EVENT]", source)
-        self.assertIn('/api/conversations', source)
+        self.assertIn('/api/turns/', source)
+        self.assertIn('present_conversation', (ROOT / "backend" / "db.py").read_text(encoding="utf-8"))
 
     def test_companion_is_foreground_only_and_keeps_three_rallies(self) -> None:
         source = (FRONTEND / "companion.js").read_text(encoding="utf-8")

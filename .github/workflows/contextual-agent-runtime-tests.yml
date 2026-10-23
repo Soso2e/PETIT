@@ -7,6 +7,12 @@ on:
       - "backend/dialogue_resolution.py"
       - "backend/conversation_state.py"
       - "backend/brain_runtime.py"
+      - "backend/brain.py"
+      - "backend/conversation_api.py"
+      - "backend/conversation_store.py"
+      - "tests/test_renaissance_core.py"
+      - "frontend/session.js"
+      - "scripts/test-thread-client.cjs"
       - "backend/chat.py"
       - "backend/attachments.py"
       - "backend/vision.py"
@@ -93,6 +99,10 @@ jobs:
           node --check frontend/app.js
           node --check frontend/action_confirm.js
           node --check frontend/chat_attachments.js
+      - name: Run Renaissance Core and Thread client contracts
+        run: |
+          python -m pytest tests/test_renaissance_core.py tests/test_pending_actions_router.py -q
+          node --test scripts/test-thread-client.cjs
       - name: Run image intake and Vision regressions
         run: python -m pytest tests/test_vision.py tests/test_vision_calculations.py tests/test_chat_router.py tests/test_module_registry.py -q
       - name: Run contextual Agent tests

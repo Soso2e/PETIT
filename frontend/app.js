@@ -39,7 +39,10 @@ if (desktopChatState) {
     if (draftStateEl) draftStateEl.textContent = saved.pending ? '応答が未確認です。履歴と操作結果を確認してから送信してください。' : '下書きを復元しました';
   }
   inputEl.addEventListener('input', () => saveDraft());
-  if (waitStopEl) waitStopEl.onclick = () => desktopChatState.stop();
+  if (waitStopEl) waitStopEl.onclick = () => {
+    window.PETIT_SESSION?.stopWaiting();
+    desktopChatState.stop();
+  };
 }
 
 function freshnessLabel(status, label) {
@@ -65,11 +68,13 @@ function addMessage(role, text, { tools, error, actions, modelRoute, silent = fa
     bubble.appendChild(t);
   }
 
-  if (actions && actions.length) {
+  for (const action of actions || []) {
+    if (document.querySelector('[data-approval-id="' + action.approval_id + '"]')) continue;
     const controls = document.createElement("div");
+    controls.dataset.approvalId = action.approval_id;
     controls.className = "action-confirm";
-    if (actions[0].name === "add_schedule") {
-      const args = actions[0].arguments || {};
+    if (action.name === "add_schedule") {
+      const args = action.arguments || {};
       const preview = document.createElement("dl");
       preview.className = "action-preview";
       const fields = [
@@ -88,8 +93,8 @@ function addMessage(role, text, { tools, error, actions, modelRoute, silent = fa
         preview.append(term, detail);
       }
       controls.appendChild(preview);
-    } else if (actions[0].name === "complete_task") {
-      const args = actions[0].arguments || {};
+    } else if (action.name === "complete_task") {
+      const args = action.arguments || {};
       const preview = document.createElement("dl");
       preview.className = "action-preview";
       const term = document.createElement("dt");
@@ -99,16 +104,20 @@ function addMessage(role, text, { tools, error, actions, modelRoute, silent = fa
       preview.append(term, detail);
       controls.appendChild(preview);
     }
+    const exact = document.createElement('pre'); exact.className = 'action-preview';
+    exact.textContent = JSON.stringify(action.arguments || {}, null, 2);
+    exact.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto';
+    controls.appendChild(exact);
     const approve = document.createElement("button");
     approve.type = "button";
-    approve.textContent = actions[0].name === "complete_task" ? "完了にする" : "実行する";
+    approve.textContent = action.name === "complete_task" ? "完了にする" : "実行する";
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.textContent = actions[0].name === "complete_task" ? "やめる" : "キャンセル";
+    cancel.textContent = action.name === "complete_task" ? "やめる" : "キャンセル";
     controls.append(approve, cancel);
     bubble.appendChild(controls);
-    approve.addEventListener("click", () => decideAction(actions[0].approval_id, true, controls));
-    cancel.addEventListener("click", () => decideAction(actions[0].approval_id, false, controls));
+    approve.addEventListener("click", () => decideAction(action.approval_id, true, controls));
+    cancel.addEventListener("click", () => decideAction(action.approval_id, false, controls));
   }
 
   if (modelRoute && modelRoute.observability) {
@@ -156,7 +165,7 @@ async function decideAction(approvalId, approved, controls) {
       addMessage("assistant", "⚠️ " + data.error, { error: true });
       return;
     }
-    addMessage("assistant", data.reply, { tools: data.used_tools });
+    addMessage("assistant", data.reply || "", { tools: data.used_tools, actions: data.pending_actions });
     history.push({ role: "assistant", content: data.reply });
   } catch (e) {
     addMessage("assistant", "⚠️ 確認操作に失敗しました: " + e.message, { error: true });
@@ -360,12 +369,8 @@ async function sendMessage(text) {
   if (desktopChatState) saveDraft(true, text);
 
   try {
-    const data = await chatJson("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, attachment_ids: attachmentIds, history, request_id: requestId, session_id: sessionId,
-        conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }),
-    });
+    const data = await window.PETIT_SESSION.send({ message: text, attachment_ids: attachmentIds,
+      request_id: requestId, conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }, chatJson);
     setTyping(false);
 
     if (data.request_id !== requestId) {
@@ -379,7 +384,7 @@ async function sendMessage(text) {
       window.PetitChatAttachments?.complete(attachmentIds);
       voiceResult = data;
       history.push({ role: "user", content: text });
-      if (data.reply) {
+      if (data.reply || data.pending_actions?.length) {
         addMessage("assistant", data.reply, { tools: data.used_tools, actions: data.pending_actions, modelRoute: data.model_route });
         history.push({ role: "assistant", content: data.reply });
       }
@@ -458,7 +463,7 @@ async function restoreHistory() {
   try {
     const data = await chatJson(`/api/conversations?limit=10&session_id=${encodeURIComponent(sessionId)}`);
     const rows = data.conversations || [];
-    if (!rows.length) return false;
+
     removeStaticGreeting();
     for (const row of rows) {
       if (row.user_text) {
@@ -470,7 +475,11 @@ async function restoreHistory() {
         history.push({ role: "assistant", content: row.assistant_text });
       }
     }
-    return true;
+    try {
+      const snapshot = await chatJson('/api/threads/' + encodeURIComponent(sessionId) + '/snapshot');
+      if (snapshot.pending_actions?.length) addMessage('assistant', '', { actions: snapshot.pending_actions, silent: true });
+      return rows.length > 0 || snapshot.pending_actions?.length > 0;
+    } catch { return rows.length > 0; }
   } catch (e) {
     if (desktopChatState) {
       addMessage('assistant', '会話履歴を取得できませんでした。接続を確認して画面を開き直してください。', { error: true, silent: true });

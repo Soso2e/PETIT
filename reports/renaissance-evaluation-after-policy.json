@@ -1,0 +1,122 @@
+{
+  "provider": "configured_deepseek_flash",
+  "data": "synthetic",
+  "external_sync_and_embedding": "disabled",
+  "real_discord_and_devices": "not_tested",
+  "passed": 6,
+  "cases": [
+    {
+      "case": "progress",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "find_projects",
+        "get_project_status",
+        "get_local_development_status",
+        "get_tasks"
+      ],
+      "memory_rows": 0,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 6051,
+      "error": null,
+      "reply": "卒研のコード側は、ローカルのリポジトリ（Python_Tools、mainブランチ）を見る限り「骨格の実装まで」で止まっている状態です。\n\n- PROGRESS.mdの記述：骨格の実装まで完了。自動テスト・実機検証は未実施。次は比較実験。\n- 直近コミットは「fixture」1件のみ、作業ツリーに未コミットの変更なし、mainとリモートの差分も0（ただしfetchはしていないので、リモートの最新状態は未確認）。\n- Concept.mdとREADME.mdは見当たりません。\n\nつまり、動く骨組みはあるけど、テストと実機検証、そして比較実験がこれから、という段階ですね。この「骨格まで」というのはPROGRESS.mdに書かれている内容であって、テストを実行した証拠ではないので、その点は割り引いて見てください。\n\nタスク側は「卒研の発表準備」が1件Yetで残っています。比較実験まで進めるなら、まずはテストを一度回して現状を確定させるのが良さそうですが、そこは着手しますか？"
+    },
+    {
+      "case": "remember",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "save_memory"
+      ],
+      "memory_rows": 1,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 3389,
+      "error": null,
+      "reply": "覚えました。卒研の発表は2026年11月10日 10時ですね。\n\n今日が10月23日なので、残りは約2週間半。さっき話していた比較実験とテストを考えると、けっこうタイトです。カレンダーに予定として入れますか？ あわせて、逆算した準備スケジュールをタスクに落とすこともできます。"
+    },
+    {
+      "case": "avoid_duplicate",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "search_memory",
+        "get_tasks"
+      ],
+      "memory_rows": 1,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 5407,
+      "error": null,
+      "reply": "了解、発表日はもう保存しません。記憶を検索しても重複は出てこなかったので、そのままで大丈夫です。\n\nで、今の手元はこうなっています。\n\nタスクは「卒研の発表準備」1件だけで、期限も未設定のままYet。コード側は骨格実装までで、テストと実機検証が未実施、比較実験が次の山。発表は11月10日10時。\n\n僕が最初にやるべきだと思うのは、比較実験に手を付ける前に、まずテストを一度回して現状を確定させることです。理由は、PROGRESS.mdの「骨格まで完了」が自己申告で、実行した証拠がないから。ここが実は動いていなかった場合、比較実験の結果ごと崩れるので、後半で一番痛い手戻りになります。30分くらいで白黒つく作業です。\n\nそのうえで順番は、\n1. テストを回して、通る／落ちるを確定\n2. 落ちた分を直して「動く骨格」を確定\n3. 比較実験の条件を決めて回す\n4. 結果をまとめて発表資料へ\n\nという流れが自然だと思います。実機検証は実験と並行でも回せますが、まずは1番を今日中に済ませるのが安全です。\n\nやるなら「卒研の発表準備」を親にして、下に「テスト実行して現状確定」を子タスクで作っておきますか？ 期限を今日にして、作業計測もそこで開始できます。"
+    },
+    {
+      "case": "start",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "get_tasks",
+        "get_tasks",
+        "start_work_session"
+      ],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 6390,
+      "error": null,
+      "reply": "「卒研の発表準備」で作業計測を開始しました。今から積み上がります。\n\n最初の一手は、さっき話したとおりテストを一度回して現状を確定させることです。Python_Toolsでテスト一式を流して、通る／落ちるを出してください。結果を貼ってくれれば、落ちた分の切り分けから一緒にやります。\n\n先にタスクを整理しておくなら、「テスト実行して現状確定」をこのタスクの子として作っておけます。必要なら言ってください。"
+    },
+    {
+      "case": "original_quote",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "search_conversations",
+        "search_conversations",
+        "search_conversations"
+      ],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 4898,
+      "error": null,
+      "reply": "見つかりました。Discord（thread: fixture-discord）の元発言です。\n\n- 日時: 2026年10月23日 15:01 (UTC) ／ 24日 0:01 JST\n- 発言元: Discord\n- 原文ID: conversation:1\n\nあなたの発言:\n> 卒研の実験条件は解像度512、比較対象は3方式。\n\nそれに対する返答:\n> 解像度512・3方式で比較する決定を確認した。\n\nつまり「解像度512、比較対象は3方式」という条件だけが記録に残っていて、3方式の中身（具体的な手法名）まではこの発言には書かれていません。そこも確認したい場合は、同じスレッドの前後をさらに掘るか、別の言い方を探してみます。"
+    },
+    {
+      "case": "quoted_command",
+      "passed": true,
+      "status": "completed",
+      "tools": [],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 1478,
+      "error": null,
+      "reply": "\"Start the graduation research work.\"\n\n操作の依頼ではなく翻訳だけということで、そのまま訳出しています。"
+    },
+    {
+      "case": "correction",
+      "passed": false,
+      "status": "completed",
+      "tools": [
+        "search_memory",
+        "search_memory",
+        "save_memory"
+      ],
+      "memory_rows": 2,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 6672,
+      "error": null,
+      "reply": "保存しました。卒研の発表は2026年11月12日 10時、で覚えておきます。\n\nただ、正直に言っておくと、前回「覚えておいて」と言われた分は記憶に残っていませんでした。今の登録が実質の初回になります。なので「前の記憶を訂正」ではなく「新しく入れ直した」という扱いです。\n\n今日が10月23日なので、延期で2日増えて約3週間。さっき始めた作業計測はそのまま続いています。"
+    }
+  ]
+}

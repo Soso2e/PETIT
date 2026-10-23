@@ -1,0 +1,179 @@
+{
+  "provider": "configured_deepseek_flash",
+  "data": "synthetic",
+  "external_sync_and_embedding": "disabled",
+  "real_discord_and_devices": "not_tested",
+  "passed": 7,
+  "cases": [
+    {
+      "case": "progress",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "get_local_development_status",
+        "get_project_status"
+      ],
+      "memory_rows": 0,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 5348,
+      "error": null,
+      "reply": "卒研プロジェクトのローカルリポジトリ（Python_Tools）は、今のところこんな感じです。\n\n- ブランチは main、最新コミットは 0f4d845「fixture」（2026-10-24 00:24 時点）\n- 未コミットの変更はゼロ、ブランチも1本だけ\n- PROGRESS.md の記述では「骨格の実装まで。自動テスト・実機検証は未実施。次は比較実験。」\n- Concept.md と README.md は未作成\n\nつまりコード側は骨格が組まれた段階で止まっていて、テストと実機検証はまだ、次にやるのは比較実験という整理ですね。\n\n補足しておくと、これはPC上のローカル状態を見たもので、リモートとの差は取得していないので不明です。また PROGRESS.md の記述はあくまで文書の内容で、テストが通ったことの証拠ではないです。比較実験、もう手を付け始めてます？",
+      "tool_calls": [
+        {
+          "arguments": "{}",
+          "name": "get_local_development_status"
+        },
+        {
+          "arguments": "{}",
+          "name": "get_project_status"
+        }
+      ]
+    },
+    {
+      "case": "remember",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "save_memory"
+      ],
+      "memory_rows": 1,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 3667,
+      "error": null,
+      "reply": "覚えました。卒研の発表は2026年11月10日の10時ですね。\n\n今日が10月24日なので、残りは約2週間半。さっきの状況だと比較実験と実機検証がまだ残っているので、そこから逆算すると少しタイトかも。リマインダーや予定として登録しておくこともできますが、どうしますか？",
+      "tool_calls": [
+        {
+          "arguments": "{\"content\": \"卒研の発表日は2026年11月10日10時。\", \"type\": \"fact\"}",
+          "name": "save_memory"
+        }
+      ]
+    },
+    {
+      "case": "avoid_duplicate",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "search_memory"
+      ],
+      "memory_rows": 1,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 5531,
+      "error": null,
+      "reply": "発表日の件、記録にすでに「2026年11月10日10時」で入っていたので、重複保存はしませんでした。\n\nで、何から手を付けるかですが、私は「比較実験の設計を今日中に固める」を最初に推します。理由は、骨格ができた状態で一番危ないのが、実験を回しながら設計を考え始めて手戻りすることだからです。条件・比較対象・評価指標・必要なデータ量を先に決めておけば、その後の実装も検証も迷いません。\n\nそのうえで順番はこんな感じでどうでしょう。\n\n1. 比較実験の設計（条件、指標、必要サンプル数）を決めてメモに残す\n2. 骨格に実験用の入口（設定切り替えとログ出力）を足す\n3. 自動テストを最低限通す\n4. 実機検証、結果をまとめる\n\n2週間半で発表まで持っていくなら、1と2を今週中、3を来週頭、4と発表資料を残りに、という配分が無理がないと思います。\n\nもし設計はもう頭の中にあるなら、先に2の入口づくりから入っても大丈夫です。今の気分的には、考える方と手を動かす方、どっちから始めたいですか？",
+      "tool_calls": [
+        {
+          "arguments": "{\"query\": \"卒研 発表日 2026年11月10日\"}",
+          "name": "search_memory"
+        }
+      ]
+    },
+    {
+      "case": "start",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "get_tasks",
+        "get_project_status",
+        "start_work_session"
+      ],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 6429,
+      "error": null,
+      "reply": "「卒研の発表準備」の作業計測を始めました。プロジェクトは卒研に紐づいています。\n\n最初の一歩は、さっき話した比較実験の設計を決めて書き出すところから。決めるべきはこの4点です。\n\n1. 比較対象を何と何にするか（ベースラインと提案手法）\n2. 評価指標（精度、処理時間、メモリなど、発表で出す数字）\n3. 実験条件（データセット、パラメータ、試行回数）\n4. 結果の出し方（表かグラフか、何を主張に持っていくか）\n\n今の骨格の状態からすると、まずは1と2を15分くらいで書き出してしまうのがいいと思います。決まったらPROGRESS.mdか別メモに残しておけば、実装に戻ったときに迷いません。\n\n議論しながら詰めていきますか？それとも先に自分で案を出して、それを見せてもらう形がいいですか？",
+      "tool_calls": [
+        {
+          "arguments": "{\"limit\": 50, \"priority\": \"all\"}",
+          "name": "get_tasks"
+        },
+        {
+          "arguments": "{}",
+          "name": "get_project_status"
+        },
+        {
+          "arguments": "{\"task_id\": \"1\"}",
+          "name": "start_work_session"
+        }
+      ]
+    },
+    {
+      "case": "original_quote",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "search_conversations",
+        "search_conversations",
+        "search_conversations"
+      ],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 5650,
+      "error": null,
+      "reply": "Discordの元発言、見つかりました。\n\n- 出典: Discord（thread_id: fixture-discord）、2026-10-23 15:24 UTC（日本時間 10/24 00:24）、原文ID conversation:1\n- あなたの発言: 「卒研の実験条件は解像度512、比較対象は3方式。」\n\n条件は解像度512、比較対象が3方式、という2点だけですね。3方式が具体的に何と何かまでは、この発言には書かれていません。必要なら、その周辺のやり取りをもう少し掘ってみます。",
+      "tool_calls": [
+        {
+          "arguments": "{\"limit\": 10, \"query\": \"卒研 実験条件\", \"source\": \"discord\"}",
+          "name": "search_conversations"
+        },
+        {
+          "arguments": "{\"limit\": 10, \"query\": \"実験\", \"source\": \"discord\"}",
+          "name": "search_conversations"
+        },
+        {
+          "arguments": "{\"limit\": 10, \"query\": \"卒業研究\"}",
+          "name": "search_conversations"
+        }
+      ]
+    },
+    {
+      "case": "quoted_command",
+      "passed": true,
+      "status": "completed",
+      "tools": [],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 1459,
+      "error": null,
+      "reply": "\"Start working on my graduation research.\"",
+      "tool_calls": []
+    },
+    {
+      "case": "correction",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "search_memory",
+        "save_memory"
+      ],
+      "memory_rows": 2,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 1,
+      "elapsed_ms": 4960,
+      "error": null,
+      "reply": "訂正しておきました。卒研の発表は2026年11月12日の10時、旧記録（11月10日10時）は置き換え済みです。\n\n2日延びたので、さっきの逆算も少し楽になりましたね。今週中に比較実験の設計と入口づくり、来週頭に自動テスト、残りで実機検証と資料、という流れはそのまま使えます。",
+      "tool_calls": [
+        {
+          "arguments": "{\"query\": \"卒研 発表日 2026年11月10日 10時\"}",
+          "name": "search_memory"
+        },
+        {
+          "arguments": "{\"content\": \"卒研の発表日は2026年11月12日10時（当初11月10日10時から延期）。\", \"replaces_id\": 1, \"type\": \"fact\"}",
+          "name": "save_memory"
+        }
+      ]
+    }
+  ]
+}
