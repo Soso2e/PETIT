@@ -8,6 +8,9 @@ from __future__ import annotations
 import re
 import subprocess
 from pathlib import Path
+from datetime import datetime, timezone
+import hashlib
+import os
 from typing import Any, Callable
 
 RunCommand = Callable[[list[str]], bytes]
@@ -35,6 +38,11 @@ def _safe_excerpt(value: str, limit: int) -> str:
     return text[:limit]
 
 
+def workspace_identity(root: Path) -> str:
+    """Identity is the exact canonical root, never its possibly shared basename."""
+    return hashlib.sha256(os.path.normcase(str(root.resolve())).encode()).hexdigest()[:24]
+
+
 def _root_document(root: Path, name: str, limit: int) -> dict[str, Any]:
     """Only three hard-coded root documents can be opened; symlinks are excluded."""
     doc = root / name
@@ -43,7 +51,8 @@ def _root_document(root: Path, name: str, limit: int) -> dict[str, Any]:
             return {"name": name, "status": "excluded_symlink"}
         if not doc.is_file():
             return {"name": name, "status": "missing"}
-        size = doc.stat().st_size
+        before = doc.stat()
+        size = before.st_size
         if size > _MAX_DOCUMENT_BYTES:
             return {"name": name, "status": "too_large"}
         with doc.open("rb") as source:
@@ -51,9 +60,15 @@ def _root_document(root: Path, name: str, limit: int) -> dict[str, Any]:
         if len(content) > _MAX_DOCUMENT_BYTES or b"\x00" in content:
             return {"name": name, "status": "excluded"}
         raw = content.decode("utf-8-sig", errors="replace")
+        after = doc.stat()
+        if (before.st_mtime_ns, before.st_size) != (after.st_mtime_ns, after.st_size):
+            return {"name": name, "status": "changed_during_read"}
         excerpt = _safe_excerpt(raw, limit)
         return {"name": name, "status": "ok", "excerpt": excerpt,
-                "truncated": len(raw) > len(excerpt), "size_bytes": size}
+                "truncated": len(raw) > len(excerpt), "size_bytes": size,
+                "modified_at": datetime.fromtimestamp(before.st_mtime, timezone.utc).isoformat(),
+                "source": {"workspace_id": workspace_identity(root), "relative_path": name},
+                "verification": "document_claims_not_execution_evidence"}
     except (OSError, UnicodeError):
         return {"name": name, "status": "unavailable"}
 
@@ -80,7 +95,7 @@ def collect_local_development(root: Path, run: RunCommand) -> dict[str, Any]:
         "branches": [],
         "recent_commits": [],
     }
-    head = read_git("rev-parse", "--short=12", "HEAD")
+    head = read_git("rev-parse", "HEAD")
     result["head_sha"] = _clean(head) if head else None
     refs = read_git("for-each-ref", "--count=12", "--sort=-committerdate",
                     "--format=%(refname:short)%09%(objectname:short)%09%(committerdate:iso8601-strict)",
