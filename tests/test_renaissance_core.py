@@ -33,7 +33,8 @@ class RenaissanceCoreTests(unittest.TestCase):
             p = patch.object(config, target, value)
             p.start()
             self.addCleanup(p.stop)
-        for target in ("backend.chroma_client.sync_structured_data", "backend.chat._artifact_executor.submit"):
+        for target in ("backend.chroma_client.sync_structured_data", "backend.chroma_client.add",
+                       "backend.chroma_client.delete_ids", "backend.chat._artifact_executor.submit"):
             p = patch(target)
             p.start()
             self.addCleanup(p.stop)
