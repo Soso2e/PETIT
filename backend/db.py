@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from uuid import uuid4
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
@@ -227,7 +227,27 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def _backup_before_memory_extension() -> None:
+    path = Path(config.DB_PATH)
+    if not path.is_file():
+        return
+    with closing(sqlite3.connect(path)) as source:
+        columns = {row[1] for row in source.execute("PRAGMA table_info(memory)")}
+        if not columns or "visibility" in columns:
+            return
+        backup = Path(str(path) + ".before-renaissance.bak")
+        if backup.exists():
+            return
+        pending = Path(str(backup) + "." + uuid4().hex + ".partial")
+        with closing(sqlite3.connect(pending)) as destination:
+            source.backup(destination)
+            if destination.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise RuntimeError("renaissance_backup_check_failed")
+        pending.rename(backup)
+
+
 def init_db() -> None:
+    _backup_before_memory_extension()
     Path(config.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = get_connection()
     try:

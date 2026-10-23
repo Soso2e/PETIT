@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -84,6 +86,25 @@ class RenaissanceMemoryTests(unittest.TestCase):
         self.assertEqual(sum(r["created"] for r in result), 1)
         with db.get_connection() as connection:
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM memory").fetchone()[0], 36)
+
+    def test_legacy_backup_precedes_memory_extension_and_preserves_content(self):
+        legacy = Path(self.temp.name) / "legacy.db"
+        with closing(sqlite3.connect(legacy)) as connection:
+            connection.executescript(db.SCHEMA)
+            connection.execute("INSERT INTO memory(created_at,type,content) VALUES(?,?,?)",
+                               (db.now_iso(), "fact", "以前からの記憶"))
+            connection.commit()
+        with patch.object(config, "DB_PATH", legacy):
+            db.init_db()
+            backup = Path(str(legacy) + ".before-renaissance.bak")
+            original = backup.read_bytes()
+            db.init_db()
+            self.assertEqual(backup.read_bytes(), original)
+            with closing(sqlite3.connect(backup)) as connection:
+                self.assertNotIn("visibility", {r[1] for r in connection.execute("PRAGMA table_info(memory)")})
+                self.assertEqual(connection.execute("SELECT id,content FROM memory").fetchone(), (1, "以前からの記憶"))
+            with db.get_connection() as connection:
+                self.assertEqual(connection.execute("SELECT id,content,visibility FROM memory").fetchone()["visibility"], "standard")
 
     def test_superseded_and_expired_records_are_preserved_but_not_current_facts(self):
         old = memory.save_memory("卒研の発表日は11月2日")
