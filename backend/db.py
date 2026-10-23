@@ -179,6 +179,9 @@ def init_db() -> None:
             "updated_at": "TEXT", "valid_until": "TEXT", "superseded_by": "INTEGER",
             "visibility": "TEXT NOT NULL DEFAULT 'standard'", "source_session_id": "TEXT",
         })
+        conn.create_function("petit_memory_hash", 1, normalized_hash, deterministic=True)
+        conn.execute("UPDATE memory SET content_hash=petit_memory_hash(content) WHERE content_hash IS NULL")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_memory_hash_visibility ON memory(content_hash,visibility)")
         _ensure_columns(conn, "calendar_events_cache", {"source_key": "TEXT", "external_id": "TEXT"})
         _ensure_columns(
             conn,

@@ -22,3 +22,5 @@ schema変更は列追加のみ。既存memoryのID・本文・作成日時、旧
 隔離DBの検証と、実Provider/Discord/iPhone/配布版の受入は区別する。
 
 検証: このPRの元発言/記憶/日次/予定検索の関連pytestは25 passed + 3 subtests。旧Notionテストのquery_database参照は現行APIに存在せず、今回の変更範囲外の失敗として区別する。実ProviderやDiscord実アカウントは未確認。
+
+実Brainの合成会話で表記差による検索不一致を確認したため、空白区切りの複数語検索と、文字の部分一致候補を追加した。候補は確定一致と区別し、元ID・本文を見てAIが訂正対象を判断する。意図判定や発話ごとの分岐は追加しない。旧NULL hashの記憶は本文を変えずhashを補完し、重複保存を避ける。

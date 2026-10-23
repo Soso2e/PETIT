@@ -143,6 +143,24 @@ class RenaissanceMemoryTests(unittest.TestCase):
         with db.get_connection() as connection:
             self.assertEqual(connection.execute("SELECT COUNT(*) FROM calendar_events_cache").fetchone()[0], 1)
 
+    def test_multiple_keywords_and_japanese_related_candidates_keep_the_original_id(self):
+        record = memory.save_memory("卒研発表の日時は2026年11月10日10時")
+        multi = memory.search_memory("卒研 発表", include_vault=False)
+        self.assertEqual(multi["memories"][0]["id"], record["id"])
+        related = memory.search_memory("卒研の発表日", include_vault=False)
+        self.assertEqual(related["memories"][0]["id"], record["id"])
+        self.assertEqual(related["memories"][0]["match_kind"], "related_candidate")
+
+    def test_legacy_unhashed_memory_is_reused_without_deleting_or_replacing_its_row(self):
+        with db.get_connection() as connection:
+            row_id = connection.execute(
+                "INSERT INTO memory(created_at,type,content) VALUES(?,?,?)",
+                (db.now_iso(), "note", "以前からある記憶")).lastrowid
+        db.init_db()
+        reused = memory.save_memory("以前からある記憶")
+        self.assertFalse(reused["created"])
+        self.assertEqual(reused["id"], row_id)
+
 
 if __name__ == "__main__":
     unittest.main()

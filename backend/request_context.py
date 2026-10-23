@@ -30,3 +30,18 @@ def current_ids() -> tuple[str | None, str | None]:
 
 def current_conversation_mode() -> str:
     return _conversation_mode.get()
+def local_only() -> bool:
+    """Read the current Thread's disclosure mode without creating any schema."""
+    _request_id, session_id = current_ids()
+    if not session_id:
+        return False
+    from pathlib import Path
+    from . import config, db
+    if not Path(config.DB_PATH).exists():
+        return False
+    with db.get_connection() as connection:
+        if not connection.execute("SELECT 1 FROM sqlite_master WHERE name='threads'").fetchone():
+            return False
+        row = connection.execute("SELECT privacy FROM threads WHERE id=?", (session_id,)).fetchone()
+    return bool(row and row["privacy"] == "local_only")
+
