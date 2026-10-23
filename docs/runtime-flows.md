@@ -907,3 +907,24 @@ flowchart TD
     UI -->|競合を比較| Conflict[既存競合UI・revision確認]
     Conflict --> Choice[PETIT側再同期 / Notion側採用を明示選択]
 ```
+
+
+## Renaissance: 確認済みProjectとローカル開発参照（#345 / #341）
+
+```mermaid
+flowchart TD
+    Task[既存Task.project_id] --> Project[Project Continuity 内部ID]
+    Lookup[find_projects / 確認済み別名] --> Project
+    Allowed[list_project_workspaces / 明示allowlist] --> Link[link_project_workspace / 利用者確認]
+    Project --> Link
+    Link --> Verify[承認時にpath・Gitルート・private・symlinkを再検査]
+    Verify --> Sources[既存project_source_links / local_workspace / confirmed_at]
+    Project --> Read[get_local_development_status project_id]
+    Sources --> Read
+    Read --> Cache[既存WorkspaceObserver / 正確なrootのworkspace_id]
+    Cache --> Facts[観測時刻とstale / 文書mtime・出典 / 実Git状態を区別]
+    Facts --> Brain[Brainが必要な情報だけ統合して返答]
+```
+
+似た名前での自動紐付けや別の進捗台帳は追加しない。未確認・解除済み・許可撤回・staleは明示する。
+詳細: [project-workspaces.md](project-workspaces.md)。

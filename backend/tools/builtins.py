@@ -28,6 +28,7 @@ _BUILTIN_MODULES = (
     "backend.tools.project_completion",
     "backend.tools.project_registration",
     "backend.tools.project_status",
+    "backend.tools.project_workspaces",
     "backend.tools.reminders",
     "backend.tools.schedule",
     "backend.tools.tasks",

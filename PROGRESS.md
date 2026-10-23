@@ -2,9 +2,11 @@
 
 **Current Version: v0.31.0**
 
-**Last Updated: 2026-10-21**
+**Last Updated: 2026-10-23**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #345 / #341（確認済みProjectフォルダ、実装済み・実データ受入未確認）: 既存project_source_linksへlocal_workspace対応を確認付きで保存し、既存get_local_development_status(project_id)からWorkspaceObserverのキャッシュを取得。Task.project_idと同じIDを使い、同名フォルダはcanonical rootのIDで区別する。allowlist/実行時再検査/private/symlink・junction拒否、文書更新日時・出典・観測時刻・実Git状態を分離。34件の関連テストを一時Git/DBで確認。Core #346との結合、実Provider、実登録フォルダ、配布端末の受入は別途。
 
 - #341（main統合候補・実機未確認）: Opt-in既存workspace観測に、登録GitルートのHEAD・local branch/commit・tracking比較とConcept/PROGRESS/README限定抜粋を追加。キャッシュ参照のsafe_read Toolを会話Capabilityへ登録。フォルダ・コマンド・ファイル取得はallowlist/固定名のread-only、fresh/staleと未確認文書を区別。コード単体テストを追加したが、実Windows/macOS PC上の観測と実LLM/iPhone/PWA会話は未確認。後続はソースコード部分読取・内部Project IDとの明示紐付け・追加UI。統合済みv0.31.0との回帰と実Windows/macOS/iPhoneの受入はIssue #343で追跡。
 
@@ -270,3 +272,5 @@
 
 | 2026-10-19 | 11:24 | #338 | AI-First責務分担と3方式を調査・比較し、本番未接続PoCを追加。実DeepSeekの合成12ケース×3方式で直接経路に改善を観測したが、引用翻訳の失敗等が残るため本番移行は見送り。PR #337の安全機能・元checkoutは保持。結果/手順/未確認は docs/ai-first-agent-design.md。 |
 | 2026-10-17 | 14:16 | #333 | v0.31.0: 画像添付/Vision観測/Read専用Brain回答とPython比率検証、明示cloud同意・TTL・session境界を実装。関連125件と11 subtests、Desktop64件、隔離Chromeの3 UI×2幅成功。実Provider/Discord/実端末は未確認。 |
+
+| 2026-10-23 | 14:48 | #345 | Project Continuityと既存ローカル観測を確認済みフォルダで接続。登録/解除・同名衝突・Task.project_id・mtime/出典/Git・stale・許可撤回・private/リンク拒否を一時Gitで検証（34件成功）。実データ/実Provider/実端末は未確認。 |
