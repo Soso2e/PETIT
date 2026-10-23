@@ -54,33 +54,6 @@ def _confirmed_notion_project_external_id(project_id: str) -> str:
     return next(iter(external_ids))
 
 
-@tool(
-    name="get_tasks",
-    description=(
-        "タスク一覧を取得する。Notion が設定されていれば自動で最新データを取得する。"
-        "エリアは personal（個人）/ group（グループ）/ university（大学）/ work（仕事）。"
-        "「今日のタスク教えて」「大学のやること何があったっけ」のような発話で使う。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "status": {
-                "type": "string",
-                "description": "絞り込むステータス。省略で未完了のみ、allで全件。",
-            },
-            "area": {
-                "type": "string",
-                "enum": list(AREAS),
-                "description": "責任の発生源で絞り込む。個人/グループ/大学/仕事。",
-            },
-            "project_id": {
-                "type": "string",
-                "description": "確認済みPETIT内部プロジェクトIDで絞り込む。任意。",
-            },
-            "limit": {"type": "integer", "description": "最大件数", "default": 20},
-        },
-    },
-)
 def get_tasks(
     status: str | None = None,
     area: str | None = None,
@@ -151,48 +124,6 @@ def add_task(title: str, due_date: str | None = None, priority: str | None = Non
     return {"added": True, "id": task_id, "title": title, "due_date": due_date, "priority": priority}
 
 
-@tool(
-    name="create_task",
-    description=(
-        "新しいタスクを作成する。Notion が設定されていれば Notion のタスクDBに作成し、"
-        "未設定ならローカルDBに保存する。area は責任の発生源で、personal（個人）/ "
-        "group（グループ）/ university（大学）/ work（仕事）から指定する。"
-        "project_idを指定する場合、Notionでは確認済みRelationだけを使用する。"
-        "areaが明確なら指定し、判断できない場合だけユーザーへ確認する。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "title": {"type": "string", "description": "タスク名"},
-            "due_date": {
-                "type": "string",
-                "description": "目標完了日時。YYYY-MM-DD または ISO datetime。作業予定とは別。",
-            },
-            "priority": {
-                "type": "string",
-                "enum": _PRIORITIES,
-                "description": "優先度。迷う場合は Mid。",
-            },
-            "area": {
-                "type": "string",
-                "enum": list(AREAS),
-                "description": "責任の発生源。personal/group/university/work。",
-            },
-            "project_id": {
-                "type": "string",
-                "description": "PETIT内部プロジェクトID。Notionでは確認済み紐付けがある場合だけRelationへ保存する。",
-            },
-            "category": {
-                "type": "string",
-                "enum": _CATEGORIES,
-                "description": "旧Category。既存DB互換用。迷う場合は省略してよい。",
-            },
-            "reason": {"type": "string", "description": "補足・理由・メモ。任意。"},
-        },
-        "required": ["title"],
-    },
-    requires_confirmation=True,
-)
 def create_task(
     title: str,
     due_date: str | None = None,
@@ -264,23 +195,6 @@ def create_task(
     }
 
 
-@tool(
-    name="complete_task",
-    description=(
-        "タスクを完了にする。task_id が分かる場合はそれを使う。分からない場合は title_query に"
-        "タスク名の一部を指定する。Notion タスクなら Status=Done と Done=今日で更新する。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "task_id": {"type": "integer", "description": "PETIT のローカルキャッシュ数値ID。任意。"},
-            "external_id": {"type": "string", "description": "NotionページUUID。分かる場合だけ使う。"},
-            "title_query": {"type": "string", "description": "ユーザーがタスク名を指定した場合は、その名前をここへ入れる。"},
-            "done_date": {"type": "string", "description": "完了日 YYYY-MM-DD。省略時は今日。"},
-        },
-    },
-    requires_confirmation=True,
-)
 def complete_task(
     task_id: int | str | None = None,
     external_id: str | None = None,

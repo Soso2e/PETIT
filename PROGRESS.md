@@ -1,12 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.31.0**
+**Current Version: v0.32.0（開発ブランチ・未マージ）**
 
 **Last Updated: 2026-10-23**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #345 / #341（確認済みProjectフォルダ、実装済み・実データ受入未確認）: 既存project_source_linksへlocal_workspace対応を確認付きで保存し、既存get_local_development_status(project_id)からWorkspaceObserverのキャッシュを取得。Task.project_idと同じIDを使い、同名フォルダはcanonical rootのIDで区別する。allowlist/実行時再検査/private/symlink・junction拒否、文書更新日時・出典・観測時刻・実Git状態を分離。34件の関連テストを一時Git/DBで確認。Core #346との結合、実Provider、実登録フォルダ、配布端末の受入は別途。
+- #345 / #341（確認済みProjectフォルダ、実装済み・実データ受入未確認）: 既存project_source_linksへlocal_workspace対応を確認付きで保存し、既存get_local_development_status(project_id)からWorkspaceObserverのキャッシュを取得。Task.project_idと同じIDを使い、同名フォルダはcanonical rootのIDで区別する。allowlist/実行時再検査/private/symlink・junction拒否、文書更新日時・出典・観測時刻・実Git状態を分離。34件の関連テストを一時Git/DBで確認。Core #346・記憶検索 #347と結合済み。関連pytest154件+3 subtests、Node4件、Chrome 1440/390pxと実DeepSeek Flash・合成7ケース（7/7）を確認。実登録フォルダ・実Discord/Notion・配布端末の受入は別途。
+- #345（元発言検索・記憶鮮度、実装済み・実機未確認）: 既存conversationsの入力/出力を日時・発言元・Thread・原文ID付きでbounded検索するToolを追加。旧NULL sessionは推測で結合しない。save_memoryは固定保存上限を設けず、正規化重複・明示置換・期限・visibilityをSQLiteで扱い、旧行を保持。private元発言/記憶をstandard検索から除外し、private検索ではembeddingを呼ばない。全件再索引を個別索引更新へ縮小。Core PR #346を取り込み、単一Brainへ接続済み。#346 → #347 → #348の順でレビューする（全PRのbaseはmain、main未マージ）。
+- #345 / #303（実装済み・実機未確認）: 単一native Brain Tool Loop、永続Thread/Turn/承認/receipt、既存chat/画像/作業開始接続と明示Thread切替を追加。本文は既存conversations、旧session/ID/データを維持し、初回追加schema前にSQLiteバックアップを作成。旧ルーティングは本番text/Worker経路から除外。旧agent_legacy.run・Taskの重複登録・idle自動分割・fetch差替えを撤去。再送/並行/ロールバック/承認再開/ローカル専用の隔離検証を実施。後続#347/#348との結合状態で実DeepSeek Flash・合成7ケースのTool実行と保存結果を確認（7/7、初期6/7の失敗記録も保持）。実Providerの一般的な理解精度、実Notion/Discord、配布Desktop/iPhoneは未確認。新会話契約はdocs/renaissance-core.md。次は3 PRのレビューと実データ受入、Discord本人確認/配信adapter。
 
 - #341（main統合候補・実機未確認）: Opt-in既存workspace観測に、登録GitルートのHEAD・local branch/commit・tracking比較とConcept/PROGRESS/README限定抜粋を追加。キャッシュ参照のsafe_read Toolを会話Capabilityへ登録。フォルダ・コマンド・ファイル取得はallowlist/固定名のread-only、fresh/staleと未確認文書を区別。コード単体テストを追加したが、実Windows/macOS PC上の観測と実LLM/iPhone/PWA会話は未確認。後続はソースコード部分読取・内部Project IDとの明示紐付け・追加UI。統合済みv0.31.0との回帰と実Windows/macOS/iPhoneの受入はIssue #343で追跡。
 
@@ -274,3 +276,5 @@
 | 2026-10-17 | 14:16 | #333 | v0.31.0: 画像添付/Vision観測/Read専用Brain回答とPython比率検証、明示cloud同意・TTL・session境界を実装。関連125件と11 subtests、Desktop64件、隔離Chromeの3 UI×2幅成功。実Provider/Discord/実端末は未確認。 |
 
 | 2026-10-23 | 14:48 | #345 | Project Continuityと既存ローカル観測を確認済みフォルダで接続。登録/解除・同名衝突・Task.project_id・mtime/出典/Git・stale・許可撤回・private/リンク拒否を一時Gitで検証（34件成功）。実データ/実Provider/実端末は未確認。 |
+| 2026-10-23 | 14:35 | #345 | 元発言の横断検索と長期記憶の期限/置換/visibilityを追加。無制限保存・bounded取得・旧行保護・並行重複・private除外・予定の完全一致再登録抑止を一時DBで検証。実Provider/Discord/実端末は未確認。 |
+| 2026-10-23 | 14:10 | #345 | 単一BrainとThread/Turnの永続化を実装。再送・同時受付・承認・局所書込receipt・履歴分離・SQLiteバックアップを隔離データで検証。旧実行ループと重複登録を削減。実サービス/実端末の受入とRenaissance後続能力は未確認。 |

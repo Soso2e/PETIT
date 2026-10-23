@@ -214,26 +214,28 @@ class ActionReliabilityTests(unittest.TestCase):
     def test_http_original_conversation_uses_saved_state(self):
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
-        from backend import chat as chat_api
+        from backend import brain, chat as chat_api
         task = self.create("富美子動画制作", session="fixture")
         app = FastAPI()
         app.include_router(chat_api.router)
-        client = TestClient(app)
-        history = []
-        with patch.object(chat_api._artifact_executor, "submit"), \
-             patch.object(agent, "chat_completion", return_value={"content": "カットの続きだね"}) as llm:
-            for text in ("セッション開始、富美子動画制作", "セッション開始", "いまカットやってる途中かな〜", "セッション開始してくれた？", "開始して"):
-                response = client.post("/api/chat", json={"message": text, "session_id": "reliability-http", "history": history})
-                self.assertEqual(response.status_code, 200)
-                result = response.json()
-                self.assertFalse(result.get("error"), result)
-                self.assertEqual(result["model_route"]["observability"]["llm_calls"], 0)
-                history += [{"role": "user", "content": text}, {"role": "assistant", "content": result["reply"]}]
-            self.assertEqual(llm.call_count, 1)
+        responses = [
+            {"tool_calls": [{"id": "start", "type": "function", "function": {"name": "start_work_session", "arguments": json.dumps({"task_id": str(task["id"])})}}]},
+            {"content": "対象の作業を開始したよ"},
+            {"content": "カットの続きだね"},
+            {"tool_calls": [{"id": "status", "type": "function", "function": {"name": "get_work_status", "arguments": "{}"}}]},
+            {"content": "そのタスクを計測中だよ"},
+        ]
+        with TestClient(app) as client, patch.object(chat_api._artifact_executor, "submit"), \
+             patch.object(brain.lmstudio_client, "chat_completion", side_effect=responses) as llm:
+            for text in ("作業に取り掛かろう", "いまカットを進めている", "計測はどうなってる？"):
+                data = client.post("/api/chat", json={"message": text, "session_id": "reliability-http"}).json()
+                self.assertFalse(data.get("error"), data)
+            self.assertEqual(llm.call_count, 5)
+            self.assertIn("カット", str(llm.call_args.args[0]))
         self.assertEqual(work_sessions.active_session()["task_id"], str(task["id"]))
         with db.get_connection() as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM work_sessions").fetchone()[0], 1)
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM conversations WHERE session_id='reliability-http'").fetchone()[0], 5)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM conversations WHERE session_id='reliability-http'").fetchone()[0], 3)
 
     def test_approved_write_receipt_is_not_lost_on_resume(self):
         state = {"original_request": "予定を追加して", "capabilities": ["calendar"], "messages": [], "action_required": True}

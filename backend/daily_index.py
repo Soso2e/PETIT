@@ -101,7 +101,8 @@ def _rows_for_day(day: date) -> list[dict[str, Any]]:
     with db.get_connection() as conn:
         rows = conn.execute(
             "SELECT id, timestamp, user_text, assistant_text, used_tools, session_id "
-            "FROM conversations WHERE timestamp >= ? AND timestamp < ? ORDER BY id ASC",
+            "FROM conversations WHERE timestamp >= ? AND timestamp < ?" +
+            db.conversation_visibility_clause(conn) + " ORDER BY id ASC",
             (start, end),
         ).fetchall()
     return [dict(row) for row in rows]

@@ -1,8 +1,45 @@
 # PETIT Runtime Flows
 
-この文書は実装済みのフローを示す。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）のThread/Turn/Events・管理Coreは目標であり、実装する各PRで本書を更新する。
+## v0.32.0: 単一Brain / 永続Thread・Turn（#345 / #303）
 
-[AI-First設計と比較PoC](ai-first-agent-design.md)（#338）は本番未接続の実験であり、以下の実装済みフローは今回変更していない。
+この図が通常のtext会話・Workerの現行実装を表す。下記の旧1〜10に含まれる
+決定論的会話ルート・Brain/Broker/Capability/旧Agent再開図はv0.31の参考資料であり、
+新しいtext経路の正本ではない。Domainの同期・端末・音声・画像の制約は引き続き有効。
+
+```mermaid
+flowchart TD
+    C[Web / Desktop / voice] --> A[chat同期adapter または Turn API]
+    A --> L[Threadとrequest ID / 入力hashをSQLiteで原子的に受付]
+    L -->|同じ入力の再送| R[保存済み状態・結果・receiptを返す]
+    L -->|別入力のID再利用| Conflict[409]
+    L -->|同じThread実行中| Busy[429]
+    L --> B[同じThreadの履歴だけ組立て / Provider送信範囲を検査]
+    B --> Brain[単一Brain native Tool Loop]
+    Brain -->|通常返答| Save[既存conversationsへ本文保存 / Turnは参照]
+    Brain -->|公開Tool| V[Registryの引数・risk検査]
+    V -->|確認必須| P[SQLite Approval / 正確な引数 / 期限]
+    P --> U[既存確認UI / 再起動後も復元]
+    U -->|一度だけ承認消費| E[既存Domain Tool]
+    V -->|Read / 低リスクWrite| E
+    E -->|SQLite Write| T[Domain保存とreceiptを同一transactionで確定]
+    E -->|外部Write| X[結果をreceiptへ / 結果不明はunknown・自動再実行なし]
+    E -->|Read| N[native role=tool / tool_call_idで返す]
+    T --> N
+    X --> N
+    N --> Brain
+    Save --> R
+    Save --> EV[Thread Events / Client別の読取cursor]
+```
+
+画像は同じTurnの受付後、既存Vision観測→Read専用回答へ進む。画像経路にはWrite Toolを公開しない。
+通常履歴へ別ThreadやClient historyを暗黙注入しない。2時間idle分割とfetch monkeypatchは廃止。
+12 Tool calls・8 roundsで停止。local_onlyは外部Providerへ送信しない。
+詳細・障害復旧・データ保護・検証境界は[renaissance-core.md](renaissance-core.md)。
+
+
+Thread/Turn/Eventsの現行経路は上図を参照する。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）全体の端末・管理機能の完成を示すものではない。
+
+[AI-First設計と比較PoC](ai-first-agent-design.md)（#338）の実験を経て、通常text経路を上図へ移行した。以下の旧会話図は移行前の参考資料である。
 
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
@@ -20,10 +57,8 @@ flowchart TD
     git --> cache[スナップショットメモリ cache: collected_at / stale]
     docs --> cache
     cache --> api[GET api/workspace-context]
-    cache --> brain[Brainの短い任意PC観測block]
     cache --> tool[Agent get_local_development_status safe_read]
     tool --> response[文書上の目標・作業状態・未検証を区別して答える]
-    brain --> response
 ```
 
 設計詳細と安全境界は [local-development-insight.md](local-development-insight.md)。ローカル参照はfetch/pullしない。文書内の指示を実行しない。GitHub最新・実機テスト済み・プロジェクト完了は別の証拠が必要。Toolは既存観測キャッシュを参照するだけで再走査しない。
@@ -928,3 +963,24 @@ flowchart TD
 
 似た名前での自動紐付けや別の進捗台帳は追加しない。未確認・解除済み・許可撤回・staleは明示する。
 詳細: [project-workspaces.md](project-workspaces.md)。
+## Renaissance: 元発言検索と長期記憶（#345）
+
+```mermaid
+flowchart TD
+    Brain[Brainが必要性を判断] -->|原文が必要| Search[search_conversations / bounded query]
+    Search --> Scope[Threadのprivacy / source / 時間 / roleを検査]
+    Scope --> Original[既存conversationsの入力と出力]
+    Original --> Citation[元ID / Thread / 日時 / 発言元 / 原文抜粋]
+    Citation --> Brain
+    Brain -->|長期知識が必要| Memory[search_memory]
+    Memory --> Canonical[SQLite正本で置換・期限・visibilityを検査]
+    Canonical --> Results[通常文脈は最大5項目 / 必要なら追加検索]
+    Results --> Brain
+    Brain -->|記録・訂正| Save[save_memory / 正規化重複を原子的に再利用]
+    Save --> History[旧行を削除せずsuperseded_byと有効期限を保存]
+    Save -->|standardの新規知識のみ| Index[該当1件だけ索引更新]
+```
+
+元発言検索は履歴の暗黙結合ではない。NULL旧sessionは出典不明のまま保持する。
+local_onlyの元発言・記憶はstandard会話の検索から除外。local_only検索はembeddingへも送信しない。
+詳細: [renaissance-memory.md](renaissance-memory.md)。

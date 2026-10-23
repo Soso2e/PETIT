@@ -290,7 +290,7 @@
   const requestJson = async (url, options = {}) => {
     const response = await fetch(url, { cache: "no-store", ...options });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.error) throw new Error(data.error || `HTTP ${response.status}`);
+    if (!response.ok || (data.error && !data.thread_id)) throw new Error(data.error || `HTTP ${response.status}`);
     return data;
   };
 
@@ -927,12 +927,12 @@
     const selected = state.overviewSelectionId === key;
     button.classList.toggle("is-selected", selected);
     button.setAttribute("aria-pressed", String(selected));
-    
+
     const title = document.createElement("span");
     title.className = "universe-task__title";
     title.textContent = text(task.title, "名称未設定");
     button.appendChild(title);
-    
+
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       selectOverviewTask(task, index);
@@ -944,7 +944,7 @@
     constellationGridEl.replaceChildren();
     const groups = projectGroups();
     universeSummaryEl.textContent = `Core · ${groups.length} Project · ${openTasks().length} Task`;
-    
+
     if (!groups.length) {
       const empty = document.createElement("p");
       empty.className = "constellation-empty";
@@ -983,7 +983,7 @@
       header.type = "button";
       header.className = "univ-task-planet";
       if (rootKey) header.dataset.taskId = rootKey;
-      
+
       const rootSelected = Boolean(rootKey && state.overviewSelectionId === rootKey);
       header.classList.toggle("is-selected", rootSelected);
       header.setAttribute("aria-pressed", String(rootSelected));
@@ -1001,7 +1001,7 @@
       const counts = document.createElement("span");
       counts.className = "constellation-card__counts";
       counts.textContent = `${childTasks.length} satellite${childTasks.length === 1 ? "" : "s"}`;
-      
+
       header.append(headingWrap, counts);
       header.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -1245,14 +1245,18 @@
     copy.textContent = message;
     item.appendChild(copy);
 
-    if (actions.length) {
+    for (const action of actions) {
+      if (document.querySelector('[data-approval-id="' + action.approval_id + '"]')) continue;
       const controls = document.createElement("div");
+      controls.dataset.approvalId = action.approval_id;
       controls.className = "chat-actions";
-      const action = actions[0];
       const description = document.createElement("small");
       description.textContent = action.name === "complete_task"
         ? `完了: ${text(action.arguments?.title_query || action.arguments?.task_id, "対象タスク")}`
         : `${action.name}を実行します`;
+      const exact = document.createElement('pre'); exact.className = 'action-preview';
+      exact.textContent = JSON.stringify(action.arguments || {}, null, 2);
+      exact.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto';
       const approve = document.createElement("button");
       approve.type = "button";
       approve.textContent = action.name === "complete_task" ? "完了にする" : "実行する";
@@ -1261,7 +1265,7 @@
       cancel.textContent = "キャンセル";
       approve.addEventListener("click", () => decideAction(action.approval_id, true, controls, action));
       cancel.addEventListener("click", () => decideAction(action.approval_id, false, controls, action));
-      controls.append(description, approve, cancel);
+      controls.append(description, exact, approve, cancel);
       item.appendChild(controls);
     }
 
@@ -1287,7 +1291,8 @@
         ));
         await animateTaskExit(completedTask);
       }
-      appendMessage("assistant", data.reply || (approved ? "実行しました。" : "キャンセルしました。"));
+      if (data.error) throw new Error(data.error);
+      appendMessage("assistant", data.reply || "", data.pending_actions || []);
       await loadUniverse();
     } catch (error) {
       appendMessage("assistant", `確認操作に失敗しました: ${error.message}`);
@@ -1327,14 +1332,12 @@
         const session = await workSessionRequest(`/${encodeURIComponent(state.workSessionId)}/respond`);
         applyWorkSession(session, { notifyAutoStop: false });
       }
-      const data = await requestJson("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, attachment_ids: attachmentIds, history: state.history, request_id: requestId, session_id: state.sessionId }),
-      });
+      const data = await window.PETIT_SESSION.send({ message, attachment_ids: attachmentIds,
+        request_id: requestId, conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }, requestJson);
+      if (data.error) throw new Error(data.error);
       window.PetitChatAttachments?.complete(attachmentIds);
       pending.remove();
-      appendMessage("assistant", data.reply || "返答がありませんでした。", data.pending_actions || []);
+      appendMessage("assistant", data.reply || "", data.pending_actions || []);
       state.history.push({ role: "user", content: message }, { role: "assistant", content: data.reply || "" });
       await loadUniverse();
     } catch (error) {
@@ -1498,7 +1501,7 @@
     try {
       const data = await requestJson(`/api/conversations?limit=10&session_id=${encodeURIComponent(state.sessionId)}`);
       const rows = data.conversations || [];
-      if (!rows.length) return false;
+
       state.history = [];
       for (const row of rows) {
         if (row.user_text) {
@@ -1510,7 +1513,11 @@
           state.history.push({ role: "assistant", content: row.assistant_text });
         }
       }
-      return true;
+      try {
+        const snapshot = await requestJson('/api/threads/' + encodeURIComponent(state.sessionId) + '/snapshot');
+        if (snapshot.pending_actions?.length) appendMessage('assistant', '', snapshot.pending_actions);
+        return rows.length > 0 || snapshot.pending_actions?.length > 0;
+      } catch { return rows.length > 0; }
     } catch (_error) {
       return false;
     }

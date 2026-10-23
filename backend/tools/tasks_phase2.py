@@ -206,23 +206,6 @@ def _notion_create_payload(
     }
 
 
-@tool(
-    name="get_tasks",
-    description=(
-        "SQLiteのタスクミラーから即時に一覧を取得する。Notion同期は会話を待たせず、"
-        "sync_statusでpending/synced/failed/conflictを確認できる。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "status": {"type": "string", "description": "省略で未完了、allで全件。"},
-            "area": {"type": "string", "enum": list(AREAS)},
-            "project_id": {"type": "string"},
-            "sync_status": {"type": "string", "enum": list(task_sync_queue.SYNC_STATES)},
-            "limit": {"type": "integer", "default": 20},
-        },
-    },
-)
 def get_tasks(
     status: str | None = None,
     area: str | None = None,
@@ -273,27 +256,6 @@ def get_tasks(
     }
 
 
-@tool(
-    name="create_task",
-    description=(
-        "新しいタスクを作成する。明示依頼ならすぐSQLiteへ保存し、Notion書き込みは"
-        "pendingキューでバックグラウンド実行する。"
-    ),
-    parameters={
-        "type": "object",
-        "properties": {
-            "title": {"type": "string"},
-            "due_date": {"type": "string"},
-            "priority": {"type": "string", "enum": _PRIORITIES},
-            "area": {"type": "string", "enum": list(AREAS)},
-            "project_id": {"type": "string"},
-            "category": {"type": "string", "enum": _CATEGORIES},
-            "reason": {"type": "string"},
-        },
-        "required": ["title"],
-    },
-    risk="low_risk_write",
-)
 def create_task(
     title: str,
     due_date: str | None = None,
