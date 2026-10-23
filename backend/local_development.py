@@ -129,6 +129,7 @@ def collect_local_development(root: Path, run: RunCommand) -> dict[str, Any]:
     # Uses existing local tracking refs only. No git fetch, pull, or push.
     upstream = read_git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
     result["upstream"] = _clean(upstream) if upstream else None
+    result["upstream_status"] = "configured_local_tracking_ref" if upstream else "unknown_or_not_configured"
     if upstream:
         difference = read_git("rev-list", "--left-right", "--count", "HEAD...@{upstream}")
         if difference:
@@ -146,6 +147,7 @@ def collect_local_development(root: Path, run: RunCommand) -> dict[str, Any]:
             if len(parts) == 2 and all(part.isdecimal() for part in parts):
                 result["main_comparison"] = {
                     "base": base_ref, "ahead": int(parts[0]), "behind": int(parts[1]),
+                    "base_kind": "remote_tracking_cache" if base_ref.startswith("refs/remotes/") else "local_branch",
                     "ref_freshness": "local_only",
                 }
     return result
