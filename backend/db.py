@@ -266,7 +266,7 @@ def init_db() -> None:
             },
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_cache_area ON tasks_cache(area, status)")
-        _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER"})
+        _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER", "source": "TEXT"})
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id, id)")
         _ensure_columns(conn, "memory", {"source": "TEXT NOT NULL DEFAULT 'explicit'", "content_hash": "TEXT", "embedding_model": "TEXT", "embedding_version": "TEXT", "indexed_at": "TEXT"})

@@ -23,7 +23,7 @@ class ChatRequest(BaseModel):
     history: list[dict[str, str]] | None = None
     request_id: str | None = Field(default=None, max_length=200)
     session_id: str | None = Field(default=None, max_length=200)
-    source: Literal["web", "desktop", "voice"] = "web"
+    source: Literal["web", "desktop", "voice", "discord"] = "web"
     conversation_mode: Literal["text", "voice"] = "text"
 
 
