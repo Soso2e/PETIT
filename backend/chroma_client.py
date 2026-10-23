@@ -22,7 +22,7 @@ import chromadb
 import httpx
 from chromadb import EmbeddingFunction, Embeddings
 
-from . import config
+from . import config, request_context
 
 log = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ def add(collection_name: str, doc_id: str, text: str, metadata: dict[str, Any] |
 
 def add_many(collection_name: str, docs: list[tuple[str, str, dict[str, Any]]]) -> int:
     """Embed and upsert documents in one Chroma call. Returns indexed count."""
-    if not _embedding_available():
+    if request_context.local_only() or not _embedding_available():
         return 0
     if not docs:
         return 0
@@ -168,7 +168,7 @@ def query(
 
     Each result: {id, document, distance, metadata}
     """
-    if not _embedding_available():
+    if request_context.local_only() or not _embedding_available():
         return None
     try:
         col = _collection(collection_name)

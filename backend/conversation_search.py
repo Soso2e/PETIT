@@ -5,12 +5,7 @@ from . import db, request_context
 
 
 def local_only_context() -> bool:
-    _, session_id = request_context.current_ids()
-    with db.get_connection() as connection:
-        if not connection.execute("SELECT 1 FROM sqlite_master WHERE name='threads'").fetchone():
-            return False
-        row = connection.execute("SELECT privacy FROM threads WHERE id=?", (session_id,)).fetchone()
-    return bool(row and row["privacy"] == "local_only")
+    return request_context.local_only()
 
 
 def literal_like(query: str) -> str:

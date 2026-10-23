@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 from datetime import datetime, timezone
+import unicodedata
 
 from .. import chroma_client, conversation_search, db, request_context, vault_indexer
 from .registry import tool
@@ -138,30 +139,49 @@ def search_memory(query: str, limit: int = 5, include_vault: bool = True, offset
 
     # --- Fallback: SQLite LIKE search + Markdown keyword search ---
     like = conversation_search.literal_like(query)
+    words = query.split()[:8] or [query]
+    word_where = " AND ".join("content LIKE ? ESCAPE '\\'" for _ in words)
+    scope = ("" if private else " AND visibility='standard'") + (
+        "" if include_inactive else " AND superseded_by IS NULL AND (valid_until IS NULL OR valid_until>?)")
+    scope_values = [] if include_inactive else [db.now_iso()]
+    word_values = [conversation_search.literal_like(word) for word in words]
+    related = False
     with db.get_connection() as conn:
         mem_rows = conn.execute(
-            "SELECT * FROM memory WHERE content LIKE ? ESCAPE '\\'" +
-            ("" if private else " AND visibility='standard'") +
-            ("" if include_inactive else " AND superseded_by IS NULL AND (valid_until IS NULL OR valid_until>?)") +
-            " ORDER BY id DESC LIMIT ? OFFSET ?",
-            (like, *(() if include_inactive else (db.now_iso(),)), limit, offset),
+            "SELECT * FROM memory WHERE " + word_where + scope + " ORDER BY id DESC LIMIT ? OFFSET ?",
+            [*word_values, *scope_values, limit, offset],
         ).fetchall()
+        has_literal = mem_rows or conn.execute("SELECT 1 FROM memory WHERE " + word_where + scope + " LIMIT 1",
+                                               [*word_values, *scope_values]).fetchone()
+        if not has_literal:
+            # Generic character retrieval, not an intent/phrase router. Japanese
+            # prose may contain particles between a name and the fact's subject.
+            compact_query = "".join(unicodedata.normalize("NFKC", query).casefold().split())
+            grams = list(dict.fromkeys(compact_query[i:i+2] for i in range(len(compact_query)-1)))[:24]
+            if grams:
+                score = " + ".join("CASE WHEN content LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END" for _ in grams)
+                mem_rows = conn.execute(
+                    "SELECT * FROM (SELECT memory.*,(" + score + ") AS term_matches FROM memory WHERE 1=1" +
+                    scope + ") WHERE term_matches>0 ORDER BY term_matches DESC,id DESC LIMIT ? OFFSET ?",
+                    [*[conversation_search.literal_like(g) for g in grams], *scope_values, limit, offset]).fetchall()
+                related = True
         episode_rows = conn.execute(
             "SELECT episode_id, started_at, title, summary FROM conversation_episodes WHERE title LIKE ? OR summary LIKE ? OR facts LIKE ? ORDER BY episode_id DESC LIMIT ?",
             (like, like, like, limit),
         ).fetchall()
 
-    memories = [dict(r) for r in mem_rows]
+    memories = [{**dict(r), "match_kind": "related_candidate" if related else "literal_keywords"} for r in mem_rows]
     episodes = [{"historical_summary": True, "type": "episode", "title": r["title"], "summary": r["summary"], "started_at": r["started_at"]} for r in episode_rows]
     vault_notes = vault_indexer.keyword_search(query, limit=limit) if include_vault else []
     return {
         "query": query,
-        "search_type": "keyword",
+        "search_type": "related_candidates" if related else "keyword",
         "note": "意味検索で利用できる正本がないためSQLite/Markdownを検索しました。",
         "memories": memories,
         "episodes": episodes,
         "vault_notes": vault_notes,
         "found": len(memories) + len(episodes) + len(vault_notes),
+        "candidate_warning": "部分一致候補は内容を確認し、同じ事実か判断する。検索不一致だけで保存されていないと断定しない。" if related else None,
     }
 
 
