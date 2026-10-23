@@ -62,6 +62,9 @@ class ProjectWorkspaceTests(unittest.TestCase):
         self.assertGreater(observed["changed_entries"], 0)
         development = observed["development"]
         self.assertEqual(development["head_sha"], self.git(self.second, "rev-parse", "HEAD").strip())
+        self.assertEqual(development["main_comparison"]["base_kind"], "local_branch")
+        self.assertEqual(development["upstream_status"], "unknown_or_not_configured")
+        self.assertNotIn("upstream_ahead", development)
         progress = next(doc for doc in development["documents"] if doc["name"] == "PROGRESS.md")
         self.assertTrue(progress["modified_at"])
         self.assertEqual(progress["source"]["relative_path"], "PROGRESS.md")
