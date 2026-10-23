@@ -18,6 +18,9 @@ class ChatResponse(BaseModel):
     error: str | None = None
     model_route: dict[str, Any] | None = None
     request_id: str | None = None
+    thread_id: str | None = None
+    status: str | None = None
+    effects: list[dict[str, Any]] = Field(default_factory=list)
     pending_actions: list[PendingAction] = Field(default_factory=list)
 
 

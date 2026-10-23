@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.31.0**
+**Current Version: v0.32.0（開発ブランチ・未マージ）**
 
-**Last Updated: 2026-10-21**
+**Last Updated: 2026-10-23**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #345 / #303（実装済み・実機未確認）: 単一native Brain Tool Loop、永続Thread/Turn/承認/receipt、既存chat/画像/作業開始接続と明示Thread切替を追加。本文は既存conversations、旧session/ID/データを維持し、初回追加schema前にSQLiteバックアップを作成。旧ルーティングは本番text/Worker経路から除外。旧agent_legacy.run・Taskの重複登録・idle自動分割・fetch差替えを撤去。再送/並行/ロールバック/承認再開/ローカル専用の隔離検証を実施。実Providerの一般的な言語理解、実Notion、配布Desktop/iPhoneは未確認。新会話契約はdocs/renaissance-core.md。次は元発言の横断検索・記憶鮮度・Projectの確認済みフォルダ対応を接続する。
 
 - #341（main統合候補・実機未確認）: Opt-in既存workspace観測に、登録GitルートのHEAD・local branch/commit・tracking比較とConcept/PROGRESS/README限定抜粋を追加。キャッシュ参照のsafe_read Toolを会話Capabilityへ登録。フォルダ・コマンド・ファイル取得はallowlist/固定名のread-only、fresh/staleと未確認文書を区別。コード単体テストを追加したが、実Windows/macOS PC上の観測と実LLM/iPhone/PWA会話は未確認。後続はソースコード部分読取・内部Project IDとの明示紐付け・追加UI。統合済みv0.31.0との回帰と実Windows/macOS/iPhoneの受入はIssue #343で追跡。
 
@@ -270,3 +272,5 @@
 
 | 2026-10-19 | 11:24 | #338 | AI-First責務分担と3方式を調査・比較し、本番未接続PoCを追加。実DeepSeekの合成12ケース×3方式で直接経路に改善を観測したが、引用翻訳の失敗等が残るため本番移行は見送り。PR #337の安全機能・元checkoutは保持。結果/手順/未確認は docs/ai-first-agent-design.md。 |
 | 2026-10-17 | 14:16 | #333 | v0.31.0: 画像添付/Vision観測/Read専用Brain回答とPython比率検証、明示cloud同意・TTL・session境界を実装。関連125件と11 subtests、Desktop64件、隔離Chromeの3 UI×2幅成功。実Provider/Discord/実端末は未確認。 |
+
+| 2026-10-23 | 14:10 | #345 | 単一BrainとThread/Turnの永続化を実装。再送・同時受付・承認・局所書込receipt・履歴分離・SQLiteバックアップを隔離データで検証。旧実行ループと重複登録を削減。実サービス/実端末の受入とRenaissance後続能力は未確認。 |

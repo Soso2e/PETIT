@@ -1,5 +1,42 @@
 # PETIT Runtime Flows
 
+## v0.32.0: 単一Brain / 永続Thread・Turn（#345 / #303）
+
+この図が通常のtext会話・Workerの現行実装を表す。下記の旧1〜10に含まれる
+決定論的会話ルート・Brain/Broker/Capability/旧Agent再開図はv0.31の参考資料であり、
+新しいtext経路の正本ではない。Domainの同期・端末・音声・画像の制約は引き続き有効。
+
+```mermaid
+flowchart TD
+    C[Web / Desktop / voice] --> A[chat同期adapter または Turn API]
+    A --> L[Threadとrequest ID / 入力hashをSQLiteで原子的に受付]
+    L -->|同じ入力の再送| R[保存済み状態・結果・receiptを返す]
+    L -->|別入力のID再利用| Conflict[409]
+    L -->|同じThread実行中| Busy[429]
+    L --> B[同じThreadの履歴だけ組立て / Provider送信範囲を検査]
+    B --> Brain[単一Brain native Tool Loop]
+    Brain -->|通常返答| Save[既存conversationsへ本文保存 / Turnは参照]
+    Brain -->|公開Tool| V[Registryの引数・risk検査]
+    V -->|確認必須| P[SQLite Approval / 正確な引数 / 期限]
+    P --> U[既存確認UI / 再起動後も復元]
+    U -->|一度だけ承認消費| E[既存Domain Tool]
+    V -->|Read / 低リスクWrite| E
+    E -->|SQLite Write| T[Domain保存とreceiptを同一transactionで確定]
+    E -->|外部Write| X[結果をreceiptへ / 結果不明はunknown・自動再実行なし]
+    E -->|Read| N[native role=tool / tool_call_idで返す]
+    T --> N
+    X --> N
+    N --> Brain
+    Save --> R
+    Save --> EV[Thread Events / Client別の読取cursor]
+```
+
+画像は同じTurnの受付後、既存Vision観測→Read専用回答へ進む。画像経路にはWrite Toolを公開しない。
+通常履歴へ別ThreadやClient historyを暗黙注入しない。2時間idle分割とfetch monkeypatchは廃止。
+12 Tool calls・8 roundsで停止。local_onlyは外部Providerへ送信しない。
+詳細・障害復旧・データ保護・検証境界は[renaissance-core.md](renaissance-core.md)。
+
+
 この文書は実装済みのフローを示す。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）のThread/Turn/Events・管理Coreは目標であり、実装する各PRで本書を更新する。
 
 [AI-First設計と比較PoC](ai-first-agent-design.md)（#338）は本番未接続の実験であり、以下の実装済みフローは今回変更していない。
