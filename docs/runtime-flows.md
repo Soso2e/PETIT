@@ -14,7 +14,14 @@ flowchart TD
     L -->|別入力のID再利用| Conflict[409]
     L -->|同じThread実行中| Busy[429]
     L --> B[同じThreadの履歴だけ組立て / Provider送信範囲を検査]
-    B --> Brain[単一Brain native Tool Loop]
+    B --> Backend{明示選択したBrainバックエンド}
+    Backend -->|local / deepseek| Brain[単一Brain native Tool Loop]
+    Backend -->|antigravity_sdk| SDK[公式SDK Agent Loop / 別のnative Loopは起動しない]
+    SDK -->|petit_read_tool| ReadGate[限定カタログ / schema / live risk / cancel / Provider再検査]
+    ReadGate -->|safe_readのみ| Read[既存PETIT Read Tool]
+    Read --> SDK
+    SDK -->|返答| Save
+    SDK --> Obs[既存Turn Eventsへbackend / model / auth / usage / latency / session ID]
     Brain -->|通常返答| Save[既存conversationsへ本文保存 / Turnは参照]
     Brain -->|公開Tool| V[Registryの引数・risk検査]
     V -->|確認必須| P[SQLite Approval / 正確な引数 / 期限]
@@ -35,6 +42,15 @@ flowchart TD
 通常履歴へ別ThreadやClient historyを暗黙注入しない。2時間idle分割とfetch monkeypatchは廃止。
 12 Tool calls・8 roundsで停止。local_onlyは外部Providerへ送信しない。
 詳細・障害復旧・データ保護・検証境界は[renaissance-core.md](renaissance-core.md)。
+
+`antigravity_sdk`は選択式のテキスト・Read専用バックエンド。既定は公式
+`LocalOpenAIAgentConfig`とloopback LM Studio。SDK内蔵Toolは`finish`だけで、
+PETITの公開Readを単一のPython bridgeから利用する。Write・MCP・OS操作・ファイル・Web・Subagentは公開しない。
+Thread/Turn/本文は従来のSQLiteが正本。各Turnは新しい一時SDKセッションへ同じThreadのbounded履歴を渡し、
+SDK会話IDをEventsへ紐づける。SDKの永続履歴をCoreへ二重注入せず、再起動後はCore履歴から再構築する。
+取消/timeout/設定変更は終了し、別Providerへ自動再送しない。local_onlyはloopback SDKのみ利用できる。
+SDK+Geminiは別API課金と明示cloud設定が必要。個人契約CLIラップは使用しない。
+詳細と実測範囲は[SDK導入記録](antigravity-brain-poc.md)。画像・旧completion経路ではSDKを使わず、未対応エラーを返す。
 
 
 Thread/Turn/Eventsの現行経路は上図を参照する。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）全体の端末・管理機能の完成を示すものではない。

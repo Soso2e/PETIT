@@ -8,15 +8,17 @@ from __future__ import annotations
 import json
 import os
 import threading
+from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Any
 
 from . import config
 
 ROUTES = ("chat", "agent")
-PROFILE_IDS = ("local", "deepseek_flash", "deepseek_pro")
+PROFILE_IDS = ("local", "antigravity_sdk", "deepseek_flash", "deepseek_pro")
 PROFILE_LABELS = {
     "local": "ローカル LM Studio",
+    "antigravity_sdk": "Antigravity SDK（Read専用）",
     "deepseek_flash": "DeepSeek V4 Flash",
     "deepseek_pro": "DeepSeek V4 Pro",
 }
@@ -31,7 +33,7 @@ class ModelRoutingError(ValueError):
 def _default_profile(route: str) -> str:
     name = "PETIT_CHAT_PROFILE" if route == "chat" else "PETIT_AGENT_PROFILE"
     value = os.getenv(name, "local").strip().lower() or "local"
-    return value if value in PROFILE_IDS else "local"
+    return value if value in PROFILE_IDS and not (route == "agent" and value == "antigravity_sdk") else "local"
 
 
 def _read_selection() -> dict[str, str]:
@@ -44,7 +46,7 @@ def _read_selection() -> dict[str, str]:
         return selection
     for route in ROUTES:
         value = str(data.get(route) or "").strip().lower()
-        if value in PROFILE_IDS:
+        if value in PROFILE_IDS and not (route == "agent" and value == "antigravity_sdk"):
             selection[route] = value
     return selection
 
@@ -85,11 +87,40 @@ def _deepseek_target(profile: str) -> dict[str, Any]:
     }
 
 
+def sdk_local_url(base_url: str) -> bool:
+    try:
+        parsed = urlsplit(base_url)
+        return (parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+                and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment)
+    except ValueError:
+        return False
+
+
+def _antigravity_target(route: str) -> dict[str, Any]:
+    from .antigravity_brain import installed
+    auth = os.getenv("PETIT_ANTIGRAVITY_AUTH", "local").strip().lower()
+    local = _local_target(route)
+    base_url = os.getenv("PETIT_ANTIGRAVITY_BASE_URL", local["base_url"]).strip().rstrip("/")
+    model = os.getenv("PETIT_ANTIGRAVITY_MODEL", local["model"] if auth == "local" else "").strip()
+    key = os.getenv("PETIT_ANTIGRAVITY_API_KEY", os.getenv("GEMINI_API_KEY", "")) if auth == "gemini" else ""
+    cloud_allowed = os.getenv("PETIT_ALLOW_ANTIGRAVITY_CLOUD", "").lower() in {"1", "true"}
+    try:
+        timeout = float(os.getenv("PETIT_ANTIGRAVITY_TIMEOUT_SECONDS", "90"))
+    except ValueError:
+        timeout = 0
+    valid = (auth == "local" and sdk_local_url(base_url)) or (auth == "gemini" and bool(key) and cloud_allowed)
+    return {"provider": "antigravity_sdk", "base_url": base_url if auth == "local" else "https://generativelanguage.googleapis.com",
+            "api_key": key, "model": model, "auth_mode": auth, "external": auth != "local",
+            "timeout_seconds": timeout, "configured": bool(installed() and valid and model and 0 < timeout <= 300)}
+
+
 def _target(route: str, profile: str) -> dict[str, Any]:
     if route not in ROUTES:
         raise ModelRoutingError(f"unknown route: {route}")
     if profile == "local":
         target = _local_target(route)
+    elif profile == "antigravity_sdk":
+        target = _antigravity_target(route)
     elif profile in {"deepseek_flash", "deepseek_pro"}:
         target = _deepseek_target(profile)
     else:
@@ -110,6 +141,7 @@ def endpoint(route: str) -> dict[str, Any]:
 
 def _public_target(target: dict[str, Any]) -> dict[str, Any]:
     return {
+        **({"auth_mode": target["auth_mode"]} if "auth_mode" in target else {}),
         "profile": target["profile"],
         "label": target["label"],
         "provider": target["provider"],
@@ -126,6 +158,8 @@ def public_status() -> dict[str, Any]:
     for route in ROUTES:
         options = []
         for profile in PROFILE_IDS:
+            if profile == "antigravity_sdk" and route != "chat":
+                continue
             target = _target(route, profile)
             options.append(_public_target(target))
         routes[route] = {
@@ -148,6 +182,8 @@ def update_selection(updates: dict[str, str]) -> dict[str, Any]:
             profile = str(raw_profile or "").strip().lower()
             if profile not in PROFILE_IDS:
                 raise ModelRoutingError(f"利用できないモデル設定です: {profile}")
+            if profile == "antigravity_sdk" and route != "chat":
+                raise ModelRoutingError("Antigravity SDKは単一BrainのChat側で選択してください。")
             target = _target(route, profile)
             if not target["configured"]:
                 if target["provider"] == "deepseek":

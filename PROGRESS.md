@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.32.0（開発ブランチ・未マージ）**
+**Current Version: v0.33.0（開発ブランチ・未マージ）**
 
-**Last Updated: 2026-10-23**
+**Last Updated: 2026-10-24 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #349（SDK Read専用Brain実装・実Windows/ローカル推論確認、main未反映）: feat/renaissance-antigravity-sdkで公式SDK 0.1.22のAgent Loopを選択式バックエンドへ接続。既定はloopback LM Studio。限定Read bridgeのschema/risk検査、Turn専用Workerの取消/deadline/Provider固定、既存Thread/Turn/Events/履歴を再利用。実SDK+Qwen3.5-9Bの会話→get_tasks→次Turn、独立SDKのstream/保存再開、実Core再送/復旧/timeout/取消、実Chromium 1440/390pxのWeb/Desktop source adapterを確認。関連pytest81件+5 subtests・Node5件成功。Write/画像/配布Desktop/macOS/実サービス受入、SDK+Gemini（キーなし）は未確認。個人契約CLIラップは現行FAQで非サポート、agy未導入。PR #351は未採用・未マージ、Notionコード/本番設定/実DBは不変。次は専用Draft PR/CIと実端末受入。詳細: docs/antigravity-brain-poc.md。
 
 - #345 / #341（確認済みProjectフォルダ、実装済み・実データ受入未確認）: 既存project_source_linksへlocal_workspace対応を確認付きで保存し、既存get_local_development_status(project_id)からWorkspaceObserverのキャッシュを取得。Task.project_idと同じIDを使い、同名フォルダはcanonical rootのIDで区別する。allowlist/実行時再検査/private/symlink・junction拒否、文書更新日時・出典・観測時刻・実Git状態を分離。34件の関連テストを一時Git/DBで確認。Core #346・記憶検索 #347と結合済み。関連pytest154件+3 subtests、Node4件、Chrome 1440/390pxと実DeepSeek Flash・合成7ケース（7/7）を確認。実登録フォルダ・実Discord/Notion・配布端末の受入は別途。
 - #345（元発言検索・記憶鮮度、実装済み・実機未確認）: 既存conversationsの入力/出力を日時・発言元・Thread・原文ID付きでbounded検索するToolを追加。旧NULL sessionは推測で結合しない。save_memoryは固定保存上限を設けず、正規化重複・明示置換・期限・visibilityをSQLiteで扱い、旧行を保持。private元発言/記憶をstandard検索から除外し、private検索ではembeddingを呼ばない。全件再索引を個別索引更新へ縮小。Core PR #346を取り込み、単一Brainへ接続済み。#346 → #347 → #348の順でレビューする（全PRのbaseはmain、main未マージ）。
@@ -278,3 +280,7 @@
 | 2026-10-23 | 14:48 | #345 | Project Continuityと既存ローカル観測を確認済みフォルダで接続。登録/解除・同名衝突・Task.project_id・mtime/出典/Git・stale・許可撤回・private/リンク拒否を一時Gitで検証（34件成功）。実データ/実Provider/実端末は未確認。 |
 | 2026-10-23 | 14:35 | #345 | 元発言の横断検索と長期記憶の期限/置換/visibilityを追加。無制限保存・bounded取得・旧行保護・並行重複・private除外・予定の完全一致再登録抑止を一時DBで検証。実Provider/Discord/実端末は未確認。 |
 | 2026-10-23 | 14:10 | #345 | 単一BrainとThread/Turnの永続化を実装。再送・同時受付・承認・局所書込receipt・履歴分離・SQLiteバックアップを隔離データで検証。旧実行ループと重複登録を削減。実サービス/実端末の受入とRenaissance後続能力は未確認。 |
+
+| 2026-10-24 | 22:20 | #349 | 公式SDKも可という最新指示に従い独立SDK/単一Brain接続PoCを専用branchへ追加。SDK設定と合成契約32件成功、実SDK通信はキー未設定でskipped。本番未接続・目標未達。個人CLI制約と認証/課金/受入の残件を記録。 |
+
+| 2026-10-24 | 22:46 | #349 | v0.33.0: 再更新されたSDK+LM Studio方針に従い、公式SDKを限定Read専用Brainへ接続。実runtime/ローカル推論・会話/Read/履歴・SDK保存再開・取消/timeout・ChromiumのWeb/Desktop sourceを確認。関連81件+5 subtests/Node5件成功。個人CLI・Gemini SDK実通信・配布Desktop/macOS/Writeは未確認、Issue Open・PR #351未マージを維持。 |

@@ -1,0 +1,15 @@
+{
+  "sdk_version": "0.1.22",
+  "mode": "offline",
+  "network_invoked": false,
+  "petit_brain_connected": false,
+  "issue_349_complete": false,
+  "backend": "local",
+  "model": null,
+  "status": "offline_config_validated",
+  "enabled_builtins": [
+    "finish"
+  ],
+  "custom_tools": 0,
+  "session_persistence": "not_executed"
+}

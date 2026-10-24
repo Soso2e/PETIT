@@ -1,10 +1,10 @@
 {
   "name": "PETIT",
-  "version": "0.32.0",
-  "release": "renaissance-core",
+  "version": "0.33.0",
+  "release": "antigravity-sdk-readonly",
   "includes": [
     "durable threads and turns",
-    "single native Brain Tool loop",
+    "selectable official Antigravity SDK Brain",
     "persistent approvals and effect receipts"
   ]
 }

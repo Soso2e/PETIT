@@ -258,11 +258,12 @@ def chat_completion(
     ):
         raise LMStudioError("LLM送信前のmessagesに空でないrole=userがありません。")
 
+    target = target_override or endpoint(route)
+    if target.get("provider") == "antigravity_sdk":
+        raise LMStudioError("Antigravity SDKは単一Brainのテキスト会話で使用してください。この経路は未対応です。")
     prefetched = _take_prefetched_chat(messages, route=route, tools=tools)
     if prefetched is not None:
         return prefetched
-
-    target = target_override or endpoint(route)
     from . import request_context
     if request_context.local_only() and (
         target.get("provider") != "lm_studio" or image_egress_is_external(target)

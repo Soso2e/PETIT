@@ -155,6 +155,12 @@ def result(request_id: str) -> dict:
     data.update(request_id=request_id, thread_id=row["thread_id"], status=row["status"])
     data["pending_actions"] = approvals(request_id)
     with db.get_connection() as connection:
+        if not data.get("model_route"):
+            backend_event = connection.execute(
+                "SELECT payload_json FROM turn_events WHERE request_id=? AND type='model_backend' ORDER BY seq DESC LIMIT 1",
+                (request_id,)).fetchone()
+            if backend_event:
+                data["model_route"] = json.loads(backend_event["payload_json"])
         data["effects"] = [dict(r) for r in connection.execute(
             "SELECT call_id,tool,status,result FROM effect_receipts WHERE request_id=? ORDER BY rowid",
             (request_id,))]

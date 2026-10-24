@@ -1,0 +1,70 @@
+{
+  "synthetic_data_only": true,
+  "browser": "real_chromium",
+  "sdk": "real",
+  "inference": "real_lm_studio",
+  "desktop_source_adapter_only": true,
+  "packaged_desktop_verified": false,
+  "results": [
+    {
+      "width": 1440,
+      "source": "web",
+      "status": "completed",
+      "provider": "antigravity_sdk",
+      "used_tools": [
+        "get_tasks"
+      ],
+      "model_route": {
+        "auth_mode": "local",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 7.057,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "runtime_startup_seconds": 2.183,
+        "sdk_conversation_id": "76654108b21cca00d2ac97d633f3cfcf",
+        "sdk_version": "0.1.22",
+        "usage": {
+          "cached_content_token_count": 0,
+          "candidates_token_count": 83,
+          "prompt_token_count": 9726,
+          "service_tier": null,
+          "thoughts_token_count": 23,
+          "total_token_count": 9832
+        }
+      }
+    },
+    {
+      "width": 390,
+      "source": "desktop",
+      "status": "completed",
+      "provider": "antigravity_sdk",
+      "used_tools": [
+        "get_tasks"
+      ],
+      "model_route": {
+        "auth_mode": "local",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 7.435,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "runtime_startup_seconds": 2.174,
+        "sdk_conversation_id": "12207777796086f5fed23dc9e7cbaf36",
+        "sdk_version": "0.1.22",
+        "usage": {
+          "cached_content_token_count": 0,
+          "candidates_token_count": 80,
+          "prompt_token_count": 9733,
+          "service_tier": null,
+          "thoughts_token_count": 64,
+          "total_token_count": 9877
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "sdk_version": "0.1.22",
+  "mode": "live",
+  "network_invoked": true,
+  "petit_brain_connected": false,
+  "issue_349_complete": false,
+  "backend": "local",
+  "model": "petit-agy-probe",
+  "status": "passed",
+  "startup_seconds": 2.177,
+  "conversation_id_retained": true,
+  "synthetic_tool_calls": 1,
+  "turns": [
+    {
+      "matched": true,
+      "stream_matches_text": true,
+      "stream_chunks": 33,
+      "usage": {
+        "prompt_token_count": 3782,
+        "candidates_token_count": 84,
+        "total_token_count": 3994,
+        "cached_content_token_count": 0,
+        "thoughts_token_count": 128
+      },
+      "stop_reason": "StopReason.UNSPECIFIED",
+      "latency_seconds": 3.02
+    },
+    {
+      "matched": true,
+      "stream_matches_text": true,
+      "stream_chunks": 33,
+      "usage": {
+        "prompt_token_count": 2098,
+        "candidates_token_count": 36,
+        "total_token_count": 2164,
+        "cached_content_token_count": 0,
+        "thoughts_token_count": 30
+      },
+      "stop_reason": "StopReason.UNSPECIFIED",
+      "latency_seconds": 0.927
+    },
+    {
+      "matched": true,
+      "stream_matches_text": true,
+      "stream_chunks": 33,
+      "usage": {
+        "prompt_token_count": 1834,
+        "candidates_token_count": 36,
+        "total_token_count": 1954,
+        "cached_content_token_count": 0,
+        "thoughts_token_count": 84
+      },
+      "stop_reason": "StopReason.UNSPECIFIED",
+      "latency_seconds": 2.122
+    }
+  ]
+}

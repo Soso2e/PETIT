@@ -1,0 +1,11 @@
+{
+  "sdk_version": "0.1.22",
+  "mode": "live",
+  "network_invoked": false,
+  "petit_brain_connected": false,
+  "issue_349_complete": false,
+  "backend": "gemini",
+  "model": null,
+  "status": "skipped",
+  "reason": "missing_sdk_api_key"
+}
