@@ -53,6 +53,8 @@ def observe_workspace(path: Path) -> dict[str, Any]:
     result: dict[str, Any] = {"name": _text(path.name), "status": "unavailable"}
     try:
         root = path.expanduser().resolve(strict=True)
+        from .local_development import workspace_identity
+        result["workspace_id"] = workspace_identity(root)
         git = ["git", "-c", "core.fsmonitor=false", "-C", str(root)]
         actual = _command(git + ["rev-parse", "--show-toplevel"]).decode().strip()
         if Path(actual).resolve() != root:

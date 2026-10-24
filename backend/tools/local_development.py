@@ -17,6 +17,7 @@ from .registry import tool
     parameters={
         "type": "object",
         "properties": {
+            "project_id": {"type": "string", "description": "Task.project_id等の確認済みPETIT内部ID。対応する確認済みフォルダだけ読む。"},
             "workspace": {
                 "type": "string",
                 "description": "登録済みのプロジェクトフォルダ名。省略時は一覧、1件のみなら詳細。",
@@ -26,10 +27,13 @@ from .registry import tool
     },
     risk="safe_read",
 )
-def get_local_development_status(workspace: str = "") -> dict:
+def get_local_development_status(workspace: str = "", project_id: str | None = None) -> dict:
     if not config.WORKSPACE_CONTEXT_ENABLED or not config.WORKSPACE_LOCAL_DEVELOPMENT_ENABLED:
         return {"ok": False, "status": "disabled",
                 "reason": "local_development_observation_requires_opt_in"}
+    if project_id:
+        from .. import project_workspaces
+        return project_workspaces.status(project_id)
     snapshot = workspace_context.get_workspace_context()
     if snapshot.get("status") != "observed" or snapshot.get("stale"):
         return {"ok": False, "status": "stale_or_pending",
