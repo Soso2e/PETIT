@@ -301,7 +301,7 @@ def status() -> dict[str, Any]:
         ).fetchone()[0])
     current.pop("webhook_verification_token", None)
     daily = config.NOTION_TASK_SYNC_MODE == "daily"
-    stale = bool(config.notion_configured() and (
+    stale = bool(config.notion_configured() and config.NOTION_TASK_SYNC_MODE != "off" and (
         (current.get("daily_slot") != daily_slot() or current.get("daily_status") != "success") if daily
         else store.due(current.get("last_success_at"), config.NOTION_TASK_PULL_INTERVAL_SECONDS * 2)
     ))
