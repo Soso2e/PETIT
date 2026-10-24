@@ -261,9 +261,9 @@ def run_daily_if_due() -> bool:
 
 def run_due_sync() -> bool:
     global _STARTUP_SYNC_REQUESTED
-    ensure_schema()
     if not config.NOTION_TASK_BACKGROUND_SYNC_ENABLED or not config.notion_configured() or config.NOTION_TASK_SYNC_MODE == "off":
         return False
+    ensure_schema()
     if config.NOTION_TASK_SYNC_MODE == "daily":
         return run_daily_if_due()
     current = store.state()
