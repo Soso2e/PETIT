@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 
 def _notion_task_sync_enabled() -> bool:
-    return bool(config.NOTION_TASK_BACKGROUND_SYNC_ENABLED and config.notion_configured())
+    return bool(config.NOTION_TASK_BACKGROUND_SYNC_ENABLED and config.NOTION_TASK_SYNC_MODE != "off" and config.notion_configured())
 
 
 class JobWorker:
@@ -29,7 +29,8 @@ class JobWorker:
         task_sync_queue.ensure_task_sync_schema()
         if _notion_task_sync_enabled():
             notion_task_sync.ensure_schema()
-            notion_task_sync.request_startup_sync()
+            if config.NOTION_TASK_SYNC_MODE == "legacy":
+                notion_task_sync.request_startup_sync()
         github_daily_review.ensure_schema()
         daily_index.ensure_schema()
         work_sessions.ensure_schema()
@@ -58,13 +59,14 @@ class JobWorker:
                 if job is not None:
                     _process_job(job)
                     continue
-                # Outbound writes remain highest priority so PETIT changes reach
-                # Notion quickly. Webhook inbox and repair pulls run afterwards.
-                if task_sync_queue.process_next():
-                    continue
                 if _notion_task_sync_enabled():
-                    if notion_task_sync.process_inbox_next():
-                        continue
+                    # Daily mode intentionally holds ALL outbound writes and
+                    # webhook processing until the 02:00 JST pull-first window.
+                    if config.NOTION_TASK_SYNC_MODE == "legacy":
+                        if task_sync_queue.process_next():
+                            continue
+                        if notion_task_sync.process_inbox_next():
+                            continue
                     if notion_task_sync.run_due_sync():
                         continue
                 self._stop.wait(self.interval_seconds)

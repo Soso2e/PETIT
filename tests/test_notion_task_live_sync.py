@@ -177,7 +177,9 @@ class NotionTaskLiveSyncTests(unittest.TestCase):
 
     def test_full_reconcile_marks_missing_remote_task_deleted_without_removing_row(self) -> None:
         notion_task_sync.merge_remote_task(self.remote(external_id="missing-task"))
-        with patch.object(notion_client, "query_tasks_database_v2", return_value=[]):
+        # A valid nonempty full snapshot identifies this specific missing row.
+        # Completely empty results are treated as unsafe until manually verified.
+        with patch.object(notion_client, "query_tasks_database_v2", return_value=[self.remote(external_id="remaining-task")]):
             result = notion_task_sync.sync_now("full")
         self.assertTrue(result["ok"])
         with db.get_connection() as conn:
@@ -187,6 +189,16 @@ class NotionTaskLiveSyncTests(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertTrue(row["remote_deleted_at"])
 
+    def test_empty_full_pull_keeps_local_rows_until_verified(self) -> None:
+        notion_task_sync.merge_remote_task(self.remote(external_id="old-task"))
+        with patch.object(notion_client, "query_tasks_database_v2", return_value=[]):
+            result = notion_task_sync.sync_now("full")
+        self.assertFalse(result["ok"])
+        with db.get_connection() as conn:
+            row = conn.execute("SELECT remote_deleted_at FROM tasks_cache WHERE external_id='old-task'").fetchone()
+        self.assertIsNotNone(row)
+        self.assertIsNone(row["remote_deleted_at"])
+
     def test_get_tasks_reads_sqlite_without_calling_notion(self) -> None:
         notion_task_sync.merge_remote_task(self.remote())
         with patch.object(notion_client, "query_tasks_database_v2", side_effect=AssertionError("network called")) as query:
@@ -194,7 +206,7 @@ class NotionTaskLiveSyncTests(unittest.TestCase):
         query.assert_not_called()
         self.assertEqual(result["returned_count"], 1)
         self.assertEqual(result["tasks"][0]["title"], "卒研資料")
-        self.assertEqual(result["sync"]["mode"], "local_first_outbox_inbox")
+        self.assertEqual(result["sync"]["mode"], "daily")
 
 
 if __name__ == "__main__":
