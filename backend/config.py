@@ -202,6 +202,12 @@ NOTION_DONE_STATUS = os.getenv("NOTION_DONE_STATUS", "Done")
 NOTION_SYNC_TTL_SECONDS = float(os.getenv("NOTION_SYNC_TTL_SECONDS", "300"))
 
 # Local-first Notion task synchronization.
+# Daily mode never sends queued writes or receives webhook changes between sync windows.
+# "legacy" retains historical eager behavior; "off" disables automatic Notion I/O.
+NOTION_TASK_SYNC_MODE = os.getenv("NOTION_TASK_SYNC_MODE", "daily").strip().lower()
+if NOTION_TASK_SYNC_MODE not in {"daily", "legacy", "off"}:
+    NOTION_TASK_SYNC_MODE = "off"  # Fail closed on invalid configuration.
+NOTION_TASK_DAILY_MAX_WRITES = max(1, min(500, int(os.getenv("NOTION_TASK_DAILY_MAX_WRITES", "100"))))
 NOTION_TASK_BACKGROUND_SYNC_ENABLED = os.getenv("NOTION_TASK_BACKGROUND_SYNC_ENABLED", "1") not in ("0", "false", "False")
 NOTION_TASK_SYNC_ON_STARTUP = os.getenv("NOTION_TASK_SYNC_ON_STARTUP", "1") not in ("0", "false", "False")
 NOTION_TASK_PULL_INTERVAL_SECONDS = max(30.0, float(os.getenv("NOTION_TASK_PULL_INTERVAL_SECONDS", "300")))
