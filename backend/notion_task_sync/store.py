@@ -42,7 +42,11 @@ CREATE TABLE IF NOT EXISTS notion_task_sync_state (
     pull_cursor_at TEXT,
     full_sync_requested INTEGER NOT NULL DEFAULT 0,
     webhook_verification_token TEXT,
-    synced_count INTEGER NOT NULL DEFAULT 0
+    synced_count INTEGER NOT NULL DEFAULT 0,
+    daily_slot TEXT,
+    daily_status TEXT,
+    daily_finished_at TEXT,
+    daily_error TEXT
 );
 
 CREATE TABLE IF NOT EXISTS notion_task_inbox (
@@ -113,6 +117,11 @@ def ensure_schema() -> None:
         if "remote_deleted_at" not in existing:
             conn.execute('ALTER TABLE tasks_cache ADD COLUMN "remote_deleted_at" TEXT')
         conn.executescript(_SCHEMA)
+        # Incremental migration for existing installations; no task/history rewrites.
+        state_columns = {str(row["name"]) for row in conn.execute("PRAGMA table_info(notion_task_sync_state)")}
+        for name in ("daily_slot", "daily_status", "daily_finished_at", "daily_error"):
+            if name not in state_columns:
+                conn.execute(f'ALTER TABLE notion_task_sync_state ADD COLUMN "{name}" TEXT')
         conn.execute(
             "INSERT OR IGNORE INTO notion_task_sync_state(provider, synced_count) VALUES (?, 0)",
             (SYNC_SOURCE,),
