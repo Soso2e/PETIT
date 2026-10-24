@@ -1,5 +1,9 @@
 # Notionタスクのローカルファースト双方向同期
 
+> **2026-10-24更新:** PETIT Renaissanceの既定は[毎日02:00 JSTの差分・競合同期](notion-daily-sync.md)。
+> 以下の「起動時」「5分ごと」「逐次Push」「Webhook」の説明は `NOTION_TASK_SYNC_MODE=legacy` の動作。
+> `daily` はローカル優先で、Notionへの自動通信は深夜バッチまで行わない。
+
 ## 目的
 
 PETITの会話をNotion API待ちで止めず、NotionをスマートフォンやPCから直接編集できる状態を両立する。
