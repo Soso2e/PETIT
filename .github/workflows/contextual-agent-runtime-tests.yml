@@ -45,6 +45,10 @@ on:
       - "backend/config.py"
       - "backend/tools/local_development.py"
       - "backend/tools/builtins.py"
+      - "backend/tools/memory.py"
+      - "backend/conversation_search.py"
+      - "backend/tools/conversation_search.py"
+      - "tests/test_renaissance_memory.py"
       - "tests/test_workspace_context.py"
       - "tests/test_local_development.py"
       - "backend/context_broker.py"
@@ -124,6 +128,8 @@ jobs:
       - name: Run local development observation regressions
         run: python -m unittest tests.test_workspace_context tests.test_local_development -v
       # Sona Core adapter tests need the private Sona-Agent-Core dependency and run locally.
+      - name: Run original utterance and durable memory tests
+        run: python -m pytest tests/test_renaissance_memory.py tests/test_conversation_episodes.py tests/test_daily_life_index.py -q
       - name: Run calendar keyword regression tests
         run: |
           python -m unittest \

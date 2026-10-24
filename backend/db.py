@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from uuid import uuid4
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
@@ -227,7 +227,27 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def _backup_before_memory_extension() -> None:
+    path = Path(config.DB_PATH)
+    if not path.is_file():
+        return
+    with closing(sqlite3.connect(path)) as source:
+        columns = {row[1] for row in source.execute("PRAGMA table_info(memory)")}
+        if not columns or "visibility" in columns:
+            return
+        backup = Path(str(path) + ".before-renaissance.bak")
+        if backup.exists():
+            return
+        pending = Path(str(backup) + "." + uuid4().hex + ".partial")
+        with closing(sqlite3.connect(pending)) as destination:
+            source.backup(destination)
+            if destination.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise RuntimeError("renaissance_backup_check_failed")
+        pending.rename(backup)
+
+
 def init_db() -> None:
+    _backup_before_memory_extension()
     Path(config.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = get_connection()
     try:
@@ -250,6 +270,13 @@ def init_db() -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id, id)")
         _ensure_columns(conn, "memory", {"source": "TEXT NOT NULL DEFAULT 'explicit'", "content_hash": "TEXT", "embedding_model": "TEXT", "embedding_version": "TEXT", "indexed_at": "TEXT"})
+        _ensure_columns(conn, "memory", {
+            "updated_at": "TEXT", "valid_until": "TEXT", "superseded_by": "INTEGER",
+            "visibility": "TEXT NOT NULL DEFAULT 'standard'", "source_session_id": "TEXT",
+        })
+        conn.create_function("petit_memory_hash", 1, normalized_hash, deterministic=True)
+        conn.execute("UPDATE memory SET content_hash=petit_memory_hash(content) WHERE content_hash IS NULL")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_memory_hash_visibility ON memory(content_hash,visibility)")
         _ensure_columns(conn, "calendar_events_cache", {"source_key": "TEXT", "external_id": "TEXT"})
         _ensure_columns(
             conn,
@@ -351,7 +378,7 @@ def present_conversation(row: dict) -> dict:
 def all_memory() -> list[dict[str, Any]]:
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, created_at, type, content, source, content_hash, embedding_model, embedding_version, indexed_at FROM memory ORDER BY id ASC"
+            "SELECT * FROM memory ORDER BY id ASC"
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -362,18 +389,46 @@ def normalized_hash(content: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
-def save_memory_item(content: str, mem_type: str, source: str) -> tuple[int, bool]:
+def save_memory_item(content: str, mem_type: str, source: str, *, visibility="standard",
+                     source_session_id=None, valid_until=None, replaces_id=None) -> tuple[int, bool]:
     """Save a durable fact once. Exact normalized duplicates remain one record."""
     digest = normalized_hash(content)
+    if not content.strip():
+        raise ValueError("memory content is empty")
     with get_connection() as conn:
-        row = conn.execute("SELECT id FROM memory WHERE content_hash = ?", (digest,)).fetchone()
+        conn.execute("BEGIN IMMEDIATE")
+        previous = None
+        if replaces_id is not None:
+            previous = conn.execute("SELECT * FROM memory WHERE id=?", (replaces_id,)).fetchone()
+            if previous is None or previous["visibility"] != visibility:
+                raise ValueError("replacement memory not found in this visibility scope")
+        row = conn.execute(
+            "SELECT id FROM memory WHERE content_hash=? AND visibility=? AND superseded_by IS NULL "
+            "AND (valid_until IS NULL OR valid_until>?) ORDER BY id LIMIT 1",
+            (digest, visibility, now_iso())).fetchone()
         if row:
-            return int(row["id"]), False
-        cur = conn.execute(
-            "INSERT INTO memory (created_at, type, content, source, content_hash) VALUES (?, ?, ?, ?, ?)",
-            (now_iso(), mem_type, content.strip(), source, digest),
-        )
-        return int(cur.lastrowid), True
+            memory_id, created = int(row["id"]), False
+        else:
+            cur = conn.execute(
+                "INSERT INTO memory (created_at,type,content,source,content_hash,updated_at,visibility,"
+                "source_session_id,valid_until) VALUES(?,?,?,?,?,?,?,?,?)",
+                (now_iso(), mem_type, content.strip(), source, digest, now_iso(), visibility,
+                 source_session_id, valid_until))
+            memory_id, created = int(cur.lastrowid), True
+        if previous and previous["id"] != memory_id:
+            if previous["superseded_by"] not in (None, memory_id):
+                raise ValueError("memory was already superseded; inspect its current replacement")
+            conn.execute("UPDATE memory SET superseded_by=?,updated_at=? WHERE id=?",
+                         (memory_id, now_iso(), replaces_id))
+        return memory_id, created
+
+
+def conversation_visibility_clause(conn, alias="") -> str:
+    """For automatic derived knowledge only; original private rows stay stored."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='threads'").fetchone():
+        return ""
+    prefix = alias + "." if alias else ""
+    return " AND (" + prefix + "session_id IS NULL OR " + prefix + "session_id NOT IN (SELECT id FROM threads WHERE privacy='local_only'))"
 
 
 def update_memory_indexed(memory_id: int, model: str, version: str) -> None:
