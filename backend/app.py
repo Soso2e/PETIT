@@ -7,6 +7,7 @@ from . import (
     attachments,
     vision,
     chat,
+    conversation_api,
     frontend_api,
     health,
     lifecycle,
@@ -29,6 +30,7 @@ def build_modules() -> tuple[ModuleDefinition, ...]:
     return (
         ModuleDefinition(id="builtin-tools", registrars=(tools.register_builtin_tools,)),
         ModuleDefinition(id="health", routers=(health.router,)),
+        ModuleDefinition(id="conversations", routers=(conversation_api.router,)),
         ModuleDefinition(id="model-routing", routers=(model_routing_api.router,)),
         ModuleDefinition(id="attachments", routers=(attachments.router,)),
         ModuleDefinition(id="vision", routers=(vision.router,)),

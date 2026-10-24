@@ -19,6 +19,8 @@ def register(app: FastAPI) -> None:
 
 def startup() -> None:
     db.init_db()
+    from . import conversation_store
+    conversation_store.recover()
     from . import attachments
     attachments.start_cleanup()
     notifications.init_db()

@@ -49,6 +49,10 @@ def register(actions: list[dict[str, Any]], *, session_id: str | None = None) ->
 
 @router.post("/api/actions/{approval_id}", response_model=ChatResponse)
 def decide_action(approval_id: str, decision: ActionDecision) -> ChatResponse:
+    from . import conversation_api
+    durable = conversation_api.decide(approval_id, decision.approved)
+    if durable is not None:
+        return ChatResponse(**durable)
     if config.USE_SONA_CORE:
         try:
             from . import sona_core_add_schedule

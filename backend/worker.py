@@ -26,11 +26,6 @@ class JobWorker:
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
-        # Agent is fully imported by startup time, so Phase 2 routes can be
-        # installed without participating in the agent -> tools import cycle.
-        from .tools import tasks_phase2
-
-        tasks_phase2.install_agent_routes()
         task_sync_queue.ensure_task_sync_schema()
         if _notion_task_sync_enabled():
             notion_task_sync.ensure_schema()
@@ -92,7 +87,9 @@ def _process_job(job: dict[str, Any]) -> None:
         if job["type"] == "background_research":
             result = _run_background_research(payload)
         elif job["type"] == "agent_followup":
-            result = _run_agent_followup(payload)
+            from . import request_context
+            with request_context.bind(request_id=f"job-{job_id}", session_id=job.get("session_id")):
+                result = _run_agent_followup(payload)
         else:
             raise ValueError(f"unknown job type: {job['type']}")
         db.finish_job(job_id, result)
@@ -114,32 +111,12 @@ def _run_background_research(payload: dict[str, Any]) -> str:
 
 def _run_agent_followup(payload: dict[str, Any]) -> str:
     message = str(payload.get("message") or "").strip()
-    history = payload.get("history") or []
     if not message:
         raise ValueError("agent_followup requires message")
-
-    from . import agent, chroma_client, markdown_export
-
-    result = agent.run(message, history=history, allow_defer=False)
-    used_tools_str = ", ".join(t["name"] for t in result["used_tools"]) or None
-    reply = result["reply"]
-    if not reply.strip():
-        return ""
-    conv_id = db.save_conversation(
-        user_text=f"[follow-up] {message}",
-        assistant_text=reply,
-        used_tools=used_tools_str,
-    )
-    chroma_client.add(
-        "petit_conversations",
-        doc_id=f"conv_{conv_id}",
-        text=f"ユーザー: {message}\nPETIT追加: {reply}",
-        metadata={"timestamp": db.now_iso(), "kind": "agent_followup"},
-    )
-    markdown_export.append_conversation_turn(
-        user_text=f"[follow-up] {message}",
-        assistant_text=reply,
-        used_tools=used_tools_str,
-        timestamp=db.now_iso(),
-    )
-    return reply
+    from . import conversation_api, request_context
+    from uuid import uuid4
+    request_id, session_id = request_context.current_ids()
+    result = conversation_api.submit(session_id or uuid4().hex, request_id or uuid4().hex, message, source="worker")
+    if result.get("error"):
+        raise RuntimeError(result["error"])
+    return result.get("reply", "")

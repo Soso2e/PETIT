@@ -1,4 +1,4 @@
-from backend import main, pending_actions
+from backend import app as app_module, main, pending_actions
 from backend.chat_models import ActionDecision, ChatResponse, PendingAction
 
 
@@ -10,7 +10,9 @@ def _clear_pending_actions() -> None:
 def test_pending_action_route_is_registered_once() -> None:
     routes = [
         route
-        for route in main.app.routes
+        for module in app_module.build_modules()
+        for router in module.routers
+        for route in router.routes
         if getattr(route, "path", None) == "/api/actions/{approval_id}"
         and "POST" in (getattr(route, "methods", None) or set())
     ]

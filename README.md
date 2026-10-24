@@ -1,5 +1,7 @@
 # PETIT — Personal AI Assistant (MVP)
 
+v0.32.0開発版は[単一Brainと永続Thread/Turn](docs/renaissance-core.md)を導入します。会話は明示して切り替え、再送は同じrequest IDで結果を照会します。既存DBは初回schema追加前にSQLiteバックアップを作成します。実運用はCore 1プロセス（workers=1）です。実Provider/配布版/実端末の受入は別途です。
+
 設計とデータソースの役割は [ASSISTANT_ARCHITECTURE.md](ASSISTANT_ARCHITECTURE.md) を参照。
 主要な概念の使い分けは [docs/terminology.md](docs/terminology.md) を参照。
 DesktopをPCの主入口にする全体の目標・会話/実行の正本・起動/復旧・段階移行は [Desktop・共通Core基盤設計](docs/desktop-foundation-design.md) を参照。Brain/Context Brokerの方針は [docs/jarvis-agent.md](docs/jarvis-agent.md)。目標の新API/管理Coreは未実装です。

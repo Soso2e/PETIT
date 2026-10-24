@@ -24,10 +24,10 @@ class AppNotificationUnificationTests(unittest.TestCase):
         self.assertIn("workSessionId", source)
         self.assertIn('localStorage.removeItem("petit_universe_active_started_at")', source)
 
-    def test_conversation_idle_boundary_is_two_hours(self):
+    def test_conversation_thread_is_stable_until_explicit_switch(self):
         session = (ROOT / "frontend" / "session.js").read_text(encoding="utf-8")
-        self.assertIn("2 * 60 * 60 * 1000", session)
-        self.assertIn("now - lastActiveAt >= IDLE_SPLIT_MS", session)
+        self.assertIn("petit_session_id", session)
+        self.assertNotIn("IDLE_SPLIT_MS", session)
 
     def test_universe_uses_shared_chat_input(self):
         html = (ROOT / "frontend" / "universe.html").read_text(encoding="utf-8")

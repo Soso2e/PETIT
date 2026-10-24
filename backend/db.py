@@ -7,11 +7,83 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from uuid import uuid4
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from . import config
+
+_transaction: ContextVar[Any] = ContextVar("petit_sqlite_transaction", default=None)
+
+
+class _BorrowedConnection:
+    """Nested services share the caller's transaction without committing it."""
+
+    def __init__(self, connection):
+        self.connection = connection
+
+    def __enter__(self):
+        self.savepoint = "service_" + uuid4().hex
+        self.connection.execute("SAVEPOINT " + self.savepoint)
+        return self
+
+    def __exit__(self, exc_type, *_args):
+        if exc_type:
+            self.connection.execute("ROLLBACK TO " + self.savepoint)
+        self.connection.execute("RELEASE " + self.savepoint)
+        return False
+
+    def execute(self, sql, parameters=()):
+        if sql.strip().upper() in {"BEGIN", "BEGIN IMMEDIATE", "BEGIN TRANSACTION"}:
+            return self.connection.cursor()
+        return self.connection.execute(sql, parameters)
+
+    def executescript(self, script):
+        # sqlite3.executescript implicitly commits. Schema helpers must not end
+        # the transaction that also owns a local effect receipt.
+        statement = ""
+        cursor = None
+        for char in script:
+            statement += char
+            if char == ";" and sqlite3.complete_statement(statement):
+                cursor = self.connection.execute(statement)
+                statement = ""
+        if statement.strip():
+            cursor = self.connection.execute(statement)
+        return cursor
+
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+    def __getattr__(self, name):
+        return getattr(self.connection, name)
+
+
+@contextmanager
+def write_transaction():
+    """One SQLite transaction for a local domain write and its receipt."""
+    active = _transaction.get()
+    if active is not None:
+        yield _BorrowedConnection(active)
+        return
+    connection = get_connection()
+    connection.execute("BEGIN IMMEDIATE")
+    token = _transaction.set(connection)
+    try:
+        yield _BorrowedConnection(connection)
+        connection.commit()
+    except BaseException:
+        connection.rollback()
+        raise
+    finally:
+        _transaction.reset(token)
+        connection.close()
 
 
 class _ClosingConnection(sqlite3.Connection):
@@ -145,6 +217,9 @@ def now_iso() -> str:
 
 
 def get_connection() -> sqlite3.Connection:
+    active = _transaction.get()
+    if active is not None:
+        return _BorrowedConnection(active)
     conn = sqlite3.connect(config.DB_PATH, timeout=5.0, factory=_ClosingConnection)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -171,7 +246,7 @@ def init_db() -> None:
             },
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_cache_area ON tasks_cache(area, status)")
-        _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER"})
+        _ensure_columns(conn, "conversations", {"session_id": "TEXT", "episode_id": "INTEGER", "source": "TEXT"})
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_episode ON conversations(episode_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_session ON conversations(session_id, id)")
         _ensure_columns(conn, "memory", {"source": "TEXT NOT NULL DEFAULT 'explicit'", "content_hash": "TEXT", "embedding_model": "TEXT", "embedding_version": "TEXT", "indexed_at": "TEXT"})
@@ -263,7 +338,14 @@ def recent_conversations(limit: int = 20, session_id: str | None = None) -> list
                 "FROM conversations ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-    return [dict(r) for r in reversed(rows)]
+    return [present_conversation(dict(r)) for r in reversed(rows)]
+
+
+def present_conversation(row: dict) -> dict:
+    """Internal app events are stored evidence, not words typed by the owner."""
+    if str(row.get("user_text") or "").startswith("[PETIT_INTERNAL_EVENT]"):
+        return {**row, "user_text": "", "kind": "internal_event"}
+    return row
 
 
 def all_memory() -> list[dict[str, Any]]:
@@ -302,7 +384,10 @@ def update_memory_indexed(memory_id: int, model: str, version: str) -> None:
 def pending_episode_groups() -> list[list[dict[str, Any]]]:
     """Unfinalized turns grouped by browser session; never includes an episode twice."""
     with get_connection() as conn:
-        rows = conn.execute("SELECT id, timestamp, user_text, assistant_text, used_tools, session_id FROM conversations WHERE episode_id IS NULL ORDER BY id ASC").fetchall()
+        privacy_filter = ""
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='threads'").fetchone():
+            privacy_filter = " AND (session_id IS NULL OR session_id NOT IN (SELECT id FROM threads WHERE privacy='local_only'))"
+        rows = conn.execute("SELECT id, timestamp, user_text, assistant_text, used_tools, session_id FROM conversations WHERE episode_id IS NULL" + privacy_filter + " ORDER BY id ASC").fetchall()
     groups: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         item = dict(row)
