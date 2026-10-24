@@ -5,7 +5,6 @@ import logging
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 from typing import Any
 
 from .. import config, db, notion_client, notion_project_sync, task_sync_queue
@@ -203,7 +202,7 @@ def process_inbox_next() -> bool:
 
 def daily_slot(now: datetime | None = None) -> str:
     """Latest due 02:00 Japan-time slot, including missed runs after sleep."""
-    local = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Asia/Tokyo"))
+    local = (now or datetime.now(timezone.utc)).astimezone(timezone(timedelta(hours=9)))
     if local.hour < 2:
         local -= timedelta(days=1)
     return local.date().isoformat()
