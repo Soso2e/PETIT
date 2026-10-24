@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Any
 
 from .. import config, db, notion_client, notion_project_sync, task_sync_queue
@@ -12,6 +13,7 @@ from . import merge, store
 log = logging.getLogger(__name__)
 
 _SYNC_LOCK = threading.Lock()
+_DAILY_LOCK = threading.Lock()
 _STARTUP_SYNC_REQUESTED = False
 _OUTBOX_APPLY_ORIGINAL: Any | None = None
 
@@ -122,6 +124,15 @@ def sync_now(mode: str = "incremental") -> dict[str, Any]:
             filter_payload=filter_payload,
             sorts=[{"timestamp": "last_edited_time", "direction": "ascending"}],
         )
+        # A misconfigured/inaccessible Notion source must never make an existing
+        # populated cache look like every task was deleted.
+        if normalized == "full" and not tasks:
+            with db.get_connection() as conn:
+                existing_count = conn.execute(
+                    "SELECT COUNT(*) FROM tasks_cache WHERE source='notion' AND remote_deleted_at IS NULL"
+                ).fetchone()[0]
+            if existing_count:
+                raise RuntimeError("notion_full_pull_empty_for_existing_cache")
         counts: dict[str, int] = {}
         seen: set[str] = set()
         for task in tasks:
@@ -189,11 +200,68 @@ def process_inbox_next() -> bool:
     return True
 
 
+def daily_slot(now: datetime | None = None) -> str:
+    """Latest due 02:00 Japan-time slot, including missed runs after sleep."""
+    local = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Asia/Tokyo"))
+    if local.hour < 2:
+        local -= timedelta(days=1)
+    return local.date().isoformat()
+
+
+def run_daily_if_due() -> bool:
+    """One durable attempt per JST slot. Pull precedes *any* Notion write."""
+    if not _DAILY_LOCK.acquire(blocking=False):
+        return False
+    try:
+        slot = daily_slot()
+        with db.get_connection() as conn:
+            updated = conn.execute(
+                "UPDATE notion_task_sync_state SET daily_slot=?, daily_status='running', "
+                "daily_finished_at=NULL, daily_error=NULL WHERE provider=? "
+                "AND (daily_slot IS NULL OR daily_slot<>?)",
+                (slot, store.SYNC_SOURCE, slot),
+            ).rowcount
+        if not updated:
+            return False
+        outcome, detail = "failed", ""
+        try:
+            # Full snapshot also detects remote deletions. Never push if Pull failed.
+            pulled = sync_now("full")
+            if not pulled.get("ok") or pulled.get("skipped"):
+                raise RuntimeError("notion_pull_failed_before_push: " + str(pulled.get("reason") or pulled.get("error") or "unknown"))
+            processed = 0
+            while processed < config.NOTION_TASK_DAILY_MAX_WRITES and task_sync_queue.process_next():
+                processed += 1
+            # Check Notion again after writes; a failed verification is not success.
+            verified = sync_now("incremental")
+            if not verified.get("ok") or verified.get("skipped"):
+                raise RuntimeError("notion_post_push_verification_failed")
+            counts = task_sync_queue.status(limit=1)["counts"]
+            incomplete = sum(int(counts.get(k, 0)) for k in ("pending", "failed", "conflict", "processing"))
+            outcome = "partial" if incomplete else "success"
+            detail = f"pull={pulled.get('synced_count', 0)}, writes={processed}, unresolved={incomplete}"
+        except Exception as exc:  # Preserve queued writes and expose the real failure.
+            detail = str(exc)[:300] or type(exc).__name__
+            log.exception("Notion daily sync failed for slot %s", slot)
+        finally:
+            with db.get_connection() as conn:
+                conn.execute(
+                    "UPDATE notion_task_sync_state SET daily_status=?, daily_finished_at=?, daily_error=? "
+                    "WHERE provider=? AND daily_slot=?",
+                    (outcome, db.now_iso(), None if outcome == "success" else detail, store.SYNC_SOURCE, slot),
+                )
+        return True
+    finally:
+        _DAILY_LOCK.release()
+
+
 def run_due_sync() -> bool:
     global _STARTUP_SYNC_REQUESTED
     ensure_schema()
-    if not config.NOTION_TASK_BACKGROUND_SYNC_ENABLED or not config.notion_configured():
+    if not config.NOTION_TASK_BACKGROUND_SYNC_ENABLED or not config.notion_configured() or config.NOTION_TASK_SYNC_MODE == "off":
         return False
+    if config.NOTION_TASK_SYNC_MODE == "daily":
+        return run_daily_if_due()
     current = store.state()
     if _STARTUP_SYNC_REQUESTED and config.NOTION_TASK_SYNC_ON_STARTUP:
         _STARTUP_SYNC_REQUESTED = False
@@ -228,12 +296,19 @@ def status() -> dict[str, Any]:
             "SELECT COUNT(*) FROM tasks_cache WHERE source='notion' AND remote_deleted_at IS NULL"
         ).fetchone()[0])
     current.pop("webhook_verification_token", None)
-    stale = bool(config.notion_configured() and store.due(
-        current.get("last_success_at"), config.NOTION_TASK_PULL_INTERVAL_SECONDS * 2
+    daily = config.NOTION_TASK_SYNC_MODE == "daily"
+    stale = bool(config.notion_configured() and (
+        (current.get("daily_slot") != daily_slot() or current.get("daily_status") != "success") if daily
+        else store.due(current.get("last_success_at"), config.NOTION_TASK_PULL_INTERVAL_SECONDS * 2)
     ))
     return {
         "configured": config.notion_configured(),
-        "mode": "local_first_outbox_inbox",
+        "mode": config.NOTION_TASK_SYNC_MODE,
+        "daily": {
+            "timezone": "Asia/Tokyo", "hour": 2, "due_slot": daily_slot(),
+            "last_slot": current.get("daily_slot"), "status": current.get("daily_status"),
+            "finished_at": current.get("daily_finished_at"), "error": current.get("daily_error"),
+        },
         "background_enabled": config.NOTION_TASK_BACKGROUND_SYNC_ENABLED,
         "stale": stale,
         "pull_interval_seconds": config.NOTION_TASK_PULL_INTERVAL_SECONDS,
