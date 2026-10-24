@@ -208,6 +208,7 @@ NOTION_TASK_SYNC_MODE = os.getenv("NOTION_TASK_SYNC_MODE", "daily").strip().lowe
 if NOTION_TASK_SYNC_MODE not in {"daily", "legacy", "off"}:
     NOTION_TASK_SYNC_MODE = "off"  # Fail closed on invalid configuration.
 NOTION_TASK_DAILY_MAX_WRITES = max(1, min(500, int(os.getenv("NOTION_TASK_DAILY_MAX_WRITES", "100"))))
+NOTION_TASK_DAILY_WRITE_INTERVAL_SECONDS = max(0.0, float(os.getenv("NOTION_TASK_DAILY_WRITE_INTERVAL_SECONDS", "0.85")))
 NOTION_TASK_BACKGROUND_SYNC_ENABLED = os.getenv("NOTION_TASK_BACKGROUND_SYNC_ENABLED", "1") not in ("0", "false", "False")
 NOTION_TASK_SYNC_ON_STARTUP = os.getenv("NOTION_TASK_SYNC_ON_STARTUP", "1") not in ("0", "false", "False")
 NOTION_TASK_PULL_INTERVAL_SECONDS = max(30.0, float(os.getenv("NOTION_TASK_PULL_INTERVAL_SECONDS", "300")))
