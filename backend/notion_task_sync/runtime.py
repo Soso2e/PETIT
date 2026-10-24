@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from typing import Any
@@ -232,6 +233,9 @@ def run_daily_if_due() -> bool:
             processed = 0
             while processed < config.NOTION_TASK_DAILY_MAX_WRITES and task_sync_queue.process_next():
                 processed += 1
+                # A task update can cost GET + PATCH. Pace the shared Notion API.
+                if config.NOTION_TASK_DAILY_WRITE_INTERVAL_SECONDS:
+                    time.sleep(config.NOTION_TASK_DAILY_WRITE_INTERVAL_SECONDS)
             # Check Notion again after writes; a failed verification is not success.
             verified = sync_now("incremental")
             if not verified.get("ok") or verified.get("skipped"):
