@@ -112,7 +112,8 @@
       if (!requestId) { result.textContent = 'この端末からの依頼はまだありません。'; return; }
       try {
         const data = await json('/api/turns/' + encodeURIComponent(requestId));
-        result.textContent = JSON.stringify({ status: data.status, error: data.error, effects: data.effects }, null, 2);
+        result.textContent = JSON.stringify({ status: data.status, error: data.error,
+          model_route: data.model_route, effects: data.effects }, null, 2);
       } catch (e) { result.textContent = e.message; }
     };
     controls.append(last);

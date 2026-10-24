@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import json
 import hashlib
+import time
 from typing import Any
 
-from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, request_context, time_context, tools
+from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, model_routing, request_context, time_context, tools
 from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
 
 # A reviewed public catalog, never the registry's internal approval executors.
@@ -56,6 +57,73 @@ def check_provider(thread: dict) -> dict:
         target.get("provider") != "lm_studio" or lmstudio_client.image_egress_is_external(target)
     ):
         raise lmstudio_client.LMStudioError("ローカル専用の会話です。ローカルProviderを選択してください。")
+    return target
+
+
+def _provider_key(target: dict) -> str:
+    return hashlib.sha256(store.encode({k: target.get(k) for k in
+        ("provider", "profile", "model", "base_url")}).encode()).hexdigest()
+
+
+def _turn_target(row: dict, thread: dict) -> dict:
+    primary = check_provider(thread)
+    pinned = row.get("provider_key")
+    if not pinned or pinned == _provider_key(primary):
+        target = primary
+    else:
+        fallback = model_routing.fallback_target(thread) if primary.get("provider") == "gemini" else None
+        with db.get_connection() as connection:
+            transition = connection.execute(
+                "SELECT payload_json FROM turn_events WHERE thread_id=? AND request_id=? AND type='provider_fallback' ORDER BY seq DESC LIMIT 1",
+                (thread["id"], row["request_id"])).fetchone()
+        previous = json.loads(transition[0]) if transition else {}
+        if not (fallback and pinned == _provider_key(fallback) and previous.get("primary_key") == _provider_key(primary)):
+            raise lmstudio_client.LMStudioError("依頼中にProviderが変更されました。保存した文脈を別Providerへ自動再送しません。")
+        target = fallback
+    if pinned != _provider_key(target):
+        with db.get_connection() as connection:
+            connection.execute("UPDATE turns SET provider_key=? WHERE request_id=?", (_provider_key(target), row["request_id"]))
+    return target
+
+
+def _model_call(request_id: str, thread: dict, messages: list[dict], catalog: list[dict], target: dict) -> dict:
+    started = time.monotonic()
+    attempt = {"provider": target.get("provider"), "model": target.get("model"),
+               "usage": "unknown", "quota": "unknown", "reason": "selected_provider", "error": None}
+    try:
+        response = lmstudio_client.chat_completion(messages, tools=catalog or None, route="chat",
+                                                   max_tokens=1600, target_override=target)
+        usage = response.get("_usage")
+        if isinstance(usage, dict):
+            attempt["usage"] = {k: v for k, v in usage.items() if k in
+                {"prompt_tokens", "completion_tokens", "total_tokens"} and type(v) is int and v >= 0} or "unknown"
+        return response
+    except lmstudio_client.LMStudioError as exc:
+        attempt["error"] = exc.category
+        raise
+    except Exception:
+        attempt["error"] = "client_error"
+        raise
+    finally:
+        attempt["latency_ms"] = round((time.monotonic() - started) * 1000)
+        with db.get_connection() as connection:
+            store.event(connection, thread["id"], request_id, "provider_attempt", attempt)
+
+
+def _fallback(request_id: str, thread: dict, primary: dict, error: lmstudio_client.LMStudioError) -> dict | None:
+    if primary.get("provider") != "gemini" or not error.retryable:
+        return None
+    target = model_routing.fallback_target(thread)
+    if not target:
+        return None
+    with db.write_transaction() as connection:
+        # Even a running/unknown effect excludes fallback. Never replay an operation.
+        if connection.execute("SELECT 1 FROM effect_receipts WHERE request_id=? LIMIT 1", (request_id,)).fetchone():
+            return None
+        connection.execute("UPDATE turns SET provider_key=? WHERE request_id=?", (_provider_key(target), request_id))
+        store.event(connection, thread["id"], request_id, "provider_fallback", {
+            "from": primary["provider"], "to": target["provider"], "reason": error.category,
+            "primary_key": _provider_key(primary)})
     return target
 
 
@@ -154,14 +222,8 @@ def execute(request_id: str, call: dict, arguments: dict) -> str:
 def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list | None = None) -> dict:
     row = store.load_turn(request_id)
     thread = store.thread(row["thread_id"])
-    target = check_provider(thread)
-    provider_key = hashlib.sha256(store.encode({k: target.get(k) for k in
-        ("provider", "profile", "model", "base_url")}).encode()).hexdigest()
-    with db.get_connection() as connection:
-        pinned = connection.execute("SELECT provider_key FROM turns WHERE request_id=?", (request_id,)).fetchone()[0]
-        if pinned and pinned != provider_key:
-            raise lmstudio_client.LMStudioError("依頼中にProviderが変更されました。保存した文脈を別Providerへ自動再送しません。")
-        connection.execute("UPDATE turns SET provider_key=? WHERE request_id=?", (provider_key, request_id))
+    target = _turn_target(row, thread)
+    fresh = messages is None and not row.get("messages_json")
     catalog = schemas()
     allowed = {item["function"]["name"] for item in catalog}
     used = list(used_tools or [])
@@ -178,9 +240,20 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
     for _round in range(MAX_ROUNDS):
         if store.load_turn(request_id)["cancel_requested"]:
             raise TurnCancelled("取消要求を受け付けました。すでに実行された操作は取り消していません。")
-        check_provider(thread)
-        response = lmstudio_client.chat_completion(messages, tools=catalog or None, route="chat",
-                                                   max_tokens=1600, target_override=target)
+        if _turn_target(store.load_turn(request_id), thread) != target:
+            raise lmstudio_client.LMStudioError("依頼中にProvider設定が変更されました。")
+        try:
+            response = _model_call(request_id, thread, messages, catalog, target)
+        except lmstudio_client.LMStudioError as exc:
+            # Deliberately stricter than no-external-write: only before the first
+            # model response, never after any Tool call or approval resumption.
+            fallback = _fallback(request_id, thread, target, exc) if fresh and _round == 0 else None
+            if fallback is None:
+                raise
+            target = fallback
+            if store.load_turn(request_id)["cancel_requested"]:
+                raise TurnCancelled("取消要求を受け付けました。")
+            response = _model_call(request_id, thread, messages, catalog, target)
         calls = response.get("tool_calls") or []
         if not calls:
             reply = str(response.get("content") or "").strip()
@@ -193,7 +266,7 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
         if len(used) + len(calls) > MAX_CALLS:
             raise lmstudio_client.LMStudioError("Tool呼出しの上限に達しました。依頼を絞ってください。")
         # Preserve the provider's native assistant call and reasoning_content.
-        assistant = {k: response[k] for k in ("role", "content", "tool_calls", "reasoning_content") if k in response}
+        assistant = {k: response[k] for k in ("role", "content", "tool_calls", "reasoning_content", "extra_content") if k in response}
         assistant["role"] = "assistant"
         messages.append(assistant)
         waiting = False

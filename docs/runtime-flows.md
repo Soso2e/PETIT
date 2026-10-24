@@ -14,7 +14,13 @@ flowchart TD
     L -->|別入力のID再利用| Conflict[409]
     L -->|同じThread実行中| Busy[429]
     L --> B[同じThreadの履歴だけ組立て / Provider送信範囲を検査]
-    B --> Brain[単一Brain native Tool Loop]
+    B --> Provider[選択ProviderとTurn固定キーを検査 / Gemini API・DeepSeek・LM Studio]
+    Provider --> Brain[単一Brain native Tool Loop / 試行・usage・latencyをEventsへ記録]
+    Brain -->|最初の応答前に429・5xx・通信障害| Consent{Gemini・明示許可Thread・receiptなし?}
+    Consent -->|YES| Fallback[DeepSeek Flashへ一度切替 / Turnに固定して同じBrainを継続]
+    Fallback --> Brain
+    Consent -->|NO| Failure[失敗を保存 / 効果は再実行しない]
+    Brain -->|認証403等・Tool後の障害| Failure
     Brain -->|通常返答| Save[既存conversationsへ本文保存 / Turnは参照]
     Brain -->|公開Tool| V[Registryの引数・risk検査]
     V -->|確認必須| P[SQLite Approval / 正確な引数 / 期限]
@@ -34,6 +40,9 @@ flowchart TD
 画像は同じTurnの受付後、既存Vision観測→Read専用回答へ進む。画像経路にはWrite Toolを公開しない。
 通常履歴へ別ThreadやClient historyを暗黙注入しない。2時間idle分割とfetch monkeypatchは廃止。
 12 Tool calls・8 roundsで停止。local_onlyは外部Providerへ送信しない。
+Fallbackは最初のモデル応答前のみ。Read後・Write後・承認再開後も切替しない。
+承認再開は同意と元Provider設定を再検査し、保存したFallback先を維持する。
+Providerの詳細・費用・実接続の検証境界は[Provider導入記録](renaissance-provider.md)を参照。
 詳細・障害復旧・データ保護・検証境界は[renaissance-core.md](renaissance-core.md)。
 
 

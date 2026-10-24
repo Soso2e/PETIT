@@ -1,0 +1,193 @@
+{
+  "status": "passed",
+  "profile": "gemini",
+  "fault_injected_primary": true,
+  "real_provider_verified": true,
+  "cases": [
+    {
+      "name": "chat",
+      "passed": true,
+      "status": "completed",
+      "reply": "こんにちは。今日もいい天気だといいですね。何か手伝えることある？",
+      "tools": [],
+      "error": null,
+      "model_route": {
+        "actual_route": "chat",
+        "kind": "brain",
+        "llm_call_count": 2,
+        "model": "deepseek-flash",
+        "provider": "deepseek",
+        "tools": [],
+        "attempts": [
+          {
+            "error": "quota_or_rate_limit",
+            "latency_ms": 1,
+            "model": "gemini-3.8-flash",
+            "provider": "gemini",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": "unknown"
+          },
+          {
+            "error": null,
+            "latency_ms": 891,
+            "model": "deepseek-flash",
+            "provider": "deepseek",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": {
+              "completion_tokens": 24,
+              "prompt_tokens": 6381,
+              "total_tokens": 6405
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 24,
+          "prompt_tokens": 6381,
+          "total_tokens": 6405
+        },
+        "quota": "unknown",
+        "latency_ms": 892,
+        "fallback": [
+          {
+            "from": "gemini",
+            "reason": "quota_or_rate_limit",
+            "to": "deepseek"
+          }
+        ]
+      }
+    },
+    {
+      "name": "workspace",
+      "passed": true,
+      "status": "completed",
+      "reply": "合成卒研のPROGRESS.md、読んできたよ。ただ中身はかなり薄い。\n\n- 実装済み: 「実装済み」とだけ書かれている。何をもって実装済みか、どの機能まで済んだかは書かれていない。\n- 実機未確認: 「実機での受入は未確認」と明記されている。受入項目のリストもなし。\n- 次の作業: 「次は実機検証」で終わっている。\n\n補足すると、このリポジトリ（フォルダ名 graduation）はまだコミットが1つもなく、PROGRESS.md自体も未追跡の状態。つまりこの記述は作業メモであって、実装や検証の証拠ではない。実装済みの内訳を知りたいなら、コード側を見るか、PROGRESS.mdを項目立てて書き直す必要がある。\n\nPROGRESS.mdを実装済み／実機未確認が一目で分かる形に整理し直そうか？",
+      "tools": [
+        "get_local_development_status",
+        "get_project_status"
+      ],
+      "error": null,
+      "model_route": {
+        "actual_route": "chat",
+        "kind": "brain",
+        "llm_call_count": 3,
+        "model": "deepseek-flash",
+        "provider": "deepseek",
+        "tools": [
+          "get_project_status",
+          "get_local_development_status"
+        ],
+        "attempts": [
+          {
+            "error": "quota_or_rate_limit",
+            "latency_ms": 1,
+            "model": "gemini-3.8-flash",
+            "provider": "gemini",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": "unknown"
+          },
+          {
+            "error": null,
+            "latency_ms": 1197,
+            "model": "deepseek-flash",
+            "provider": "deepseek",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": {
+              "completion_tokens": 113,
+              "prompt_tokens": 6475,
+              "total_tokens": 6588
+            }
+          },
+          {
+            "error": null,
+            "latency_ms": 2181,
+            "model": "deepseek-flash",
+            "provider": "deepseek",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": {
+              "completion_tokens": 230,
+              "prompt_tokens": 7237,
+              "total_tokens": 7467
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 230,
+          "prompt_tokens": 7237,
+          "total_tokens": 7467
+        },
+        "quota": "unknown",
+        "latency_ms": 3379,
+        "fallback": [
+          {
+            "from": "gemini",
+            "reason": "quota_or_rate_limit",
+            "to": "deepseek"
+          }
+        ]
+      }
+    },
+    {
+      "name": "continuation",
+      "passed": true,
+      "status": "completed",
+      "reply": "いいえ、済んでいない。PROGRESS.mdには「実機での受入は未確認」とだけ書かれていて、完了した記録はなかったよ。",
+      "tools": [],
+      "error": null,
+      "model_route": {
+        "actual_route": "chat",
+        "kind": "brain",
+        "llm_call_count": 2,
+        "model": "deepseek-flash",
+        "provider": "deepseek",
+        "tools": [],
+        "attempts": [
+          {
+            "error": "quota_or_rate_limit",
+            "latency_ms": 1,
+            "model": "gemini-3.8-flash",
+            "provider": "gemini",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": "unknown"
+          },
+          {
+            "error": null,
+            "latency_ms": 967,
+            "model": "deepseek-flash",
+            "provider": "deepseek",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": {
+              "completion_tokens": 38,
+              "prompt_tokens": 6733,
+              "total_tokens": 6771
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 38,
+          "prompt_tokens": 6733,
+          "total_tokens": 6771
+        },
+        "quota": "unknown",
+        "latency_ms": 968,
+        "fallback": [
+          {
+            "from": "gemini",
+            "reason": "quota_or_rate_limit",
+            "to": "deepseek"
+          }
+        ]
+      }
+    }
+  ],
+  "verified_providers": [
+    "deepseek"
+  ],
+  "checked_on_utc": "2026-10-24"
+}

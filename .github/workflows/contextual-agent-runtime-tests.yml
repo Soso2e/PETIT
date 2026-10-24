@@ -11,6 +11,9 @@ on:
       - "backend/conversation_api.py"
       - "backend/conversation_store.py"
       - "tests/test_renaissance_core.py"
+      - "tests/test_gemini_provider.py"
+      - "backend/model_routing.py"
+      - "backend/lmstudio_client.py"
       - "frontend/session.js"
       - "scripts/test-thread-client.cjs"
       - "backend/chat.py"
@@ -104,7 +107,7 @@ jobs:
           node --check frontend/chat_attachments.js
       - name: Run Renaissance Core and Thread client contracts
         run: |
-          python -m pytest tests/test_renaissance_core.py tests/test_pending_actions_router.py -q
+          python -m pytest tests/test_renaissance_core.py tests/test_gemini_provider.py tests/test_pending_actions_router.py -q
           node --test scripts/test-thread-client.cjs
       - name: Run image intake and Vision regressions
         run: python -m pytest tests/test_vision.py tests/test_vision_calculations.py tests/test_chat_router.py tests/test_module_registry.py -q

@@ -1,0 +1,8 @@
+{
+  "status": "skipped",
+  "profile": "gemini",
+  "reason": "credential_not_configured",
+  "real_provider_verified": false,
+  "verified_providers": [],
+  "checked_on_utc": "2026-10-24"
+}

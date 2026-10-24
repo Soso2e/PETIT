@@ -44,6 +44,12 @@ async function main() {
       const turnId = snapshot.events.find(event => event.type === 'accepted').request_id;
       const turn = await (await fetch(url + '/api/turns/' + turnId)).json();
       assert.equal(turn.effects[0].status, 'applied');
+      assert.equal(turn.model_route.provider, 'gemini');
+      assert.equal(turn.model_route.quota, 'unknown');
+      await page.getByText('最新の依頼', { exact: true }).click();
+      await page.locator('.petit-thread-controls pre').filter({ hasText: '"provider": "gemini"' }).waitFor();
+      const modelStatus = await (await fetch(url + '/api/model-routing')).json();
+      assert.equal(modelStatus.routes.chat.options.find(option => option.profile === 'gemini').label, 'Gemini API');
       await page.locator('#chat-form [type="submit"]:enabled').waitFor();
       await page.locator('#chat-input').fill('予定を追加');
       await page.locator('#chat-form').evaluate(form => form.requestSubmit());
@@ -65,7 +71,7 @@ async function main() {
       assert.equal(await secondPage.locator('.petit-thread-controls').count(), 1);
       await second.close();
       await context.close();
-      console.log('PASS Chromium width=' + width + ': Tool effect, approval restore, explicit same-thread history');
+      console.log('PASS Chromium width=' + width + ': Gemini diagnostics, Tool effect, approval restore, explicit same-thread history');
     }
   } finally { await browser.close(); }
 }

@@ -9,6 +9,9 @@ from pathlib import Path
 _directory = tempfile.TemporaryDirectory(prefix="petit-renaissance-ui-")
 os.environ["PETIT_STORAGE_DIR"] = _directory.name
 os.environ["PETIT_DB_PATH"] = str(Path(_directory.name) / "app.db")
+os.environ["PETIT_MODEL_ROUTING_PATH"] = str(Path(_directory.name) / "models.json")
+os.environ["PETIT_CHAT_PROFILE"] = "gemini"
+os.environ["PETIT_GEMINI_API_KEY"] = "fixture-not-a-real-key"
 os.environ["PETIT_AUTO_SUMMARY_ENABLED"] = "0"
 os.environ["PETIT_DAILY_INDEX_ENABLED"] = "0"
 
@@ -37,4 +40,9 @@ def fixture_model(messages, **kwargs):
 
 
 brain.lmstudio_client.chat_completion = fixture_model
+brain.lmstudio_client.health = lambda route="chat": {
+    "provider": "gemini", "profile": "gemini", "label": "Gemini API",
+    "model": "gemini-3.8-flash", "server_ok": True, "model_loaded": True,
+    "models": ["gemini-3.8-flash"], "latency_ms": 0,
+}
 app = create_app()

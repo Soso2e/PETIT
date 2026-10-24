@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.32.0（開発ブランチ・未マージ）**
+**Current Version: v0.33.0（開発ブランチ・未マージ）**
 
-**Last Updated: 2026-10-23**
+**Last Updated: 2026-10-24 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #349（実装済み・実Gemini未確認）: main `4135053`からGemini API profileを既存単一Brain/Tool/Thread/Turnへ追加。個人契約CLIラップは公式FAQで非サポート、公式SDK 0.1.22は独立ハーネス/Tool実行/保存の二重化を避けて今回不採用。Thread単位の明示同意・初回応答前だけのDeepSeek Flash Fallback、Provider固定・usage/unknown/latency/errorの永続Eventsと画面診断を追加。関連pytest121件・Node5件、実Chromium 1440/390px、実DeepSeek合成3/3とGemini 429注入→実DeepSeek 3/3を確認。Geminiキー未設定のため実接続はskipped。Notionコード・DB schemaは未変更。詳細/費用/設定/未確認は docs/renaissance-provider.md。次はPRレビューとGemini実接続、配布Desktop/実端末の受入。
 
 - #345 / #341（確認済みProjectフォルダ、実装済み・実データ受入未確認）: 既存project_source_linksへlocal_workspace対応を確認付きで保存し、既存get_local_development_status(project_id)からWorkspaceObserverのキャッシュを取得。Task.project_idと同じIDを使い、同名フォルダはcanonical rootのIDで区別する。allowlist/実行時再検査/private/symlink・junction拒否、文書更新日時・出典・観測時刻・実Git状態を分離。34件の関連テストを一時Git/DBで確認。Core #346・記憶検索 #347と結合済み。関連pytest154件+3 subtests、Node4件、Chrome 1440/390pxと実DeepSeek Flash・合成7ケース（7/7）を確認。実登録フォルダ・実Discord/Notion・配布端末の受入は別途。
 - #345（元発言検索・記憶鮮度、実装済み・実機未確認）: 既存conversationsの入力/出力を日時・発言元・Thread・原文ID付きでbounded検索するToolを追加。旧NULL sessionは推測で結合しない。save_memoryは固定保存上限を設けず、正規化重複・明示置換・期限・visibilityをSQLiteで扱い、旧行を保持。private元発言/記憶をstandard検索から除外し、private検索ではembeddingを呼ばない。全件再索引を個別索引更新へ縮小。Core PR #346を取り込み、単一Brainへ接続済み。#346 → #347 → #348の順でレビューする（全PRのbaseはmain、main未マージ）。
@@ -278,3 +280,5 @@
 | 2026-10-23 | 14:48 | #345 | Project Continuityと既存ローカル観測を確認済みフォルダで接続。登録/解除・同名衝突・Task.project_id・mtime/出典/Git・stale・許可撤回・private/リンク拒否を一時Gitで検証（34件成功）。実データ/実Provider/実端末は未確認。 |
 | 2026-10-23 | 14:35 | #345 | 元発言の横断検索と長期記憶の期限/置換/visibilityを追加。無制限保存・bounded取得・旧行保護・並行重複・private除外・予定の完全一致再登録抑止を一時DBで検証。実Provider/Discord/実端末は未確認。 |
 | 2026-10-23 | 14:10 | #345 | 単一BrainとThread/Turnの永続化を実装。再送・同時受付・承認・局所書込receipt・履歴分離・SQLiteバックアップを隔離データで検証。旧実行ループと重複登録を削減。実サービス/実端末の受入とRenaissance後続能力は未確認。 |
+
+| 2026-10-24 | 21:44 | #349 | v0.33.0: 正規経路を比較しGemini APIを既存単一Brainへ実装。明示Thread同意と初回応答前のみDeepSeek Fallback、Provider固定/永続診断を追加し契約・Chromium・実DeepSeek合成会話を確認。実Geminiはキー未設定で未確認。設定/費用/証拠は docs/renaissance-provider.md。 |

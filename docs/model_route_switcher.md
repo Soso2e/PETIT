@@ -7,10 +7,12 @@ PETITのWeb画面上部にある `Chat:` と `Agent:` から、それぞれ別�
 | 選択肢 | 接続先 | 用途 |
 |---|---|---|
 | ローカル LM Studio | PC内のLM Studio | 外部へ内容を送りたくない会話 |
+| Gemini API | Google Gemini API | 単一Brainの通常会話・既存Tool Calling |
 | DeepSeek V4 Flash | DeepSeek API | 普段使い・低コスト |
 | DeepSeek V4 Pro | DeepSeek API | より精度が必要な分析 |
 
-Chatは通常会話とルーター、Agentはツール実行・分析・自動要約などに使われます。
+現行の単一BrainではChatの選択を通常会話・Tool実行の全ラウンドに使います。Agentの選択は旧互換・補助経路用であり、別Brainへの振り分けではありません。
+Geminiの利用条件・API課金・設定・Fallback・検証結果は[Provider導入記録](renaissance-provider.md)を参照してください。
 
 ## `.env`設定
 

@@ -26,6 +26,11 @@ _SYSTEM_TRUST_CONTEXT = ssl.create_default_context()
 class LMStudioError(RuntimeError):
     """Raised when the selected model endpoint is unavailable or invalid."""
 
+    def __init__(self, message: str, *, category: str = "unknown", retryable: bool = False):
+        super().__init__(message)
+        self.category = category
+        self.retryable = retryable
+
 
 _health_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 _HEALTH_CACHE_SECONDS = 30.0
@@ -160,26 +165,31 @@ def _post_completion(
 ) -> dict[str, Any]:
     provider_name = _provider_name(target)
     try:
-        verify = _SYSTEM_TRUST_CONTEXT if target.get("provider") == "deepseek" else True
+        verify = _SYSTEM_TRUST_CONTEXT if target.get("external") else True
         resp = httpx.post(url, json=payload, headers=headers, timeout=target.get("timeout_seconds", config.LM_TIMEOUT), verify=verify)
         resp.raise_for_status()
     except httpx.ConnectError as exc:
         raise LMStudioError(
             f"{route}の{provider_name}に接続できませんでした ({target['base_url']})。"
-            "接続先、起動状態、ネットワークを確認してください。"
-        ) from exc
+            "接続先、起動状態、ネットワークを確認してください。",
+            category="connection", retryable=True) from exc
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
-        body = exc.response.text[:200]
-        hint = " APIキーと残高を確認してください。" if target.get("provider") == "deepseek" and status in {401, 402, 403} else ""
-        raise LMStudioError(f"{provider_name}がエラーを返しました: {status} {body}{hint}") from exc
+        category = {401: "authentication", 402: "billing", 403: "permission", 429: "quota_or_rate_limit"}.get(
+            status, "server" if status >= 500 else "request")
+        # Provider bodies may echo credentials or private input. Persist only classifications.
+        raise LMStudioError(f"{provider_name}: HTTP {status} ({category})。設定と利用枠を確認してください。",
+                            category=category, retryable=status == 429 or 500 <= status <= 599) from exc
+    except httpx.TimeoutException as exc:
+        raise LMStudioError(f"{provider_name}の応答がタイムアウトしました。",
+                            category="timeout", retryable=True) from exc
     except httpx.HTTPError as exc:
-        raise LMStudioError(f"{provider_name}との通信に失敗しました: {exc}") from exc
+        raise LMStudioError(f"{provider_name}との通信に失敗しました。", category="network", retryable=True) from exc
 
     try:
         return resp.json()
     except ValueError as exc:
-        raise LMStudioError(f"{provider_name}の応答がJSONではありませんでした。") from exc
+        raise LMStudioError(f"{provider_name}の応答がJSONではありませんでした。", category="invalid_response") from exc
 
 
 def _parse_choice(data: dict[str, Any], target: dict[str, Any]) -> dict[str, Any]:
@@ -189,7 +199,7 @@ def _parse_choice(data: dict[str, Any], target: dict[str, Any]) -> dict[str, Any
         message["_finish_reason"] = choice.get("finish_reason")
         return message
     except (KeyError, IndexError, TypeError) as exc:
-        raise LMStudioError(f"{_provider_name(target)}の応答を解釈できませんでした: {data}") from exc
+        raise LMStudioError(f"{_provider_name(target)}の応答を解釈できませんでした。", category="invalid_response") from exc
 
 
 def _has_usable_output(message: dict[str, Any]) -> bool:
@@ -239,6 +249,8 @@ def _base_payload(
         # Tool-call continuation needs reasoning_content when thinking is enabled.
         # Keep the first switcher release in non-thinking mode for predictable tools.
         payload["thinking"] = {"type": "disabled"}
+    elif target["provider"] == "gemini":
+        payload["reasoning_effort"] = "low"
     return payload
 
 
@@ -275,8 +287,8 @@ def chat_completion(
         validate_image_target(target)
     if not target.get("configured"):
         if target.get("provider") == "deepseek":
-            raise LMStudioError(f"{route}のDeepSeek APIキーが未設定です。PETIT_DEEPSEEK_API_KEYを.envに追加してください。")
-        raise LMStudioError(f"{route}の{_provider_name(target)}が未設定です。")
+            raise LMStudioError(f"{route}のDeepSeek APIキーが未設定です。PETIT_DEEPSEEK_API_KEYを.envに追加してください。", category="not_configured")
+        raise LMStudioError(f"{route}の{_provider_name(target)}が未設定です。", category="not_configured")
 
     selected_model = _selected_model(route, model, target)
     url = f"{target['base_url'].rstrip('/')}/chat/completions"
@@ -323,7 +335,12 @@ def chat_completion(
         if _has_usable_output(message):
             if retry_count:
                 message["_empty_response_recovered"] = True
+            message["_usage"] = data.get("usage") or None
             return message
+
+        if target["provider"] == "gemini":
+            raise LMStudioError("Gemini APIから本文・Tool呼出しを取得できませんでした。",
+                                category="empty_response")
 
         log.warning(
             "empty model response route=%s profile=%s model=%s finish_reason=%s content_length=%s "
@@ -378,7 +395,7 @@ def health(route: str = "chat") -> dict[str, Any]:
     headers = {"Authorization": f"Bearer {target['api_key']}"}
     started = time.monotonic()
     try:
-        verify = _SYSTEM_TRUST_CONTEXT if target.get("provider") == "deepseek" else True
+        verify = _SYSTEM_TRUST_CONTEXT if target.get("external") else True
         resp = httpx.get(url, headers=headers, timeout=10, verify=verify)
         resp.raise_for_status()
         models = [m.get("id") for m in resp.json().get("data", [])]

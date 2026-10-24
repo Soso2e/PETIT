@@ -1,0 +1,146 @@
+{
+  "status": "passed",
+  "profile": "deepseek_flash",
+  "fault_injected_primary": false,
+  "real_provider_verified": true,
+  "cases": [
+    {
+      "name": "chat",
+      "passed": true,
+      "status": "completed",
+      "reply": "こんにちは。今日もよろしく。",
+      "tools": [],
+      "error": null,
+      "model_route": {
+        "actual_route": "chat",
+        "kind": "brain",
+        "llm_call_count": 1,
+        "model": "deepseek-flash",
+        "provider": "deepseek",
+        "tools": [],
+        "attempts": [
+          {
+            "error": null,
+            "latency_ms": 845,
+            "model": "deepseek-flash",
+            "provider": "deepseek",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": {
+              "completion_tokens": 12,
+              "prompt_tokens": 6381,
+              "total_tokens": 6393
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 12,
+          "prompt_tokens": 6381,
+          "total_tokens": 6393
+        },
+        "quota": "unknown",
+        "latency_ms": 845,
+        "fallback": []
+      }
+    },
+    {
+      "name": "workspace",
+      "passed": true,
+      "status": "completed",
+      "reply": "合成卒研のフォルダ（graduation）のPROGRESS.md、中身はこれだけでした。\n\n```\n# 合成卒研\n実装済み。実機での受入は未確認。次は実機検証。\n```\n\nなので区別すると、こうなります。\n\n- 実装済み：PROGRESS.md上は「実装済み」とだけ書かれています。ただし何を実装したかの内訳は書かれていません。\n- 実機未確認：実機での受入確認がまだ。次にやることは実機検証、と明記されています。\n\n補足として、これは文書に書かれている内容であって、実行やテストの証拠ではありません。またリポジトリ側はまだ初回コミット前（No commits yet on main）で、PROGRESS.md自体も未追跡ファイルです。リモートとの比較は取得していないので不明です。\n\n必要なら、実装済みの内訳をコード側から拾って一覧にしましょうか。",
+      "tools": [
+        "get_local_development_status"
+      ],
+      "error": null,
+      "model_route": {
+        "actual_route": "chat",
+        "kind": "brain",
+        "llm_call_count": 2,
+        "model": "deepseek-flash",
+        "provider": "deepseek",
+        "tools": [
+          "get_local_development_status"
+        ],
+        "attempts": [
+          {
+            "error": null,
+            "latency_ms": 710,
+            "model": "deepseek-flash",
+            "provider": "deepseek",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": {
+              "completion_tokens": 61,
+              "prompt_tokens": 6463,
+              "total_tokens": 6524
+            }
+          },
+          {
+            "error": null,
+            "latency_ms": 2315,
+            "model": "deepseek-flash",
+            "provider": "deepseek",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": {
+              "completion_tokens": 226,
+              "prompt_tokens": 7005,
+              "total_tokens": 7231
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 226,
+          "prompt_tokens": 7005,
+          "total_tokens": 7231
+        },
+        "quota": "unknown",
+        "latency_ms": 3025,
+        "fallback": []
+      }
+    },
+    {
+      "name": "continuation",
+      "passed": true,
+      "status": "completed",
+      "reply": "いいえ、済んでいません。直前のPROGRESS.mdの記述では「実機での受入は未確認。次は実機検証」となっていました。",
+      "tools": [],
+      "error": null,
+      "model_route": {
+        "actual_route": "chat",
+        "kind": "brain",
+        "llm_call_count": 1,
+        "model": "deepseek-flash",
+        "provider": "deepseek",
+        "tools": [],
+        "attempts": [
+          {
+            "error": null,
+            "latency_ms": 962,
+            "model": "deepseek-flash",
+            "provider": "deepseek",
+            "quota": "unknown",
+            "reason": "selected_provider",
+            "usage": {
+              "completion_tokens": 39,
+              "prompt_tokens": 6717,
+              "total_tokens": 6756
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 39,
+          "prompt_tokens": 6717,
+          "total_tokens": 6756
+        },
+        "quota": "unknown",
+        "latency_ms": 962,
+        "fallback": []
+      }
+    }
+  ],
+  "verified_providers": [
+    "deepseek"
+  ],
+  "checked_on_utc": "2026-10-24"
+}

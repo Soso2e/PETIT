@@ -14,9 +14,10 @@ from typing import Any
 from . import config
 
 ROUTES = ("chat", "agent")
-PROFILE_IDS = ("local", "deepseek_flash", "deepseek_pro")
+PROFILE_IDS = ("local", "gemini", "deepseek_flash", "deepseek_pro")
 PROFILE_LABELS = {
     "local": "ローカル LM Studio",
+    "gemini": "Gemini API",
     "deepseek_flash": "DeepSeek V4 Flash",
     "deepseek_pro": "DeepSeek V4 Pro",
 }
@@ -90,6 +91,14 @@ def _target(route: str, profile: str) -> dict[str, Any]:
         raise ModelRoutingError(f"unknown route: {route}")
     if profile == "local":
         target = _local_target(route)
+    elif profile == "gemini":
+        api_key = os.getenv("PETIT_GEMINI_API_KEY", "").strip() or os.getenv("GEMINI_API_KEY", "").strip()
+        model = os.getenv("PETIT_GEMINI_MODEL", "gemini-3.8-flash").strip()
+        target = {
+            "provider": "gemini", "model": model, "api_key": api_key,
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+            "external": True, "configured": bool(api_key and model),
+        }
     elif profile in {"deepseek_flash", "deepseek_pro"}:
         target = _deepseek_target(profile)
     else:
@@ -106,6 +115,15 @@ def endpoint(route: str) -> dict[str, Any]:
     """Return the active endpoint including the server-only API key."""
     selection = _read_selection()
     return _target(route, selection[route])
+
+
+def fallback_target(thread: dict) -> dict[str, Any] | None:
+    """Explicit per-Thread consent; no wildcard or local-to-cloud migration."""
+    permitted = {x.strip() for x in os.getenv("PETIT_DEEPSEEK_FALLBACK_THREADS", "").split(",") if x.strip()}
+    if thread.get("privacy") != "standard" or thread.get("id") not in permitted:
+        return None
+    target = _target("chat", "deepseek_flash")
+    return target if target["configured"] else None
 
 
 def _public_target(target: dict[str, Any]) -> dict[str, Any]:

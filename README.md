@@ -1,5 +1,7 @@
 # PETIT — Personal AI Assistant (MVP)
 
+v0.33.0開発版は、公式Gemini APIを既存の単一Brainへ接続します。Chatで`Gemini API`を選択してください。Antigravity CLI/SDKの統合とは区別します。Thread単位の明示許可付きDeepSeek Flash Fallback、APIキー設定、費用比較、実接続の検証範囲は[Provider導入記録](docs/renaissance-provider.md)を参照してください。既定はローカルのままです。
+
 v0.32.0開発版は[単一Brainと永続Thread/Turn](docs/renaissance-core.md)を導入します。会話は明示して切り替え、再送は同じrequest IDで結果を照会します。既存DBは初回schema追加前にSQLiteバックアップを作成します。実運用はCore 1プロセス（workers=1）です。実Provider/配布版/実端末の受入は別途です。
 
 設計とデータソースの役割は [ASSISTANT_ARCHITECTURE.md](ASSISTANT_ARCHITECTURE.md) を参照。

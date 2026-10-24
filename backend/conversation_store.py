@@ -158,6 +158,18 @@ def result(request_id: str) -> dict:
         data["effects"] = [dict(r) for r in connection.execute(
             "SELECT call_id,tool,status,result FROM effect_receipts WHERE request_id=? ORDER BY rowid",
             (request_id,))]
+        attempts = [json.loads(r[0]) for r in connection.execute(
+            "SELECT payload_json FROM turn_events WHERE thread_id=? AND request_id=? AND type='provider_attempt' ORDER BY seq",
+            (row["thread_id"], request_id))]
+        fallbacks = [json.loads(r[0]) for r in connection.execute(
+            "SELECT payload_json FROM turn_events WHERE thread_id=? AND request_id=? AND type='provider_fallback' ORDER BY seq",
+            (row["thread_id"], request_id))]
+    if attempts:
+        data.setdefault("model_route", {}).update(
+            provider=attempts[-1]["provider"], model=attempts[-1]["model"],
+            attempts=attempts, usage=attempts[-1]["usage"], quota="unknown",
+            latency_ms=sum(a["latency_ms"] for a in attempts), llm_call_count=len(attempts),
+            fallback=[{k: v for k, v in f.items() if k != "primary_key"} for f in fallbacks])
     return data
 
 
