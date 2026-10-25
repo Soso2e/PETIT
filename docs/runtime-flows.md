@@ -1,5 +1,35 @@
 # PETIT Runtime Flows
 
+## v0.34.1: Antigravity CLI準備・本番無効（#355）
+
+CLIのGoogleログイン・既存契約枠はSDK/LM Studioとは別。FAQ/規約とフォーラムの矛盾が
+未解決のため、本番Providerに追加していない。`antigravity_cli`の明示指定は拒否し、
+他Providerへ暗黙変更しない。Thread/Turn/Approval/Receiptの既存正本を維持する。
+
+```mermaid
+flowchart TD
+    Settings[管理者Settings] --> Detect[PATH / 公式標準先の存在確認のみ]
+    Detect --> Unknown[認証 / モデル / quota / versionはunknown]
+    Settings --> Activate[CLI接続 / テスト / 順位変更]
+    Activate --> Block[本番拒否: 許諾未確定 / ファイルRead専用も未実証]
+    Explicit[CLIを明示した設定 / target] --> Block
+    Block --> NoFallback[別Providerへ自動送信しない]
+    Offline[隔離テスト: Core受付 / claim] --> Fixture[Mock JSON / NDJSON]
+    Fixture --> Parse[ID / schema / 出力上限 / cancel / deadline検査]
+    Parse --> Events[既存Threadのmock専用Events: session / text delta / Tool観測]
+    Events --> Restore[同じThreadのみID復元 / 同request再実行拒否]
+    Parse --> Result[Mock結果: evidence=mock_only / live_verified=false]
+    Direct[独立直接診断スクリプト: runtimeから呼ばない] --> Version[agy --version]
+    Version --> Live{本人の明示--live}
+    Live -->|なし| Stop[診断のみ]
+    Live -->|あり| CLI[公式agy / 一時合成README / 明示conversation ID]
+    CLI --> Report[直接CLIの観測のみ / 契約枠は照合までunknown]
+```
+
+Tool観測は事後情報でありPETIT Toolの再実行や事前承認には使わない。Mockでは
+通常のmodel_backend/receiptを生成しない。独立スクリプトの取消/deadlineは所有process
+treeを終了するが、実agyでの動作は未検証。詳細: [CLI統合の状態](antigravity-cli.md)。
+
 ## v0.34.0: 初期設定・優先順位と単一Brain（#353）
 
 管理UIの順位設定がONなら新しい選択経路、OFFなら従来の明示Provider選択を使う。

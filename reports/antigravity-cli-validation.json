@@ -1,0 +1,59 @@
+{
+  "checked_at_utc": "2026-10-25T15:27:00Z",
+  "base_main": "65fd98a",
+  "issue": 355,
+  "production_enabled": false,
+  "policy": "unresolved_official_faq_terms_vs_forum",
+  "cli_live_status": "skipped_not_installed",
+  "actual_model": "unknown",
+  "authentication": "unknown",
+  "subscription_quota_used": "unknown",
+  "wevora_file_access_verified": false,
+  "pytest": {
+    "passed": 94,
+    "skipped": 1,
+    "subtests_passed": 5,
+    "cli_contract_tests": 27,
+    "data": "isolated synthetic DB"
+  },
+  "skip_reason": "optional real Antigravity SDK not present in this Python environment",
+  "node_thread_contracts": {
+    "passed": 5
+  },
+  "browser": {
+    "engine": "real Chrome via Playwright",
+    "widths": [
+      1440,
+      390
+    ],
+    "steps_each": 4,
+    "horizontal_overflow": false,
+    "cli_enable_disabled": true,
+    "cli_connect_and_test_http_status": 409,
+    "settings_restart": true,
+    "provider_responses": "synthetic SDK fixture; no real inference",
+    "screenshots_visually_reviewed": true,
+    "real_iphone_or_packaged_desktop_verified": false
+  },
+  "process_cleanup": {
+    "real_synthetic_process_cancel": true,
+    "real_synthetic_process_timeout": true,
+    "real_synthetic_grandchild_heartbeat_stopped": true,
+    "real_agy_verified": false
+  },
+  "syntax_checks": "passed",
+  "git_diff_check": "passed",
+  "progress_prior_history": "preserved",
+  "external_accounts_or_real_db_modified": false,
+  "remaining": [
+    "Google permission confirmation",
+    "official CLI install and user-managed sign-in",
+    "read-only allowlisted folders and private denial enforced before CLI tools",
+    "PETIT Approval linkage for any future writes",
+    "single real Brain runtime integration",
+    "actual model/auth/subscription evidence",
+    "real WEVORA read and persisted answer/tool history",
+    "actual CLI error/429/cancel/timeout",
+    "macOS/iPhone/packaged Desktop acceptance"
+  ]
+}

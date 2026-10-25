@@ -1,0 +1,22 @@
+{
+  "provider": "antigravity_cli",
+  "installed": false,
+  "production_enabled": false,
+  "reason": "cli_not_installed",
+  "message": "Antigravity CLIは公式FAQ・規約とフォーラム回答の矛盾が未解決のため、PETITからの本番接続を無効にしています。",
+  "authentication": "unknown",
+  "model": "unknown",
+  "quota_remaining": "unknown",
+  "version": "unknown",
+  "tested": false,
+  "guide": "https://www.antigravity.google/docs/getting-started/",
+  "evidence": "direct_cli_probe",
+  "scope": "synthetic_workspace_only",
+  "checked_at_utc": "2026-10-25T15:25:00.155229+00:00",
+  "subscription_quota_used": "unknown",
+  "child_api_key_policy": "remove",
+  "petit_integration_verified": false,
+  "checks": [],
+  "status": "skipped",
+  "network_invoked": false
+}

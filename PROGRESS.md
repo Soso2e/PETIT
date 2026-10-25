@@ -1,14 +1,16 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.34.0（開発ブランチ・未マージ）**
+**Current Version: v0.34.1（CLI準備の開発ブランチ・未マージ）**
 
 **Last Updated: 2026-10-25 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #353 / feat/setup-integrations（実装済み・外部認証受入未確認、main未反映）: PR #352のSDKを再利用し、管理者認証付き初回ウィザード、暗号化ホスト設定、AI順位と同意付きFallback、Codex公式app-server、Google共通OAuth/Gmail Read Tool、Notion対象選択、Calendar 02:00 JST差分同期、永続アラートと会話警告を追加。Python121件+8 subtests成功/1 skip、Desktop66件成功/1 skip・Thread Node5件、Chromium1440/390pxを確認。公式SDK+実LM StudioでRead/記憶Write/予定承認/再送/再起動/未認証Codex→SDKのFallbackを合成DBで確認し、承認引数・receipt・保存行を照合。初期の依存競合・小型モデルのTool未呼出/誤成功発言も検出し、最終は明示bridge契約プロンプトで成功。自然文の一般的な実行品質、本人のCodex/課金API/Notion/Google/TimeTree認証、実02:00/Push/Cloud/配布端末は未検証。Google双方向・Tool後のProvider間継続・画像順位Fallbackは未実装。次はDraft PRレビューと利用者による実接続受入。設計/制約はdocs/setup-integrations.md、証跡要約はreports/setup-integrations-validation.json。
+- #355 / #349（準備実装済み・実CLI未確認）: 最新main 65fd98aからfeat/antigravity-cliを作成。目的は公式agyのGoogleログインと既存契約枠であり、SDK+LM Studio/Gemini APIは代替完了にしない。現行FAQ/規約6条と10/7フォーラム回答の矛盾が未解決、CLIも未導入のため本番Provider/順位追加はハード拒否。CLI検出UI、独立直接probe、JSON/NDJSONと既存Eventsでのmockセッション復元/Thread分離/再送拒否を追加。CLI契約27件を含む関連回帰94件+5 subtests成功/1 skip、合成プロセスの取消/timeout/孫終了、隔離Chrome1440/390px、Node5件成功。Google推論/契約枠/実WEVORA/CLIの実取消と429/認証切れ/macOS/実端末は未検証。CLI内蔵workspace書込は標準許可のためRead専用境界とApproval連携も未達。次はDraft PR/CI、本人による公式CLI導入/ログイン、Googleへの条件確認。docs/antigravity-cli.md、reports/antigravity-cli-direct.json（skipped）を参照。元checkout/storage/Notion同期は不変。
 
-- #349（SDK Read専用Brain実装・実Windows/ローカル推論確認、main未反映）: feat/renaissance-antigravity-sdkで公式SDK 0.1.22のAgent Loopを選択式バックエンドへ接続。既定はloopback LM Studio。限定Read bridgeのschema/risk検査、Turn専用Workerの取消/deadline/Provider固定、既存Thread/Turn/Events/履歴を再利用。実SDK+Qwen3.5-9Bの会話→get_tasks→次Turn、独立SDKのstream/保存再開、実Core再送/復旧/timeout/取消、実Chromium 1440/390pxのWeb/Desktop source adapterを確認。関連pytest81件+5 subtests・Node5件成功。Write/画像/配布Desktop/macOS/実サービス受入、SDK+Gemini（キーなし）は未確認。個人契約CLIラップは現行FAQで非サポート、agy未導入。PR #351は未採用・未マージ、Notionコード/本番設定/実DBは不変。次は専用Draft PR/CIと実端末受入。詳細: docs/antigravity-brain-poc.md。
+- #353 / PR #354（main統合済み・外部認証受入未確認）: PR #352のSDKを再利用し、管理者認証付き初回ウィザード、暗号化ホスト設定、AI順位と同意付きFallback、Codex公式app-server、Google共通OAuth/Gmail Read Tool、Notion対象選択、Calendar 02:00 JST差分同期、永続アラートと会話警告を追加。Python121件+8 subtests成功/1 skip、Desktop66件成功/1 skip・Thread Node5件、Chromium1440/390pxを確認。公式SDK+実LM StudioでRead/記憶Write/予定承認/再送/再起動/未認証Codex→SDKのFallbackを合成DBで確認し、承認引数・receipt・保存行を照合。初期の依存競合・小型モデルのTool未呼出/誤成功発言も検出し、最終は明示bridge契約プロンプトで成功。自然文の一般的な実行品質、本人のCodex/課金API/Notion/Google/TimeTree認証、実02:00/Push/Cloud/配布端末は未検証。Google双方向・Tool後のProvider間継続・画像順位Fallbackは未実装。次は利用者による実接続受入。設計/制約はdocs/setup-integrations.md、証跡要約はreports/setup-integrations-validation.json。
+
+- #349 / PR #352（main統合済み・SDK/ローカル推論の実証、CLI契約枠は未達）: feat/renaissance-antigravity-sdkで公式SDK 0.1.22のAgent Loopを選択式バックエンドへ接続。既定はloopback LM Studio。限定Read bridgeのschema/risk検査、Turn専用Workerの取消/deadline/Provider固定、既存Thread/Turn/Events/履歴を再利用。実SDK+Qwen3.5-9Bの会話→get_tasks→次Turn、独立SDKのstream/保存再開、実Core再送/復旧/timeout/取消、実Chromium 1440/390pxのWeb/Desktop source adapterを確認。関連pytest81件+5 subtests・Node5件成功。Write/画像/配布Desktop/macOS/実サービス受入、SDK+Gemini（キーなし）は未確認。個人契約CLIラップは現行FAQで非サポート、agy未導入。PR #351は未採用・未マージ、Notionコード/本番設定/実DBは不変。SDKの証拠をCLIの完成と扱わず、次は#355の許諾/CLI直接検証と実端末受入。詳細: docs/antigravity-brain-poc.md。
 
 - #345 / #341（確認済みProjectフォルダ、実装済み・実データ受入未確認）: 既存project_source_linksへlocal_workspace対応を確認付きで保存し、既存get_local_development_status(project_id)からWorkspaceObserverのキャッシュを取得。Task.project_idと同じIDを使い、同名フォルダはcanonical rootのIDで区別する。allowlist/実行時再検査/private/symlink・junction拒否、文書更新日時・出典・観測時刻・実Git状態を分離。34件の関連テストを一時Git/DBで確認。Core #346・記憶検索 #347と結合済み。関連pytest154件+3 subtests、Node4件、Chrome 1440/390pxと実DeepSeek Flash・合成7ケース（7/7）を確認。実登録フォルダ・実Discord/Notion・配布端末の受入は別途。
 - #345（元発言検索・記憶鮮度、実装済み・実機未確認）: 既存conversationsの入力/出力を日時・発言元・Thread・原文ID付きでbounded検索するToolを追加。旧NULL sessionは推測で結合しない。save_memoryは固定保存上限を設けず、正規化重複・明示置換・期限・visibilityをSQLiteで扱い、旧行を保持。private元発言/記憶をstandard検索から除外し、private検索ではembeddingを呼ばない。全件再索引を個別索引更新へ縮小。Core PR #346を取り込み、単一Brainへ接続済み。#346 → #347 → #348の順でレビューする（全PRのbaseはmain、main未マージ）。
@@ -288,3 +290,5 @@
 | 2026-10-24 | 22:46 | #349 | v0.33.0: 再更新されたSDK+LM Studio方針に従い、公式SDKを限定Read専用Brainへ接続。実runtime/ローカル推論・会話/Read/履歴・SDK保存再開・取消/timeout・ChromiumのWeb/Desktop sourceを確認。関連81件+5 subtests/Node5件成功。個人CLI・Gemini SDK実通信・配布Desktop/macOS/Writeは未確認、Issue Open・PR #351未マージを維持。 |
 
 | 2026-10-25 | 11:03 | #353 | 2026-10-25-01: v0.34.0 初期設定・AI順位・Google読取連携・日次Calendar同期・運用アラートを実装。隔離Python121件/Node71件と実SDK+LM StudioのTool/承認/保存/再起動/Fallbackを確認。外部本人認証・実サービス/端末/Cloud受入、双方向/Tool後切替は未完了として保持。 |
+
+| 2026-10-25 | 15:25 | #355 | 2026-10-25-02: v0.34.1 CLI導入検出UI・本番拒否・独立直接probe・JSON/NDJSONのMock契約と既存Eventsのsession分離/再送防止を追加。隔離テスト/Chrome/合成process tree終了は動作確認済み。実CLIは未導入でskipped、Google推論/契約枠/実ファイル/実端末は未確認。許諾矛盾とRead専用/Approval境界を残し、導入手順・問い合わせ案を文書化。 |

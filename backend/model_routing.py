@@ -33,6 +33,9 @@ class ModelRoutingError(ValueError):
 def _default_profile(route: str) -> str:
     name = "PETIT_CHAT_PROFILE" if route == "chat" else "PETIT_AGENT_PROFILE"
     value = os.getenv(name, "local").strip().lower() or "local"
+    if value == "antigravity_cli":
+        from .antigravity_cli import POLICY_MESSAGE
+        raise ModelRoutingError(POLICY_MESSAGE)
     return value if value in PROFILE_IDS and not (route == "agent" and value == "antigravity_sdk") else "local"
 
 
@@ -46,6 +49,9 @@ def _read_selection() -> dict[str, str]:
         return selection
     for route in ROUTES:
         value = str(data.get(route) or "").strip().lower()
+        if value == "antigravity_cli":
+            from .antigravity_cli import POLICY_MESSAGE
+            raise ModelRoutingError(POLICY_MESSAGE)
         if value in PROFILE_IDS and not (route == "agent" and value == "antigravity_sdk"):
             selection[route] = value
     return selection

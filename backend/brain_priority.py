@@ -15,6 +15,9 @@ def enabled() -> bool:
 
 
 def target(provider: str) -> dict:
+    if provider == "antigravity_cli":
+        from .antigravity_cli import require_production_permission
+        require_production_permission()
     data = settings.load()
     if provider == "codex":
         return {"provider": "codex", "profile": "codex", "label": "Codex（ChatGPT）", "external": True,
@@ -67,6 +70,10 @@ def diagnostic(request_id, provider, state, reason=None):
 
 def run(request_id, execute, *, messages=None, used_tools=None):
     data = settings.load()
+    if "antigravity_cli" in data["priority"]:
+        from .antigravity_cli import POLICY_MESSAGE
+        # A blocked explicit CLI selection must never silently become another AI.
+        raise lmstudio_client.LMStudioError(POLICY_MESSAGE)
     row = store.load_turn(request_id)
     privacy = store.thread(row["thread_id"])["privacy"]
     candidates = list(data["priority"])
