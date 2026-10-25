@@ -1,6 +1,7 @@
-"""Official SDK backend: one SDK agent loop, PETIT-owned history and reads.
+"""Official SDK backend: one SDK loop with PETIT-owned history and effects.
 
-No consumer CLI wrapper, OAuth reuse, automatic provider fallback, or SDK writes.
+No consumer CLI wrapper or OAuth reuse. The legacy profile stays read-only;
+setup's core_tools bridge keeps all write authority in PETIT's approval/receipt.
 """
 from __future__ import annotations
 
@@ -69,6 +70,9 @@ def diagnostic(request_id: str, data: dict) -> None:
 
 def bridge(request_id: str, target: dict, used: list):
     """Only this read-only callable is exposed to the SDK's custom-tool runner."""
+    if target.get("core_tools"):
+        from .external_brain import tool_bridge
+        return tool_bridge(request_id, target, used)
     catalog = {item["function"]["name"]: item["function"] for item in read_catalog()}
 
     def petit_read_tool(name: str, arguments_json: str) -> str:
@@ -133,10 +137,10 @@ def stop_worker(process) -> None:
 def run_isolated(request_id: str, target: dict, instructions: str, prompt: str,
                  used: list, metadata: dict) -> str:
     """Parent owns a hard deadline and cancellation even during SDK __aenter__."""
-    from . import brain, model_routing, config
+    from . import brain, model_routing, config, setup_store
     payload = store.encode({"request_id": request_id, "target": target, "instructions": instructions,
                             "prompt": prompt, "db_path": str(config.DB_PATH),
-                            "routing_path": str(model_routing.STATE_PATH)})
+                            "routing_path": str(model_routing.STATE_PATH), "settings_path": str(setup_store.root())})
     options = {"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
     process = subprocess.Popen([sys.executable, "-m", "backend.antigravity_worker"],
                                cwd=str(Path(__file__).resolve().parents[1]), stdin=subprocess.PIPE,
@@ -219,7 +223,7 @@ async def execute_sdk(request_id: str, target: dict, instructions: str, prompt: 
                         await asyncio.gather(task, return_exceptions=True)
 
 
-def run(request_id: str, target: dict) -> dict:
+def run(request_id: str, target: dict, *, messages=None, used_tools=None) -> dict:
     from . import brain, time_context
     from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
     if not target.get("configured"):
@@ -227,19 +231,23 @@ def run(request_id: str, target: dict) -> dict:
     row = store.load_turn(request_id)
     if row["cancel_requested"]:
         raise brain.TurnCancelled("取消要求を受け付けました。")
-    payload = json.loads(row["input_json"])
+    payload = json.loads(row["input_json"] or "{}")
     instructions = (CORE_SYSTEM_PROMPT + voice_turn_instructions() + brain.INSTRUCTIONS +
                     "\nこのバックエンドはRead専用。書込やOS操作はできない。利用可能なToolがなければできないと伝える。"
                     "\npetit_read_toolで使えるカタログ:\n" + store.encode(read_catalog()))
     # Core remains canonical. Fresh SDK state receives only the bounded same-thread transcript.
     prompt = store.encode({"current_time": time_context.current_datetime().isoformat(timespec="seconds"),
-                           "history": store.history(row["thread_id"]), "user_message": payload["message"]})
-    used = []
+                           "history": store.history(row["thread_id"]), "user_message": payload.get("message", "")})
+    if target.get("core_tools"):
+        from .external_brain import context
+        instructions, prompt = context(request_id, messages)
+    used = list(used_tools or [])
     metadata = {"kind": "brain", "provider": "antigravity_sdk", "sdk_version": SDK_VERSION,
                 "model": target["model"], "auth_mode": target["auth_mode"],
                 "inference_provider": "lm_studio" if target["auth_mode"] == "local" else "gemini_api",
                 "local": target["auth_mode"] == "local", "usage": None,
-                "sdk_conversation_id": None, "fallback": False}
+                "sdk_conversation_id": None, "fallback": bool(target.get("fallback_reason")),
+                "fallback_reason": target.get("fallback_reason")}
     started = time.monotonic()
     diagnostic(request_id, {**metadata, "state": "started"})
     try:
@@ -257,4 +265,7 @@ def run(request_id: str, target: dict) -> dict:
         raise lmstudio_client.LMStudioError("Antigravity SDKを実行できませんでした。依存・接続・モデルを確認してください。") from None
     metadata["latency_seconds"] = round(time.monotonic() - started, 3)
     diagnostic(request_id, {**metadata, "state": "completed"})
+    if target.get("core_tools"):
+        from .external_brain import finish
+        return finish(request_id, reply, used, metadata)
     return store.finish(request_id, {"reply": reply, "used_tools": used, "model_route": metadata})

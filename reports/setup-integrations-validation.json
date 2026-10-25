@@ -1,0 +1,136 @@
+{
+  "date_utc": "2026-10-25",
+  "status": "implemented_with_open_acceptance",
+  "issue": 353,
+  "dependency_pr": 352,
+  "python": {
+    "passed": 121,
+    "skipped": 1,
+    "subtests_passed": 8,
+    "new_setup_contracts": 20
+  },
+  "javascript": {
+    "desktop_passed": 66,
+    "desktop_skipped": 1,
+    "thread_client_passed": 5
+  },
+  "browser_synthetic": {
+    "mode": "synthetic provider",
+    "results": [
+      {
+        "width": 1440,
+        "steps": 4,
+        "no_horizontal_overflow": true
+      },
+      {
+        "width": 390,
+        "steps": 4,
+        "no_horizontal_overflow": true
+      },
+      {
+        "conversation": true,
+        "provider": "antigravity_sdk",
+        "replay": true,
+        "real_sdk": false
+      },
+      {
+        "restart_settings": true,
+        "reauthentication_required": true
+      },
+      {
+        "restart_conversation": true,
+        "provider": "antigravity_sdk"
+      }
+    ],
+    "evidence_dir": "storage/setup-e2e/browser-1792925699781"
+  },
+  "official_sdk_local_live": {
+    "mode": "real SDK + real LM Studio",
+    "results": [
+      {
+        "width": 1440,
+        "steps": 4,
+        "no_horizontal_overflow": true
+      },
+      {
+        "width": 390,
+        "steps": 4,
+        "no_horizontal_overflow": true
+      },
+      {
+        "conversation": true,
+        "provider": "antigravity_sdk",
+        "replay": true,
+        "real_sdk": true
+      },
+      {
+        "real_sdk_read_tool": true,
+        "real_sdk_memory_write": true,
+        "real_sdk_approval_resume": true,
+        "explicit_bridge_contract_prompts": true
+      },
+      {
+        "restart_settings": true,
+        "reauthentication_required": true
+      },
+      {
+        "restart_conversation": true,
+        "provider": "antigravity_sdk"
+      },
+      {
+        "fallback": "real unauthenticated Codex -> real local SDK",
+        "stale_connection_fixture": true,
+        "reason": "authentication_expired"
+      }
+    ],
+    "evidence_dir": "storage/setup-e2e/live-1792926026525"
+  },
+  "sqlite_live_readback": {
+    "memory_rows": 1,
+    "calendar_rows": 1,
+    "applied_receipts": {
+      "save_memory": 1,
+      "add_schedule": 1
+    },
+    "approved_arguments_match_saved_row": true,
+    "note": "The local model inserted spaces in the proposed title; the approved arguments, effect receipt and SQLite row agree."
+  },
+  "codex_official_protocol": {
+    "cli": "0.163.0-alpha.11.2",
+    "account_authenticated": false,
+    "thread_start_dynamic_tools": true,
+    "paid_inference": false
+  },
+  "initial_failures": [
+    {
+      "phase": "isolated_sdk_dependencies",
+      "failure": "opentelemetry version mismatch and pip target namespace overwrite",
+      "resolution": "fresh isolated target with compatible dependencies installed together"
+    },
+    {
+      "phase": "browser_harness",
+      "failure": "expected hidden Settings card to be visible; reused a prior fixture",
+      "resolution": "check attachment state and use a fresh fixture"
+    },
+    {
+      "phase": "local_sdk_tool_selection",
+      "failure": "generic bridge mapping, past-request confusion, one reply claiming a memory save without a Tool",
+      "resolution": "clarified bridge instructions and separated historical reference from current request; final explicit bridge contract run passed; general natural-language reliability remains open"
+    }
+  ],
+  "unverified": [
+    "real Codex account login and inference",
+    "Gemini SDK and DeepSeek paid APIs",
+    "real Notion, Google OAuth, Calendar, Gmail and TimeTree",
+    "actual 02:00 clock run and sleep/power recovery",
+    "real Web Push receipt",
+    "Cloud deployment",
+    "packaged Electron/macOS/physical mobile",
+    "general natural-language Tool selection reliability"
+  ],
+  "not_implemented": [
+    "Google bidirectional sync",
+    "cross-provider continuation after a Tool has started",
+    "image fallback via the new priority chain"
+  ]
+}

@@ -60,6 +60,12 @@ AccessKey不要の方式に向けた「へいプティ」の実験モデル学�
 
 `PETIT_WORKSPACE_CONTEXT_ENABLED=1`、`PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1`、`PETIT_WORKSPACE_CONTEXT_DIRS`（最大8件の明示したGitルート）が必要。既定OFFで、自動フォルダ探索や任意パス読取はありません。設定、API、テスト、制限は[ローカル開発環境の読取](docs/local-development-insight.md)を参照。
 
+## 初期設定・接続管理（v0.34.0 開発版）
+
+初回起動時は管理者認証付きウィザードへ進み、AI優先順位、Codex公式認証、Antigravity SDK / DeepSeek、Notion、Google Calendar / Gmail、TimeTreeを設定できます。設定はGit管理外の`storage/settings/`へ暗号化保存します。API料金・クラウド文脈送信は事前同意が必要です。Local / Cloudのコードは共通で、Cloudの初期登録にはHTTPSと`PETIT_BOOTSTRAP_TOKEN`を用意します。
+
+Calendarは読み取り専用で、選択した外部サービスからSQLiteへ02:00 JSTに差分同期します。未解決エラーは通知と会話へ反映します。Google双方向同期・Tool実行後のProvider間継続・本人の外部認証を伴う全サービス受入は未完了です。導入前提・既存クライアントの認証への影響・検証手順は[初期設定と接続](docs/setup-integrations.md)を参照してください。
+
 ## セットアップ
 
 1. 依存をインストール:

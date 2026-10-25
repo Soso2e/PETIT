@@ -42,7 +42,8 @@ class NotificationTests(unittest.TestCase):
     def test_preferences_are_opt_in_and_persisted(self) -> None:
         preferences = notifications.get_preferences()
         self.assertEqual(set(preferences), set(notifications.CATEGORY_LABELS))
-        self.assertFalse(any(preferences.values()))
+        self.assertTrue(preferences["sync_failure"])
+        self.assertFalse(any(value for key, value in preferences.items() if key != "sync_failure"))
 
         updated = notifications.update_preferences({"morning_briefing": True})
         self.assertTrue(updated["morning_briefing"])

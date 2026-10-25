@@ -207,6 +207,11 @@ def finish(request_id: str, data: dict, *, status="completed") -> dict:
         row = connection.execute("SELECT * FROM turns WHERE request_id=?", (request_id,)).fetchone()
         payload = json.loads(row["input_json"] or "{}")
         reply = str(data.get("reply") or "")
+        if status == "completed" and reply:
+            from . import service_sync
+            alert = service_sync.warning()
+            if alert and alert not in reply:
+                reply += "\n\n" + alert
         conversation_id = row["conversation_id"]
         if reply:
             if conversation_id:

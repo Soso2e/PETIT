@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 import sys
 
@@ -21,6 +22,12 @@ def main() -> int:
         from . import antigravity_brain as sdk, config, model_routing, tools
         config.DB_PATH = Path(payload["db_path"])
         model_routing.STATE_PATH = Path(payload["routing_path"])
+        if payload.get("settings_path"):
+            os.environ["PETIT_SETTINGS_DIR"] = payload["settings_path"]
+            from . import setup_store, brain_priority
+            setup_store.apply_runtime()
+            if payload["target"].get("core_tools"):
+                brain_priority._active.set(payload["target"])
         tools.register_builtin_tools()
         used, metadata = [], {}
         reply = asyncio.run(sdk.execute_sdk(payload["request_id"], payload["target"],

@@ -179,6 +179,11 @@ def _search_pages(query: str, limit: int) -> list[dict[str, Any]]:
         pages.append(item)
         if len(pages) >= limit:
             break
+    from . import setup_store
+    selected = setup_store.load()["notion_pages"]
+    if selected:
+        normalized = {x.replace("-", "") for x in selected}
+        pages = [x for x in pages if str(x.get("id", "")).replace("-", "") in normalized]
     return pages
 
 

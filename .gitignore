@@ -34,3 +34,7 @@ desktop/wakeword-assets/wake-model.json
 
 # Local wake-word training environment, audio and generated models
 storage/wakeword/
+
+# Host-local setup secrets and official CLI credentials
+storage/settings/
+storage/setup-e2e/

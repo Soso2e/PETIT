@@ -1,10 +1,12 @@
-from backend import main, model_routing_api
+from backend import main, model_routing_api, app as app_module
 
 
 def _routes(path: str, method: str):
     return [
         route
-        for route in main.app.routes
+        for module in app_module.build_modules()
+        for router in module.routers
+        for route in router.routes
         if getattr(route, "path", None) == path
         and method in (getattr(route, "methods", None) or set())
     ]

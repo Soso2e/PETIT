@@ -1,6 +1,18 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { serviceUrl, isOverlay, isWorkspace, isNewer, desktopRelease, RELEASES_URL } = require('../policy.cjs');
+const { serviceUrl, isOverlay, isWorkspace, isCoreSetup, isNewer, desktopRelease, RELEASES_URL } = require('../policy.cjs');
+
+test('Core setup navigation is separate from privileged overlay/workspace IPC', () => {
+  const origin = 'https://petit.example';
+  for (const suffix of ['/static/setup.html', '/static/setup.html?next=%2Fstatic%2Fdesktop%2Findex.html&resume=1']) {
+    assert.ok(isCoreSetup(origin + suffix, origin));
+    assert.equal(isOverlay(origin + suffix, origin), false);
+    assert.equal(isWorkspace(origin + suffix, origin), false);
+  }
+  for (const suffix of ['/static/setup.html?next=https://evil.example', '/static/setup.html?resume=2', '/static/setup.html?resume=1&resume=1', '/api/setup/config'])
+    assert.equal(isCoreSetup(origin + suffix, origin), false);
+  assert.equal(isCoreSetup('https://evil.example/static/setup.html', origin), false);
+});
 test('workspace navigation stays on known same-origin pages', () => {
   const origin = 'https://petit.example';
   for (const url of [origin + '/', origin + '/static/universe.html', origin + '/static/universe.html#tasks']) assert.ok(isWorkspace(url, origin));

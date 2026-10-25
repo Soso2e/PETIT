@@ -27,8 +27,9 @@ CATEGORY_LABELS: dict[str, str] = {
     "high_task": "Highタスクのリマインド",
     "morning_briefing": "朝ブリーフィング",
     "github_ci_failure": "GitHub CI失敗",
+    "sync_failure": "同期失敗（高優先度）",
 }
-DEFAULT_PREFERENCES = {category: False for category in CATEGORY_LABELS}
+DEFAULT_PREFERENCES = {category: category == "sync_failure" for category in CATEGORY_LABELS}
 
 _NOTIFICATION_SCHEMA = """
 CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -171,8 +172,8 @@ def init_db() -> None:
         for category in CATEGORY_LABELS:
             conn.execute(
                 "INSERT OR IGNORE INTO notification_preferences(owner_id, category, enabled, updated_at) "
-                "VALUES (?, ?, 0, ?)",
-                (_owner_id(), category, now),
+                "VALUES (?, ?, ?, ?)",
+                (_owner_id(), category, int(DEFAULT_PREFERENCES[category]), now),
             )
 
 
@@ -338,6 +339,8 @@ def _create_event(category: str, title: str, body: str, url: str) -> tuple[int, 
         "body": body,
         "url": url or "/",
         "category": category,
+        "priority": "high" if category == "sync_failure" else "normal",
+        "requireInteraction": category == "sync_failure",
         "tag": f"petit-{category}",
         "icon": "/static/icon-192.png",
         "badge": "/static/favicon-64.png",

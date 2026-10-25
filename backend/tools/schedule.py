@@ -48,6 +48,11 @@ def get_schedule(date: str | None = None, query: str | None = None) -> dict[str,
     sql = "SELECT id, source, title, start_time, end_time, location FROM calendar_events_cache"
     filters: list[str] = []
     params: list[Any] = []
+    from .. import setup_store, service_sync
+    if setup_store.initialized():
+        key = service_sync.source_key()
+        filters.append("(source = 'local' OR source_key = ?)")
+        params.append(key)
     if date:
         filters.append("start_time LIKE ?")
         params.append(f"{date}%")

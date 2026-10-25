@@ -19,6 +19,7 @@ _BUILTIN_MODULES = (
     "backend.tools.conversation_search",
     "backend.tools.current_time",
     "backend.tools.github",
+    "backend.tools.gmail",
     "backend.tools.local_development",
     "backend.tools.linkraft",
     "backend.tools.lists",
