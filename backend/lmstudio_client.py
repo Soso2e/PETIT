@@ -79,7 +79,9 @@ def _take_prefetched_chat(messages: list[dict[str, Any]], *, route: str, tools: 
 
 
 def endpoint(route: str) -> dict[str, Any]:
-    return model_routing.endpoint(route)
+    from . import brain_priority
+    selected = brain_priority.current() if route == "chat" else None
+    return selected if selected is not None else model_routing.endpoint(route)
 
 
 def clear_health_cache() -> None:

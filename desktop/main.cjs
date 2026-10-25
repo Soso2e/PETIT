@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { installerAsset, downloadVerified } = require('./update-download.cjs');
 const { pathToFileURL } = require('node:url');
-const { serviceUrl, isOverlay, isWorkspace, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
+const { serviceUrl, isOverlay, isWorkspace, isCoreSetup, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
 const { windowState } = require('./window-state.cjs');
 const { nativeNotifications, deliveryMessage } = require('./native-notifications.cjs');
 const nativeDelivery = nativeNotifications({ Notification, open: () => showWorkspace() });
@@ -15,6 +15,11 @@ const { wakeError } = require('./wake-setup.cjs');
 const { prepareWakeEnvironment } = require('./wake-auto-setup.cjs');
 const SHORTCUT = 'CommandOrControl+Shift+Space';
 let overlay, settingsWindow, tray, wakeProcess, config, configFile, wakeSetupController;
+ipcMain.handle('core-setup:open-web', (event) => {
+  const owner = [overlay, workspace].find(win => win && !win.isDestroyed() && win.webContents === event.sender);
+  if (!owner || event.senderFrame !== event.sender.mainFrame || !isCoreSetup(event.senderFrame.url, config.serverUrl)) throw new Error('Invalid setup sender');
+  return shell.openExternal(`${config.serverUrl}/static/setup.html`);
+});
 let quitting = false, suspended = false, wakeFailed = false, shortcutOK = false, overlayReady = false;
 let pendingActivation = false, sttRequest = null, updateBusy = false, lastUpdate = '', lastWakeError = '';
 let generation = 0;
@@ -215,6 +220,7 @@ function watchClient(win, kind) {
     }
   });
   win.webContents.on('did-finish-load', () => {
+    if (win.webContents.getURL && isCoreSetup(win.webContents.getURL(), config.serverUrl)) { win.petitReady = true; clearTimeout(readyTimer); return; }
     clearTimeout(readyTimer); readyTimer = setTimeout(() => { if (!win.petitReady) failed(); }, 8000);
   });
   win.on('closed', () => clearTimeout(readyTimer));
@@ -229,7 +235,7 @@ function showWorkspace() {
       webPreferences: { preload: path.join(__dirname, 'workspace-preload.cjs'), sandbox: true,
         contextIsolation: true, nodeIntegration: false } });
     rememberWindow(win, 'workspace');
-    lockNavigation(win, (url) => isWorkspace(url, config.serverUrl));
+    lockNavigation(win, (url) => isWorkspace(url, config.serverUrl) || isCoreSetup(url, config.serverUrl));
     win.on('close', (event) => { if (!quitting) { event.preventDefault(); win.hide(); } });
     win.on('closed', () => { if (workspace === win) workspace = null; });
     win.webContents.on('did-finish-load', () => {
@@ -262,7 +268,7 @@ function showOverlay(voice = false) {
       title: 'PETIT', skipTaskbar: false,
       webPreferences: { preload: path.join(__dirname, 'preload.cjs'), sandbox: true, contextIsolation: true,
         nodeIntegration: false, spellcheck: false, backgroundThrottling: true } });
-    lockNavigation(overlay, (url) => isOverlay(url, config.serverUrl));
+    lockNavigation(overlay, (url) => isOverlay(url, config.serverUrl) || isCoreSetup(url, config.serverUrl));
     rememberWindow(overlay, 'overlay');
     overlay.on('close', (event) => { if (!quitting) { event.preventDefault(); hideOverlay(); } });
     const win = overlay;
@@ -458,7 +464,7 @@ else {
     try { cursors = JSON.parse(fs.readFileSync(cursorFile, 'utf8')); if (!cursors || typeof cursors !== 'object' || Array.isArray(cursors)) cursors = {}; } catch { cursors = {}; }
     feed = notificationFeed({
       fetchJson: async (url) => {
-        const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(8000) });
+        const response = await session.defaultSession.fetch(url, { redirect: 'error', signal: AbortSignal.timeout(8000) });
         if (!response.ok) throw new Error('notification'); return response.json();
       },
       show: deliverDesktopNotification,

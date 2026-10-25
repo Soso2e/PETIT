@@ -12,3 +12,6 @@ google-auth>=2.0
 google-auth-oauthlib>=1.0
 google-auth-httplib2>=0.2
 sona-agent-core @ git+https://github.com/Soso2e/Sona-Agent-Core.git@0e220a2ec2d1227256495690eefed00beb4e2b5a
+
+# Host-local authenticated setup secrets
+cryptography>=43

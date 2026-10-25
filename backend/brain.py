@@ -18,6 +18,7 @@ PUBLIC_TOOLS = {
     "get_local_development_status", "search_conversations", "list_project_workspaces",
     "link_project_workspace", "unlink_project_workspace", "find_projects",
     "get_reminders", "create_reminder", "manage_reminder", "search_brain_notes",
+    "search_notion", "gmail_search", "gmail_get_message",
 }
 LOCAL_WRITES = {
     "start_work_session", "update_work_session", "save_memory", "create_task",
@@ -153,7 +154,7 @@ def execute(request_id: str, call: dict, arguments: dict) -> str:
     return raw
 
 
-def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list | None = None) -> dict:
+def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: list | None = None) -> dict:
     row = store.load_turn(request_id)
     thread = store.thread(row["thread_id"])
     target = check_provider(thread)
@@ -167,11 +168,14 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
         if pinned and pinned != provider_key:
             raise lmstudio_client.LMStudioError("依頼中にProviderが変更されました。保存した文脈を別Providerへ自動再送しません。")
         connection.execute("UPDATE turns SET provider_key=? WHERE request_id=?", (provider_key, request_id))
+    if target.get("provider") == "codex":
+        from . import codex_brain
+        return codex_brain.run(request_id, target, messages=messages, used_tools=used_tools)
     if target.get("provider") == "antigravity_sdk":
         from . import antigravity_brain
-        if messages is not None:
+        if messages is not None and not target.get("core_tools"):
             raise lmstudio_client.LMStudioError("Antigravity SDKはRead専用です。保存済みWrite承認の再開には使用できません。")
-        return antigravity_brain.run(request_id, target)
+        return antigravity_brain.run(request_id, target, messages=messages, used_tools=used_tools)
     catalog = schemas()
     allowed = {item["function"]["name"] for item in catalog}
     used = list(used_tools or [])
@@ -184,6 +188,10 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
         messages.extend(store.history(row["thread_id"]))
         if focus:
             messages.append({"role": "user", "content": "同じ会話で確認済みの対象ID（参考データ）: " + store.encode(focus)})
+        from . import service_sync
+        alert = service_sync.warning()
+        if alert:
+            messages.append({"role": "system", "content": "運用アラートはCoreが末尾に表示する。本文には重ねて書かない。未解決の事実: " + alert})
         messages.append({"role": "user", "content": payload["message"]})
     for _round in range(MAX_ROUNDS):
         if store.load_turn(request_id)["cancel_requested"]:
@@ -199,6 +207,7 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
             return store.finish(request_id, {"reply": reply, "used_tools": used,
                 "model_route": {"kind": "brain", "actual_route": "chat", "llm_call_count": _round + 1,
                                 "provider": target.get("provider"), "model": target.get("model"),
+                                "fallback": bool(target.get("fallback_reason")), "fallback_reason": target.get("fallback_reason"),
                                 "tools": [x["name"] for x in used]}})
         if len(used) + len(calls) > MAX_CALLS:
             raise lmstudio_client.LMStudioError("Tool呼出しの上限に達しました。依頼を絞ってください。")
@@ -234,3 +243,10 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
             return store.finish(request_id, {"reply": str(response.get("content") or ""),
                                             "used_tools": used}, status="waiting_approval")
     raise lmstudio_client.LMStudioError("会話処理の上限に達しました。実行結果は保存されています。")
+
+
+def run(request_id: str, *, messages=None, used_tools=None):
+    from . import brain_priority
+    if brain_priority.enabled():
+        return brain_priority.run(request_id, _run, messages=messages, used_tools=used_tools)
+    return _run(request_id, messages=messages, used_tools=used_tools)

@@ -1,56 +1,75 @@
 # PETIT Runtime Flows
 
-## v0.32.0: 単一Brain / 永続Thread・Turn（#345 / #303）
+## v0.34.0: 初期設定・優先順位と単一Brain（#353）
 
-この図が通常のtext会話・Workerの現行実装を表す。下記の旧1〜10に含まれる
-決定論的会話ルート・Brain/Broker/Capability/旧Agent再開図はv0.31の参考資料であり、
-新しいtext経路の正本ではない。Domainの同期・端末・音声・画像の制約は引き続き有効。
+管理UIの順位設定がONなら新しい選択経路、OFFなら従来の明示Provider選択を使う。
+本文・Thread/Turn・承認・receiptは既存SQLiteが正本で、下記の旧1〜10は移行前の参考資料。
 
 ```mermaid
 flowchart TD
-    C[Web / Desktop / voice] --> A[chat同期adapter または Turn API]
-    A --> L[Threadとrequest ID / 入力hashをSQLiteで原子的に受付]
-    L -->|同じ入力の再送| R[保存済み状態・結果・receiptを返す]
-    L -->|別入力のID再利用| Conflict[409]
-    L -->|同じThread実行中| Busy[429]
-    L --> B[同じThreadの履歴だけ組立て / Provider送信範囲を検査]
-    B --> Backend{明示選択したBrainバックエンド}
-    Backend -->|local / deepseek| Brain[単一Brain native Tool Loop]
-    Backend -->|antigravity_sdk| SDK[公式SDK Agent Loop / 別のnative Loopは起動しない]
-    SDK -->|petit_read_tool| ReadGate[限定カタログ / schema / live risk / cancel / Provider再検査]
-    ReadGate -->|safe_readのみ| Read[既存PETIT Read Tool]
-    Read --> SDK
-    SDK -->|返答| Save
-    SDK --> Obs[既存Turn Eventsへbackend / model / auth / usage / latency / session ID]
-    Brain -->|通常返答| Save[既存conversationsへ本文保存 / Turnは参照]
-    Brain -->|公開Tool| V[Registryの引数・risk検査]
-    V -->|確認必須| P[SQLite Approval / 正確な引数 / 期限]
-    P --> U[既存確認UI / 再起動後も復元]
-    U -->|一度だけ承認消費| E[既存Domain Tool]
-    V -->|Read / 低リスクWrite| E
-    E -->|SQLite Write| T[Domain保存とreceiptを同一transactionで確定]
-    E -->|外部Write| X[結果をreceiptへ / 結果不明はunknown・自動再実行なし]
-    E -->|Read| N[native role=tool / tool_call_idで返す]
-    T --> N
-    X --> N
-    N --> Brain
+    C[Web / Desktop / voice] --> Auth[管理者session検査 / 初回は設定UI]
+    Auth --> A[chat adapter または Turn API]
+    A --> L[request ID / 入力hash / Threadを原子的に受付]
+    L -->|同一入力の再送| R[保存済み結果 / 承認 / receipt]
+    L -->|ID衝突 / 同じThread実行中| Conflict[409 / 429]
+    L --> Select[順位または従来選択 / local_only / 接続と費用同意を検査]
+    Select --> Pin[選択Event / Provider pin / 同じThreadの履歴と運用アラート]
+    Pin --> Backend{単一Runtimeの所有者}
+    Backend -->|DeepSeek / LM Studio| Native[既存native Tool Loop]
+    Backend -->|Codex| Codex[公式app-server Agent Loop]
+    Backend -->|Antigravity| SDK[公式SDK Agent Loop / Turn専用Worker]
+    Native --> Gate[既存Registry / 公開catalog / schema / risk / cancel]
+    Codex -->|dynamic PETIT Tool| Gate
+    SDK -->|Python PETIT bridge| Gate
+    Gate -->|確認必須| Approval[SQLite承認とmessages / Runtime終了]
+    Approval --> UI[既存確認UI / 再起動復元]
+    UI -->|一度だけ承認消費| Execute[既存Domain Tool]
+    Gate -->|Read / 低リスクWrite| Execute
+    Execute -->|SQLite Write| Receipt[Domain保存とreceiptを同じtransaction]
+    Execute -->|外部Write| Unknown[receipt / 不明はunknown / 自動再実行なし]
+    Execute --> Return[同じRuntimeへTool結果 / call IDを保存]
+    Receipt --> Return
+    Unknown --> Return
+    Return --> Backend
+    Backend -->|Tool開始前の障害のみ| Stop[現在のRuntimeを完全終了]
+    Stop --> Next{接続済み・許可済み次候補}
+    Next -->|あり| Pin
+    Next -->|なし| Failed[失敗状態 / 次Turnは順位の上位から再試行]
+    Backend -->|Tool後の障害| Failed
+    Backend -->|正常回答| Save[未解決同期警告を一言付加 / conversations本文とEvents保存]
     Save --> R
-    Save --> EV[Thread Events / Client別の読取cursor]
 ```
 
-画像は同じTurnの受付後、既存Vision観測→Read専用回答へ進む。画像経路にはWrite Toolを公開しない。
-通常履歴へ別ThreadやClient historyを暗黙注入しない。2時間idle分割とfetch monkeypatchは廃止。
-12 Tool calls・8 roundsで停止。local_onlyは外部Providerへ送信しない。
-詳細・障害復旧・データ保護・検証境界は[renaissance-core.md](renaissance-core.md)。
+管理UIのSDK bridgeはCoreのWrite承認/receiptも使う。従来`antigravity_sdk` profileは
+限定Read専用のまま。SDK内蔵Toolはfinishのみ、Codexのshell/apps/plugins/subagentは無効、
+許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
+画像は既存Vision観測→Read専用回答で、画像Providerの順位Fallbackは未対応。
+8 rounds / 12 callsと取消/deadlineを維持し、local_onlyは外部へ送らない。
 
-`antigravity_sdk`は選択式のテキスト・Read専用バックエンド。既定は公式
-`LocalOpenAIAgentConfig`とloopback LM Studio。SDK内蔵Toolは`finish`だけで、
-PETITの公開Readを単一のPython bridgeから利用する。Write・MCP・OS操作・ファイル・Web・Subagentは公開しない。
-Thread/Turn/本文は従来のSQLiteが正本。各Turnは新しい一時SDKセッションへ同じThreadのbounded履歴を渡し、
-SDK会話IDをEventsへ紐づける。SDKの永続履歴をCoreへ二重注入せず、再起動後はCore履歴から再構築する。
-取消/timeout/設定変更は終了し、別Providerへ自動再送しない。local_onlyはloopback SDKのみ利用できる。
-SDK+Geminiは別API課金と明示cloud設定が必要。個人契約CLIラップは使用しない。
-詳細と実測範囲は[SDK導入記録](antigravity-brain-poc.md)。画像・旧completion経路ではSDKを使わず、未対応エラーを返す。
+```mermaid
+flowchart TD
+    Wizard[初回ウィザード / 統合Settings] --> Admin[scrypt管理者 / HttpOnly cookie / Origin検査]
+    Admin --> Host[ホスト別の暗号化設定 / Git管理外 / atomic更新]
+    Admin --> OAuth[Google共通OAuth / session + state + PKCE / scope追加同意]
+    OAuth --> Google[Calendar read-only / Gmail read-only]
+    Host --> Connect[Notion対象選択 / TimeTree既存exporter / AI接続]
+    Host --> Calendar[外部Calendarは1つ / 未接続はlocal]
+    Calendar --> Due[SQLite日次枠とlease / 02:00 JST / 起動時catch-up / 手動再試行]
+    Due --> Fetch[Google全ページdelta / 410時full / TimeTree全snapshot]
+    Fetch -->|成功| Commit[差分とcursorを同じtransaction / 正常cache保持]
+    Fetch -->|失敗| Alert[永続アラートを先に保存 / 前回cacheとcursor保持]
+    Connect --> Notion[既存Notion日次同期の結果監視]
+    Notion -->|失敗| Alert
+    Alert --> Notify[重複抑制 / 高優先度Push + アプリ内 / 失敗でも記録保持]
+    Alert --> Context[復旧まで各会話に概要 / 末尾に一言]
+    Commit --> Resolve[アラート解除 / 最終成功と更新件数]
+    Notion -->|正常同期| Resolve
+    Google --> Mail[既存Tool RegistryへGmail検索・本文Read]
+```
+
+外部Calendarへの自動書き戻しはなく、Google双方向は未実装。詳細・認証前提・未確認事項は
+[初期設定と接続](setup-integrations.md)。既存SDK実証は[SDK導入記録](antigravity-brain-poc.md)、
+Coreの所有権・DB互換は[renaissance-core.md](renaissance-core.md)。
 
 
 Thread/Turn/Eventsの現行経路は上図を参照する。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）全体の端末・管理機能の完成を示すものではない。

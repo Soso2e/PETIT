@@ -46,6 +46,11 @@ def status() -> dict[str, Any]:
 
 def sync_if_configured(force: bool = False) -> dict[str, Any]:
     global _last_sync_monotonic, _last_result
+    from . import setup_store, service_sync
+    if setup_store.initialized():
+        if force:
+            return service_sync.sync(manual=True)
+        return {"ok": not bool(service_sync.status()["alerts"]), "cached": True, "managed": True, **service_sync.status()}
     if not configured():
         return {**_result("calendar", False, error="外部カレンダーが設定されていません"), "configured": False, "sources": []}
     if not force and _last_sync_monotonic is not None and _last_result is not None and time.monotonic() - _last_sync_monotonic < config.CALENDAR_SYNC_TTL_SECONDS:

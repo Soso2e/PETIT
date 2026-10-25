@@ -8,6 +8,16 @@ on:
       - "backend/conversation_state.py"
       - "backend/brain_runtime.py"
       - "backend/brain.py"
+      - "backend/setup_api.py"
+      - "backend/setup_store.py"
+      - "backend/service_sync.py"
+      - "backend/google_services.py"
+      - "backend/brain_priority.py"
+      - "backend/codex_brain.py"
+      - "backend/external_brain.py"
+      - "backend/tools/gmail.py"
+      - "frontend/setup*"
+      - "tests/test_setup_integrations.py"
       - "backend/conversation_api.py"
       - "backend/conversation_store.py"
       - "tests/test_renaissance_core.py"
@@ -101,17 +111,19 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter pytest 'Pillow>=11.3,<13'
+          python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter pytest cryptography jsonschema 'Pillow>=11.3,<13'
       - name: Compile Python sources
         run: python -m compileall backend tests experiments
       - name: Check frontend syntax
         run: |
+          node --check frontend/setup.js
+          node --check frontend/setup-gate.js
           node --check frontend/app.js
           node --check frontend/action_confirm.js
           node --check frontend/chat_attachments.js
       - name: Run Renaissance Core and Thread client contracts
         run: |
-          python -m pytest tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_antigravity_sdk.py tests/test_antigravity_sdk_probe.py -q
+          python -m pytest tests/test_setup_integrations.py tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_antigravity_sdk.py tests/test_antigravity_sdk_probe.py -q
           node --test scripts/test-thread-client.cjs
       - name: Run image intake and Vision regressions
         run: python -m pytest tests/test_vision.py tests/test_vision_calculations.py tests/test_chat_router.py tests/test_module_registry.py -q

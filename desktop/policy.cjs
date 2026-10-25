@@ -12,6 +12,15 @@ function serviceUrl(value, { originOnly = false } = {}) {
 function isOverlay(url, serverUrl) {
   return url === `${serverUrl}/static/desktop/index.html`;
 }
+function isCoreSetup(value, serverUrl) {
+  try {
+    const url = new URL(value);
+    const params = [...url.searchParams];
+    return url.origin === serverUrl && !url.username && !url.password && url.pathname === '/static/setup.html' &&
+      params.every(([key, value]) => key === 'next' ? ['/static/universe.html', '/static/desktop/index.html', '/static/legacy.html'].includes(value) : key === 'resume' && value === '1') &&
+      new Set(params.map(([key]) => key)).size === params.length;
+  } catch { return false; }
+}
 function isWorkspace(value, serverUrl) {
   try {
     const url = new URL(value);
@@ -38,4 +47,4 @@ function desktopRelease(releases, current, platform, arch) {
     r.assets?.some((a) => a.name === `PETIT-${r.tag_name.replace(/^v/, '')}-${suffix}`))
     .sort((a, b) => isNewer(a.tag_name, b.tag_name) ? -1 : 1)[0] || null;
 }
-module.exports = { serviceUrl, isOverlay, isWorkspace, isNewer, desktopRelease, RELEASES_URL, RELEASES_API };
+module.exports = { serviceUrl, isOverlay, isWorkspace, isCoreSetup, isNewer, desktopRelease, RELEASES_URL, RELEASES_API };

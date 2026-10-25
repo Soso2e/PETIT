@@ -1,5 +1,6 @@
 'use strict';
 const { contextBridge, ipcRenderer } = require('electron');
+contextBridge.exposeInMainWorld('petitCoreSetup', { openWeb: () => ipcRenderer.invoke('core-setup:open-web') });
 contextBridge.exposeInMainWorld('petitDesktop', {
   hide: () => ipcRenderer.invoke('desktop:hide'),
   openWeb: () => ipcRenderer.invoke('desktop:open-web'),

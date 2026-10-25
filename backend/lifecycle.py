@@ -18,6 +18,8 @@ def register(app: FastAPI) -> None:
 
 
 def startup() -> None:
+    from . import setup_store, service_sync
+    setup_store.apply_runtime()
     db.init_db()
     from . import conversation_store
     conversation_store.recover()
@@ -30,9 +32,16 @@ def startup() -> None:
     if config.AUTO_SUMMARY_ENABLED:
         scheduler.get_scheduler().start()
     worker.get_worker().start()
+    # Complete this shared lazy migration before first-run UI requests race each other.
+    from . import task_hierarchy
+    task_hierarchy.ensure_task_hierarchy_schema()
+    service_sync.start()
 
 
 def shutdown() -> None:
+    from . import service_sync, codex_brain
+    service_sync.stop()
+    codex_brain.shutdown()
     from . import attachments
     attachments.stop_cleanup()
     if config.AUTO_SUMMARY_ENABLED:
