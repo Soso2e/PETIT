@@ -1,0 +1,94 @@
+{
+  "transport": "official_antigravity_sdk",
+  "inference": "real_lm_studio",
+  "synthetic_data_only": true,
+  "turns": [
+    {
+      "status": "completed",
+      "reply": "CORE_SDK_OK",
+      "used_tools": [],
+      "model_route": {
+        "auth_mode": "local",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 4.452,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "sdk_conversation_id": "5e208d4ec338647ba513d2979e73b749",
+        "sdk_version": "0.1.22",
+        "usage": {
+          "cached_content_token_count": 0,
+          "candidates_token_count": 6,
+          "prompt_token_count": 3900,
+          "service_tier": null,
+          "thoughts_token_count": 26,
+          "total_token_count": 3932
+        }
+      },
+      "error": null,
+      "wall_seconds": 4.553
+    },
+    {
+      "status": "completed",
+      "reply": "fixture-9ba15704",
+      "used_tools": [
+        {
+          "arguments": "{}",
+          "name": "get_tasks"
+        }
+      ],
+      "model_route": {
+        "auth_mode": "local",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 5.613,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "sdk_conversation_id": "fd34f95043544850b3065954253c8d0c",
+        "sdk_version": "0.1.22",
+        "usage": {
+          "cached_content_token_count": 0,
+          "candidates_token_count": 91,
+          "prompt_token_count": 9812,
+          "service_tier": null,
+          "thoughts_token_count": 60,
+          "total_token_count": 9963
+        }
+      },
+      "error": null,
+      "wall_seconds": 5.698
+    },
+    {
+      "status": "completed",
+      "reply": "fixture-9ba15704",
+      "used_tools": [],
+      "model_route": {
+        "auth_mode": "local",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 4.172,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "sdk_conversation_id": "495e4e3cd61dc9527c6758a51d174ee3",
+        "sdk_version": "0.1.22",
+        "usage": {
+          "cached_content_token_count": 0,
+          "candidates_token_count": 12,
+          "prompt_token_count": 4011,
+          "service_tier": null,
+          "thoughts_token_count": 37,
+          "total_token_count": 4060
+        }
+      },
+      "error": null,
+      "wall_seconds": 4.258
+    }
+  ],
+  "fixture_marker": "fixture-9ba15704"
+}

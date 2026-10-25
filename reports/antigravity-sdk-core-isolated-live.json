@@ -1,0 +1,81 @@
+{
+  "status": "failed",
+  "synthetic_data_only": true,
+  "sdk_runtime": "real",
+  "inference": "real_lm_studio",
+  "fixture_marker": "sdk-fixture-0dc3523b",
+  "core_recovery_invoked": true,
+  "same_request_replay_matches": true,
+  "turns": [
+    {
+      "status": "failed",
+      "reply": "",
+      "used_tools": null,
+      "model_route": {
+        "auth_mode": "local",
+        "error_type": "LMStudioError",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 1.696,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "sdk_conversation_id": null,
+        "sdk_error_type": "UnicodeEncodeError",
+        "sdk_version": "0.1.22",
+        "state": "failed",
+        "usage": null
+      },
+      "error": "Antigravity SDKが返答を生成できませんでした。診断と接続設定を確認してください。",
+      "wall_seconds": 1.789
+    },
+    {
+      "status": "failed",
+      "reply": "",
+      "used_tools": null,
+      "model_route": {
+        "auth_mode": "local",
+        "error_type": "LMStudioError",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 1.643,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "sdk_conversation_id": null,
+        "sdk_error_type": "UnicodeEncodeError",
+        "sdk_version": "0.1.22",
+        "state": "failed",
+        "usage": null
+      },
+      "error": "Antigravity SDKが返答を生成できませんでした。診断と接続設定を確認してください。",
+      "wall_seconds": 1.729
+    },
+    {
+      "status": "failed",
+      "reply": "",
+      "used_tools": null,
+      "model_route": {
+        "auth_mode": "local",
+        "error_type": "LMStudioError",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 1.653,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "sdk_conversation_id": null,
+        "sdk_error_type": "UnicodeEncodeError",
+        "sdk_version": "0.1.22",
+        "state": "failed",
+        "usage": null
+      },
+      "error": "Antigravity SDKが返答を生成できませんでした。診断と接続設定を確認してください。",
+      "wall_seconds": 1.737
+    }
+  ],
+  "packaged_desktop_verified": false
+}

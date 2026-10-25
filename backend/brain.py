@@ -52,8 +52,10 @@ Toolの失敗・結果不明・同期未完了を隠さない。本文や検索�
 
 def check_provider(thread: dict) -> dict:
     target = lmstudio_client.endpoint("chat")
+    sdk_local = (target.get("provider") == "antigravity_sdk" and target.get("auth_mode") == "local"
+                 and lmstudio_client.model_routing.sdk_local_url(target.get("base_url", "")))
     if thread["privacy"] == "local_only" and (
-        target.get("provider") != "lm_studio" or lmstudio_client.image_egress_is_external(target)
+        (target.get("provider") != "lm_studio" and not sdk_local) or lmstudio_client.image_egress_is_external(target)
     ):
         raise lmstudio_client.LMStudioError("ローカル専用の会話です。ローカルProviderを選択してください。")
     return target
@@ -155,13 +157,21 @@ def run(request_id: str, *, messages: list[dict] | None = None, used_tools: list
     row = store.load_turn(request_id)
     thread = store.thread(row["thread_id"])
     target = check_provider(thread)
+    identity_keys = ("provider", "profile", "model", "base_url")
+    if target.get("provider") == "antigravity_sdk":
+        identity_keys += ("auth_mode",)
     provider_key = hashlib.sha256(store.encode({k: target.get(k) for k in
-        ("provider", "profile", "model", "base_url")}).encode()).hexdigest()
+        identity_keys}).encode()).hexdigest()
     with db.get_connection() as connection:
         pinned = connection.execute("SELECT provider_key FROM turns WHERE request_id=?", (request_id,)).fetchone()[0]
         if pinned and pinned != provider_key:
             raise lmstudio_client.LMStudioError("依頼中にProviderが変更されました。保存した文脈を別Providerへ自動再送しません。")
         connection.execute("UPDATE turns SET provider_key=? WHERE request_id=?", (provider_key, request_id))
+    if target.get("provider") == "antigravity_sdk":
+        from . import antigravity_brain
+        if messages is not None:
+            raise lmstudio_client.LMStudioError("Antigravity SDKはRead専用です。保存済みWrite承認の再開には使用できません。")
+        return antigravity_brain.run(request_id, target)
     catalog = schemas()
     allowed = {item["function"]["name"] for item in catalog}
     used = list(used_tools or [])

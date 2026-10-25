@@ -1,0 +1,3 @@
+# Optional official SDK Brain backend. Install into the chosen PETIT environment.
+google-antigravity==0.1.22
+jsonschema>=4,<5

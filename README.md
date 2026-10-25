@@ -1,5 +1,7 @@
 # PETIT — Personal AI Assistant (MVP)
 
+v0.33.0開発版は、公式Antigravity SDKを選択式のRead専用Brainとして接続します。既定の推論先はloopback LM Studioで、追加のクラウドAPI課金は不要です。導入・モデル選択・実測と未確認範囲は[SDK導入記録](docs/antigravity-brain-poc.md)を参照してください。Gemini API単独の追加とは区別します。
+
 v0.32.0開発版は[単一Brainと永続Thread/Turn](docs/renaissance-core.md)を導入します。会話は明示して切り替え、再送は同じrequest IDで結果を照会します。既存DBは初回schema追加前にSQLiteバックアップを作成します。実運用はCore 1プロセス（workers=1）です。実Provider/配布版/実端末の受入は別途です。
 
 設計とデータソースの役割は [ASSISTANT_ARCHITECTURE.md](ASSISTANT_ARCHITECTURE.md) を参照。
