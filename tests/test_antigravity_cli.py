@@ -175,8 +175,10 @@ def test_missing_cli_report_is_skipped_without_model_or_auth_claim():
 
 
 def test_direct_live_probe_uses_explicit_conversation_and_reports_only_observations():
+    read_events = [json.loads(line) for line in lines()]
+    read_events[-1]["result"]["response"] = "READ_EVIDENCE_4f99"
     answers = [(0, "agy 1.4.2", ""), (0, json.dumps(envelope()), ""),
-               (0, "\n".join(lines()), ""), (0, json.dumps(envelope()), "")]
+               (0, "\n".join(json.dumps(event) for event in read_events), ""), (0, json.dumps(envelope()), "")]
     with patch.object(probe, "executable", return_value="synthetic-agy"), patch.object(probe, "invoke", side_effect=answers) as invoke:
         report = probe.run(live=True)
     assert report["status"] == "completed"
@@ -187,7 +189,24 @@ def test_direct_live_probe_uses_explicit_conversation_and_reports_only_observati
     for call in invoke.call_args_list[2:]:
         command = call.args[0]
         assert command[command.index("--conversation") + 1] == CID
+    for call in invoke.call_args_list[1:]:
+        command = call.args[0]
+        assert command[command.index("--mode=plan")] == "--mode=plan"
+        assert "--sandbox" in command
         assert "--continue" not in command and "--dangerously-skip-permissions" not in command
+    assert "書き込み" in invoke.call_args_list[2].args[0][2]
+
+
+def test_direct_live_probe_fails_if_read_tool_missing_or_unsafe_tool_observed():
+    events = [json.loads(line) for line in lines()]
+    events[2]["step_update"]["tool_name"] = "run_command"
+    events[-1]["result"]["response"] = "READ_EVIDENCE_4f99"
+    answers = [(0, "agy 1.4.2", ""), (0, json.dumps(envelope()), ""),
+               (0, "\n".join(json.dumps(event) for event in events), "")]
+    with patch.object(probe, "executable", return_value="synthetic-agy"), patch.object(probe, "invoke", side_effect=answers):
+        report = probe.run(live=True)
+    assert report["status"] == "failed"
+    assert report["checks"][-1]["unsafe_tool_observed"]
 
 
 def test_direct_version_only_and_raw_probe_errors_are_not_reported():

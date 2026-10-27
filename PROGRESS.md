@@ -2,11 +2,11 @@
 
 **Current Version: v0.34.1（CLI準備の開発ブランチ・未マージ）**
 
-**Last Updated: 2026-10-25 UTC**
+**Last Updated: 2026-10-27 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #355 / #349（準備実装済み・実CLI未確認）: 最新main 65fd98aからfeat/antigravity-cliを作成。目的は公式agyのGoogleログインと既存契約枠であり、SDK+LM Studio/Gemini APIは代替完了にしない。現行FAQ/規約6条と10/7フォーラム回答の矛盾が未解決、CLIも未導入のため本番Provider/順位追加はハード拒否。CLI検出UI、独立直接probe、JSON/NDJSONと既存Eventsでのmockセッション復元/Thread分離/再送拒否を追加。CLI契約27件を含む関連回帰94件+5 subtests成功/1 skip、合成プロセスの取消/timeout/孫終了、隔離Chrome1440/390px、Node5件成功。Google推論/契約枠/実WEVORA/CLIの実取消と429/認証切れ/macOS/実端末は未検証。CLI内蔵workspace書込は標準許可のためRead専用境界とApproval連携も未達。次はDraft PR/CI、本人による公式CLI導入/ログイン、Googleへの条件確認。docs/antigravity-cli.md、reports/antigravity-cli-direct.json（skipped）を参照。元checkout/storage/Notion同期は不変。
+- #355 / #349（実CLI直接検証済み・PETIT本番接続は無効）: Windowsの公式agy 1.4.8を使い、APIキー環境変数を除いて日本語JSON会話、同一conversation IDのNDJSON継続、/model、/usage、/creditsを実測。gemini-4-argon-medium、Gemini 4 Argon週次枠98%残、AI Premium credits残高0を確認したが、契約プランと呼出ごとの枠消費はunknown。plan+sandbox/request-reviewで一時READMEのみread_file読取、検証文字列を確認し、書込/削除/コマンド/subagentなし・ファイル不変。GoogleアカウントID、規約許諾、PETIT Core保存、実WEVORA、429/認証切れ/取消、macOS/実端末は未確認。docs/antigravity-cli.mdとreports/antigravity-cli-direct.jsonを参照。
 
 - #353 / PR #354（main統合済み・外部認証受入未確認）: PR #352のSDKを再利用し、管理者認証付き初回ウィザード、暗号化ホスト設定、AI順位と同意付きFallback、Codex公式app-server、Google共通OAuth/Gmail Read Tool、Notion対象選択、Calendar 02:00 JST差分同期、永続アラートと会話警告を追加。Python121件+8 subtests成功/1 skip、Desktop66件成功/1 skip・Thread Node5件、Chromium1440/390pxを確認。公式SDK+実LM StudioでRead/記憶Write/予定承認/再送/再起動/未認証Codex→SDKのFallbackを合成DBで確認し、承認引数・receipt・保存行を照合。初期の依存競合・小型モデルのTool未呼出/誤成功発言も検出し、最終は明示bridge契約プロンプトで成功。自然文の一般的な実行品質、本人のCodex/課金API/Notion/Google/TimeTree認証、実02:00/Push/Cloud/配布端末は未検証。Google双方向・Tool後のProvider間継続・画像順位Fallbackは未実装。次は利用者による実接続受入。設計/制約はdocs/setup-integrations.md、証跡要約はreports/setup-integrations-validation.json。
 
@@ -292,3 +292,5 @@
 | 2026-10-25 | 11:03 | #353 | 2026-10-25-01: v0.34.0 初期設定・AI順位・Google読取連携・日次Calendar同期・運用アラートを実装。隔離Python121件/Node71件と実SDK+LM StudioのTool/承認/保存/再起動/Fallbackを確認。外部本人認証・実サービス/端末/Cloud受入、双方向/Tool後切替は未完了として保持。 |
 
 | 2026-10-25 | 15:25 | #355 | 2026-10-25-02: v0.34.1 CLI導入検出UI・本番拒否・独立直接probe・JSON/NDJSONのMock契約と既存Eventsのsession分離/再送防止を追加。隔離テスト/Chrome/合成process tree終了は動作確認済み。実CLIは未導入でskipped、Google推論/契約枠/実ファイル/実端末は未確認。許諾矛盾とRead専用/Approval境界を残し、導入手順・問い合わせ案を文書化。 |
+
+| 2026-10-27 | 10:11 | #355 | 2026-10-27-01: Windowsの公式agy 1.4.8でAPIキー環境変数なしの日本語JSON/同一conversation NDJSON/合成README read_fileを実証。modelと週次枠98%をCLIで観測、credits 0。月額契約利用はunknown、規約・PETIT本番/実WEVORA・Approval境界は未解決のため無効を維持。

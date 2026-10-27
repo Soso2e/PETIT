@@ -90,10 +90,12 @@ def run(*, live=False):
             cid = None
             for name, prompt, fmt in (
                 ("hello", "こんにちは。日本語で返答してください。", "json"),
-                ("readme", "現在のフォルダのREADME.mdを読み、内容を要約してください。", "stream-json"),
+                ("readme", "現在のフォルダのREADME.mdを読み、識別子READ_EVIDENCE_4f99だけを返してください。書き込み・削除・コマンド実行・補助Agent起動はしないでください。", "stream-json"),
                 ("continue", "前の会話で確認したREADMEの識別子を答えてください。", "json"),
             ):
-                command = [binary, "-p", prompt, "--output-format", fmt]
+                # Plan mode exposes read-only investigation tools; the terminal
+                # sandbox adds OS restrictions. Never grant permissions to tools.
+                command = [binary, "-p", prompt, "--mode=plan", "--sandbox", "--output-format", fmt]
                 # Explicit ID only; never --continue (which could mix threads).
                 if cid:
                     command += ["--conversation", cid]
@@ -111,10 +113,16 @@ def run(*, live=False):
                     report["checks"].append({"name": name, "status": "failed", "reason": error_category(diagnostic)})
                     break
                 cid = result["conversation_id"]
-                report["checks"].append({"name": name, "status": "passed" if code == 0 and result["status"] == "SUCCESS" else "failed",
+                observed_names = {tool["name"] for tool in tools}
+                unsafe_tools = observed_names - {"read_file", "search_files", "list_directory"}
+                read_evidence = "READ_EVIDENCE_4f99" in result["response"]
+                safe_read = name != "readme" or ("read_file" in observed_names and read_evidence and not unsafe_tools)
+                passed = code == 0 and result["status"] == "SUCCESS" and safe_read and not unsafe_tools
+                report["checks"].append({"name": name, "status": "passed" if passed else "failed",
                                          "conversation_id": cid, "usage": result["usage"], "error": result["error"],
-                                         "tools_observed": tools, "fixture_marker_in_response": "READ_EVIDENCE_4f99" in result["response"]})
-                if code or result["status"] != "SUCCESS":
+                                         "tools_observed": tools, "fixture_marker_in_response": read_evidence,
+                                         "read_only_mode": "plan_and_sandbox", "unsafe_tool_observed": bool(unsafe_tools)})
+                if not passed:
                     break
             report["authentication"] = "official_cli_managed_unknown_account_type"
             report["status"] = "completed" if len(report["checks"]) == 3 and all(x["status"] == "passed" for x in report["checks"]) else "failed"

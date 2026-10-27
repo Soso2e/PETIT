@@ -1,20 +1,96 @@
 {
-  "checked_at_utc": "2026-10-25T15:27:00Z",
+  "checked_at_utc": "2026-10-27T10:11:00Z",
   "base_main": "65fd98a",
   "issue": 355,
   "production_enabled": false,
   "policy": "unresolved_official_faq_terms_vs_forum",
-  "cli_live_status": "skipped_not_installed",
-  "actual_model": "unknown",
-  "authentication": "unknown",
+  "cli_live_status": "direct_official_cli_verified",
+  "actual_model": "gemini-4-argon-medium (agy /model selection; per-turn response metadata omitted model)",
+  "authentication": "official_cli_inference_succeeded_without_api_key_environment; account_identity_unverified",
   "subscription_quota_used": "unknown",
+  "model_quota_remaining": "Gemini 4 Argon weekly 98%; separate from token usage",
+  "ai_premium_credits_remaining": 0,
+  "synthetic_file_access_verified": true,
   "wevora_file_access_verified": false,
+  "petit_integration_verified": false,
+  "live_cli": {
+    "version": "1.4.8",
+    "binary": "C:\\Users\\So2e\\AppData\\Local\\agy\\bin\\agy.exe",
+    "api_key_environment_variables_passed": false,
+    "json": {
+      "status": "passed",
+      "japanese_reply": true,
+      "process_elapsed_seconds": 9.97,
+      "usage_total_tokens": 6973
+    },
+    "stream_json": {
+      "status": "passed",
+      "ndjson_event_lines": 6,
+      "same_conversation_id": true,
+      "usage_total_tokens": 14236,
+      "cli_reported_duration_seconds": 40.4143554,
+      "cli_reported_duration_note": "CLI result telemetry differed from observed process timing; do not treat it as wall-clock latency."
+    },
+    "file_read": {
+      "status": "passed",
+      "data": "synthetic temporary README",
+      "tools": [
+        "read_file",
+        "read_file"
+      ],
+      "plan_mode": true,
+      "sandbox": true,
+      "permission_mode": "request-review",
+      "marker_returned": true,
+      "file_unchanged": true,
+      "write_delete_command_or_subagent_observed": false,
+      "usage_total_tokens": 11379
+    },
+    "model": {
+      "status": "read",
+      "name": "gemini-4-argon-medium",
+      "source": "agy -p /model"
+    },
+    "usage": {
+      "status": "read",
+      "gemini_4_argon_weekly_remaining_percent": 98,
+      "subscription_plan_identified": false,
+      "gemini_4_argon_weekly_reset_at": "2026-11-02T06:26:36Z"
+    },
+    "credits": {
+      "status": "read",
+      "remaining": 0
+    },
+    "auth_expiration_or_429": "not_tested",
+    "cancellation_or_timeout": "not_tested",
+    "updated_probe_script": {
+      "status": "passed",
+      "checks": [
+        "hello",
+        "readme",
+        "continue"
+      ],
+      "same_conversation_continuation": true,
+      "read_tools": [
+        "read_file",
+        "read_file"
+      ],
+      "fixture_marker_returned_on_read_and_continue": true,
+      "unsafe_tool_observed": false
+    }
+  },
   "pytest": {
     "passed": 94,
     "skipped": 1,
     "subtests_passed": 5,
-    "cli_contract_tests": 27,
-    "data": "isolated synthetic DB"
+    "cli_contract_tests": 28,
+    "data": "isolated synthetic DB",
+    "previous_run_before_safety_probe_update": true,
+    "latest_targeted_run": {
+      "passed": 28,
+      "failed": 0,
+      "warning": "existing chroma_client deprecation warning"
+    }
   },
   "skip_reason": "optional real Antigravity SDK not present in this Python environment",
   "node_thread_contracts": {
@@ -46,14 +122,12 @@
   "progress_prior_history": "preserved",
   "external_accounts_or_real_db_modified": false,
   "remaining": [
-    "Google permission confirmation",
-    "official CLI install and user-managed sign-in",
-    "read-only allowlisted folders and private denial enforced before CLI tools",
-    "PETIT Approval linkage for any future writes",
-    "single real Brain runtime integration",
-    "actual model/auth/subscription evidence",
-    "real WEVORA read and persisted answer/tool history",
-    "actual CLI error/429/cancel/timeout",
-    "macOS/iPhone/packaged Desktop acceptance"
+    "Google written confirmation resolving the official FAQ/Terms and forum-answer conflict before production PETIT invocation.",
+    "Determine whether the observed model quota belongs to the user's paid monthly subscription; CLI showed 98% Gemini 4 Argon weekly quota remaining and 0 AI Premium credits, without identifying the plan or a before/after quota delta.",
+    "Build an allowlisted read-only folder boundary that excludes _private and connect write/delete/command permissions to PETIT Approval before enabling the adapter.",
+    "Persist real CLI Tool evidence and assistant response through PETIT's existing Thread/Turn/Events; no second Brain or database.",
+    "Verify real 429, expired authentication, cancellation, timeout, recovery, and stream forwarding.",
+    "Verify a real WEVORA PROGRESS.md read only after policy and permission boundaries are approved.",
+    "macOS, iPhone, and packaged Desktop acceptance."
   ]
 }

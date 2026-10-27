@@ -11,7 +11,7 @@ SDK+LM Studio、SDK+Gemini API、Gemini API単独はこの目的の達成に含�
 
 WindowsではPATHと公式インストーラーの標準配置先にagyが見つからない。
 Antigravityデスクトップアプリの存在はCLI導入・CLI認証の証拠にならない。
-`reports/antigravity-cli-direct.json` は **skipped**。使用モデル、認証アカウント種別、契約枠の利用と残量は **unknown**。
+- 実機状況は `reports/antigravity-cli-direct.json` を参照。Windows公式agy 1.4.8で日本語JSON・同一会話NDJSON・合成README読取が成功。契約プランとの照合はunknownで、本番接続は無効を維持。
 WEVORAの実ファイル、Google推論、macOS/iPhone/PWA/配布Desktop受入は未検証。
 
 ## 公式資料の矛盾と本番無効化
@@ -93,6 +93,17 @@ APIキー不使用だけでは月額枠利用の証拠にならないため、�
 
 ## 完了条件に残ること
 
-Googleの許諾確認、Read専用の強制、実CLI認証とAPIキーなし推論、契約枠照合、モデル照合、実read Tool証拠、429/実認証切れ、CLI子孫プロセスの取消/deadline、Core再起動/並行/承認境界、UIへの実stream配信が未検証。
-実CLIが使えるようになった後も、許諾が確定するまでWEVORA等の実文書をPETITから送らない。
+Googleの規約許諾、サブスクリプション契約枠との対応・推論前後の残量差分、許可フォルダ/_privateのRead専用境界とPETIT Approval、実WEVORAおよびCoreへの実応答/Tool履歴保存、実429/認証切れ/CLI取消・deadline/Core復旧/並行/UI配信、macOS/iPhone/配布Desktopは未検証。
+Googleの許諾とデータ境界が確定するまで、実WEVORA等の実文書をPETITからCLIへ送らない。
 最終受入は実WEVORAのPROGRESS参照→`antigravity_cli`の実応答→実Tool履歴と回答のCore保存を照合し、LM Studio/Gemini API未使用を確認する。現在はこの受入に未達であり、#349/#355をcloseしない。
+
+
+## 2026-10-27 Windows実機検証追記
+
+- 公式インストーラー配下の `agy.exe` を直接起動し、バージョン `1.4.8` を確認。APIキー・APIトークン・Google Cloud/Vertex関連の認証環境変数を子プロセスから除いた状態で、日本語JSON会話が成功した。公式CLIの既存認証で推論できたが、アカウント識別情報や認証情報は読んでいない。
+- `agy -p /model` は `gemini-4-argon-medium` を表示。各JSON応答にはモデル名が含まれなかったため、これはCLIが示す選択モデルであり、個々の応答のサーバー側モデル証明ではない。
+- 同一の明示conversation IDで `stream-json` を再開し、NDJSONの6イベントと成功結果を確認。JSON/streamのtoken使用量はCLI値として記録し、契約枠の残量とは分けた。
+- 公式 `/usage` はGemini 4 Argonの週次枠残量98%を表示し、`/credits` はAI Premium credits残高0を表示した。契約プラン名も呼出前後の差分も示されないため、既存の月額契約枠が今回の推論に使われたかは **unknown**。
+- 一時フォルダに作成した合成READMEだけを `--mode=plan --sandbox` で読み取り、ランダムな検証文字列を応答から照合した。ストリーム上のToolは `read_file` 2回だけで、書込・削除・コマンド・補助AgentのTool実行は観測せず、ファイルの内容も不変だった。実WEVORA・PETIT DB・実スレッドは使用していない。
+- 更新後の `scripts/probe_antigravity_cli.py --live` も実行し、挨拶・合成README読取・同一会話の継続が全て成功した。読取Toolは `read_file` のみで、許可外Toolは観測しなかった。この直接CLI実証はPETITへの統合実証ではない。Googleの規約/FAQとフォーラム回答の相違、許可フォルダ/_privateの強制境界、PETIT Approvalとの接続が残るため、本番起動は引き続き無効。429、認証切れ、CLI取消/timeout、Core保存、macOS/iPhone/配布Desktopも未確認。
+- 詳細な構造化証跡: `reports/antigravity-cli-direct.json` と `reports/antigravity-cli-validation.json`。公式資料: [headless mode](https://www.antigravity.google/docs/cli/headless/)、[execution modes](https://www.antigravity.google/docs/cli/modes/)、[permissions](https://www.antigravity.google/docs/permissions?tab=cli)、[model quotas](https://www.antigravity.google/docs/cli/commands/usage/)、[AI credits](https://www.antigravity.google/docs/cli/commands/credits/)。

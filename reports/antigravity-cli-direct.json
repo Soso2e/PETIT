@@ -1,22 +1,135 @@
 {
   "provider": "antigravity_cli",
-  "installed": false,
+  "installed": true,
   "production_enabled": false,
-  "reason": "cli_not_installed",
-  "message": "Antigravity CLIは公式FAQ・規約とフォーラム回答の矛盾が未解決のため、PETITからの本番接続を無効にしています。",
-  "authentication": "unknown",
-  "model": "unknown",
-  "quota_remaining": "unknown",
-  "version": "unknown",
-  "tested": false,
-  "guide": "https://www.antigravity.google/docs/getting-started/",
-  "evidence": "direct_cli_probe",
-  "scope": "synthetic_workspace_only",
-  "checked_at_utc": "2026-10-25T15:25:00.155229+00:00",
+  "reason": "official_policy_conflict",
+  "authentication": "official_cli_inference_succeeded_account_identity_unverified",
+  "model": "gemini-4-argon-medium",
+  "version": "1.4.8",
+  "tested": true,
+  "guide": "https://www.antigravity.google/docs/cli/headless/",
+  "evidence": "direct_official_cli_live",
+  "scope": "synthetic_temp_workspace_only; no_PETIT_runtime_or_real_project",
+  "checked_at_utc": "2026-10-27T10:11:00Z",
   "subscription_quota_used": "unknown",
-  "child_api_key_policy": "remove",
+  "model_quota_remaining": "Gemini 4 Argon weekly: 98%",
+  "ai_premium_credits_remaining": 0,
+  "api_key_environment_variables_passed": false,
+  "credential_files_or_tokens_inspected": false,
   "petit_integration_verified": false,
-  "checks": [],
-  "status": "skipped",
-  "network_invoked": false
+  "wevora_file_access_verified": false,
+  "network_invoked": true,
+  "status": "verified_direct_cli_only",
+  "checks": [
+    {
+      "name": "cli_start",
+      "status": "passed",
+      "version": "1.4.8"
+    },
+    {
+      "name": "japanese_json",
+      "status": "passed",
+      "response_language": "Japanese",
+      "process_elapsed_seconds": 9.97,
+      "usage": {
+        "input_tokens": 6934,
+        "output_tokens": 39,
+        "thinking_tokens": 21,
+        "cache_read_tokens": 0,
+        "total_tokens": 6973
+      }
+    },
+    {
+      "name": "same_conversation_stream_json",
+      "status": "passed",
+      "ndjson_event_lines": 6,
+      "conversation_id_preserved": true,
+      "cli_reported_duration_seconds": 40.4143554,
+      "usage": {
+        "input_tokens": 14158,
+        "output_tokens": 78,
+        "thinking_tokens": 53,
+        "cache_read_tokens": 0,
+        "total_tokens": 14236
+      },
+      "cli_reported_duration_note": "40.41 seconds from CLI result metadata; process timing differed, so this telemetry was not treated as wall-clock latency."
+    },
+    {
+      "name": "model_selection",
+      "status": "passed",
+      "source": "agy -p /model",
+      "value": "gemini-4-argon-medium",
+      "per_turn_json_model_field": "not_present"
+    },
+    {
+      "name": "official_usage_view",
+      "status": "read",
+      "source": "agy -p /usage",
+      "values": {
+        "Gemini Models Weekly Limit Remaining": "100%",
+        "Gemini Models Five Hour Limit Remaining": "100%",
+        "Gemini 4 Argon Weekly Limit": "98%"
+      },
+      "subscription_plan_identity": "not_shown",
+      "resets_at": {
+        "Gemini Models Weekly Limit": "2026-10-29T19:30:21Z",
+        "Gemini Models Five Hour Limit": "2026-10-27T15:03:12Z",
+        "Gemini 4 Argon Weekly Limit": "2026-11-02T06:26:36Z"
+      }
+    },
+    {
+      "name": "official_credits_view",
+      "status": "read",
+      "source": "agy -p /credits",
+      "remaining_credits": 0
+    },
+    {
+      "name": "synthetic_read_only_file",
+      "status": "passed",
+      "directory": "temporary synthetic README only",
+      "mode": "plan",
+      "sandbox": true,
+      "permission_mode": "request-review",
+      "tool_names": [
+        "read_file",
+        "read_file"
+      ],
+      "marker_returned": true,
+      "file_unchanged": true,
+      "write_delete_or_command_tool_observed": false,
+      "subagent_observed": false,
+      "usage": {
+        "input_tokens": 11152,
+        "output_tokens": 227,
+        "thinking_tokens": 156,
+        "cache_read_tokens": 6744,
+        "total_tokens": 11379
+      },
+      "cli_reported_duration_seconds": 13.9458892
+    },
+    {
+      "name": "updated_probe_script_live_run",
+      "status": "passed",
+      "checks": [
+        "hello",
+        "readme",
+        "continue"
+      ],
+      "same_conversation_continuation": true,
+      "read_tools": [
+        "read_file",
+        "read_file"
+      ],
+      "fixture_marker_returned_on_read_and_continue": true,
+      "unsafe_tool_observed": false,
+      "authentication": "official_cli_managed_account_identity_unverified",
+      "subscription_quota_used": "unknown",
+      "petit_integration_verified": false
+    }
+  ],
+  "limitations": [
+    "Official CLI auth succeeded; Google account identity was not read.",
+    "/usage reports quota percentages and /credits reports a zero credit balance; neither reports the subscription plan or ties a before/after quota delta to these calls.",
+    "Real WEVORA data, PETIT persistence, 429, expired auth, CLI cancellation/timeout, macOS, iPhone, and packaged Desktop were not tested."
+  ]
 }
