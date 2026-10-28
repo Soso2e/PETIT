@@ -1,5 +1,25 @@
 # PETIT Runtime Flows
 
+## Antigravity ACP setup and restricted readiness (#357)
+
+```mermaid
+flowchart TD
+    UI[管理者が設定画面を開く] --> Install[任意の導入先 / ACP Registry latestから公式配布物取得]
+    Install --> Verify[Google CDN配布URL / RegistryのOS・arch・version・SHA-256照合]
+    Verify -->|成功| Versioned[PETIT専用versioned install root / agy CLIに非干渉]
+    Verify -->|失敗| Fail[導入失敗 / 既存配置を変更しない]
+    Versioned --> Handshake[ACP Python SDK / stdio / initialize v1]
+    Handshake --> Methods[AgentInfoとauthMethodsのみ表示]
+    Methods -->|利用者が明示的にOAuth操作| OAuth[Agentが広告したoauth-personalを選択してauthenticate]
+    OAuth --> AgentStore[Google credentialは公式Agentが管理 / PETITは読取・保存しない]
+    Methods --> Usage[model・tokens・plan quota・creditsは別状態 / 未取得はunknown]
+    AgentStore --> Usage
+    Usage --> Disabled[会話Brain・実フォルダ・Terminal・backgroundは無効]
+    Disabled --> Gate[Windows OS隔離とACP権限制御の実機検証後に別変更で解禁]
+```
+
+initialize handshakeはモデル推論・認証成功・Google契約枠の使用を証明しない。ACP Agentが内部Toolを直接実行するため、PETITのPermission callbackだけではWindows上のファイル書込みやShellを遮断できない。OSレベルの隔離とPETIT既存Approval/Receiptへの正確な接続が完成するまで、会話Providerとしては公開しない。既存 `agy` CLI診断とAntigravity SDKは独立して維持する。
+
 ## v0.34.0: 初期設定・優先順位と単一Brain（#353）
 
 管理UIの順位設定がONなら新しい選択経路、OFFなら従来の明示Provider選択を使う。

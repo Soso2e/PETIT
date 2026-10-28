@@ -36,6 +36,16 @@
         <label class="check"><input id="paid-antigravity" type="checkbox">Gemini APIへの文脈送信とAPI料金を事前許可する</label>
         <div class="actions"><button data-connect="antigravity">保存して接続</button><button data-test="antigravity">接続テスト</button><button data-disconnect="antigravity" class="quiet">切断・キー削除</button></div>
       </section>
+      <section class="card"><h2>Google Antigravity / 公式ACP</h2>
+        <p>Google公式ACP Registryのバイナリを標準ACPで起動します。本人専用の対話型開発のみが対象です。認証情報は公式Agentが管理し、PETITはOAuth tokenを読みません。</p>
+        <label>ACP Agentのインストール先<input id="acp-install-root" maxlength="1000" autocomplete="off"></label>
+        <div class="actions"><button id="acp-install">Registryから導入・SHA-256検証</button><button id="acp-handshake">ACP initializeを確認</button><button id="acp-auth">公式Google OAuth（oauth-personal）</button></div>
+        <dl><dt>導入状態 / Agent version</dt><dd id="acp-install-state">unknown</dd><dt>Google OAuth状態</dt><dd id="acp-auth-state">unknown</dd>
+          <dt>モデル / Token使用量 / 契約枠 / 追加Credits</dt><dd id="acp-usage-state">unknown / unknown / unknown / unknown</dd>
+          <dt>Filesystem / Terminal権限</dt><dd id="acp-permission-state">拒否中。OS隔離が未検証のため実フォルダへのアクセス・Brain接続は無効。</dd>
+          <dt>Handshake応答時間</dt><dd id="acp-latency">unknown</dd><dt>最後のエラー</dt><dd id="acp-error">なし</dd></dl>
+        <p class="muted">ACP Agentは独自にToolを実行します。PETIT UIのPermission確認だけでは書込をOS側で止められないため、サンドボックス検証が終わるまで通常会話・許可フォルダ・無人実行・Provider priorityには接続しません。ACP接続失敗から他Providerへ自動fallbackもしません。</p>
+      </section>
       <section class="card"><h2>DeepSeek</h2><label>APIキー<input id="deepseek-key" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
         <label>モデル<input id="deepseek-model" value="deepseek-flash" maxlength="200"></label>
         <label class="check"><input id="paid-deepseek" type="checkbox">DeepSeekへの文脈送信とAPI料金を事前許可する（自動切替を含む）</label>

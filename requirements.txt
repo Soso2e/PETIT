@@ -15,3 +15,4 @@ sona-agent-core @ git+https://github.com/Soso2e/Sona-Agent-Core.git@0e220a2ec2d1
 
 # Host-local authenticated setup secrets
 cryptography>=43
+agent-client-protocol==0.12.1
