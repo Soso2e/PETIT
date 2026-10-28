@@ -290,3 +290,5 @@
 | 2026-10-24 | 22:46 | #349 | v0.33.0: 再更新されたSDK+LM Studio方針に従い、公式SDKを限定Read専用Brainへ接続。実runtime/ローカル推論・会話/Read/履歴・SDK保存再開・取消/timeout・ChromiumのWeb/Desktop sourceを確認。関連81件+5 subtests/Node5件成功。個人CLI・Gemini SDK実通信・配布Desktop/macOS/Writeは未確認、Issue Open・PR #351未マージを維持。 |
 
 | 2026-10-25 | 11:03 | #353 | 2026-10-25-01: v0.34.0 初期設定・AI順位・Google読取連携・日次Calendar同期・運用アラートを実装。隔離Python121件/Node71件と実SDK+LM StudioのTool/承認/保存/再起動/Fallbackを確認。外部本人認証・実サービス/端末/Cloud受入、双方向/Tool後切替は未完了として保持。 |
+
+| 2026-10-28 | 13:39 | #357 | 実装済み・未確認: ACP Registry導入、状態/handshake/OAuth設定UI・APIを追加。Windows実AgentのACP v1 initializeとoauth-personal広告を確認。OAuth・推論・利用枠・PETIT Brain・OS隔離は未確認/未接続のため本番Provider化していない。隔離3件とsetup既存20件成功。 |
