@@ -7,7 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from . import brain, conversation_store as store, db, lmstudio_client, request_context
@@ -35,9 +35,11 @@ def process(request_id: str) -> dict:
         return store.result(request_id)
     row = store.load_turn(request_id)
     payload = json.loads(row["input_json"])
+    is_admin = bool(payload.get("is_admin", False))
     try:
         with request_context.bind(request_id=request_id, session_id=row["thread_id"],
-                                  conversation_mode=payload.get("conversation_mode", "text")):
+                                  conversation_mode=payload.get("conversation_mode", "text"),
+                                  is_admin=is_admin):
             with lmstudio_client.observe_turn():
                 attachment_ids = payload.get("attachment_ids") or []
                 if attachment_ids:
@@ -68,10 +70,10 @@ def process(request_id: str) -> dict:
 
 
 def submit(thread_id: str, request_id: str, message: str, *, source="web", conversation_mode="text",
-           attachment_ids: list[str] | None = None, background=False) -> dict:
+           attachment_ids: list[str] | None = None, is_admin: bool = False, background=False) -> dict:
     store.create_thread(thread_id, source=source)
     row, created = store.accept(thread_id, request_id, {"message": message, "conversation_mode": conversation_mode,
-                                                     "source": source,
+                                                     "source": source, "is_admin": is_admin,
                                                      "attachment_ids": attachment_ids or []})
     if created:
         if background:
@@ -103,10 +105,12 @@ def events(thread_id: str, after_seq: int = 0) -> dict:
 
 
 @router.post("/api/threads/{thread_id}/turns", status_code=202)
-def submit_turn(thread_id: str, payload: TurnCreate) -> dict:
+def submit_turn(thread_id: str, payload: TurnCreate, request: Request) -> dict:
+    from . import setup_store as settings
+    is_admin = settings.valid_session(request.cookies.get("petit_admin", ""))
     store.thread(thread_id)
     return submit(thread_id, payload.request_id, payload.message,
-                  conversation_mode=payload.conversation_mode, background=True)
+                  conversation_mode=payload.conversation_mode, is_admin=is_admin, background=True)
 
 
 @router.get("/api/turns/{request_id}")
@@ -151,7 +155,7 @@ def decide(approval_id: str, approved: bool) -> dict | None:
     call = {"id": item["call_id"], "function": {"name": item["tool"]}}
     arguments = json.loads(item["arguments_json"])
     try:
-        with request_context.bind(request_id=request_id, session_id=row["thread_id"]):
+        with request_context.bind(request_id=request_id, session_id=row["thread_id"], is_admin=True):
             messages = json.loads(row["messages_json"] or "[]")
             raw = brain.execute(request_id, call, arguments) if approved else store.encode({"status": "cancelled_by_user"})
             # Replace only the matching pending result; retain every other call.

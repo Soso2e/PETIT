@@ -175,6 +175,9 @@ def set_password(password: str) -> None:
     apply_runtime(data)
 
 
+SESSION_TTL_SECONDS = 365 * 24 * 3600
+
+
 def authenticate(password: str) -> str | None:
     admin = load().get("admin")
     if not admin or len(password) > 256:
@@ -183,21 +186,55 @@ def authenticate(password: str) -> str | None:
     if not hmac.compare_digest(digest.hex(), admin["hash"]):
         return None
     token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    now = time.time()
+    expires_at = now + SESSION_TTL_SECONDS
+    from . import db
+    try:
+        with db.get_connection() as conn:
+            conn.execute("DELETE FROM admin_sessions WHERE expires_at <= ?", (now,))
+            conn.execute("INSERT OR REPLACE INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)",
+                         (token_hash, expires_at, db.now_iso()))
+    except Exception:
+        # Never issue a session token that was not durably persisted.
+        return None
     with _lock:
-        now = time.time()
-        for key in list(_sessions):
-            if _sessions[key] <= now:
-                del _sessions[key]
-        _sessions[hashlib.sha256(token.encode()).hexdigest()] = now + 43200
+        _sessions[token_hash] = expires_at
     return token
 
 
 def valid_session(token: str) -> bool:
-    return _sessions.get(hashlib.sha256(token.encode()).hexdigest(), 0) > time.time()
+    if not token or len(token) > 256:
+        return False
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    now = time.time()
+    # DB is authoritative across processes; a RAM cache must never keep a revoked
+    # one-year admin token valid on another worker.
+    from . import db
+    try:
+        with db.get_connection() as conn:
+            row = conn.execute("SELECT expires_at FROM admin_sessions WHERE token_hash=?", (token_hash,)).fetchone()
+            if row and row["expires_at"] > now:
+                with _lock:
+                    _sessions[token_hash] = row["expires_at"]
+                return True
+            elif row:
+                conn.execute("DELETE FROM admin_sessions WHERE token_hash=?", (token_hash,))
+    except Exception:
+        pass
+    return False
 
 
 def logout(token: str) -> None:
-    _sessions.pop(hashlib.sha256(token.encode()).hexdigest(), None)
+    if not token:
+        return
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    from . import db
+    # Revocation must complete durably before the logout endpoint reports success.
+    with db.get_connection() as conn:
+        conn.execute("DELETE FROM admin_sessions WHERE token_hash=?", (token_hash,))
+    with _lock:
+        _sessions.pop(token_hash, None)
 
 
 def public() -> dict:

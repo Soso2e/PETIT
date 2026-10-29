@@ -114,7 +114,8 @@ def list_threads(limit=30) -> list[dict]:
 
 def accept(thread_id: str, request_id: str, payload: dict) -> tuple[dict, bool]:
     ensure_schema()
-    signature = hashlib.sha256(encode(payload).encode()).hexdigest()
+    hash_payload = {k: v for k, v in payload.items() if k != "is_admin"}
+    signature = hashlib.sha256(encode(hash_payload).encode()).hexdigest()
     with db.write_transaction() as connection:
         existing = connection.execute("SELECT * FROM turns WHERE request_id=?", (request_id,)).fetchone()
         if existing:

@@ -209,7 +209,15 @@ CREATE TABLE IF NOT EXISTS jobs (
     delivered_at TEXT,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
-);"""
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    token_hash  TEXT PRIMARY KEY,
+    expires_at  REAL NOT NULL,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at);
+"""
 
 
 def now_iso() -> str:

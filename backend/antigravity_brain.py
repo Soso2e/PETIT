@@ -108,8 +108,9 @@ def sdk_config(root: Path, target: dict, instructions: str, read_tool):
     options = dict(
         model=target["model"], system_instructions=instructions,
         capabilities=CapabilitiesConfig(enabled_tools=[BuiltinTools.FINISH]),
-        policies=[policy.deny("*"), policy.allow("finish"), policy.allow("petit_read_tool")],
-        tools=[read_tool], mcp_servers=[], skills_paths=[], inline_skills=[], subagents=[], triggers=[],
+        policies=([policy.deny("*"), policy.allow("finish")] if target.get("no_tools") else
+                  [policy.deny("*"), policy.allow("finish"), policy.allow("petit_read_tool")]),
+        tools=[] if target.get("no_tools") else [read_tool], mcp_servers=[], skills_paths=[], inline_skills=[], subagents=[], triggers=[],
         workspaces=[str(root / "workspace")], app_data_dir=str(root / "app"),
         save_dir=str(root / "sessions"), budget_config=BudgetConfig(max_model_calls=8, max_tool_calls=12, max_output_tokens=4096),
     )
@@ -233,8 +234,11 @@ def run(request_id: str, target: dict, *, messages=None, used_tools=None) -> dic
         raise brain.TurnCancelled("取消要求を受け付けました。")
     payload = json.loads(row["input_json"] or "{}")
     instructions = (CORE_SYSTEM_PROMPT + voice_turn_instructions() + brain.INSTRUCTIONS +
-                    "\nこのバックエンドはRead専用。書込やOS操作はできない。利用可能なToolがなければできないと伝える。"
-                    "\npetit_read_toolで使えるカタログ:\n" + store.encode(read_catalog()))
+                    "\nこのバックエンドはRead専用。書込やOS操作はできない。利用可能なToolがなければできないと伝える。")
+    if target.get("no_tools"):
+        instructions += "\nこの会話ではPETITのToolは一切使えない。"
+    else:
+        instructions += "\npetit_read_toolで使えるカタログ:\n" + store.encode(read_catalog())
     # Core remains canonical. Fresh SDK state receives only the bounded same-thread transcript.
     prompt = store.encode({"current_time": time_context.current_datetime().isoformat(timespec="seconds"),
                            "history": store.history(row["thread_id"]), "user_message": payload.get("message", "")})

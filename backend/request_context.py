@@ -8,19 +8,23 @@ from typing import Iterator
 _request_id: ContextVar[str | None] = ContextVar("petit_request_id", default=None)
 _conversation_mode: ContextVar[str] = ContextVar("petit_conversation_mode", default="text")
 _session_id: ContextVar[str | None] = ContextVar("petit_session_id", default=None)
+_is_admin: ContextVar[bool] = ContextVar("petit_is_admin", default=False)
 
 
 @contextmanager
-def bind(*, request_id: str | None, session_id: str | None, conversation_mode: str = "text") -> Iterator[None]:
+def bind(*, request_id: str | None, session_id: str | None, conversation_mode: str = "text",
+         is_admin: bool = False) -> Iterator[None]:
     request_token = _request_id.set(request_id)
     session_token = _session_id.set(session_id)
     mode_token = _conversation_mode.set(conversation_mode)
+    admin_token = _is_admin.set(is_admin)
     try:
         yield
     finally:
         _request_id.reset(request_token)
         _session_id.reset(session_token)
         _conversation_mode.reset(mode_token)
+        _is_admin.reset(admin_token)
 
 
 def current_ids() -> tuple[str | None, str | None]:
@@ -30,6 +34,10 @@ def current_ids() -> tuple[str | None, str | None]:
 
 def current_conversation_mode() -> str:
     return _conversation_mode.get()
+
+
+def current_is_admin() -> bool:
+    return _is_admin.get()
 
 
 def local_only() -> bool:

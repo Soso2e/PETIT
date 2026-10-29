@@ -22,6 +22,8 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
     monkeypatch.setenv("PETIT_ALLOW_CLOUD_IMAGES", "false")
     db.init_db()
+    # This fixture covers trusted image-session contracts, not unauthenticated guest routing.
+    monkeypatch.setattr("backend.setup_store.valid_session", lambda _token: True)
     monkeypatch.setattr(chat._artifact_executor, "submit", lambda *args, **kwargs: None)
     app = FastAPI()
     app.include_router(attachments.router)

@@ -139,10 +139,12 @@ def run(request_id, target, *, messages=None, used_tools=None):
         acct = client.request("account/read", {"refreshToken": False}).get("account") or {}
         if acct.get("type") != "chatgpt":
             raise CodexUnavailable("authentication_expired", "CodexのChatGPT認証が必要です。")
-        parameters = {"cwd": client.temp.name, "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": True,
-                      "baseInstructions": instructions, "dynamicTools": [{"name": "petit_read_tool", "description": "PETITのToolをCore経由で実行",
+        from . import request_context
+        dynamic_tools = [{"name": "petit_read_tool", "description": "PETITのToolをCore経由で実行",
                       "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "arguments_json": {"type": "string"}},
-                                      "required": ["name", "arguments_json"], "additionalProperties": False}}]}
+                                      "required": ["name", "arguments_json"], "additionalProperties": False}}] if request_context.current_is_admin() else []
+        parameters = {"cwd": client.temp.name, "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": True,
+                      "baseInstructions": instructions, "dynamicTools": dynamic_tools}
         if target.get("model"):
             parameters["model"] = target["model"]
         thread = client.request("thread/start", parameters)["thread"]["id"]
@@ -162,7 +164,7 @@ def run(request_id, target, *, messages=None, used_tools=None):
             method, params = item.get("method"), item.get("params", {})
             if method == "item/tool/call":
                 try:
-                    if params.get("tool") != "petit_read_tool":
+                    if not request_context.current_is_admin() or params.get("tool") != "petit_read_tool":
                         raise ValueError("tool_not_allowed")
                     args = params["arguments"]
                     if isinstance(args, str):
