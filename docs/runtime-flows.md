@@ -1,5 +1,27 @@
 # PETIT Runtime Flows
 
+## v0.34.3: Sona Core / Linkraft撤去（#363）
+
+現行の`get_schedule`は既存Tool Registry、`add_schedule`は現在の承認・実行経路で処理する。Sona専用分岐は削除する。
+Project Source RefreshはNotion/GitHub/BRAINを維持し、既存のLinkraft source linkはデータを保持して`skipped`とする。旧図の旧Runtime/承認フローは履歴・比較用であり、現在のRenaissance Core正本は上位のThread/Turn/Receipt図に従う。
+
+```mermaid
+flowchart TD
+    User[会話 / 既存Thread] --> Brain[Renaissance Brain / 公開Tool]
+    Brain --> Registry[現行Tool Registry]
+    Registry --> Schedule[get_schedule / 保存済みカレンダー]
+    Registry --> Writes[add_schedule / 承認対象]
+    Writes --> Approval[Thread/Turn / Approval / Receipt]
+    Approval --> Local[ローカル予定DB]
+    Resume[プロジェクト再開] --> Sources[確認済みsource link]
+    Sources --> Notion[Notion]
+    Sources --> Github[GitHub]
+    Sources --> Obsidian[BRAIN]
+    Sources --> Other[未対応provider / 旧Linkraft]
+    Other --> Skipped[skipped / 既存DB行は保持]
+```
+
+
 ## v0.34.1: Antigravity CLI準備・本番無効（#355）
 
 CLIのGoogleログイン・既存契約枠はSDK/LM Studioとは別。FAQ/規約とフォーラムの矛盾が
@@ -663,7 +685,7 @@ flowchart TD
     failed -->|はい| resume --> readOnly --> final --> delete
 ```
 
-`pending_actions.py` が短期のapproval状態、10分TTL、承認API、Sona Core互換分岐、承認後のTool dispatchを所有します。`chat.py` はAgent Runtimeが返した`pending_actions`を`pending_actions.register(...)`へ渡し、返された`approval_id`を`ChatResponse`へ載せるだけです。APIモデルは`chat_models.py`で共有し、確認Routerから`main.py`を参照しません。
+`pending_actions.py` が短期のapproval状態、10分TTL、承認API、承認後のTool dispatchを所有します。`chat.py` はAgent Runtimeが返した`pending_actions`を`pending_actions.register(...)`へ渡し、返された`approval_id`を`ChatResponse`へ載せるだけです。APIモデルは`chat_models.py`で共有し、確認Routerから`main.py`を参照しません。
 
 Agentが自然文だけで「実行しますか？」と返した場合は承認として扱わず、確認対象Toolをcallするよう1回だけ再指示します。
 
