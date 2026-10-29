@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
+import secrets
 import logging
 from uuid import uuid4
 from typing import Literal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
 
 from . import chroma_client, markdown_export, db
@@ -28,7 +30,7 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest, request: Request = None) -> ChatResponse:
+def chat(req: ChatRequest, request: Request = None, response: Response = None) -> ChatResponse:
     request_id = (req.request_id or "").strip() or uuid4().hex
     session_id = (req.session_id or "").strip() or None
     message = (req.message or "").strip()
@@ -37,6 +39,20 @@ def chat(req: ChatRequest, request: Request = None) -> ChatResponse:
 
     from . import conversation_api, setup_store as settings
     is_admin = settings.valid_session(request.cookies.get("petit_admin", "")) if request is not None else False
+    if not is_admin and request is not None:
+        # Never accept a user-supplied thread id for a guest conversation.
+        guest_token = request.cookies.get("petit_guest", "")
+        if len(guest_token) < 43 or len(guest_token) > 128 or not all(
+            char.isalnum() or char in "-_" for char in guest_token
+        ):
+            guest_token = secrets.token_urlsafe(32)
+            if response is not None:
+                response.set_cookie(
+                    "petit_guest", guest_token, httponly=True,
+                    secure=request.url.scheme == "https", samesite="lax",
+                    max_age=30 * 24 * 3600, path="/",
+                )
+        session_id = "guest-" + hashlib.sha256(guest_token.encode()).hexdigest()
     result = conversation_api.submit(session_id or uuid4().hex, request_id, message,
         source=req.source, conversation_mode=req.conversation_mode, attachment_ids=req.attachment_ids,
         is_admin=is_admin)
