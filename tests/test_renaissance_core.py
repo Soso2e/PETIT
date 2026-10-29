@@ -255,7 +255,9 @@ class RenaissanceCoreTests(unittest.TestCase):
 
     def test_shared_http_adapter_ignores_client_supplied_history(self):
         from backend.app import create_app
-        from backend import lifecycle
+        from backend import lifecycle, setup_store as settings
+        settings.set_password("test-password-for-guest")
+        settings.update({"completed": True})
         with patch.object(lifecycle, "startup", store.recover), patch.object(lifecycle, "shutdown"), TestClient(create_app()) as client, patch.object(
             brain.lmstudio_client, "chat_completion", return_value={"content": "確認したよ"}
         ) as model:
