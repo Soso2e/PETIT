@@ -22,6 +22,9 @@
 
 ## AIと単一Turn
 
+- **CLI中心の運用（#359）**: 「Brainの接続方式」を「CLIのみ」にし、Codexを認証して「この優先順位を会話で使う」をONにしてAI設定を保存する。現時点の有効候補はCodex CLIのみ。SDK/APIの既存順位・接続・キーは保存したまま、会話の選択候補から除外する。CLI障害時もSDK/APIへ自動切替しない。既存設定は`mixed`として引き継ぐため、利用者が明示して変更する。OFF時は従来のProvider選択を使用する。
+- 接続経路は`端末 → Tailscale → PETIT Core → 同じホストのCodex CLI（stdio）`。Tailscale自体が推論先やCLI認証を提供するわけではない。CLI用のネットワークport公開は不要。「CLI導入・認証状態を確認」は推論しない。`account/read`が成功してもモデル利用可否は未確認で、「接続テスト」の完了が必要。権限エラー時はCore実行ユーザーと`PETIT_SETTINGS_DIR`のアクセス権を確認し、既存暗号化設定を削除・再作成しない。
+- CodexのTool要求は既存Core bridgeでschema/risk/承認を検査し、結果とreceiptをSQLiteへ保存する。同一外部call IDの再送は同じ応答を返し、異なる引数なら拒否する。承認後は保存済みTool結果と履歴でCodexを再開する。Codex固有のShell/ファイル編集は許可していない。CLIのみの画像付き会話はVision/API実行前に拒否する（未対応）。
 - **Codex**: [公式app-server](https://learn.chatgpt.com/docs/app-server)をstdioで使用。PETIT専用`CODEX_HOME`と公式keyring、ChatGPT device-code認証。利用者の既存Codexトークンを読み出して流用しない。`account/read`と公式Thread/dynamic Toolのプロトコルを使う。ChatGPT認証以外のAPIキーアカウントでは推論しない。
 - **Antigravity**: [公式FAQ](https://antigravity.google/docs/faq)により個人CLIラップを採用しない。[公式SDK](https://antigravity.google/docs/sdk/overview)0.1.22を再利用。loopback LM Studioか、明示許可したGemini APIで推論する。SDKの内蔵Toolはfinishだけに限定する。今回の管理UIで選ぶSDKはCoreの公開Toolをbridgeし、schema/risk/承認/receiptはPETITが管理する。従来`antigravity_sdk` profileのRead専用契約はそのまま。
 - **DeepSeek**: 既存OpenAI互換native Tool Loopを再利用。APIキーと費用/文脈送信許可が必要。
@@ -44,6 +47,8 @@
 ## 検証
 
 `python -m pytest tests/test_setup_integrations.py -q`で認証/暗号化/OAuth/Calendar delta/再起動相当のschedule/lease/通知/Brain fallback/Gmail契約を検証する。実サービスをMock成功で代替したという主張はしない。
+
+`tests/test_codex_brain.py`は合成app-server RPCでCodex会話/Read/Write承認・再開/receipt/再送/取消/終了/CLIのみの送信制限を検証する。旧`test_renaissance_core.py`を含めて実行する場合は、`PETIT_SETTINGS_DIR`も一時フォルダへ向け、本人の設定・認証を使わない。ブラウザ用`tests/setup_ui_server.py`も本番bootstrap tokenとACP配置を引き継がず隔離する。
 
 `node scripts/test-setup-ui.cjs`はPlaywright+Chromeの実HTTP/合成Providerで1440/390px、ウィザード、優先順位、再送、サーバー再起動後の設定/会話を検証する。`PETIT_SETUP_REAL_SDK=1`ではMockを外し、公式SDK+`petit-setup-probe`というLM Studioモデルを使う。`PETIT_TEST_PYTHON`で環境を指定する。証跡はGit管理外`storage/setup-e2e/`。
 

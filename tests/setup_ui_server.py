@@ -10,10 +10,14 @@ _temp = tempfile.TemporaryDirectory(prefix="petit-setup-ui-")
 _root = Path(os.getenv("PETIT_SETUP_TEST_ROOT", _temp.name))
 _root.mkdir(parents=True, exist_ok=True)
 os.environ.update(PETIT_STORAGE_DIR=str(_root), PETIT_SETTINGS_DIR=str(_root / "settings"),
+                  PETIT_BOOTSTRAP_TOKEN="",
+                  PETIT_ANTIGRAVITY_ACP_EXECUTABLE="",
                   PETIT_DB_PATH=str(_root / "app.db"), PETIT_MODEL_ROUTING_PATH=str(_root / "routing.json"),
                   PETIT_AUTO_SUMMARY_ENABLED="0", PETIT_DAILY_INDEX_ENABLED="0")
 
 from backend import config, db, lifecycle, conversation_store, chat, tools
+from backend import antigravity_acp
+antigravity_acp.DEFAULT_ROOT = _root / "antigravity-acp"
 from backend.app import create_app
 
 config.notion_configured = lambda: False

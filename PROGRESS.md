@@ -6,6 +6,8 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #359（CLIのみ選択を実装・実Codex推論は未確認）: 既存Codex app-server/Core Tool bridgeを再利用し、CLIのみではSDK/APIへFallbackしない接続方式、明示したCLI/認証診断、call ID再送防止・最終返答・外部session記録を追加。承認/receipt/再開は既存Coreを使用。隔離pytest90件とChrome 1440/390pxの設定/保存/再起動確認に成功。実CLI 0.165.0-alpha.1.2のinitialize・dynamic Tool登録・process終了を確認したが、一時認証homeは未認証でモデル推論/実Toolは未検証。作業環境から既存storage/settingsへのアクセス権エラーあり、本人認証結果待ち。CLI画像はVision前に拒否。Antigravity個人CLI/ACP本番は無効を維持。次は本人のCodex接続テストと実会話/Tool受入。docs/setup-integrations.md、reports/codex-cli-validation.jsonを参照。
+
 - #357 ACP初回導入（PR #358 main反映済み・本番Brain未接続）: 公式ACP Agentの検証付き導入、ACP initialize、oauth-personal設定UI/APIを追加。Windows実Agentのinitializeと認証方式広告を確認。OAuth、モデル応答、契約枠、PETIT Thread/Turn/Receipt接続、Session復元、OS隔離、実フォルダ読取は未確認または未実装。通常会話・実フォルダ・Terminal・backgroundは無効のまま。次は本人操作のOAuth、Windows隔離の実証、既存Core/Approvalとの接続を分けて受入する。既存agy CLI経路は変更なし。
 
 - #355 / #349（実CLI直接検証済み・PETIT本番接続は無効）: Windowsの公式agy 1.4.8を使い、APIキー環境変数を除いて日本語JSON会話、同一conversation IDのNDJSON継続、/model、/usage、/creditsを実測。gemini-4-argon-medium、Gemini 4 Argon週次枠98%残、AI Premium credits残高0を確認したが、契約プランと呼出ごとの枠消費はunknown。plan+sandbox/request-reviewで一時READMEのみread_file読取、検証文字列を確認し、書込/削除/コマンド/subagentなし・ファイル不変。GoogleアカウントID、規約許諾、PETIT Core保存、実WEVORA、429/認証切れ/取消、macOS/実端末は未確認。docs/antigravity-cli.mdとreports/antigravity-cli-direct.jsonを参照。
@@ -301,3 +303,5 @@
 | 2026-10-28 | 13:39 | #357 | 実装済み・未確認: ACP Registry導入、状態/handshake/OAuth設定UI・APIを追加。Windows実AgentのACP v1 initializeとoauth-personal広告を確認。OAuth・推論・利用枠・PETIT Brain・OS隔離は未確認/未接続のため本番Provider化していない。隔離3件とsetup既存20件成功。 |
 
 | 2026-10-29 | 08:15 | #358 | PR #358反映済みorigin/mainとローカルmainを統合。#332のTask再開修正を保持し、新mainのv0.34.0・ACP導入・Runtimeを維持。7ファイル競合を解決。関連テスト21件+29 subtests成功（HTTP保存ケース1件はstorage/settings権限エラーで未確認）。compileall成功。diff --checkは上流追加docsの末尾空白9件を報告。DBバックアップとstorage/vision-uiを保持。 |
+
+| 2026-10-29 | 09:51 | #359 | 2026-10-29-02: CLIのみ接続方式とCodex診断/Tool再送防止を追加。隔離90件・Chrome 1440/390px成功、実CLIのinitialize/Tool登録/終了を確認。本人認証/実推論・Toolは未確認、既存settingsの権限エラーを保持し本番設定は未変更。Antigravity個人CLIは現行FAQの制限で無効を維持。 |

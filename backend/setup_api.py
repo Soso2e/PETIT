@@ -136,9 +136,10 @@ def logout(request: Request):
 
 @router.get("/config", dependencies=[Depends(_admin)])
 def get_config():
+    from . import codex_brain
     from .antigravity_cli import status
     return {"settings": settings.public(), "brain": brain_priority.public_status(), "sync": service_sync.status(),
-            "antigravity_cli": status()}
+            "antigravity_cli": status(), "codex_cli": codex_brain.status()}
 
 
 @router.get("/antigravity-acp", dependencies=[Depends(_admin)])
@@ -214,6 +215,7 @@ class SettingsUpdate(BaseModel):
     priority: list[Literal["codex", "antigravity", "deepseek"]] | None = None
     paid_allowed: list[Literal["antigravity", "deepseek"]] | None = None
     brain_enabled: bool | None = None
+    brain_transport: Literal["mixed", "cli_only"] | None = None
     calendar: Literal["local", "google_calendar", "timetree"] | None = None
     google_calendar_id: str | None = Field(default=None, max_length=300)
     google_redirect_uri: str | None = Field(default=None, max_length=1000)
@@ -244,15 +246,22 @@ def put_config(payload: SettingsUpdate):
     if "google_calendar_id" in values and "google_calendar" in data["connected"]:
         if values["google_calendar_id"] not in {x["id"] for x in google_services.calendars()} and values["google_calendar_id"] != "primary":
             raise HTTPException(400, "アクセス可能なカレンダーを選択してください。")
-    if values.get("brain_enabled"):
+    if values.get("brain_enabled", data["brain_enabled"]) and ("brain_enabled" in values or "brain_transport" in values):
         candidate = {**data, **values}
-        if not any(brain_priority.permitted(x, candidate) and brain_priority.target(x)["configured"] for x in candidate["priority"]):
+        if not any(brain_priority.permitted(x, candidate) and brain_priority.target(x, candidate)["configured"] for x in candidate["priority"]):
             raise HTTPException(400, "AIを接続し、必要な費用許可を設定してください。")
     settings.update(values)
     if "sync_notifications" in values:
         from . import notifications
         notifications.update_preferences({"sync_failure": values["sync_notifications"]})
     return get_config()
+
+
+@router.post("/codex/diagnose", dependencies=[Depends(_admin)])
+def codex_diagnose():
+    """Explicit local CLI/auth check; does not start inference or log in."""
+    from . import codex_brain
+    return codex_brain.diagnose()
 
 
 class Credentials(BaseModel):

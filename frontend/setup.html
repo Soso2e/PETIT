@@ -20,10 +20,14 @@
     <div id="step-0" class="step">
       <section class="card"><h2>AI Brainの優先順位</h2><p>ドラッグ、または上下ボタンで並び替えます。次の依頼から上位を再試行します。</p>
         <ol id="priority" aria-label="AIの優先順位"></ol><p id="active-brain"></p>
+        <label>Brainの接続方式<select id="brain-transport"><option value="cli_only">CLIのみ（SDK/APIへ自動切替しない）</option><option value="mixed" selected>上の優先順位でCLI・SDK・APIを使う</option></select></label>
+        <p class="muted">CLIのみで現在使える候補はCodexです。端末 → Tailscale → PETITサーバー → サーバー上のCLIと接続します。Antigravity個人契約CLIは許諾確認待ちです。</p>
         <label class="check"><input type="checkbox" id="brain-enabled">この優先順位を会話で使う</label>
         <button id="save-brain">AI設定を保存</button><p class="muted">Tool実行後の障害では、自動切替で処理を再実行せず、保存済み結果を保持します。</p>
       </section>
-      <section class="card"><h2>Codex / ChatGPT</h2><p>サーバーの公式Codex CLIを使います。PETIT専用の認証を公式の資格情報ストアへ保存します。</p>
+      <section class="card"><h2>Codex CLI / ChatGPT</h2><p>サーバーの公式Codex CLIを使います。PETIT専用の認証を公式の資格情報ストアへ保存します。チャット・Tool選択はCodex、Toolの検証・承認・実行結果の保存はPETITが担当します。</p>
+        <p id="codex-cli-status" role="status"></p><button id="codex-diagnose" class="quiet">CLI導入・認証状態を確認（推論なし）</button>
+        <p class="muted">Codexの認証状態は導入検出と別に確認します。実際のモデル応答は「接続テスト」で確認してください。CLIへの直接のファイル編集・Shell操作は許可せず、PETITの公開Toolを使用します。CLIのみの画像付き会話は未対応です。</p>
         <label>モデル（空欄でCodexの既定）<input id="codex-model" maxlength="200"></label>
         <div class="actions"><button data-connect="codex">ChatGPTで認証</button><button id="codex-confirm">認証完了を確認</button><button data-test="codex">接続テスト</button><button data-disconnect="codex" class="quiet">切断</button></div>
         <p id="codex-code" role="status"></p><a id="codex-link" target="_blank" rel="noopener noreferrer" hidden>公式認証ページを開く</a>

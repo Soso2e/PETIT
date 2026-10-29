@@ -63,13 +63,20 @@ flowchart TD
     L -->|同一入力の再送| R[保存済み結果 / 承認 / receipt]
     L -->|ID衝突 / 同じThread実行中| Conflict[409 / 429]
     L --> Select[順位または従来選択 / local_only / 接続と費用同意を検査]
-    Select --> Pin[選択Event / Provider pin / 同じThreadの履歴と運用アラート]
+    Select --> Transport{Brain接続方式}
+    Transport -->|mixed| Pin[選択Event / Provider pin / 同じThreadの履歴と運用アラート]
+    Transport -->|cli_only| CLIOnly[Codexのみ許可 / SDK・APIを候補から除外]
+    CLIOnly --> Pin
     Pin --> Backend{単一Runtimeの所有者}
     Backend -->|DeepSeek / LM Studio| Native[既存native Tool Loop]
-    Backend -->|Codex| Codex[公式app-server Agent Loop]
+    Backend -->|Codex| Codex[サーバー上の公式CLI / app-server stdio Agent Loop]
     Backend -->|Antigravity| SDK[公式SDK Agent Loop / Turn専用Worker]
     Native --> Gate[既存Registry / 公開catalog / schema / risk / cancel]
-    Codex -->|dynamic PETIT Tool| Gate
+    Codex --> CallID{同じdynamic Tool call ID}
+    CallID -->|初回| Gate
+    CallID -->|同じ引数で再送| Cached[保存したTool応答を再送 / 再実行なし]
+    Cached --> Codex
+    CallID -->|異なる引数| Failed
     SDK -->|Python PETIT bridge| Gate
     Gate -->|確認必須| Approval[SQLite承認とmessages / Runtime終了]
     Approval --> UI[既存確認UI / 再起動復元]
@@ -82,7 +89,7 @@ flowchart TD
     Unknown --> Return
     Return --> Backend
     Backend -->|Tool開始前の障害のみ| Stop[現在のRuntimeを完全終了]
-    Stop --> Next{接続済み・許可済み次候補}
+    Stop --> Next{接続方式で許可された接続済み次候補}
     Next -->|あり| Pin
     Next -->|なし| Failed[失敗状態 / 次Turnは順位の上位から再試行]
     Backend -->|Tool後の障害| Failed
@@ -93,7 +100,10 @@ flowchart TD
 管理UIのSDK bridgeはCoreのWrite承認/receiptも使う。従来`antigravity_sdk` profileは
 限定Read専用のまま。SDK内蔵Toolはfinishのみ、Codexのshell/apps/plugins/subagentは無効、
 許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
-画像は既存Vision観測→Read専用回答で、画像Providerの順位Fallbackは未対応。
+`brain_transport=cli_only`はCodexのみを許可し、障害時もSDK/APIへFallbackしない。既存設定は`mixed`のまま引き継ぐ。
+CLIの導入検出は受動的に行い、明示した診断で`account/read`を確認する。認証確認と実推論の接続テストは別。
+Thread/Turn/承認再開はPETIT SQLiteが正本で、Codexは各実行でephemeral Threadを作り、既存Eventsに外部session IDを記録する。
+画像はmixedで既存Vision観測→Read専用回答を維持し、CLIのみではVision実行前に拒否する。CLI画像対応と画像Providerの順位Fallbackは未対応。
 8 rounds / 12 callsと取消/deadlineを維持し、local_onlyは外部へ送らない。
 
 ```mermaid

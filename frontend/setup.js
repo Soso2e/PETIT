@@ -5,7 +5,7 @@
   const params=new URLSearchParams(location.search);
   const next=['/static/universe.html','/static/desktop/index.html','/static/legacy.html'].includes(params.get('next'))?params.get('next'):'/static/universe.html';
   $('back').href=next;
-  const labels = {codex:'Codex / ChatGPT',antigravity:'Antigravity SDK',deepseek:'DeepSeek',notion:'Notion',google_calendar:'Googleカレンダー',gmail:'Gmail',timetree:'TimeTree',local:'PETITローカル'};
+  const labels = {codex:'Codex CLI / ChatGPT',antigravity:'Antigravity SDK',deepseek:'DeepSeek API',notion:'Notion',google_calendar:'Googleカレンダー',gmail:'Gmail',timetree:'TimeTree',local:'PETITローカル'};
   const reasons = {not_configured:'未設定・依存不足',authentication_expired:'認証切れ',usage_limit:'使用量上限',connection_or_runtime_failure:'接続またはRuntime障害'};
   let state, session, step = 0, order = [], notionItems = [], notionCursor = null, dragging = null, acpState = null;
   function notice(text, error=false) { $('notice').textContent=text; $('notice').classList.toggle('error',error); }
@@ -34,6 +34,9 @@
   }
   function render() {
     const s=state.settings;order=[...s.priority];priority();
+    $('brain-transport').value=s.brain_transport||'mixed';
+    const codex=state.codex_cli;
+    $('codex-cli-status').textContent=codex?(codex.installed?'CLI検出済み':'CLI未検出')+' / '+(codex.error||('ChatGPT認証: '+(codex.authenticated===null?'未確認':codex.authenticated?'確認済み':'未認証')))+' / モデル応答: 接続テストで確認':'CLI状態は未確認です。';
     const cli=state.antigravity_cli;
     $('antigravity-cli-status').textContent=cli?(cli.installed?'公式CLIの候補を検出':'CLI未検出（サーバーのPATH・標準配置先）')+' / 本番接続: 無効 / バージョン・ログイン・モデル・契約枠残量: unknown（未検証）':'CLIの診断情報を取得できません。';
     for (const [id,key] of [['codex-model','codex_model'],['deepseek-model','deepseek_model'],['antigravity-auth','antigravity_auth'],['antigravity-model','antigravity_model'],['antigravity-url','antigravity_url'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
@@ -51,9 +54,10 @@
   function renderAcp(){if(!acpState)return;$('acp-install-state').textContent=acpState.installed?'導入済み / '+acpState.agent_version:'未導入';$('acp-auth-state').textContent='現在の認証状態はunknown'+(acpState.auth_last_success_utc?' / OAuth成功記録: '+acpState.auth_last_success_utc:'');$('acp-usage-state').textContent=[acpState.model,acpState.token_usage,acpState.plan_quota,acpState.additional_credits].join(' / ');$('acp-error').textContent=acpState.last_error||'なし';}
   async function refresh(){state=await api('/config');try{acpState=await api('/antigravity-acp');}catch{acpState=null;}render();}
   action($('antigravity-cli-diagnose'),async()=>{state.antigravity_cli=await api('/antigravity-cli');render();notice('CLIの配置だけを確認しました。ログイン・推論は実行していません。');});
+  action($('codex-diagnose'),async()=>{state.codex_cli=await api('/codex/diagnose','POST');render();notice(state.codex_cli.error||'CLI導入・認証状態を確認しました。モデル推論は実行していません。',Boolean(state.codex_cli.error));});
   async function save(values){state=await api('/config','PUT',values);render();}
   async function saveKeys(fields){const values={};for(const [id,key]of fields){if($(id).value)values[key]=$(id).value;}if(Object.keys(values).length){await api('/credentials','PUT',{values});fields.forEach(([id])=>$(id).value='');}}
-  async function saveAI(){await save({priority:order,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,antigravity_auth:$('antigravity-auth').value,antigravity_model:$('antigravity-model').value,antigravity_url:$('antigravity-url').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null,$('paid-antigravity').checked?'antigravity':null].filter(Boolean)});}
+  async function saveAI(extra={}){await save({priority:order,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,antigravity_auth:$('antigravity-auth').value,antigravity_model:$('antigravity-model').value,antigravity_url:$('antigravity-url').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null,$('paid-antigravity').checked?'antigravity':null].filter(Boolean),...extra});}
   document.querySelectorAll('[data-step]').forEach(x=>action(x,()=>showStep(Number(x.dataset.step))));
   action($('previous'),()=>showStep(step-1));action($('next'),()=>{showStep(step+1);notice('未設定のサービスはスキップできます。');});action($('refresh'),async()=>{await refresh();notice('保存済み状態を更新しました。');});
   action($('acp-install'),async()=>{const root=$('acp-install-root').value.trim();acpState=await api('/antigravity-acp/install','POST',root?{destination:root}:{});await refresh();notice('公式ACP AgentをRegistry SHA-256照合後に導入しました。');});
@@ -61,7 +65,7 @@
   action($('acp-auth'),async()=>{const result=await api('/antigravity-acp/authenticate','POST');await refresh();notice(result.ok?'公式ACP Agentのoauth-personal認証処理が完了しました。利用枠とモデル応答は別途未確認です。':'認証を確認できませんでした。',!result.ok);});
   $('auth-form').addEventListener('submit',async event=>{event.preventDefault();const button=$('auth-submit');button.disabled=true;try{await api(session.initialized?'/login':'/bootstrap','POST',{password:$('password').value,bootstrap_token:$('bootstrap-token').value});$('password').value='';$('bootstrap-token').value='';await start();if(session.completed&&params.get('resume')==='1'){location.replace(next);return;}notice('ログインしました。');}catch(error){notice(error.message,true);}finally{button.disabled=false;}});
   action($('logout'),async()=>{await api('/logout','POST');await start();notice('ログアウトしました。');});
-  action($('save-brain'),async()=>{const enabled=$('brain-enabled').checked;await saveAI();await save({brain_enabled:enabled});notice('AI設定を保存しました。');});
+  action($('save-brain'),async()=>{await saveAI({brain_enabled:$('brain-enabled').checked,brain_transport:$('brain-transport').value});notice('AI設定を保存しました。');});
   document.querySelectorAll('[data-connect]').forEach(button=>action(button,async()=>{const id=button.dataset.connect;
     if(['codex','antigravity','deepseek'].includes(id)){await saveKeys([['deepseek-key','deepseek_key'],['antigravity-key','antigravity_key']]);await saveAI();}
     if(id==='notion')await saveKeys([['notion-key','notion_key']]);

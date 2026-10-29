@@ -128,13 +128,39 @@ def logout():
         auth_client().request("account/logout")
 
 
+def status():
+    # Rendering settings must not start a CLI or infer login from a saved flag.
+    return {"installed": bool(shutil.which("codex")), "transport": "cli", "protocol": "app-server/stdio",
+            "authenticated": None, "inference": "unknown"}
+
+
+def diagnose():
+    result = status()
+    if not result["installed"]:
+        return {**result, "error": "Codex CLIが未導入です。サーバーのPATHを確認してください。"}
+    client = None
+    try:
+        client = RPC()
+        acct = client.request("account/read", {"refreshToken": False}).get("account") or {}
+        return {**result, "authenticated": acct.get("type") == "chatgpt", "auth_mode": acct.get("type"),
+                "plan": acct.get("planType"), "protocol_ready": True}
+    except PermissionError:
+        return {**result, "error": "PETIT専用Codex設定フォルダにアクセスできません。Core実行ユーザーとフォルダ権限を確認してください。"}
+    except (OSError, lmstudio_client.LMStudioError):
+        return {**result, "error": "Codex CLIとの接続に失敗しました。公式CLIの導入・互換性を確認してください。"}
+    finally:
+        if client is not None:
+            client.close()
+
+
 def run(request_id, target, *, messages=None, used_tools=None):
     from . import brain, external_brain
     instructions, prompt = external_brain.context(request_id, messages)
     used = list(used_tools or [])
     invoke = external_brain.tool_bridge(request_id, target, used)
     client = RPC()
-    started, reply = time.monotonic(), ""
+    started, reply, final_reply = time.monotonic(), "", ""
+    completed_calls = {}
     try:
         acct = client.request("account/read", {"refreshToken": False}).get("account") or {}
         if acct.get("type") != "chatgpt":
@@ -146,6 +172,10 @@ def run(request_id, target, *, messages=None, used_tools=None):
         if target.get("model"):
             parameters["model"] = target["model"]
         thread = client.request("thread/start", parameters)["thread"]["id"]
+        row = store.load_turn(request_id)
+        with db.get_connection() as connection:
+            store.event(connection, row["thread_id"], request_id, "external_session",
+                        {"provider": "codex", "transport": "cli", "session_id": thread})
         client.request("turn/start", {"threadId": thread, "input": [{"type": "text", "text": prompt}],
                         "sandboxPolicy": {"type": "readOnly", "access": {"type": "restricted", "includePlatformDefaults": False,
                                                                                     "readableRoots": [client.temp.name]}}})
@@ -153,6 +183,7 @@ def run(request_id, target, *, messages=None, used_tools=None):
         while time.monotonic() < deadline:
             if store.load_turn(request_id)["cancel_requested"]:
                 raise brain.TurnCancelled("取消要求を受け付けました。")
+            brain.check_provider(store.thread(row["thread_id"]))
             try:
                 item = client.pending.pop(0) if client.pending else client.events.get(timeout=.2)
             except queue.Empty:
@@ -161,17 +192,27 @@ def run(request_id, target, *, messages=None, used_tools=None):
                 raise lmstudio_client.LMStudioError("Codex接続が終了しました。")
             method, params = item.get("method"), item.get("params", {})
             if method == "item/tool/call":
+                call_id = params.get("callId", item["id"])
+                signature = json.dumps(params, sort_keys=True, ensure_ascii=True)
+                if call_id in completed_calls:
+                    previous, result = completed_calls[call_id]
+                    if previous != signature:
+                        raise lmstudio_client.LMStudioError("CodexのTool呼出IDが異なる引数で再使用されました。再実行しません。")
+                    client.send({"id": item["id"], "result": result})
+                    continue
                 try:
-                    if params.get("tool") != "petit_read_tool":
+                    if params.get("threadId", thread) != thread or params.get("tool") != "petit_read_tool":
                         raise ValueError("tool_not_allowed")
                     args = params["arguments"]
                     if isinstance(args, str):
                         args = json.loads(args)
                     raw = invoke(args["name"], args["arguments_json"])
-                    success = True
+                    success = not brain.failed(raw)
                 except (ValueError, KeyError, TypeError):
                     raw, success = '{"error":"invalid_tool_call"}', False
-                client.send({"id": item["id"], "result": {"contentItems": [{"type": "inputText", "text": raw}], "success": success}})
+                result = {"contentItems": [{"type": "inputText", "text": raw}], "success": success}
+                completed_calls[call_id] = (signature, result)
+                client.send({"id": item["id"], "result": result})
                 if store.approvals(request_id):
                     return external_brain.finish(request_id, "", used, {"provider": "codex", "kind": "brain"})
             elif "id" in item and method:
@@ -179,12 +220,17 @@ def run(request_id, target, *, messages=None, used_tools=None):
                 client.send({"id": item["id"], "error": {"code": -32601, "message": "PETIT tools only"}})
             elif method == "item/agentMessage/delta":
                 reply += params.get("delta", "")
+            elif method == "item/completed" and params.get("item", {}).get("type") == "agentMessage":
+                message = params["item"]
+                if message.get("phase") in (None, "final_answer"):
+                    final_reply = message.get("text", "")
             elif method == "turn/completed":
                 turn = params.get("turn", {})
+                reply = final_reply or reply
                 if turn.get("status") != "completed" or not reply.strip():
                     raise lmstudio_client.LMStudioError("CodexのTurnが完了しませんでした。認証・使用量・接続を確認してください。")
                 return external_brain.finish(request_id, reply.strip(), used, {"provider": "codex", "model": target.get("model"),
-                        "kind": "brain", "latency_seconds": round(time.monotonic()-started, 3)})
+                        "kind": "brain", "transport": "cli", "latency_seconds": round(time.monotonic()-started, 3)})
         raise lmstudio_client.LMStudioError("Codexの応答がタイムアウトしました。")
     finally:
         client.close()

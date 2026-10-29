@@ -69,6 +69,8 @@ AccessKey不要の方式に向けた「へいプティ」の実験モデル学�
 
 初回起動時は管理者認証付きウィザードへ進み、AI優先順位、Codex公式認証、Antigravity SDK / DeepSeek、Notion、Google Calendar / Gmail、TimeTreeを設定できます。設定はGit管理外の`storage/settings/`へ暗号化保存します。API料金・クラウド文脈送信は事前同意が必要です。Local / Cloudのコードは共通で、Cloudの初期登録にはHTTPSと`PETIT_BOOTSTRAP_TOKEN`を用意します。
 
+CLI中心で使う場合は「Brainの接続方式」を「CLIのみ」にして、CodexをChatGPT認証し、優先順位の会話利用をONにして保存します。PETITサーバー上の公式Codex CLIへ会話・Tool選択を渡し、承認・実行・保存は既存Coreが管理します。SDK/APIへ自動切替しません。既存設定は従来どおり引き継ぎ、Antigravity個人CLIは許諾確認待ち、CLI画像対応は未実装です。実Codex推論の受入は未確認です。
+
 Calendarは読み取り専用で、選択した外部サービスからSQLiteへ02:00 JSTに差分同期します。未解決エラーは通知と会話へ反映します。Google双方向同期・Tool実行後のProvider間継続・本人の外部認証を伴う全サービス受入は未完了です。導入前提・既存クライアントの認証への影響・検証手順は[初期設定と接続](docs/setup-integrations.md)を参照してください。
 
 ## セットアップ
