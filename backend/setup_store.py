@@ -196,7 +196,8 @@ def authenticate(password: str) -> str | None:
             conn.execute("INSERT OR REPLACE INTO admin_sessions (token_hash, expires_at, created_at) VALUES (?, ?, ?)",
                          (token_hash, expires_at, db.now_iso()))
     except Exception:
-        pass
+        # Never issue a session token that was not durably persisted.
+        return None
     with _lock:
         _sessions[token_hash] = expires_at
     return token
@@ -207,12 +208,8 @@ def valid_session(token: str) -> bool:
         return False
     token_hash = hashlib.sha256(token.encode()).hexdigest()
     now = time.time()
-    with _lock:
-        cached = _sessions.get(token_hash)
-        if cached is not None:
-            if cached > now:
-                return True
-            del _sessions[token_hash]
+    # DB is authoritative across processes; a RAM cache must never keep a revoked
+    # one-year admin token valid on another worker.
     from . import db
     try:
         with db.get_connection() as conn:
@@ -232,14 +229,12 @@ def logout(token: str) -> None:
     if not token:
         return
     token_hash = hashlib.sha256(token.encode()).hexdigest()
+    from . import db
+    # Revocation must complete durably before the logout endpoint reports success.
+    with db.get_connection() as conn:
+        conn.execute("DELETE FROM admin_sessions WHERE token_hash=?", (token_hash,))
     with _lock:
         _sessions.pop(token_hash, None)
-    from . import db
-    try:
-        with db.get_connection() as conn:
-            conn.execute("DELETE FROM admin_sessions WHERE token_hash=?", (token_hash,))
-    except Exception:
-        pass
 
 
 def public() -> dict:
