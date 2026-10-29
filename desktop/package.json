@@ -1,6 +1,6 @@
 {
   "name": "petit-desktop",
-  "version": "0.34.1",
+  "version": "0.34.2",
   "private": true,
   "description": "PETIT desktop companion",
   "author": "Soso2e",
@@ -32,7 +32,9 @@
       "recovery.html",
       "recovery.js",
       "workspace.css",
-      "nudge.html", "nudge.js", "nudge.css"
+      "nudge.html",
+      "nudge.js",
+      "nudge.css"
     ],
     "extraResources": [
       {
