@@ -263,9 +263,10 @@ class RenaissanceCoreTests(unittest.TestCase):
                 "message": "この相談", "request_id": "http", "session_id": "http-thread",
                 "history": [{"role": "user", "content": "別スレッドを勝手に注入"}]})
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["thread_id"], "http-thread")
+            self.assertTrue(response.json()["thread_id"].startswith("guest-"))
+            self.assertNotEqual(response.json()["thread_id"], "http-thread")
             self.assertNotIn("勝手に注入", json.dumps(model.call_args.args[0], ensure_ascii=False))
-            self.assertEqual(client.get("/api/turns/http").json()["reply"], "確認したよ")
+            self.assertEqual(client.get("/api/turns/http").status_code, 401)
 
 
 if __name__ == "__main__":
