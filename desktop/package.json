@@ -32,9 +32,7 @@
       "recovery.html",
       "recovery.js",
       "workspace.css",
-      "nudge.html",
-      "nudge.js",
-      "nudge.css"
+      "nudge.html", "nudge.js", "nudge.css"
     ],
     "extraResources": [
       {
