@@ -6,6 +6,8 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #366 セキュリティ/回帰修正（PR上で確認中）: 誤削除された petit-version.js の起動・遅延ロードを復旧。公開APIを /api/chat に限定し、ゲスト会話はHttpOnlyのpetit_guest Cookieから独立Threadを導出して管理者/他ゲストの履歴を分離。未認証SDK経路はTool全禁止、承認再開では管理者権限Contextを復元。DBをセッション真実源とし、プロセスを跨ぐログアウトを反映。既存テストの新しい認証境界への追従とゲストAPIアクセス拒否の回帰テストを追加。GitHub CI完了待ち、未ログインUIでの履歴/再取得・Discord等のサービス認証経路は実機受入が必要。
+
 - #365 / v0.35.0 管理者セッションDB永続化と非管理者向け安全な会話モード（実装済み・単体テスト完了）: 管理者セッションをSQLite（admin_sessions）に保存し、サーバー再起動やリロードによるセッション喪失を解消（1年間有効）。UI設定から管理者セッションの終了（ログアウト）を可能にし、非管理者状態でもチャット（/api/chat）を許可。非管理者時はTool全般を禁止して純粋なテキスト応答のみに制限（コード変更や副作用操作を防止）。関連テスト23件成功。次は実画面でのログイン・ログアウト受入。
 
 - #357 ACP初回導入（PR #358 main反映済み・本番Brain未接続）: 公式ACP Agentの検証付き導入、ACP initialize、oauth-personal設定UI/APIを追加。Windows実Agentのinitializeと認証方式広告を確認。OAuth、モデル応答、契約枠、PETIT Thread/Turn/Receipt接続、Session復元、OS隔離、実フォルダ読取は未確認または未実装。通常会話・実フォルダ・Terminal・backgroundは無効のまま。次は本人操作のOAuth、Windows隔離の実証、既存Core/Approvalとの接続を分けて受入する。既存agy CLI経路は変更なし。
