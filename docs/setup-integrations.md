@@ -28,6 +28,7 @@
 - **Codex**: [公式app-server](https://learn.chatgpt.com/docs/app-server)をstdioで使用。PETIT専用`CODEX_HOME`と公式keyring、ChatGPT device-code認証。利用者の既存Codexトークンを読み出して流用しない。`account/read`と公式Thread/dynamic Toolのプロトコルを使う。ChatGPT認証以外のAPIキーアカウントでは推論しない。
 - Codexの導入検出・Brain選択・起動は同じresolverを使用する。PATHにないWindowsでは`%LOCALAPPDATA%\OpenAI\Codex\bin\codex.exe`の公式launcherを確認する。別配置はサーバーの`.env`に`PETIT_CODEX_EXECUTABLE`で実在する絶対パスを指定して再起動する。明示パスが無効なら別CLIへ黙って切り替えない。導入検出とChatGPT認証・実推論は別である。
 - **Antigravity CLI**: #362で利用者の明示依頼により追加。公式CLIのheadless/NDJSONをfinish専用Agentで使い、構造化された返答とPETIT Tool要求を既存Core Loopへ返す。ログインは公式CLIが管理しPETITはtokenを読まない。個人契約の第三者アプリ内利用は[公式FAQ](https://antigravity.google/docs/faq)で非サポートのままであり、利用者の選択をGoogleの許諾取得とは扱わない。モデル/契約枠/overageはCLI管理で、取得できない値はunknown。接続ボタンは設定を保存するだけで、実推論の証明は接続テストで行う。
+- 接続テストは専用Thread/Turnを作り「Toolを呼ばず、接続しました、とだけ返答」と依頼し、通常Brain経路でCLIの起動・推論・イベント/返答JSON検証・Core保存まで確認する。CLIは1回90秒制限。CLI単体の成功とPETITまでの成功は異なる。失敗時は固定のreasonコードと説明をAPI/Turnへ保存し、認証・利用枠・timeout・構造化JSON等を区別する。生のCLIログや秘密値は画面へ返さない。
 - **Antigravity SDK**: [公式SDK](https://antigravity.google/docs/sdk/overview)0.1.22を再利用。loopback LM Studioか、明示許可したGemini APIで推論する。SDKの内蔵Toolはfinishだけに限定する。管理UIで選ぶSDKはCoreの公開Toolをbridgeし、schema/risk/承認/receiptはPETITが管理する。従来`antigravity_sdk` profileのRead専用契約はそのまま。CLIとは別の推論先・費用・認証方式である。
 - **DeepSeek**: 既存OpenAI互換native Tool Loopを再利用。APIキーと費用/文脈送信許可が必要。
 - 各依頼の冒頭で優先順位を評価する。未接続・依存不足・未許可の候補を飛ばし、認証切れ/使用量上限/接続障害時に次へ進む。次Turnでは上位から再試行し、復旧後に戻る。

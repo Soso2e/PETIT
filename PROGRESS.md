@@ -6,6 +6,8 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #362 接続テスト診断: 実CLI推論に加えPETIT用JSON検証・保存を行うテストで、従来は失敗理由が一律表示だった。固定のreasonと説明をAPI/Turnへ返すよう変更。利用者環境の今回の失敗原因はまだ未特定で、再試行結果から切り分ける。
+
 - #359 Codex検出修正: サーバーのPATHにCodexがなくてもWindowsの公式launcher標準先から検出・Brain選択・起動する共通resolverへ変更。別配置はPETIT_CODEX_EXECUTABLEで絶対パスを指定でき、無効な明示指定はfail closed。PATH検出を無効化した実launcherでapp-server接続を確認。本人の既存認証・モデル推論は未確認のまま。
 
 - #225（CLI開発タスクの初期実装・合成データ受入済み）: 明示したGitルート・開始commit・目的・CLIをTask/Jobへ保存し、会話の既存ApprovalまたはWebの開始確認後に1件ずつ実行する。元checkoutと未コミット変更を保ち、remoteを除いた専用cloneでCore限定のlist/read/SHA照合write/静的checkを使う。Webに状態・進捗・差分・取消・レビュー完了を追加。再送/二重承認/取消/設定解除/再起動中断を検証し、実Antigravity CLIで合成repositoryの編集・静的check・元repo不変を確認。Codexの実推論、実プロジェクトの機能テスト、任意Shell/依存導入/削除/Push/PR/merge、実端末は未確認または対象外。次は本人Codex認証と、許可repositoryでの利用者レビュー。docs/coding-tasks.md参照。
@@ -317,3 +319,5 @@
 | 2026-10-29 | 10:44 | #225 | 2026-10-29-04: 承認付きCLI開発タスク、Task/Job永続化、専用clone/Core限定Tool、Web進捗・差分・取消・レビュー完了を追加。関連143件/Chrome 1440・390px成功。実Antigravity CLIの合成コード編集・静的check・元repo不変を確認。実Codex/実project機能テスト/任意Shell・削除・Push/PR/mergeは未確認または対象外。 |
 
 | 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH依存検出を公式Windows標準launcher対応の共通resolverへ修正。PATH検出なしの実launcherでapp-server接続、関連42件と構文/diff確認に成功。本人認証/実推論とは区別し、無効な明示実行パスは拒否。 |
+
+| 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの一律エラーを固定reason別の説明・Turn保存へ変更。生のCLI診断を返さない境界を保持。利用者環境の失敗原因は未特定。 |

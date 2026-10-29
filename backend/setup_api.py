@@ -438,15 +438,40 @@ def test_connection(service: str):
                 with request_context.bind(request_id=request_id, session_id=thread_id):
                     result = brain._run(request_id)
                 return {"ok": result["status"] == "completed", "status": result["status"], "provider": service}
-            except Exception:
-                store.finish(request_id, {"reply": "", "error": "接続テスト失敗"}, status="failed")
+            except Exception as exc:
+                failure = _test_failure(exc)
+                store.finish(request_id, {"reply": "", "error": failure["error"], "reason": failure["reason"]}, status="failed")
                 raise
             finally:
                 brain_priority._active.reset(token)
         raise ValueError("unknown_service")
     except Exception as exc:
         # Provider response bodies and secret URLs never cross this boundary.
-        return JSONResponse({"ok": False, "error": "接続テストに失敗しました。認証・権限・モデル・依存を確認してください。", "error_type": type(exc).__name__}, status_code=400)
+        return JSONResponse(_test_failure(exc), status_code=400)
+
+
+def _test_failure(exc):
+    """Only fixed diagnostic codes/messages cross the API, never provider text."""
+    messages = {
+        "authentication_required": "公式CLIへのログインが必要です。サーバーPCのCLIで認証してください。",
+        "authentication_expired": "CLIの認証を確認できません。公式の認証をやり直してください。",
+        "usage_limit": "CLIが利用枠の上限を報告しました。公式CLIで利用状況を確認してください。",
+        "timeout": "CLIの応答が90秒の制限を超えました。公式CLIの応答速度・モデル・混雑を確認してください。",
+        "invalid_cli_response": "CLIは応答しましたが、PETIT用の返答JSON（content・tool_calls）を検証できませんでした。",
+        "invalid_cli_protocol": "CLIが返したイベント形式をPETITで検証できませんでした。",
+        "direct_tool_detected": "CLIの直接Toolを検出したため、接続テストを停止しました。",
+        "cli_start_failed": "CLIを起動できません。実行ユーザー・配置・実行権限を確認してください。",
+        "not_configured": "CLIが見つかりません。サーバー上の導入状態を確認してください。",
+        "permission_denied": "CLIの実行または保存場所へのアクセスが拒否されました。サーバーの実行ユーザーと権限を確認してください。",
+        "output_limit": "CLIの出力が上限を超えました。",
+        "provider_changed": "テスト中にAI設定が変更されました。設定を保存してから再試行してください。",
+        "cli_error": "公式CLIがエラーを返しました。公式CLI本体で認証・モデル・利用枠を確認してください。",
+    }
+    reason = getattr(exc, "reason", None)
+    if isinstance(exc, PermissionError):reason = "permission_denied"
+    if reason not in messages:reason = "unknown"
+    return {"ok": False, "reason": reason, "error": messages.get(reason,
+        "接続テストに失敗しました。認証・権限・モデル・依存を確認してください。"), "error_type": type(exc).__name__}
 
 
 @router.post("/sync/{service}", dependencies=[Depends(_admin)])

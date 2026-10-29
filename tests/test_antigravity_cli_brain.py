@@ -112,3 +112,15 @@ def test_transport_cleans_child_after_parent_exits(tmp_path):
     assert code==0 and marker.exists()
     first=marker.read_text();time.sleep(.25)
     assert marker.read_text()==first
+
+
+@pytest.mark.parametrize("reason", ["invalid_cli_response", "timeout", "authentication_required"])
+def test_setup_failure_reports_safe_reason_and_persists_it(client, selected, monkeypatch, reason):
+    admin(client)
+    monkeypatch.setattr(runtime, "invoke", Mock(side_effect=runtime.CLIError(reason, "PRIVATE-DIAGNOSTIC")))
+    response=client.post("/api/setup/services/antigravity_cli/test")
+    assert response.status_code==400 and response.json()["reason"]==reason
+    assert "PRIVATE-DIAGNOSTIC" not in response.text
+    with db.get_connection() as connection:
+        row=connection.execute("SELECT result_json FROM turns WHERE request_id LIKE 'setup-test-%' ORDER BY updated_at DESC LIMIT 1").fetchone()
+    assert json.loads(row[0])["reason"]==reason
