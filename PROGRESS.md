@@ -315,4 +315,5 @@
 | 2026-10-29 | 10:44 | #362 | 2026-10-29-03: 利用者の明示依頼で公式Antigravity CLIをfinish専用Agent/構造化JSONのBrainへ接続。実CLI+合成DBで会話/Read/予定承認・再開・再送を確認。公式非サポート表示とquota unknownを維持。CLIのみ候補と接続UIを追加し、本番設定の自動変更は行わない。 |
 
 | 2026-10-29 | 10:44 | #225 | 2026-10-29-04: 承認付きCLI開発タスク、Task/Job永続化、専用clone/Core限定Tool、Web進捗・差分・取消・レビュー完了を追加。関連143件/Chrome 1440・390px成功。実Antigravity CLIの合成コード編集・静的check・元repo不変を確認。実Codex/実project機能テスト/任意Shell・削除・Push/PR/mergeは未確認または対象外。 |
-`n| 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH依存検出を公式Windows標準launcher対応の共通resolverへ修正。PATH検出なしの実launcherでapp-server接続、関連42件と構文/diff確認に成功。本人認証/実推論とは区別し、無効な明示実行パスは拒否。 |
+
+| 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH依存検出を公式Windows標準launcher対応の共通resolverへ修正。PATH検出なしの実launcherでapp-server接続、関連42件と構文/diff確認に成功。本人認証/実推論とは区別し、無効な明示実行パスは拒否。 |
