@@ -54,7 +54,7 @@ def install(app):
                 if not initialized or not settings.load()["completed"]:
                     from urllib.parse import urlencode
                     return RedirectResponse("/static/setup.html?" + urlencode({"next": path if path != "/" else "/static/universe.html", "resume": "1"}))
-            chat_public = path in {"/api/chat", "/api/threads", "/api/conversations", "/api/history"} or path.startswith(("/api/turns/", "/api/threads/"))
+            chat_public = path == "/api/chat"
             setup_public = path in {"/api/setup/session", "/api/setup/login", "/api/setup/bootstrap", "/api/health", "/api/setup/google/callback"}
             is_public_api = setup_public or (chat_public and initialized and settings.load().get("completed"))
             if path.startswith("/api/") and initialized and not is_public_api:
