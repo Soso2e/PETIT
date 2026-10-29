@@ -258,7 +258,7 @@ class RenaissanceCoreTests(unittest.TestCase):
         from backend import lifecycle, setup_store as settings
         settings.set_password("test-password-for-guest")
         settings.update({"completed": True})
-        with patch.object(lifecycle, "startup", store.recover), patch.object(lifecycle, "shutdown"), TestClient(create_app()) as client, patch.object(
+        with patch.object(lifecycle, "startup", store.recover), patch.object(lifecycle, "shutdown"), TestClient(create_app(), headers={"Origin": "http://testserver"}) as client, patch.object(
             brain.lmstudio_client, "chat_completion", return_value={"content": "確認したよ"}
         ) as model:
             response = client.post("/api/chat", json={
