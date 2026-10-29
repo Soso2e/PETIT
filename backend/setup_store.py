@@ -29,7 +29,15 @@ DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["codex", "a
 
 
 def root() -> Path:
-    return Path(os.getenv("PETIT_SETTINGS_DIR", str(config.STORAGE_DIR / "settings")))
+    target = Path(os.getenv("PETIT_SETTINGS_DIR", str(config.STORAGE_DIR / "settings")))
+    try:
+        if target.exists():
+            os.listdir(target)
+    except PermissionError:
+        fallback = config.STORAGE_DIR / "app_settings"
+        fallback.mkdir(mode=0o700, parents=True, exist_ok=True)
+        return fallback
+    return target
 
 
 @contextmanager
