@@ -6,6 +6,8 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #357 ACP導入（実装済み・本番Brain未接続）: 最新main `65fd98a` から独立ブランチ。ACP Registry Windows x86_64配布物をv1.4.3 / Registry SHA-256で検証してPETIT専用の別配置へ導入。Python ACP SDK 0.12.1で実AgentのACP v1 initializeと `oauth-personal` authMethods広告を確認。Registry導入・状態/handshake/OAuth操作APIとWeb Settings UIを追加。OAuthは未開始。モデル応答、会話Streaming/継続、token/plan quota/creditsはいずれもunknown。Agent内ToolはPETIT Permission callbackだけではOS上で書込・Shellを遮断できないため、一般会話・Provider順位・実フォルダ・無人処理へは未接続。隔離3件、既存setup 20件成功。次はPRレビュー後に公式OAuth認証を本人操作で行い、Windows OS sandboxを実証してからCore/Approval/ReceiptとACP Tool bridgeを実装する。PR #356のCLI資産はこのbranchで変更していない。
+
 - #353 / feat/setup-integrations（実装済み・外部認証受入未確認、main未反映）: PR #352のSDKを再利用し、管理者認証付き初回ウィザード、暗号化ホスト設定、AI順位と同意付きFallback、Codex公式app-server、Google共通OAuth/Gmail Read Tool、Notion対象選択、Calendar 02:00 JST差分同期、永続アラートと会話警告を追加。Python121件+8 subtests成功/1 skip、Desktop66件成功/1 skip・Thread Node5件、Chromium1440/390pxを確認。公式SDK+実LM StudioでRead/記憶Write/予定承認/再送/再起動/未認証Codex→SDKのFallbackを合成DBで確認し、承認引数・receipt・保存行を照合。初期の依存競合・小型モデルのTool未呼出/誤成功発言も検出し、最終は明示bridge契約プロンプトで成功。自然文の一般的な実行品質、本人のCodex/課金API/Notion/Google/TimeTree認証、実02:00/Push/Cloud/配布端末は未検証。Google双方向・Tool後のProvider間継続・画像順位Fallbackは未実装。次はDraft PRレビューと利用者による実接続受入。設計/制約はdocs/setup-integrations.md、証跡要約はreports/setup-integrations-validation.json。
 
 - #349（SDK Read専用Brain実装・実Windows/ローカル推論確認、main未反映）: feat/renaissance-antigravity-sdkで公式SDK 0.1.22のAgent Loopを選択式バックエンドへ接続。既定はloopback LM Studio。限定Read bridgeのschema/risk検査、Turn専用Workerの取消/deadline/Provider固定、既存Thread/Turn/Events/履歴を再利用。実SDK+Qwen3.5-9Bの会話→get_tasks→次Turn、独立SDKのstream/保存再開、実Core再送/復旧/timeout/取消、実Chromium 1440/390pxのWeb/Desktop source adapterを確認。関連pytest81件+5 subtests・Node5件成功。Write/画像/配布Desktop/macOS/実サービス受入、SDK+Gemini（キーなし）は未確認。個人契約CLIラップは現行FAQで非サポート、agy未導入。PR #351は未採用・未マージ、Notionコード/本番設定/実DBは不変。次は専用Draft PR/CIと実端末受入。詳細: docs/antigravity-brain-poc.md。
@@ -288,3 +290,5 @@
 | 2026-10-24 | 22:46 | #349 | v0.33.0: 再更新されたSDK+LM Studio方針に従い、公式SDKを限定Read専用Brainへ接続。実runtime/ローカル推論・会話/Read/履歴・SDK保存再開・取消/timeout・ChromiumのWeb/Desktop sourceを確認。関連81件+5 subtests/Node5件成功。個人CLI・Gemini SDK実通信・配布Desktop/macOS/Writeは未確認、Issue Open・PR #351未マージを維持。 |
 
 | 2026-10-25 | 11:03 | #353 | 2026-10-25-01: v0.34.0 初期設定・AI順位・Google読取連携・日次Calendar同期・運用アラートを実装。隔離Python121件/Node71件と実SDK+LM StudioのTool/承認/保存/再起動/Fallbackを確認。外部本人認証・実サービス/端末/Cloud受入、双方向/Tool後切替は未完了として保持。 |
+
+| 2026-10-28 | 13:39 | #357 | 実装済み・未確認: ACP Registry導入、状態/handshake/OAuth設定UI・APIを追加。Windows実AgentのACP v1 initializeとoauth-personal広告を確認。OAuth・推論・利用枠・PETIT Brain・OS隔離は未確認/未接続のため本番Provider化していない。隔離3件とsetup既存20件成功。 |
