@@ -1,11 +1,10 @@
 {
   "name": "PETIT",
-  "version": "0.34.2",
-  "release": "development-rule-maintenance",
+  "version": "0.34.3",
+  "release": "remove-sona-linkraft-integrations",
   "includes": [
-    "code removal review and compatibility safeguards",
-    "official Antigravity CLI detection and policy gate",
-    "Google Calendar/Gmail read-only OAuth",
-    "persistent daily sync and operational alerts"
+    "Sona runtime branch and external dependency removed",
+    "Linkraft owner-only sync adapter removed; legacy SQLite records preserved",
+    "Renaissance Core, GitHub/Notion/BRAIN, calendar and approval retained"
   ]
 }
