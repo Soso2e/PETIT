@@ -6,6 +6,8 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #362/#359 CLIモデル選択: 従来のID手入力に加え、公式agy models/Codex model/listの一覧取得・選択・PETIT設定保存を追加。Windows実agyから13候補を取得。catalogは実推論や利用枠の証明と区別し、既存接続テストで確認する。CLI本体の既定値は変更しない。
+
 - #362 接続テスト診断: 実CLI推論に加えPETIT用JSON検証・保存を行うテストで、従来は失敗理由が一律表示だった。固定のreasonと説明をAPI/Turnへ返すよう変更。利用者環境の今回の失敗原因はまだ未特定で、再試行結果から切り分ける。
 
 - #359 Codex検出修正: サーバーのPATHにCodexがなくてもWindowsの公式launcher標準先から検出・Brain選択・起動する共通resolverへ変更。別配置はPETIT_CODEX_EXECUTABLEで絶対パスを指定でき、無効な明示指定はfail closed。PATH検出を無効化した実launcherでapp-server接続を確認。本人の既存認証・モデル推論は未確認のまま。
@@ -321,3 +323,5 @@
 | 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH依存検出を公式Windows標準launcher対応の共通resolverへ修正。PATH検出なしの実launcherでapp-server接続、関連42件と構文/diff確認に成功。本人認証/実推論とは区別し、無効な明示実行パスは拒否。 |
 
 | 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの一律エラーを固定reason別の説明・Turn保存へ変更。生のCLI診断を返さない境界を保持。利用者環境の失敗原因は未特定。 |
+
+| 2026-10-29 | 10:59 | #362 | 2026-10-29-07: Codex/Antigravity CLIの公式モデル一覧取得・選択・保存UIを追加。実CLI catalogはCodex9件・agy13件、関連24テストとChrome 1440/390pxの合成一覧選択/保存に成功。catalogと実推論/利用枠を区別し、接続失敗の解消は未確認。 |

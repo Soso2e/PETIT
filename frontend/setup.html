@@ -29,6 +29,7 @@
         <p id="codex-cli-status" role="status"></p><button id="codex-diagnose" class="quiet">CLI導入・認証状態を確認（推論なし）</button>
         <p class="muted">Codexの認証状態は導入検出と別に確認します。実際のモデル応答は「接続テスト」で確認してください。CLIへの直接のファイル編集・Shell操作は許可せず、PETITの公開Toolを使用します。CLIのみの画像付き会話は未対応です。</p>
         <label>モデル（空欄でCodexの既定）<input id="codex-model" maxlength="200"></label>
+        <button data-models="codex">モデル一覧を取得</button><label>一覧から選択<select id="codex-model-options"><option value="">CLIの既定モデル</option></select></label><button data-save-model="codex">このモデル設定を保存</button>
         <div class="actions"><button data-connect="codex">ChatGPTで認証</button><button id="codex-confirm">認証完了を確認</button><button data-test="codex">接続テスト</button><button data-disconnect="codex" class="quiet">切断</button></div>
         <p id="codex-code" role="status"></p><a id="codex-link" target="_blank" rel="noopener noreferrer" hidden>公式認証ページを開く</a>
       </section>
@@ -37,6 +38,7 @@
         <p class="muted">個人契約CLIの第三者アプリ内利用は公式FAQで非サポートです。この接続はGoogleの許諾取得を意味しません。契約枠の残量・追加Credits設定は公式CLIで確認してください。</p>
         <p id="antigravity-cli-status" role="status" aria-live="polite">状態を確認中…</p>
         <label>CLIモデル（空欄で公式CLIの既定）<input id="antigravity-cli-model" maxlength="200"></label>
+        <button data-models="antigravity_cli">モデル一覧を取得</button><label>一覧から選択<select id="antigravity-cli-model-options"><option value="">CLIの既定モデル</option></select></label><button data-save-model="antigravity_cli">このモデル設定を保存</button>
         <div class="actions"><button id="antigravity-cli-diagnose">インストール状態を再確認</button><button data-connect="antigravity_cli">CLIへ接続・優先順位の先頭へ</button><button data-test="antigravity_cli">接続テスト</button><button data-disconnect="antigravity_cli" class="quiet">PETITから切断</button></div>
         <p><a href="https://www.antigravity.google/docs/getting-started/" target="_blank" rel="noopener noreferrer">公式CLIの導入・ログイン手順</a></p>
         <p class="muted">ログインはサーバーPCの公式CLIで行います。ここにはGoogle認証情報を入力しません。バージョンはサーバーで agy --version を確認してください。CLIが未導入・未認証の状態をSDKや別Providerの成功として扱いません。</p>

@@ -22,6 +22,16 @@ try{
   await page.goto(url+'/static/universe.html');await page.waitForURL(/\/static\/setup\.html(?:\?.*)?$/);await login(page);
   await page.locator('#codex-cli-status').filter({hasText:'ChatGPT認証: 未確認'}).waitFor();
   assert.equal(await page.locator('#brain-transport').inputValue(),'mixed');
+  await page.route('**/api/setup/services/*/models',route=>route.fulfill({json:{models:[{id:'fixture-model',label:'合成モデル'}],inference_verified:false}}));
+  for(const [provider,input,key] of [['codex','codex-model','codex_model'],['antigravity_cli','antigravity-cli-model','antigravity_cli_model']]){
+    await clickReady(page,`[data-models="${provider}"]`,'モデル候補を取得');
+    await page.locator('#'+input+'-options').selectOption('fixture-model');
+    await clickReady(page,`[data-save-model="${provider}"]`,'モデル設定を保存');
+    assert.equal((await(await page.request.get(url+'/api/setup/config')).json()).settings[key],'fixture-model');
+    await page.locator('#'+input).fill('');await clickReady(page,`[data-save-model="${provider}"]`,'モデル設定を保存');
+  }
+  results.push({cli_model_catalog_selection_and_save:true,catalog_provider:'synthetic'});
+  await page.unroute('**/api/setup/services/*/models');
   await page.locator('#brain-transport').selectOption('cli_only');
   await clickReady(page,'#save-brain','AI設定を保存');
   const cliOnly=await (await page.request.get(url+'/api/setup/config')).json();

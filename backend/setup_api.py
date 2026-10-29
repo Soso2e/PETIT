@@ -450,6 +450,15 @@ def test_connection(service: str):
         return JSONResponse(_test_failure(exc), status_code=400)
 
 
+@router.post("/services/{service}/models", dependencies=[Depends(_admin)])
+def models(service: str):
+    from . import cli_models
+    try:return cli_models.list_models(service)
+    except Exception as exc:
+        return JSONResponse({"error": "モデル一覧を取得できません。公式CLIの導入・認証・接続を確認してください。",
+                             "error_type": type(exc).__name__}, status_code=400)
+
+
 def _test_failure(exc):
     """Only fixed diagnostic codes/messages cross the API, never provider text."""
     messages = {

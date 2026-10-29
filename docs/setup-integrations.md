@@ -22,6 +22,7 @@
 
 ## AIと単一Turn
 
+- CodexとAntigravity CLIは「モデル一覧を取得」→選択→「このモデル設定を保存」に対応する。公式`model/list`と`agy models`を使用し、空欄はCLIの既定、入力欄でIDの直接指定もできる。一覧はcatalogであり認証・契約枠・実推論の成功を証明しない。保存後の接続テストで実応答を確認する。モデル指定はPETIT側だけに保存し、CLI本体の既定設定を書き換えない。
 - **CLI中心の運用（#359 / #362）**: 「Brainの接続方式」を「CLIのみ」にし、Codexを認証またはAntigravity CLIを明示接続して「この優先順位を会話で使う」をONにして保存する。SDK/APIの既存順位・接続・キーは保存したまま、会話の選択候補から除外する。CLI障害時もSDK/APIへ自動切替しない。既存設定は`mixed`として引き継ぐため、利用者が明示して変更する。OFF時は従来のProvider選択を使用する。
 - 接続経路は`端末 → Tailscale → PETIT Core → 同じホストのCodex CLI（stdio）`。Tailscale自体が推論先やCLI認証を提供するわけではない。CLI用のネットワークport公開は不要。「CLI導入・認証状態を確認」は推論しない。`account/read`が成功してもモデル利用可否は未確認で、「接続テスト」の完了が必要。権限エラー時はCore実行ユーザーと`PETIT_SETTINGS_DIR`のアクセス権を確認し、既存暗号化設定を削除・再作成しない。
 - CodexのTool要求は既存Core bridgeでschema/risk/承認を検査し、結果とreceiptをSQLiteへ保存する。同一外部call IDの再送は同じ応答を返し、異なる引数なら拒否する。承認後は保存済みTool結果と履歴でCodexを再開する。Codex固有のShell/ファイル編集は許可していない。CLIのみの画像付き会話はVision/API実行前に拒否する（未対応）。

@@ -7,6 +7,7 @@
 ```mermaid
 flowchart TD
     Settings[管理者が公式CLIへ明示接続] --> Priority[antigravity_cliを順位へ追加 / CLIのみの候補]
+    Settings --> Models[公式agy models / Codex model list / 選択をPETIT設定へ保存]
     Priority --> Turn[既存Thread / Turn / Provider pin]
     Turn --> Step[Turn専用の空workspace / finish専用Agent / stdin NDJSON]
     Step --> Official[未改変の公式agy / 本人のCLI管理認証]
