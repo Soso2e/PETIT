@@ -7,10 +7,15 @@ PETITのWeb画面上部にある `Chat:` と `Agent:` から、それぞれ別�
 | 選択肢 | 接続先 | 用途 |
 |---|---|---|
 | ローカル LM Studio | PC内のLM Studio | 外部へ内容を送りたくない会話 |
+| Antigravity SDK（Read専用） | 公式SDK Agent Runtime + loopback LM Studio（既定） | 単一BrainのChat側のみ。限定Read Tool・Cloudは明示許可が必要 |
 | DeepSeek V4 Flash | DeepSeek API | 普段使い・低コスト |
 | DeepSeek V4 Pro | DeepSeek API | より精度が必要な分析 |
 
 Chatは通常会話とルーター、Agentはツール実行・分析・自動要約などに使われます。
+
+Renaissanceの通常text会話ではChat側の単一BrainがTool選択まで担当します。
+Antigravity SDKの導入・設定・実測・制約は[SDK導入記録](antigravity-brain-poc.md)を参照してください。
+SDK自体がAgent Loopを持つため、選択時は同じTurnで別のnative Loopを起動しません。
 
 ## `.env`設定
 

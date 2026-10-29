@@ -55,6 +55,8 @@ def build_context_block(user_message: str) -> str:
     calendar_status = calendar_sync.sync_if_configured()
     today = time_context.current_date()
     horizon = (today + timedelta(days=7)).isoformat()
+    from . import service_sync
+    criterion, parameters = service_sync.cache_filter()
     with db.get_connection() as conn:
         tasks = [dict(row) for row in conn.execute(
             "SELECT title, status, due_date, priority, category FROM tasks_cache "
@@ -64,8 +66,8 @@ def build_context_block(user_message: str) -> str:
         ).fetchall()]
         events = [dict(row) for row in conn.execute(
             "SELECT title, start_time, end_time, location, source FROM calendar_events_cache "
-            "WHERE start_time >= ? AND start_time < ? ORDER BY start_time ASC LIMIT 10",
-            (today.isoformat(), horizon),
+            "WHERE start_time >= ? AND start_time < ?" + (" AND " + criterion if criterion else "") + " ORDER BY start_time ASC LIMIT 10",
+            (today.isoformat(), horizon, *parameters),
         ).fetchall()]
 
     lines = [

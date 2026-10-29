@@ -124,9 +124,11 @@ def _tool_failed(result: str) -> bool:
         return False
     if not isinstance(data, dict):
         return False
-    return bool(data.get("error")) or any(
+    if data.get("already_active") is True and not data.get("error"):
+        return False
+    return bool(data.get("error") or data.get("partial_update")) or any(
         data.get(key) is False
-        for key in ("ok", "created", "completed", "added", "saved", "updated")
+        for key in ("ok", "created", "completed", "added", "saved", "updated", "started")
     )
 
 
@@ -265,6 +267,8 @@ def _save_resume_state(
     tool_rounds: int,
     total_tool_calls: int,
     used_tools: list[dict[str, Any]],
+    action_required: bool = False,
+    write_results: list[dict[str, str]] | None = None,
 ) -> str:
     request_id, session_id = request_context.current_ids()
     return agent_state.save(
@@ -279,6 +283,8 @@ def _save_resume_state(
             "used_tools": used_tools,
             "request_id": request_id,
             "session_id": session_id,
+            "action_required": action_required,
+            "write_results": write_results or [],
         }
     )
 
@@ -296,14 +302,18 @@ def _execute_loop(
     router_source: str = "llm",
     router_confidence: float | None = None,
     allow_write_proposal: bool = True,
+    action_required: bool | None = None,
+    write_results: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     attempted = attempted or set()
     used_tools = list(used_tools or [])
     selected_schemas = _selected_schemas(selected_names)
     allowed = set(selected_names)
-    had_failure = False
+    write_results = list(write_results or [])
+    had_failure = any(_tool_failed(item["content"]) for item in write_results)
     deferred_retry_used = False
     deferred_failure = False
+    action_required = bool(action_required or capability_router.action_requested(original_request))
 
     while True:
         message = chat_completion(
@@ -319,6 +329,7 @@ def _execute_loop(
                 reply = "うまく答えを確定できなかったよ。対象やしてほしいことを少し具体的に教えて。"
             incomplete = capabilities and (
                 _is_deferred_action_reply(reply) or _is_manual_write_confirmation(reply)
+                or (action_required and not write_results)
             )
             if incomplete:
                 if not deferred_retry_used:
@@ -343,6 +354,20 @@ def _execute_loop(
                 )
                 had_failure = True
                 deferred_failure = True
+            if action_required and write_results and had_failure:
+                # Execution evidence wins over optimistic model prose, including
+                # failure and partial success. Never infer success from text.
+                failures = [item for item in write_results if _tool_failed(item["content"])]
+                details = []
+                for item in failures:
+                    try:
+                        data = json.loads(item["content"])
+                        reason = str(data.get("error") or "保存結果を確認できませんでした。")
+                    except (ValueError, TypeError):
+                        reason = item["content"][:300]
+                    details.append(reason)
+                partial = any(not _tool_failed(item["content"]) for item in write_results)
+                reply = ("一部の操作は実行されましたが、依頼全体は完了していません。" if partial else "依頼の操作は完了していません。") + " ".join(details)
             agent_progress.emit("finalizing", "返答をまとめてるよ")
             return {
                 "reply": reply,
@@ -471,6 +496,8 @@ def _execute_loop(
                     tool_rounds=tool_rounds,
                     total_tool_calls=total_tool_calls,
                     used_tools=used_tools,
+                    action_required=action_required,
+                    write_results=write_results,
                 )
                 return {
                     "reply": _confirmation_text(name, arguments),
@@ -506,6 +533,8 @@ def _execute_loop(
             round_results.append(
                 {"name": name, "content": compact_tool_result(name, raw_result)}
             )
+            if tools.risk_for(name) != "safe_read":
+                write_results.append({"name": name, "content": raw_result})
 
         messages.append(
             {
@@ -631,7 +660,9 @@ def resume_after_write(
             router_source="resume",
             router_confidence=None,
             allow_write_proposal=False,
+            action_required=state.get("action_required") is True,
+            write_results=list(state.get("write_results") or []) + [{"name": tool_name, "content": raw_result}],
         )
         return str(result.get("reply") or "").strip() or "確認された内容を実行したよ。"
     except LMStudioError:
-        return "確認された内容を実行したよ。"
+        return "確認された操作の実行に失敗しました。実行結果を確認してください。" if _tool_failed(raw_result) else "確認された内容を実行したよ。"

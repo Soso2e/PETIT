@@ -1,11 +1,10 @@
 {
   "name": "PETIT",
-  "version": "0.16.0",
-  "release": "universe-full-legacy-migration",
+  "version": "0.34.0",
+  "release": "setup-integrations",
   "includes": [
-    "voice control and audio response in universe UI",
-    "model routing settings and push notification configuration in universe UI",
-    "full task editing form directly inside detail panel",
-    "work session companion frequency control and prompt shortcuts"
+    "authenticated setup and ordered Brain",
+    "Google Calendar/Gmail read-only OAuth",
+    "persistent daily sync and operational alerts"
   ]
 }

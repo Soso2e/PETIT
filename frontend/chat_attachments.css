@@ -1,0 +1,7 @@
+.chat-attachments { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; max-height: 140px; overflow: auto; padding: 6px 8px; font-size: 11px; line-height: 1.5; color: var(--muted, #a0a09b); }
+.chat-attachments input { min-width: 0; max-width: 100%; font-size: 11px; }
+.chat-attachments > span { flex: 1 1 200px; overflow-wrap: anywhere; }
+.chat-attachments > div { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.chat-attachments > div > span { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow-wrap: anywhere; }
+.chat-attachments button { min-height: 32px; padding: 4px 8px; border: 1px solid #ffffff30; border-radius: 6px; font: inherit; color: inherit; background: transparent; cursor: pointer; }
+.chat-attachments img { max-width: 48px; max-height: 36px; object-fit: contain; }

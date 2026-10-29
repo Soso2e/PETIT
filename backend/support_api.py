@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from . import briefing, calendar_sync, db, proactive, scheduler, vault_indexer
+from . import briefing, calendar_sync, db, proactive, request_context, scheduler, vault_indexer
 
 router = APIRouter()
 
@@ -38,7 +38,9 @@ def sync_obsidian_vault(max_files: int | None = None) -> dict[str, Any]:
 @router.get("/api/proactive")
 def proactive_opener(session_id: str | None = None) -> dict[str, Any]:
     """A line PETIT says first when the user opens the app (talks proactively)."""
-    return proactive.generate_opener(session_id=(session_id or "").strip() or None)
+    session_id = (session_id or "").strip() or None
+    with request_context.bind(request_id=None, session_id=session_id):
+        return proactive.generate_opener(session_id=session_id)
 
 
 @router.get("/api/briefing")

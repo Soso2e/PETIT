@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import patch
 from pydantic import ValidationError
-from backend import chat, request_context, brain_runtime, capability_router
+from backend import chat, request_context, brain, brain_runtime, capability_router, config, db
+import tempfile
+from pathlib import Path
 from backend.petit_prompt import voice_turn_instructions
 
 
@@ -25,10 +27,12 @@ class VoiceConversationModeTests(unittest.TestCase):
 
     def test_chat_binds_mode_without_changing_message(self):
         seen = []
-        def run(message, history):
-            seen.append((message, request_context.current_conversation_mode()))
+        def run(messages, **kwargs):
+            seen.append((messages[-1]["content"], request_context.current_conversation_mode()))
             raise RuntimeError('fixture stops before persistence')
-        with patch.object(chat.agent, 'run', side_effect=run), patch.object(chat.log, 'exception'):
+        with tempfile.TemporaryDirectory() as directory, patch.object(config, "DB_PATH", Path(directory) / "app.db"), \
+             patch.object(brain.lmstudio_client, 'chat_completion', side_effect=run):
+            db.init_db()
             response = chat.chat(chat.ChatRequest(message='続きやろう', conversation_mode='voice'))
         self.assertIsNotNone(response.error)
         self.assertEqual(seen, [('続きやろう', 'voice')])

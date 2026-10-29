@@ -16,6 +16,19 @@ _DUE = re.compile(rf"^(?P<ref>{_REF})(?:の)?(?:期限|締切)(?:を)?(?P<date>�
 _TITLE = re.compile(rf"^(?P<ref>{_REF})(?:の)?(?:名前|タスク名)(?:を)?(?P<title>.+?)に(?:して|変更して)[。!！]*$")
 _COMPLETE = re.compile(rf"^(?P<ref>{_REF})(?:を|は)?(?:完了(?:して|にして|した)?|終わった)[。!！]*$")
 _CANCEL = {"キャンセル", "やめて", "取り消し", "取消", "やめる"}
+_START = r"(?:開始|再開)(?:して(?:ください|くれ|ほしい|ね)?|する)?"
+_WORK_START = re.compile(rf"^(?:(?:セッション|作業|計測)(?:を)?{_START}(?:[、,:： ]+(?P<after>.+))?|(?P<before>.+?)(?:の)?(?:セッション|作業|計測)(?:を)?{_START}|(?P<ref>{_REF})(?:を)?{_START}|{_START})$")
+_WORK_STATUS = re.compile(r"^(?:セッション|作業|計測)?(?:を)?(?:開始|再開)(?:してくれた|した|されてる|してる)(?:の|かな|か)?[?？]?$|^(?:今|現在)(?:は)?(?:何を)?作業中[?？]?$")
+
+
+def _work_operation(text: str) -> tuple[dict[str, Any], str] | None:
+    if "プロジェクト" in text:
+        return None
+    match = _WORK_START.fullmatch(text)
+    if not match:
+        return None
+    target = (match["after"] or match["before"] or match["ref"] or "").strip(" 「」")
+    return {"kind": "start_work_session", "arguments": {}}, target
 
 
 def _text(value: str) -> str:
@@ -153,6 +166,24 @@ def _execute(operation: dict[str, Any], chosen: dict[str, Any], session_id: str,
         item = dialogue_state.entity(task, "last_selected", turn_id=request_context.current_ids()[0])
         dialogue_state.remember(session_id, [item])
         return _reply(f"「{task['title']}」を選んだよ。", source)
+    if kind == "start_work_session":
+        # Retain the selected stable ID even when the handler or policy fails.
+        item = dialogue_state.entity(task, "last_selected", turn_id=request_context.current_ids()[0])
+        dialogue_state.remember(session_id, [item])
+        data = _dispatch(kind, {"task_id": str(task["id"])}, used)
+        from . import work_sessions
+        active = work_sessions.active_session()
+        reported = data.get("session") or {}
+        success = (not data.get("error") and (data.get("started") is True or data.get("already_active") is True)
+                   and active and active.get("status") == "active" and str(active.get("task_id")) == str(task["id"])
+                   and active.get("session_id") == reported.get("session_id"))
+        if success:
+            wording = "再開したよ" if data.get("resumed") else "すでに作業中だよ" if data.get("already_active") else "作業計測を開始したよ"
+            return _reply(f"「{task['title']}」は{wording}。", source, used)
+        dialogue_state.set_pending(session_id, {**operation, "status": "failed"}, [item], operation.get("original_request") or "セッション開始")
+        dialogue_state.remember(session_id, [], {"tool": kind, "entity_type": "task", "entity_id": task["id"],
+                                                "status": "failed", "updated_at": db.now_iso()})
+        return _reply(f"「{task['title']}」の開始を確認できませんでした。{data.get('error') or '保存された作業状態が実行結果と一致しません。'} 対象は保持しています。「開始して」で再試行できます。", source, used)
     if kind == "create_child_task":
         # Validate before creating, so an invalid parent cannot leave an orphan.
         error = task_hierarchy._validate_parent({"id": -1, "source": "notion" if config.notion_configured() else "local"}, task)
@@ -183,10 +214,30 @@ def try_handle(message: str) -> dict[str, Any] | None:
     text = _text(message)
     state = dialogue_state.load(session_id)
     pending = state.get("pending_dialogue")
-    operation = _operation(text)
+    operation = _work_operation(text) or _operation(text)
+    if (operation and operation[0]["kind"] == "start_work_session" and not operation[1]
+            and text.startswith("再開") and not state.get("focus_stack")
+            and not (pending and pending.get("kind") == "start_work_session")):
+        # Preserve Project Continuity's bare resume when no task is referenced.
+        operation = None
+    if _WORK_STATUS.fullmatch(text):
+        from . import work_sessions
+        active = work_sessions.active_session()
+        if active:
+            status = "作業中" if active["status"] == "active" else "一時停止中"
+            return _reply(f"「{active['task']}」は{status}だよ。", "saved_work_status")
+        return _reply("現在、開始されている作業セッションはありません。", "saved_work_status")
+    if any(marker in text for marker in ("ところで", "別の話", "話を変")):
+        if pending:
+            dialogue_state.take_pending(session_id, pending["id"])
+        # Keep task working memory, but stop implicit reuse after an explicit topic switch.
+        dialogue_state.remember(session_id, [], {"tool": "topic_change", "updated_at": db.now_iso()})
+        return None
     if pending and pending.get("owner") == "tasks":
         if text in _CANCEL:
             dialogue_state.take_pending(session_id, pending["id"])
+            if pending.get("kind") == "start_work_session":
+                dialogue_state.remember(session_id, [], {"tool": "work_canceled", "updated_at": db.now_iso()})
             return _reply("確認待ちの操作をキャンセルしたよ。", "pending_cancel")
         saved_candidates = pending.get("candidates") or []
         if not saved_candidates:
@@ -201,11 +252,19 @@ def try_handle(message: str) -> dict[str, Any] | None:
                 dialogue_state.set_pending(session_id, pending["operation"], saved_candidates, pending["original_request"])
                 return _reply(_question(saved_candidates), "ambiguous_name")
         # Keep original order for ordinal replies; revalidate only after selection.
-        chosen = select(text, saved_candidates)
+        is_work = pending.get("kind") == "start_work_session"
+        chosen = select(text, saved_candidates) if not (is_work and pending["operation"].get("status") == "failed") else None
+        if is_work and operation and operation[0]["kind"] == "start_work_session" and not operation[1] and len(saved_candidates) == 1:
+            chosen = saved_candidates[0]
+        if is_work and operation and not operation[1] and len(saved_candidates) > 1:
+            return _reply(_question(saved_candidates), "ambiguous_work_task")
         if chosen:
             if not dialogue_state.take_pending(session_id, pending["id"]):
                 return _reply("確認状態を更新できませんでした。もう一度依頼してください。", "pending_unavailable")
-            return _execute(pending["operation"], chosen, session_id, "pending_dialogue")
+            return _execute({**pending["operation"], "original_request": pending["original_request"]}, chosen, session_id, "pending_dialogue")
+        if is_work and not operation:
+            # A progress remark never retries a failed write or consumes the target.
+            return None
         if not operation and not _CREATE.fullmatch(text):
             # A new explicit topic can leave the clarification; a short candidate
             # answer belongs to its owner and must never reach the project router.
@@ -217,6 +276,31 @@ def try_handle(message: str) -> dict[str, Any] | None:
         dialogue_state.take_pending(session_id, pending["id"])
     if operation:
         op, ref = operation
+        if op["kind"] == "start_work_session":
+            op["original_request"] = message
+            if ref and not re.fullmatch(_REF, ref):
+                from .tools.work_sessions import resolve_task
+                identifier = re.fullmatch(r"(?:ID[:： ]*|#)(.+)", ref, re.I)
+                resolved = resolve_task(task_id=identifier[1]) if identifier else resolve_task(task=ref)
+                selected = resolved.get("task")
+                if selected:
+                    chosen = dialogue_state.entity({"id": selected["task_id"], "title": selected["task"],
+                                                   "source": (task_hierarchy._find_task(selected["task_id"]) or {}).get("source")}, "last_selected")
+                    return _execute(op, chosen, session_id, "explicit_work_task")
+                candidates = [dialogue_state.entity(task_hierarchy._find_task(item["task_id"]), "mentioned") for item in resolved.get("candidates", [])]
+                if candidates:
+                    dialogue_state.set_pending(session_id, op, candidates, message)
+                    return _reply(_question(candidates), "ambiguous_work_task")
+                return _reply(resolved["error"], "work_task_not_found")
+            if not ref:
+                last = state.get("last_action") or {}
+                if last.get("tool") in {"topic_change", "work_canceled"}:
+                    return _reply("開始するタスク名またはIDを教えてください。", "work_topic_changed")
+                chosen, candidates, source = _focus("それ", state)
+                if chosen and dialogue_state._fresh(chosen.get("updated_at"), dialogue_state.PENDING_TTL_SECONDS):
+                    return _execute(op, chosen, session_id, source)
+                dialogue_state.set_pending(session_id, op, [], message)
+                return _reply(_question(candidates), "missing_work_focus")
         chosen, candidates, source = _focus(ref, state)
         if chosen:
             return _execute(op, chosen, session_id, source)
@@ -237,4 +321,11 @@ def try_handle(message: str) -> dict[str, Any] | None:
         return _reply(_question(candidates), source)
     if re.match(rf"^{_REF}(?:の)?(?:期限|締切|子供|子ども|子タスク|子|下|名前|タスク名)", text):
         return _reply("対象と変更内容を確認したい。タスク名と期限・追加内容を具体的に教えてください。", "unsupported_task_anaphora")
+    # A bare exact task mention establishes reference, without starting work.
+    # Do not fuzzy-match ordinary conversation or consult external sources here.
+    with db.get_connection() as conn:
+        rows = conn.execute("SELECT id, title, source FROM tasks_cache WHERE title=? LIMIT 2", (text.strip("「」"),)).fetchall()
+    if len(rows) == 1:
+        item = dialogue_state.entity(dict(rows[0]), "mentioned", turn_id=request_context.current_ids()[0])
+        dialogue_state.remember(session_id, [item], {"tool": "mention_task", "entity_id": item["entity_id"], "updated_at": db.now_iso()})
     return None

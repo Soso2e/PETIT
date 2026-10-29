@@ -18,6 +18,8 @@ storage/chroma/
 storage/AI_Daily/
 storage/AI_Memory/
 storage/audit/
+storage/attachments/
+storage/vision-ui/
 
 # OS / editor
 .DS_Store
@@ -32,3 +34,7 @@ desktop/wakeword-assets/wake-model.json
 
 # Local wake-word training environment, audio and generated models
 storage/wakeword/
+
+# Host-local setup secrets and official CLI credentials
+storage/settings/
+storage/setup-e2e/

@@ -1,8 +1,122 @@
 # PETIT Runtime Flows
 
-この文書は実装済みのフローを示す。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）のThread/Turn/Events・管理Coreは目標であり、実装する各PRで本書を更新する。
+## Antigravity ACP setup and restricted readiness (#357)
+
+```mermaid
+flowchart TD
+    UI[管理者が設定画面を開く] --> Install[任意の導入先 / ACP Registry latestから公式配布物取得]
+    Install --> Verify[Google CDN配布URL / RegistryのOS・arch・version・SHA-256照合]
+    Verify -->|成功| Versioned[PETIT専用versioned install root / agy CLIに非干渉]
+    Verify -->|失敗| Fail[導入失敗 / 既存配置を変更しない]
+    Versioned --> Handshake[ACP Python SDK / stdio / initialize v1]
+    Handshake --> Methods[AgentInfoとauthMethodsのみ表示]
+    Methods -->|利用者が明示的にOAuth操作| OAuth[Agentが広告したoauth-personalを選択してauthenticate]
+    OAuth --> AgentStore[Google credentialは公式Agentが管理 / PETITは読取・保存しない]
+    Methods --> Usage[model・tokens・plan quota・creditsは別状態 / 未取得はunknown]
+    AgentStore --> Usage
+    Usage --> Disabled[会話Brain・実フォルダ・Terminal・backgroundは無効]
+    Disabled --> Gate[Windows OS隔離とACP権限制御の実機検証後に別変更で解禁]
+```
+
+initialize handshakeはモデル推論・認証成功・Google契約枠の使用を証明しない。ACP Agentが内部Toolを直接実行するため、PETITのPermission callbackだけではWindows上のファイル書込みやShellを遮断できない。OSレベルの隔離とPETIT既存Approval/Receiptへの正確な接続が完成するまで、会話Providerとしては公開しない。既存 `agy` CLI診断とAntigravity SDKは独立して維持する。
+
+## v0.34.0: 初期設定・優先順位と単一Brain（#353）
+
+管理UIの順位設定がONなら新しい選択経路、OFFなら従来の明示Provider選択を使う。
+本文・Thread/Turn・承認・receiptは既存SQLiteが正本で、下記の旧1〜10は移行前の参考資料。
+
+```mermaid
+flowchart TD
+    C[Web / Desktop / voice] --> Auth[管理者session検査 / 初回は設定UI]
+    Auth --> A[chat adapter または Turn API]
+    A --> L[request ID / 入力hash / Threadを原子的に受付]
+    L -->|同一入力の再送| R[保存済み結果 / 承認 / receipt]
+    L -->|ID衝突 / 同じThread実行中| Conflict[409 / 429]
+    L --> Select[順位または従来選択 / local_only / 接続と費用同意を検査]
+    Select --> Pin[選択Event / Provider pin / 同じThreadの履歴と運用アラート]
+    Pin --> Backend{単一Runtimeの所有者}
+    Backend -->|DeepSeek / LM Studio| Native[既存native Tool Loop]
+    Backend -->|Codex| Codex[公式app-server Agent Loop]
+    Backend -->|Antigravity| SDK[公式SDK Agent Loop / Turn専用Worker]
+    Native --> Gate[既存Registry / 公開catalog / schema / risk / cancel]
+    Codex -->|dynamic PETIT Tool| Gate
+    SDK -->|Python PETIT bridge| Gate
+    Gate -->|確認必須| Approval[SQLite承認とmessages / Runtime終了]
+    Approval --> UI[既存確認UI / 再起動復元]
+    UI -->|一度だけ承認消費| Execute[既存Domain Tool]
+    Gate -->|Read / 低リスクWrite| Execute
+    Execute -->|SQLite Write| Receipt[Domain保存とreceiptを同じtransaction]
+    Execute -->|外部Write| Unknown[receipt / 不明はunknown / 自動再実行なし]
+    Execute --> Return[同じRuntimeへTool結果 / call IDを保存]
+    Receipt --> Return
+    Unknown --> Return
+    Return --> Backend
+    Backend -->|Tool開始前の障害のみ| Stop[現在のRuntimeを完全終了]
+    Stop --> Next{接続済み・許可済み次候補}
+    Next -->|あり| Pin
+    Next -->|なし| Failed[失敗状態 / 次Turnは順位の上位から再試行]
+    Backend -->|Tool後の障害| Failed
+    Backend -->|正常回答| Save[未解決同期警告を一言付加 / conversations本文とEvents保存]
+    Save --> R
+```
+
+管理UIのSDK bridgeはCoreのWrite承認/receiptも使う。従来`antigravity_sdk` profileは
+限定Read専用のまま。SDK内蔵Toolはfinishのみ、Codexのshell/apps/plugins/subagentは無効、
+許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
+画像は既存Vision観測→Read専用回答で、画像Providerの順位Fallbackは未対応。
+8 rounds / 12 callsと取消/deadlineを維持し、local_onlyは外部へ送らない。
+
+```mermaid
+flowchart TD
+    Wizard[初回ウィザード / 統合Settings] --> Admin[scrypt管理者 / HttpOnly cookie / Origin検査]
+    Admin --> Host[ホスト別の暗号化設定 / Git管理外 / atomic更新]
+    Admin --> OAuth[Google共通OAuth / session + state + PKCE / scope追加同意]
+    OAuth --> Google[Calendar read-only / Gmail read-only]
+    Host --> Connect[Notion対象選択 / TimeTree既存exporter / AI接続]
+    Host --> Calendar[外部Calendarは1つ / 未接続はlocal]
+    Calendar --> Due[SQLite日次枠とlease / 02:00 JST / 起動時catch-up / 手動再試行]
+    Due --> Fetch[Google全ページdelta / 410時full / TimeTree全snapshot]
+    Fetch -->|成功| Commit[差分とcursorを同じtransaction / 正常cache保持]
+    Fetch -->|失敗| Alert[永続アラートを先に保存 / 前回cacheとcursor保持]
+    Connect --> Notion[既存Notion日次同期の結果監視]
+    Notion -->|失敗| Alert
+    Alert --> Notify[重複抑制 / 高優先度Push + アプリ内 / 失敗でも記録保持]
+    Alert --> Context[復旧まで各会話に概要 / 末尾に一言]
+    Commit --> Resolve[アラート解除 / 最終成功と更新件数]
+    Notion -->|正常同期| Resolve
+    Google --> Mail[既存Tool RegistryへGmail検索・本文Read]
+```
+
+外部Calendarへの自動書き戻しはなく、Google双方向は未実装。詳細・認証前提・未確認事項は
+[初期設定と接続](setup-integrations.md)。既存SDK実証は[SDK導入記録](antigravity-brain-poc.md)、
+Coreの所有権・DB互換は[renaissance-core.md](renaissance-core.md)。
+
+
+Thread/Turn/Eventsの現行経路は上図を参照する。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）全体の端末・管理機能の完成を示すものではない。
+
+[AI-First設計と比較PoC](ai-first-agent-design.md)（#338）の実験を経て、通常text経路を上図へ移行した。以下の旧会話図は移行前の参考資料である。
 
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
+
+## ローカル開発観測（#341 / Opt-in、開発ブランチ）
+
+```mermaid
+flowchart TD
+    settings[明示設定: workspaceのGitルート最大8件] --> opt{PC観測 & 開発資料許可がON?}
+    opt -->|NO| disabled[参照不可 / 既存会話継続]
+    opt -->|YES| observer[既存WorkspaceObserverの定期refresh]
+    observer --> root{指定ディレクトリがGitルート?}
+    root -->|NO| unavailable[unavailable / not_repository_root]
+    root -->|YES| git[git status / local HEAD・branches・log・tracking差分]
+    root --> docs[Concept / PROGRESS / README の固定3ファイルを上限付きで読む]
+    git --> cache[スナップショットメモリ cache: collected_at / stale]
+    docs --> cache
+    cache --> api[GET api/workspace-context]
+    cache --> tool[Agent get_local_development_status safe_read]
+    tool --> response[文書上の目標・作業状態・未検証を区別して答える]
+```
+
+設計詳細と安全境界は [local-development-insight.md](local-development-insight.md)。ローカル参照はfetch/pullしない。文書内の指示を実行しない。GitHub最新・実機テスト済み・プロジェクト完了は別の証拠が必要。Toolは既存観測キャッシュを参照するだけで再走査しない。
 
 ## 作業統計タブ（v0.28.0 / #319・#321）
 
@@ -104,6 +218,35 @@ flowchart TD
 
 ## 1. 会話全体フロー
 
+### 画像添付のRead専用経路（v0.31.0 / #333）
+
+```mermaid
+flowchart TD
+    file[Web / Desktop: 画像実体] --> intake[POST /api/attachments: 8MiB・30秒上限]
+    intake --> check[実体decode / PNG JPEG WebP / 画素と辺の上限]
+    check --> normalize[EXIF向き補正・metadata除去・長辺4096pxまで]
+    normalize --> store[Core非公開storage + SQLite / session hash + opaque ID]
+    store --> request[POST /api/chat: attachment_ids + 任意message]
+    request --> owner{同じsession・期限内・4枚以下}
+    owner -->|不一致・欠落| error[error応答 / 認識したふりをしない]
+    owner -->|一致| consent{画像・認識内容の外部送信許可}
+    consent -->|外部・許可なし| error
+    consent -->|許可あり またはlocal| capability{モデル画像能力}
+    capability -->|Flash対応 / LM Studio selected model vision=true| vision[Vision Adapter: 観測JSONを1 Callで抽出]
+    capability -->|非対応・不明・通信失敗| error
+    vision --> validated{JSON schema / 画像ID対応 / 上限}
+    validated -->|失敗| error
+    validated -->|成功| calc[Decimalによる既知Steam比率検証 / 不明・重複値は計算しない]
+    calc --> brain[Core Promptで観測と考察を分けて回答 / 通常1 Call]
+    brain --> saved[既存conversations + TTL付き観測JSON / 添付ID保持]
+    saved --> reply[自然な返答 / usage・実Call数]
+    store --> ttl[24時間で参照拒否 / 60秒周期と起動時cleanup / 明示DELETE]
+```
+
+画像経路は `agent.run` / Capability選択 / Tool Loopへ入らず、画像内の命令からWrite・承認を生成しない。外部送信は `PETIT_ALLOW_CLOUD_IMAGES` が既定OFF。VisionのProviderは既存DeepSeek Flashを優先し、`PETIT_VISION_PROFILE=local` の場合はLM Studio `/api/v1/models` の選択モデル `capabilities.vision=true` が必要。未確認モデルは失敗にする。観測の回答生成先が外部の場合も同意を再検査する。通常2 Call、空出力再試行は最大各1回。HTTP timeoutは画像経路で各45秒。画像経路のMarkdown/Chroma自動exportは停止し、認識JSONは24時間で削除する。既存会話の返答/添付IDは既存履歴の保持方針に従う。
+
+画像とProject/GitHubの自動照合、Discord、新Thread/Turn APIはこの経路に未接続。後続は [計画](multimodal-discord-plan.md) と #245/#246/#303/#304を参照する。session IDは既存ローカルClientの会話境界であり、インターネット公開用のユーザー認証ではない。
+
 ```mermaid
 flowchart TD
     input[/ユーザー入力/]
@@ -142,7 +285,7 @@ flowchart TD
     input --> api --> validate
     validate -->|はい| output
     validate -->|いいえ| bind --> agentEntry
-    dialogue{Pending Dialogue / Task照応 / 明示Taskか}
+    dialogue{Pending Dialogue / Task照応 / 明示Task・Session操作か}
     dialogueHandle[候補確認またはstable IDでTask Tool実行]
     dialogueSave[Tool Registry成功hookでfocusを更新]
     agentEntry --> dialogue
@@ -158,7 +301,9 @@ flowchart TD
     exactTime -->|はい| timeTool --> response
     exactTime -->|いいえ| brain --> selector --> route
     route -->|reply| directReply --> response
-    route -->|request_context| context --> parallel --> packet --> second --> response
+    route -->|request_context| context --> parallel --> packet --> unfinished{元の依頼に未実行ActionとCapabilityがあるか}
+    unfinished -->|いいえ| second --> response
+    unfinished -->|はい| capability
     route -->|route_to_agent| capability --> agentLoop --> response
     response --> pending --> persist
     persist -->|はい| save --> artifacts --> output
@@ -215,7 +360,9 @@ flowchart TD
     parallel --> calendar --> packet
     parallel --> personal --> packet
     parallel --> handoff --> packet
-    packet --> partial --> second --> final
+    packet --> partial --> actionLeft{continue_actionとCapabilityが明示されているか}
+    actionLeft -->|いいえ| second --> final
+    actionLeft -->|はい| reuse[元の依頼と取得済みPacketを既存Agentへ引継ぎ] --> map
     result -->|route_to_agent| route --> parse --> map --> agent
 ```
 
@@ -326,7 +473,7 @@ flowchart TD
     answer[回答本文を取得]
     empty{回答が空か}
     fallbackAnswer[言い換えを求める固定文]
-    incomplete{作業予告またはRuntime外の確認だけか}
+    incomplete{作業予告・重複確認またはActionにWrite実行結果がないか}
     retryUsed{再実行済みか}
     forceTool[このターンでTool callするよう再指示]
     deferredFail[未実行を明示した失敗回答]
@@ -357,7 +504,7 @@ flowchart TD
     hasCalls -->|いいえ| answer --> empty
     empty -->|はい| fallbackAnswer --> incomplete
     empty -->|いいえ| incomplete
-    incomplete -->|いいえ| finalizing --> final
+    incomplete -->|いいえ| evidence[実行結果を優先 / 失敗・部分成功を固定文で報告] --> finalizing --> final
     incomplete -->|はい| retryUsed
     retryUsed -->|いいえ| forceTool --> call
     retryUsed -->|はい| deferredFail --> finalizing
@@ -408,7 +555,7 @@ flowchart TD
     error{例外や実行時エラーか}
     errorText[[error]文字列]
     result[JSONまたは文字列]
-    observe[Task成功結果だけsessionのfocusとlast_actionへ / best effort]
+    observe[Task成功 / Workの対象IDと実行状態をfocusとlast_actionへ / best effort]
 
     decorator --> riskInput
     riskInput -->|はい| explicit --> register
@@ -829,18 +976,23 @@ flowchart TD
     Claim --> Valid[stable IDで現在のTaskとsourceを再確認]
     Pending -->|cancel| Cancel[Pendingのみ解除]
     Pending -->|明示した別の話題| Clear[Pending解除 / 通常入口へ]
-    Pending -->|未解決の短い回答| Ask[候補質問を維持]
+    Pending -->|未解決の短い回答| Ask[Task候補質問を維持 / Work補足は再実行せず通常Brainへ]
     Pending -->|なし| Focus[24時間以内のfocus / 最大8件]
     Focus --> Unique{同一turnで一意か}
     Unique -->|いいえ| Save[操作と候補を保存 / 短く確認]
     Unique -->|はい| Valid
     Valid --> Risk[既存low_risk_write / Task hierarchy検証]
-    Risk --> Tool[既存create update complete set_parent]
-    Tool --> Hook[Registry共通hook / 成功だけfocusとlast_action更新]
+    Risk --> Tool[既存create update complete set_parent start_work_session]
+    Tool --> Hook[Registry共通hook / Task成功・Work結果と対象IDを記録]
     Hook --> Reply[結果を返す / 外部同期と部分失敗を区別]
+    Tool --> Work[Work開始はSQLite BEGIN IMMEDIATEで同一Taskのactive・pausedを再利用]
+    Work --> Verify[返却session IDと保存済みactive Taskを照合]
+    Verify -->|一致| Reply
+    Verify -->|失敗・不一致| Retry[10分TTLの既存Pendingへ元依頼・対象ID・failed状態を保持]
+    Retry -->|明示した再試行だけ| Claim
 ```
 
-Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧Readや失敗結果はfocusを上書きしません。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。
+Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧ReadやTask失敗結果はfocusを上書きしません。Work開始失敗は再試行対象としてIDを保持しますが、成功した作業状態とは区別します。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。明示的な話題転換・キャンセル後は短い開始だけで旧対象を再実行しません。詳細と検証範囲は [Conversation-to-Action Reliability](conversation-action-reliability.md)。
 
 ## 接続ステータスと同期診断（#327）
 
@@ -862,3 +1014,45 @@ flowchart TD
     UI -->|競合を比較| Conflict[既存競合UI・revision確認]
     Conflict --> Choice[PETIT側再同期 / Notion側採用を明示選択]
 ```
+
+
+## Renaissance: 確認済みProjectとローカル開発参照（#345 / #341）
+
+```mermaid
+flowchart TD
+    Task[既存Task.project_id] --> Project[Project Continuity 内部ID]
+    Lookup[find_projects / 確認済み別名] --> Project
+    Allowed[list_project_workspaces / 明示allowlist] --> Link[link_project_workspace / 利用者確認]
+    Project --> Link
+    Link --> Verify[承認時にpath・Gitルート・private・symlinkを再検査]
+    Verify --> Sources[既存project_source_links / local_workspace / confirmed_at]
+    Project --> Read[get_local_development_status project_id]
+    Sources --> Read
+    Read --> Cache[既存WorkspaceObserver / 正確なrootのworkspace_id]
+    Cache --> Facts[観測時刻とstale / 文書mtime・出典 / 実Git状態を区別]
+    Facts --> Brain[Brainが必要な情報だけ統合して返答]
+```
+
+似た名前での自動紐付けや別の進捗台帳は追加しない。未確認・解除済み・許可撤回・staleは明示する。
+詳細: [project-workspaces.md](project-workspaces.md)。
+## Renaissance: 元発言検索と長期記憶（#345）
+
+```mermaid
+flowchart TD
+    Brain[Brainが必要性を判断] -->|原文が必要| Search[search_conversations / bounded query]
+    Search --> Scope[Threadのprivacy / source / 時間 / roleを検査]
+    Scope --> Original[既存conversationsの入力と出力]
+    Original --> Citation[元ID / Thread / 日時 / 発言元 / 原文抜粋]
+    Citation --> Brain
+    Brain -->|長期知識が必要| Memory[search_memory]
+    Memory --> Canonical[SQLite正本で置換・期限・visibilityを検査]
+    Canonical --> Results[通常文脈は最大5項目 / 必要なら追加検索]
+    Results --> Brain
+    Brain -->|記録・訂正| Save[save_memory / 正規化重複を原子的に再利用]
+    Save --> History[旧行を削除せずsuperseded_byと有効期限を保存]
+    Save -->|standardの新規知識のみ| Index[該当1件だけ索引更新]
+```
+
+元発言検索は履歴の暗黙結合ではない。NULL旧sessionは出典不明のまま保持する。
+local_onlyの元発言・記憶はstandard会話の検索から除外。local_only検索はembeddingへも送信しない。
+詳細: [renaissance-memory.md](renaissance-memory.md)。

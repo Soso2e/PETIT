@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import logging
+import os
+import ipaddress
 import ssl
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
@@ -76,7 +79,9 @@ def _take_prefetched_chat(messages: list[dict[str, Any]], *, route: str, tools: 
 
 
 def endpoint(route: str) -> dict[str, Any]:
-    return model_routing.endpoint(route)
+    from . import brain_priority
+    selected = brain_priority.current() if route == "chat" else None
+    return selected if selected is not None else model_routing.endpoint(route)
 
 
 def clear_health_cache() -> None:
@@ -91,6 +96,56 @@ def _record_model_call(route: str, target: dict[str, Any], model: str) -> None:
     metrics["models"].append(model)
     metrics["endpoint_ids"].append(route)
     metrics["profiles"].append(target["profile"])
+
+
+def _record_usage(data: dict[str, Any], target: dict[str, Any]) -> None:
+    metrics = _turn_metrics.get()
+    if metrics is None:
+        return
+    usage = data.get("usage") or {}
+    entry = {"provider": target["provider"], "model": target["model"]}
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens", "prompt_cache_hit_tokens", "prompt_cache_miss_tokens"):
+        value = usage.get(key)
+        entry[key] = value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+    metrics.setdefault("usage", []).append(entry)
+
+
+def image_egress_is_external(target: dict[str, Any]) -> bool:
+    if target.get("external"):
+        return True
+    host = urlsplit(target.get("base_url", "")).hostname or ""
+    if host == "localhost" or host.endswith(".local"):
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+        return not (address.is_loopback or address.is_private or address.is_link_local)
+    except ValueError:
+        return True  # Unknown hostnames must not silently count as local.
+
+
+def validate_image_target(target: dict[str, Any]) -> None:
+    """Fail closed before sending pixels. Consent applies to every external target."""
+    if image_egress_is_external(target):
+        if os.getenv("PETIT_ALLOW_CLOUD_IMAGES", "").lower() not in {"1", "true"}:
+            raise LMStudioError("クラウドへの画像送信はOFFです。設定PETIT_ALLOW_CLOUD_IMAGESで明示的に許可してください。")
+    if target.get("provider") == "deepseek":
+        if target.get("model") != "deepseek-flash":
+            raise LMStudioError("選択モデルの画像入力対応を確認できません。VisionにはDeepSeek Flashを選んでください。")
+        return
+    if target.get("provider") != "lm_studio":
+        raise LMStudioError("画像入力に対応するProviderを確認できません。")
+    parsed = urlsplit(target["base_url"])
+    url = urlunsplit((parsed.scheme, parsed.netloc, "/api/v1/models", "", ""))
+    try:
+        response = httpx.get(url, headers={"Authorization": f"Bearer {target['api_key']}"}, timeout=5)
+        response.raise_for_status()
+        models = response.json().get("models", [])
+        matching = [item for item in models if item.get("key") == target["model"] or any(
+            instance.get("id") == target["model"] for instance in item.get("loaded_instances", []))]
+        if len(matching) != 1 or matching[0].get("capabilities", {}).get("vision") is not True:
+            raise LMStudioError("LM Studioの選択モデルがVision対応と確認できません。画像対応モデルを選んでください。")
+    except (httpx.HTTPError, ValueError, TypeError, AttributeError) as exc:
+        raise LMStudioError("LM StudioのVision能力を確認できません。接続とモデルを確認してください。") from exc
 
 
 def _provider_name(target: dict[str, Any]) -> str:
@@ -108,7 +163,7 @@ def _post_completion(
     provider_name = _provider_name(target)
     try:
         verify = _SYSTEM_TRUST_CONTEXT if target.get("provider") == "deepseek" else True
-        resp = httpx.post(url, json=payload, headers=headers, timeout=config.LM_TIMEOUT, verify=verify)
+        resp = httpx.post(url, json=payload, headers=headers, timeout=target.get("timeout_seconds", config.LM_TIMEOUT), verify=verify)
         resp.raise_for_status()
     except httpx.ConnectError as exc:
         raise LMStudioError(
@@ -196,6 +251,7 @@ def chat_completion(
     model: str | None = None,
     max_tokens: int | None = None,
     route: str = "chat",
+    target_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Call the active OpenAI-compatible endpoint for Chat or Agent."""
     if not any(
@@ -204,11 +260,22 @@ def chat_completion(
     ):
         raise LMStudioError("LLM送信前のmessagesに空でないrole=userがありません。")
 
+    target = target_override or endpoint(route)
+    if target.get("provider") == "antigravity_sdk":
+        raise LMStudioError("Antigravity SDKは単一Brainのテキスト会話で使用してください。この経路は未対応です。")
     prefetched = _take_prefetched_chat(messages, route=route, tools=tools)
     if prefetched is not None:
         return prefetched
-
-    target = endpoint(route)
+    from . import request_context
+    if request_context.local_only() and (
+        target.get("provider") != "lm_studio" or image_egress_is_external(target)
+    ):
+        raise LMStudioError("ローカル専用Threadの文脈を外部Providerへ送信しません。")
+    has_images = any(isinstance(item.get("content"), list) and any(
+        block.get("type") in {"image_url", "file"} for block in item["content"] if isinstance(block, dict))
+        for item in messages)
+    if has_images:
+        validate_image_target(target)
     if not target.get("configured"):
         if target.get("provider") == "deepseek":
             raise LMStudioError(f"{route}のDeepSeek APIキーが未設定です。PETIT_DEEPSEEK_API_KEYを.envに追加してください。")
@@ -241,6 +308,7 @@ def chat_completion(
         _record_model_call(route, target, selected_model)
         try:
             data = _post_completion(url=url, payload=payload, headers=headers, route=route, target=target)
+            _record_usage(data, target)
             message = _parse_choice(data, target)
         except LMStudioError:
             if retry_count == 0:

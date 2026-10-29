@@ -1,0 +1,114 @@
+{
+  "provider": "configured_deepseek_flash",
+  "data": "synthetic",
+  "external_sync_and_embedding": "disabled",
+  "real_discord_and_devices": "not_tested",
+  "passed": 6,
+  "cases": [
+    {
+      "case": "progress",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "find_projects",
+        "get_tasks",
+        "get_project_status",
+        "list_project_workspaces",
+        "get_local_development_status"
+      ],
+      "memory_rows": 0,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 7891,
+      "error": null
+    },
+    {
+      "case": "remember",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "save_memory"
+      ],
+      "memory_rows": 1,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 4038,
+      "error": null
+    },
+    {
+      "case": "avoid_duplicate",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "search_memory",
+        "get_tasks",
+        "get_schedule"
+      ],
+      "memory_rows": 1,
+      "work_rows": 0,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 5790,
+      "error": null
+    },
+    {
+      "case": "start",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "get_tasks",
+        "start_work_session"
+      ],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 4038,
+      "error": null
+    },
+    {
+      "case": "original_quote",
+      "passed": true,
+      "status": "completed",
+      "tools": [
+        "search_conversations",
+        "search_conversations",
+        "search_conversations"
+      ],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 4842,
+      "error": null
+    },
+    {
+      "case": "quoted_command",
+      "passed": true,
+      "status": "completed",
+      "tools": [],
+      "memory_rows": 1,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 1011,
+      "error": null
+    },
+    {
+      "case": "correction",
+      "passed": false,
+      "status": "completed",
+      "tools": [
+        "save_memory"
+      ],
+      "memory_rows": 2,
+      "work_rows": 1,
+      "calendar_rows": 1,
+      "replaced_memory_rows": 0,
+      "elapsed_ms": 2956,
+      "error": null
+    }
+  ]
+}

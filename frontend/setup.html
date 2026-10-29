@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer"><title>PETIT 初期設定と接続</title>
+  <link rel="stylesheet" href="/static/setup.css"><script src="/static/setup.js" defer></script>
+</head>
+<body>
+<main>
+  <header><a href="/static/universe.html" id="back">PETITに戻る</a><p class="eyebrow">PETIT / SETUP</p><h1>初期設定と接続</h1><p>使いたいサービスだけ接続してください。設定はこのサーバーに保存します。</p></header>
+  <p id="notice" role="status" aria-live="polite"></p>
+  <section id="auth" class="card" hidden>
+    <h2 id="auth-title">管理者ログイン</h2><p id="auth-help"></p>
+    <form id="auth-form"><label>管理者パスワード<input id="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+      <label id="bootstrap-field" hidden>初期設定トークン（Cloudで設定した場合）<input id="bootstrap-token" type="password" autocomplete="off"></label>
+      <button type="submit" id="auth-submit">ログイン</button></form>
+  </section>
+  <div id="admin" hidden>
+    <nav aria-label="セットアップ手順"><button data-step="0">1 AI</button><button data-step="1">2 サービス</button><button data-step="2">3 同期と通知</button><button data-step="3">4 完了</button></nav>
+    <div id="step-0" class="step">
+      <section class="card"><h2>AI Brainの優先順位</h2><p>ドラッグ、または上下ボタンで並び替えます。次の依頼から上位を再試行します。</p>
+        <ol id="priority" aria-label="AIの優先順位"></ol><p id="active-brain"></p>
+        <label class="check"><input type="checkbox" id="brain-enabled">この優先順位を会話で使う</label>
+        <button id="save-brain">AI設定を保存</button><p class="muted">Tool実行後の障害では、自動切替で処理を再実行せず、保存済み結果を保持します。</p>
+      </section>
+      <section class="card"><h2>Codex / ChatGPT</h2><p>サーバーの公式Codex CLIを使います。PETIT専用の認証を公式の資格情報ストアへ保存します。</p>
+        <label>モデル（空欄でCodexの既定）<input id="codex-model" maxlength="200"></label>
+        <div class="actions"><button data-connect="codex">ChatGPTで認証</button><button id="codex-confirm">認証完了を確認</button><button data-test="codex">接続テスト</button><button data-disconnect="codex" class="quiet">切断</button></div>
+        <p id="codex-code" role="status"></p><a id="codex-link" target="_blank" rel="noopener noreferrer" hidden>公式認証ページを開く</a>
+      </section>
+      <section class="card"><h2>Antigravity / 公式SDK</h2><p>個人プランのCLIラップは非対応です。公式SDKを使います。ローカル推論ではGoogleの月額利用枠は使いません。</p>
+        <label>認証・推論先<select id="antigravity-auth"><option value="local">ローカル LM Studio（追加API料金なし）</option><option value="gemini">Gemini APIキー（別途API料金）</option></select></label>
+        <label>モデル<input id="antigravity-model" maxlength="200" placeholder="サーバーで利用可能なモデルID"></label>
+        <label>ローカルURL<input id="antigravity-url" type="url" value="http://127.0.0.1:1234/v1"></label>
+        <label>Gemini APIキー<input id="antigravity-key" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
+        <label class="check"><input id="paid-antigravity" type="checkbox">Gemini APIへの文脈送信とAPI料金を事前許可する</label>
+        <div class="actions"><button data-connect="antigravity">保存して接続</button><button data-test="antigravity">接続テスト</button><button data-disconnect="antigravity" class="quiet">切断・キー削除</button></div>
+      </section>
+      <section class="card"><h2>Google Antigravity / 公式ACP</h2>
+        <p>Google公式ACP Registryのバイナリを標準ACPで起動します。本人専用の対話型開発のみが対象です。認証情報は公式Agentが管理し、PETITはOAuth tokenを読みません。</p>
+        <label>ACP Agentのインストール先<input id="acp-install-root" maxlength="1000" autocomplete="off"></label>
+        <div class="actions"><button id="acp-install">Registryから導入・SHA-256検証</button><button id="acp-handshake">ACP initializeを確認</button><button id="acp-auth">公式Google OAuth（oauth-personal）</button></div>
+        <dl><dt>導入状態 / Agent version</dt><dd id="acp-install-state">unknown</dd><dt>Google OAuth状態</dt><dd id="acp-auth-state">unknown</dd>
+          <dt>モデル / Token使用量 / 契約枠 / 追加Credits</dt><dd id="acp-usage-state">unknown / unknown / unknown / unknown</dd>
+          <dt>Filesystem / Terminal権限</dt><dd id="acp-permission-state">拒否中。OS隔離が未検証のため実フォルダへのアクセス・Brain接続は無効。</dd>
+          <dt>Handshake応答時間</dt><dd id="acp-latency">unknown</dd><dt>最後のエラー</dt><dd id="acp-error">なし</dd></dl>
+        <p class="muted">ACP Agentは独自にToolを実行します。PETIT UIのPermission確認だけでは書込をOS側で止められないため、サンドボックス検証が終わるまで通常会話・許可フォルダ・無人実行・Provider priorityには接続しません。ACP接続失敗から他Providerへ自動fallbackもしません。</p>
+      </section>
+      <section class="card"><h2>DeepSeek</h2><label>APIキー<input id="deepseek-key" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
+        <label>モデル<input id="deepseek-model" value="deepseek-flash" maxlength="200"></label>
+        <label class="check"><input id="paid-deepseek" type="checkbox">DeepSeekへの文脈送信とAPI料金を事前許可する（自動切替を含む）</label>
+        <div class="actions"><button data-connect="deepseek">保存して接続</button><button data-test="deepseek">接続テスト</button><button data-disconnect="deepseek" class="quiet">切断・キー削除</button></div>
+      </section>
+    </div>
+    <div id="step-1" class="step" hidden>
+      <section class="card"><h2>Notion</h2><p>インテグレーションに共有したページとDBを選択します。既存のタスク同期と検索を使います。</p>
+        <label>インテグレーションキー<input id="notion-key" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
+        <div class="actions"><button data-connect="notion">保存して接続</button><button data-test="notion">接続テスト</button><button data-disconnect="notion" class="quiet">切断・キー削除</button></div>
+        <label>ページ・DB検索<input id="notion-query" maxlength="200"></label><button id="notion-search">検索</button><button id="notion-more" hidden>次の50件</button>
+        <label>タスクDB<select id="notion-tasks"></select></label><label>プロジェクトDB<select id="notion-projects"></select></label>
+        <fieldset><legend>検索で参照するページ（未選択なら共有済みページ全体）</legend><div id="notion-pages"></div></fieldset><button id="notion-select">選択を保存</button>
+      </section>
+      <section class="card"><h2>Google / Calendar・Gmail</h2><p>Google Cloudで作成したOAuthクライアントを登録します。CalendarとGmailは別々に読み取り権限を認可できます。</p>
+        <label>OAuth Client ID<input id="google-client-id" autocomplete="off" placeholder="変更する場合だけ入力"></label>
+        <label>OAuth Client Secret<input id="google-client-secret" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
+        <label>登録済みRedirect URI<input id="google-redirect" type="url"></label><button id="google-save">OAuth設定を保存</button>
+        <h3>Googleカレンダー</h3><div class="actions"><button data-oauth="google_calendar">Googleで接続</button><button data-test="google_calendar">接続テスト</button><button data-disconnect="google_calendar" class="quiet">切断</button></div>
+        <button id="google-calendars">利用可能なカレンダーを取得</button><label>取り込むカレンダー<select id="google-calendar"><option value="primary">メインカレンダー</option></select></label><button id="calendar-select">カレンダー選択を保存</button>
+        <h3>Gmail</h3><p>会話でメールを検索・一覧表示・本文取得できます。送信・変更・削除は行いません。</p><div class="actions"><button data-oauth="gmail">Googleで接続</button><button data-test="gmail">接続テスト</button><button data-disconnect="gmail" class="quiet">切断</button></div>
+      </section>
+      <section class="card"><h2>TimeTree</h2><p>既存の読み取り専用エクスポーターを使います。TimeTreeへ書き込みません。</p>
+        <label>メール<input id="timetree-email" type="email" autocomplete="off"></label><label>パスワード<input id="timetree-password" type="password" autocomplete="off"></label><label>カレンダーコード<input id="timetree-calendar" autocomplete="off"></label>
+        <div class="actions"><button data-connect="timetree">保存して接続</button><button data-test="timetree">接続テスト</button><button data-disconnect="timetree" class="quiet">切断・認証削除</button></div>
+      </section>
+    </div>
+    <div id="step-2" class="step" hidden>
+      <section class="card"><h2>ローカル中心のカレンダー同期</h2><label>アクティブな外部カレンダー<select id="calendar-source"><option value="local">PETITローカルのみ</option><option value="google_calendar">Googleカレンダー</option><option value="timetree">TimeTree</option></select></label>
+        <p>同期方向：外部 → PETIT SQLite（読み取り専用）。ローカル予定は外部へ書き戻しません。Google双方向同期は未実装です。</p><p>毎日02:00（Asia/Tokyo）。停止中の予定時刻は次の起動後に追いつきます。</p>
+        <button id="save-calendar">同期設定を保存</button><button id="sync-calendar">今すぐ同期・再試行</button><button data-sync="notion">Notionを再同期</button>
+      </section>
+      <section class="card" id="alerts"><h2>同期状態と運用アラート</h2><div id="sync-status"></div><div id="alert-list"></div>
+        <label class="check"><input id="sync-notifications" type="checkbox" checked>同期失敗の高優先度通知を有効にする</label><button id="save-notifications">通知設定を保存</button>
+        <a href="/static/universe.html?view=notifications" target="_top">Web Push・端末通知の設定</a><p class="muted">通知が届かなくてもエラーは保存します。正常同期まで会話でも短く警告します。</p>
+      </section>
+    </div>
+    <div id="step-3" class="step" hidden><section class="card"><h2>設定を確認</h2><div id="summary"></div><p>未接続のサービスは後から接続できます。外部サービスが停止しても設定・ローカルデータは保持します。</p><button id="complete">設定を完了してPETITを開く</button></section></div>
+    <footer><button id="previous" class="quiet">前へ</button><button id="next">次へ・未設定はスキップ</button><button id="refresh" class="quiet">状態を更新</button><button id="logout" class="quiet">ログアウト</button></footer>
+  </div>
+</main>
+</body></html>

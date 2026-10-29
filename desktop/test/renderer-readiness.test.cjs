@@ -4,6 +4,21 @@ const { EventEmitter } = require('node:events');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { isCoreSetup } = require('../policy.cjs');
+
+test('Core login page is ready without granting the workspace IPC bridge', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../main.cjs'), 'utf8');
+  const implementation = source.slice(source.indexOf('function watchClient('), source.indexOf('function showWorkspace('));
+  const win = new EventEmitter(); win.webContents = new EventEmitter();
+  win.webContents.getURL = () => 'https://petit.example/static/setup.html';
+  win.isDestroyed = () => false;
+  let timer = false;
+  const sandbox = { quitting: false, workspace: win, overlay: null, config: { serverUrl: 'https://petit.example' }, isCoreSetup,
+    setTimeout: () => { timer = true; }, clearTimeout: () => {}, showRecovery: () => assert.fail('login is not a connection failure') };
+  vm.runInNewContext(implementation + '\nwatchClient(workspace, "workspace");', sandbox);
+  win.webContents.emit('did-finish-load');
+  assert.equal(win.petitReady, true); assert.equal(timer, false);
+});
 
 test('history/tab changes retain ready state; a new document still requires readiness', () => {
   const source = fs.readFileSync(path.join(__dirname, '../main.cjs'), 'utf8');

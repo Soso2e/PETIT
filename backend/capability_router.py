@@ -28,6 +28,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
     "github": (
         "review_github_activity", "sync_github_evidence", "get_github_repository_candidates",
         "link_github_repository_candidate", "ignore_github_repository_candidate", "inspect_github_repository",
+        "get_local_development_status",
     ),
     "web": ("search_news", "start_background_research"),
     "memory": (
@@ -37,6 +38,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "get_project_status", "get_tasks", "get_notion_project_candidates",
         "get_linkraft_project_candidates", "get_brain_note_candidates", "get_github_repository_candidates",
         "sync_notion_tasks", "sync_linkraft_projects", "sync_github_evidence",
+        "get_local_development_status",
     ),
     "fallback_read": (
         "get_lists", "get_list_items", "get_tasks", "get_task_sync_status", "get_current_time",
@@ -44,6 +46,7 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
         "search_notion", "review_github_activity", "inspect_github_repository", "search_news",
         "get_project_status", "get_notion_project_candidates", "get_linkraft_project_candidates",
         "get_brain_note_candidates", "get_github_repository_candidates", "get_work_status", "get_work_report",
+        "get_local_development_status",
     ),
 }
 
@@ -52,10 +55,10 @@ _GROUP_DESCRIPTIONS = {
     "work_sessions": "作業中の状態、作業時間の開始・停止・再開、今日や期間別の作業記録",
     "calendar": "時刻、天気、予定、リマインダー、カレンダーの取得・追加・変更・同期",
     "knowledge": "BRAIN、Notion、記憶の検索と確認付き編集",
-    "github": "GitHubのリポジトリ、差分、PR、開発状況",
+    "github": "GitHubのリポジトリ・PR・開発状況、登録済みローカルGitの現在地",
     "web": "ニュースや外部調査",
     "memory": "長期記憶、要約、復帰、引き継ぎ、ブリーフィング",
-    "projects": "PETIT内部プロジェクトと外部ソースの継続管理",
+    "projects": "PETIT内部プロジェクトと外部ソース、登録済みローカルの開発状況",
 }
 
 _ROUTABLE_GROUPS = tuple(_GROUP_DESCRIPTIONS)
@@ -100,6 +103,8 @@ _REQUEST_CONTEXT_SCHEMA: dict[str, Any] = {
                     },
                 },
                 "goal": {"type": "string", "description": "取得したContextで答えたいこと"},
+                "continue_action": {"type": "boolean", "description": "元のユーザー依頼に未実行の操作があり、取得後にAgentで実行する場合だけtrue。単なる質問・状態確認はfalse。"},
+                "capabilities": {"type": "array", "items": {"type": "string", "enum": list(_ROUTABLE_GROUPS)}, "maxItems": 4},
             },
             "required": ["needs", "goal"],
             "additionalProperties": False,
@@ -122,6 +127,7 @@ _ROUTE_TOOL_SCHEMA: dict[str, Any] = {
                 },
                 "goal": {"type": "string"},
                 "confidence": {"type": "number"},
+                "action_required": {"type": "boolean", "description": "元の依頼を完了するために書き込み操作が必要ならtrue。読み取り・相談はfalse。"},
             },
             "required": ["capabilities", "goal"],
             "additionalProperties": False,
@@ -131,12 +137,26 @@ _ROUTE_TOOL_SCHEMA: dict[str, Any] = {
 
 _ACTION_WORDS = r"(?:教えて|見せて|確認|調べ|検索|取得|一覧|追加|作成|登録|変更|更新|編集|完了|削除|同期|実行|開始|停止|保存|直して|レビュー)"
 _WRITE_WORDS = re.compile(r"(?:追加|作成|登録|変更|更新|編集|完了|削除|同期|実行|開始|停止|保存|直して)")
+
+
+def action_requested(text: str) -> bool:
+    """Bounded safety guard for explicit commands; semantic routing stays with Brain."""
+    if re.search(r"(?:[?？]|(?:した|してる|してくれた|された|済み)(?:の|かな|か|だっけ)?[。！!]*$)", text):
+        return False
+    if any(marker in text for marker in ("もし", "例えば", "たとえば", "という例", "と言ったら", "しないで", "しないと")):
+        return False
+    return bool(re.search(
+        r"(?:追加|作成|登録|変更|更新|編集|完了|削除|同期|実行|開始|停止|保存|再開)"
+        r"(?:して(?:ください|くれ|ほしい|ね)?|する|しよう|をお願い)?[。!！]*$"
+        r"|^(?:セッション|作業|計測)(?:を)?(?:開始|再開)[、,：:]", text.strip()))
+
+
 _TOOL_GUARD_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("work_sessions", re.compile(r"(?:作業|集中|タイマー|計測).{0,24}(?:開始|始め|ストップ|停止|終了|中断|休憩|一時停止|再開|続け|何分|何時間|履歴|記録|集計|状況|作業中)|(?:今日|今週|最近).{0,16}(?:何分|何時間).{0,12}(?:作業|集中)|(?:何分|何時間).{0,16}(?:作業|集中)")),
+    ("work_sessions", re.compile(r"(?:セッション|作業|集中|タイマー|計測).{0,24}(?:開始|始め|ストップ|停止|終了|中断|休憩|一時停止|再開|続け|何分|何時間|履歴|記録|集計|状況|作業中)|(?:今日|今週|最近).{0,16}(?:何分|何時間).{0,12}(?:作業|集中)|(?:何分|何時間).{0,16}(?:作業|集中)")),
     ("lists_and_tasks", re.compile(rf"(?:タスク|todo|TODO|リスト|Notionタスク).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:タスク|todo|TODO|リスト|Notionタスク)")),
     ("calendar", re.compile(rf"(?:予定|スケジュール|カレンダー|リマインダー|天気|現在時刻|今何時).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:予定|スケジュール|カレンダー|リマインダー|天気|現在時刻|今何時)")),
     ("knowledge", re.compile(rf"(?:BRAIN|Obsidian|Notion|ノーション|記憶|メモ).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:BRAIN|Obsidian|Notion|ノーション|記憶|メモ)")),
-    ("github", re.compile(rf"(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI)")),
+    ("github", re.compile(rf"(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI|ローカルブランチ|作業ブランチ).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:GitHub|リポジトリ|コミット|PR|プルリク|差分|CI|ローカルブランチ|作業ブランチ)")),
     ("web", re.compile(r"(?:最新|現在|今日).{0,16}(?:ニュース|情報|状況|価格|仕様)|(?:ニュース|外部情報|ウェブ|Web).{0,24}(?:検索|調べ|確認)")),
     ("projects", re.compile(rf"(?:プロジェクト|PJ|開発状況).{{0,24}}{_ACTION_WORDS}|{_ACTION_WORDS}.{{0,24}}(?:プロジェクト|PJ|開発状況)")),
 )
@@ -269,6 +289,8 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
     """Answer once, request bounded read Context, or route to the Deep Agent."""
     text = str(user_message or "").strip()
     recent = history or []
+    required = _required_capabilities(text)
+    explicit_action = action_requested(text)
     runtime_context = time_context.prompt_context_for(text, history=recent)
     active_work_context = situation.build_active_work_context()
     workspace = workspace_context.build_context_block()
@@ -293,9 +315,19 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             route="chat",
         )
     except LMStudioError:
+        if explicit_action and required:
+            return {"type": "agent", "capabilities": required, "goal": text,
+                    "confidence": None, "source": "action_guard_after_router_error"}
         return _fallback(text, situational_context)
 
     context_args = _tool_arguments(response, "request_context")
+    if explicit_action and required:
+        # A read request or a narrowed model route must not discard a known action.
+        routed = _route_arguments(response) or {}
+        capabilities = validate_capabilities(required + list(routed.get("capabilities") or []))
+        goal = text if not situational_context else f"{text}\n\n{situational_context}"
+        return {"type": "agent", "capabilities": capabilities, "goal": goal,
+                "confidence": _confidence(routed.get("confidence")), "source": "forced_tool_guard"}
     if context_args is not None:
         request = context_broker.normalize_request(context_args)
         if request.get("needs"):
@@ -305,6 +337,8 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
                 "situational_context": situational_context,
                 "confidence": None,
                 "source": "one_pass_context_request",
+                "continue_action": context_args.get("continue_action") is True,
+                "capabilities": validate_capabilities(context_args.get("capabilities")),
             }
 
     routed = _route_arguments(response)
@@ -318,6 +352,7 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
         return {
             "type": "agent", "capabilities": capabilities, "goal": goal,
             "confidence": _confidence(routed.get("confidence")), "source": "one_pass_tool_route",
+            "action_required": routed.get("action_required") is True,
         }
 
     raw_content = str(response.get("content") or "").strip()
@@ -334,7 +369,6 @@ def choose(user_message: str, history: list[dict[str, str]] | None = None) -> di
             "confidence": _confidence(legacy.get("confidence")), "source": "legacy_json_route",
         }
 
-    required = _required_capabilities(text, recent)
     if required:
         context_route = _read_context_fallback(text, required)
         if context_route is not None:

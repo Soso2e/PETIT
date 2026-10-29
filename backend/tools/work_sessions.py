@@ -14,20 +14,19 @@ def _normalize(value: Any) -> str:
     return re.sub(r"\s+", "", unicodedata.normalize("NFKC", str(value or ""))).casefold()
 
 
-def _active_task_rows() -> list[dict[str, Any]]:
+def _task_rows() -> list[dict[str, Any]]:
     notion_task_sync.ensure_schema()
-    done = str(config.NOTION_DONE_STATUS or "done").strip().casefold()
-    terminal = {done, "chancel", "cancel", "canceled", "cancelled", "キャンセル", "取消", "取り消し"}
     with db.get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, external_id, title, status, project_id FROM tasks_cache "
-            "WHERE COALESCE(remote_deleted_at, '') = '' ORDER BY updated_at DESC, id DESC"
+            "SELECT id, external_id, title, status, project_id, remote_deleted_at FROM tasks_cache "
+            "ORDER BY updated_at DESC, id DESC"
         ).fetchall()
-    return [
-        dict(row)
-        for row in rows
-        if str(row["status"] or "").strip().casefold() not in terminal
-    ]
+    return [dict(row) for row in rows]
+
+
+def _eligible(row: dict[str, Any]) -> bool:
+    terminal = {str(config.NOTION_DONE_STATUS).casefold(), "done", "completed", "完了", "chancel", "cancel", "canceled", "cancelled", "キャンセル", "取消", "取り消し"}
+    return not row.get("remote_deleted_at") and str(row.get("status") or "").strip().casefold() not in terminal
 
 
 def _public_task(row: dict[str, Any]) -> dict[str, Any]:
@@ -43,7 +42,7 @@ def _public_task(row: dict[str, Any]) -> dict[str, Any]:
 def resolve_task(
     *, task_id: str | None = None, task: str | None = None, allow_partial: bool = True,
 ) -> dict[str, Any]:
-    rows = _active_task_rows()
+    rows = _task_rows()
     identifier = _normalize(task_id)
     if identifier:
         matches = [
@@ -51,24 +50,22 @@ def resolve_task(
             for row in rows
             if identifier in {_normalize(row.get("id")), _normalize(row.get("external_id"))}
         ]
-        if len(matches) == 1:
-            return {"task": _public_task(matches[0])}
-        return {
-            "error": "指定されたtask_idの未完了タスクが見つかりません。",
-            "task_id": task_id,
-        }
-
-    query = _normalize(task)
-    if not query:
-        return {"error": "作業を開始するタスク名またはtask_idを指定してください。"}
-    exact = [row for row in rows if _normalize(row.get("title")) == query]
-    matches = exact or ([row for row in rows if query in _normalize(row.get("title"))] if allow_partial else [])
+    else:
+        query = _normalize(task)
+        if not query:
+            return {"error": "作業を開始するタスク名またはtask_idを指定してください。"}
+        exact = [row for row in rows if _normalize(row.get("title")) == query]
+        matches = exact or ([row for row in rows if query in _normalize(row.get("title"))] if allow_partial else [])
+    excluded = [row for row in matches if not _eligible(row)]
+    matches = [row for row in matches if _eligible(row)]
     if len(matches) == 1:
         return {"task": _public_task(matches[0])}
     if not matches:
         return {
-            "error": "一致する未完了タスクが見つかりません。新規タスクは自動作成していません。",
-            "query": task,
+            "error": "一致したタスクは完了・キャンセル・削除済みのため開始していません。" if excluded else "PETITの保存済みタスク全状態を検索しましたが、一致するタスクが見つかりません。未同期のNotionタスクは未確認です。新規タスクは自動作成していません。",
+            "query": task_id or task,
+            "excluded": [_public_task(row) for row in excluded[:10]],
+            "search_scope": "local_cache_all_states",
         }
     return {
         "error": "複数のタスクが一致しました。task_idで1件を指定してください。",
@@ -118,7 +115,6 @@ def get_work_report(days: int = 7) -> dict[str, Any]:
         "既存の未完了タスクを選んで作業計測を開始する。task_idを優先し、タスク名は完全一致、"
         "正規化一致、一意な部分一致だけ開始する。0件・複数件なら開始せず候補を返す。"
         "進行中の別セッションがある場合は終了して切り替える。新規タスクは作成しない。"
-        "同じタスクが一時停止中なら既存セッションを再開し、作業中なら計測を継続する。"
     ),
     parameters={
         "type": "object",
@@ -137,25 +133,29 @@ def start_work_session(task_id: str | None = None, task: str | None = None) -> d
 
     active = work_sessions.active_session()
     selected_id = str(selected["task_id"])
-    if active and str(active.get("task_id") or "") == selected_id:
-        if active.get("status") == "paused":
-            session = work_sessions.resume_session(str(active["session_id"]))
-            if not session:
-                return {"started": False, "resumed": False, "error": "作業セッションを再開できませんでした。"}
-            return {"started": False, "resumed": True, "session": session}
-        return {"started": False, "already_active": True, "session": active}
-
     previous = active
+    new_id = f"chat-{uuid4()}"
     session = work_sessions.start_session(
-        f"chat-{uuid4()}",
+        new_id,
         str(selected["task"]),
         task_id=selected_id,
         project_id=selected.get("project_id"),
+        reuse_task=True,
     )
+    if not isinstance(session, dict) or not session.get("session_id") or session.get("status") != "active":
+        return {
+            "started": False,
+            "already_active": False,
+            "resumed": False,
+            "error": "作業セッションを開始または再開できませんでした。",
+        }
+    reused = session.get("session_id") != new_id
     return {
-        "started": True,
+        "started": not reused,
+        "already_active": reused,
+        "resumed": reused and bool(previous and previous.get("status") == "paused"),
         "session": session,
-        "replaced_session": previous if previous else None,
+        "replaced_session": previous if previous and not reused else None,
     }
 
 

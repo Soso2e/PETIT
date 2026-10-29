@@ -1,12 +1,29 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.30.3**
+**Current Version: v0.34.0**
 
-**Last Updated: 2026-10-15**
+**Last Updated: 2026-10-29 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #332 / v0.30.3（実装済み・稼働アプリ未確認）: 「HERE再開／HEREタスク再開／HERE作業再開」をProject Continuityより先に既存未完了Taskと照合。同じTaskのpausedセッションは経過時間を保持して再開、activeは重複作成せず継続、終了済み記録は保持。複数候補・Task/Project同名は書き込まず選択を案内。関連unittest 86件成功（隔離SQLiteとHTTP `/api/chat` の会話保存・承認不要・LLM 0 Callを含む）。TestClient依存の非推奨警告あり。実データ／稼働Backend／配布Desktopの操作確認は未実施。次はBackend再起動後に実HEREタスクの再開を確認する。ユーザー指定でmainへローカルコミット、Push・PR作成は対象外。
+- #357 ACP初回導入（PR #358 main反映済み・本番Brain未接続）: 公式ACP Agentの検証付き導入、ACP initialize、oauth-personal設定UI/APIを追加。Windows実Agentのinitializeと認証方式広告を確認。OAuth、モデル応答、契約枠、PETIT Thread/Turn/Receipt接続、Session復元、OS隔離、実フォルダ読取は未確認または未実装。通常会話・実フォルダ・Terminal・backgroundは無効のまま。次は本人操作のOAuth、Windows隔離の実証、既存Core/Approvalとの接続を分けて受入する。既存agy CLI経路は変更なし。
+
+- #353 / feat/setup-integrations（実装済み・外部認証受入未確認、main未反映）: PR #352のSDKを再利用し、管理者認証付き初回ウィザード、暗号化ホスト設定、AI順位と同意付きFallback、Codex公式app-server、Google共通OAuth/Gmail Read Tool、Notion対象選択、Calendar 02:00 JST差分同期、永続アラートと会話警告を追加。Python121件+8 subtests成功/1 skip、Desktop66件成功/1 skip・Thread Node5件、Chromium1440/390pxを確認。公式SDK+実LM StudioでRead/記憶Write/予定承認/再送/再起動/未認証Codex→SDKのFallbackを合成DBで確認し、承認引数・receipt・保存行を照合。初期の依存競合・小型モデルのTool未呼出/誤成功発言も検出し、最終は明示bridge契約プロンプトで成功。自然文の一般的な実行品質、本人のCodex/課金API/Notion/Google/TimeTree認証、実02:00/Push/Cloud/配布端末は未検証。Google双方向・Tool後のProvider間継続・画像順位Fallbackは未実装。次はDraft PRレビューと利用者による実接続受入。設計/制約はdocs/setup-integrations.md、証跡要約はreports/setup-integrations-validation.json。
+
+- #349（SDK Read専用Brain実装・実Windows/ローカル推論確認、main未反映）: feat/renaissance-antigravity-sdkで公式SDK 0.1.22のAgent Loopを選択式バックエンドへ接続。既定はloopback LM Studio。限定Read bridgeのschema/risk検査、Turn専用Workerの取消/deadline/Provider固定、既存Thread/Turn/Events/履歴を再利用。実SDK+Qwen3.5-9Bの会話→get_tasks→次Turn、独立SDKのstream/保存再開、実Core再送/復旧/timeout/取消、実Chromium 1440/390pxのWeb/Desktop source adapterを確認。関連pytest81件+5 subtests・Node5件成功。Write/画像/配布Desktop/macOS/実サービス受入、SDK+Gemini（キーなし）は未確認。個人契約CLIラップは現行FAQで非サポート、agy未導入。PR #351は未採用・未マージ、Notionコード/本番設定/実DBは不変。次は専用Draft PR/CIと実端末受入。詳細: docs/antigravity-brain-poc.md。
+
+- #345 / #341（確認済みProjectフォルダ、実装済み・実データ受入未確認）: 既存project_source_linksへlocal_workspace対応を確認付きで保存し、既存get_local_development_status(project_id)からWorkspaceObserverのキャッシュを取得。Task.project_idと同じIDを使い、同名フォルダはcanonical rootのIDで区別する。allowlist/実行時再検査/private/symlink・junction拒否、文書更新日時・出典・観測時刻・実Git状態を分離。34件の関連テストを一時Git/DBで確認。Core #346・記憶検索 #347と結合済み。関連pytest154件+3 subtests、Node4件、Chrome 1440/390pxと実DeepSeek Flash・合成7ケース（7/7）を確認。実登録フォルダ・実Discord/Notion・配布端末の受入は別途。
+- #345（元発言検索・記憶鮮度、実装済み・実機未確認）: 既存conversationsの入力/出力を日時・発言元・Thread・原文ID付きでbounded検索するToolを追加。旧NULL sessionは推測で結合しない。save_memoryは固定保存上限を設けず、正規化重複・明示置換・期限・visibilityをSQLiteで扱い、旧行を保持。private元発言/記憶をstandard検索から除外し、private検索ではembeddingを呼ばない。全件再索引を個別索引更新へ縮小。Core PR #346を取り込み、単一Brainへ接続済み。#346 → #347 → #348の順でレビューする（全PRのbaseはmain、main未マージ）。
+- #345 / #303（実装済み・実機未確認）: 単一native Brain Tool Loop、永続Thread/Turn/承認/receipt、既存chat/画像/作業開始接続と明示Thread切替を追加。本文は既存conversations、旧session/ID/データを維持し、初回追加schema前にSQLiteバックアップを作成。旧ルーティングは本番text/Worker経路から除外。旧agent_legacy.run・Taskの重複登録・idle自動分割・fetch差替えを撤去。再送/並行/ロールバック/承認再開/ローカル専用の隔離検証を実施。後続#347/#348との結合状態で実DeepSeek Flash・合成7ケースのTool実行と保存結果を確認（7/7、初期6/7の失敗記録も保持）。実Providerの一般的な理解精度、実Notion/Discord、配布Desktop/iPhoneは未確認。新会話契約はdocs/renaissance-core.md。次は3 PRのレビューと実データ受入、Discord本人確認/配信adapter。
+
+- #341（main統合候補・実機未確認）: Opt-in既存workspace観測に、登録GitルートのHEAD・local branch/commit・tracking比較とConcept/PROGRESS/README限定抜粋を追加。キャッシュ参照のsafe_read Toolを会話Capabilityへ登録。フォルダ・コマンド・ファイル取得はallowlist/固定名のread-only、fresh/staleと未確認文書を区別。コード単体テストを追加したが、実Windows/macOS PC上の観測と実LLM/iPhone/PWA会話は未確認。後続はソースコード部分読取・内部Project IDとの明示紐付け・追加UI。統合済みv0.31.0との回帰と実Windows/macOS/iPhoneの受入はIssue #343で追跡。
+
+
+- #333 / v0.31.0（実装済み・実Provider未確認）: 安全なPNG/JPEG/WebP添付受付、会話IDに束縛したopaque ID、向き/解像度/形式/件数/容量検査、24時間TTLと削除、DeepSeek Flash Vision観測→共通Brain回答のRead専用経路を追加。画像・認識内容のクラウド送信は設定による明示許可がある場合だけ（既定OFF）。LM Studioは選択モデルのvision能力を実照会できる場合だけ。Steamの既知比率はDecimalで検証。Web/小型Desktop/旧UIの添付・失敗保持・再試行・削除を隔離Chromeで390/1440px確認。関連Core pytest125件+11 subtests、Desktop単体64件成功/1 skip。実DeepSeek/LM Studio画像精度・実Discord・配布版/macOS/PWA実機は未確認。画像Project/GitHub照合は#245/#246、共通Thread/Turnは#303/#304が後続。計画: docs/multimodal-discord-plan.md、20件の受入設計: docs/multimodal-acceptance.md。ローカルmainの未Push修正dc865feと既存storageは保持。
+
+- #338（調査・隔離PoC、本番未移行）: DeepSeek中心で意図/文脈/Tool/複数工程を判断し、Pythonは権限/検証/承認/状態/冪等性/結果保証を担う方針をConcept/Architectureへ明記。#337の安全機能と公開PRは保持。実DeepSeek Flashの合成12ケース×3方式で、実行/停止条件は現行11/12・直接12/12・Discovery12/12、Call合計26/23/30、誤Write試行0/5ずつ。直接方式には引用文翻訳の失敗、Discoveryのpilotには雑談3 Callがあり、一般的な優位性・本番移行の条件は未達。既存61 Toolの全件公開は内部承認Toolを含むため不採用。詳細は docs/ai-first-agent-design.md、結果は reports/ai-first-evaluation.json。次は小さな直接公開集合でnative protocolと既存Pending/承認/結果契約を接続する設計・未調整ケース評価。汎用MCP接続、実データ操作、61 Tool選択精度、実Desktopは未確認。
+
+- #335 / v0.30.3（実装済み・実モデル未確認）: Session開始の失敗会話を5テストで先に再現し、既存Dialogue/Brain/Registry/Agentを接続。stable ID・TTL付き失敗再試行、保存結果照合、active/paused再利用、同時開始の原子性、Context→Actionの条件付き継続、未実行/失敗の誤成功防止を追加。通常雑談1 Call・明示Session操作0 Call、Broker Read専用・既存承認を維持。隔離HTTPと関連自動テスト、Vision差分を重ねた回帰を検証。実LM Studioは接続不可、実Notion/配布Desktop/実モデル応答時間は未確認。変更前origin/mainでも失敗する旧テスト5件は#336で追跡。feat/multimodal-vision・既存storage・ローカルmainの未Push作業は保持。詳細: docs/conversation-action-reliability.md。次は実モデル受入、Task以外の永続Action契約は#303で後続。PR/CI結果はGitHubを正とする。
 
 - #329 / PR #330 / v0.30.2（配布・OS通知実機未確認）: Desktop OS通知音の明示ON（既定無音）と、通知表示要求/show/failed診断を追加。Native通知の寿命保持・既存Web PushとDesktop権限の分離を維持。CI全テストは成功、Desktop関連の単体65件・Backend通知関連17件成功、隔離通知専用smoke成功。一方、全体smokeには音声確認ボタン・統計画面のtimeoutと入力文字列不一致による失敗が残るため、全体E2E成功とは扱わない。Mac/WindowsのOS通知受信・実音・Focus・正式配布DMGインストールは未確認。診断は `docs/desktop-notification-diagnostics.md`。
 
@@ -259,4 +276,22 @@
 
 | 2026-10-13 | 11:49 | #327 | v0.29.0: 保存済みの接続・同期診断メニューと明示接続確認、Notion失敗対象/再試行/競合導線を追加。秘密情報の伏せ字と部分障害を検証し、競合採用のsnapshot/監査を同一トランザクションへ修正。実サービス・実端末受入は未確認。 |
 
-| 2026-10-15 | 02:39 | #332 | v0.30.3: Task再開のProject誤認と同一Taskのpaused再開を修正。関連86件と隔離HTTP会話の保存・LLM不要を動作確認済み、稼働アプリ/実データは未確認。ユーザー指定でmainへローカルコミット。 |
+| 2026-10-15 | 02:39 | #332 | v0.30.3: Task再開のProject誤認と同一Taskのpaused再開を修正。関連86件と隔離HTTP会話の保存・LLM不要を動作確認済み、稼働アプリ/実データは未確認。ローカル固有コミットdc865feを退避ブランチに保持し、新mainとの統合を実施。 |
+| 2026-10-19 | 10:52 | #335 | v0.30.3: 会話からSession開始の原因を先に再現し、既存Dialogue/Brain/Agentで対象ID・失敗再試行・実行結果照合・同時開始を改善。隔離HTTP/自動回帰とVision重ね合わせを検証、実モデル/実Notion/配布Desktopは未確認。変更前の旧テスト失敗は#336、一般Action契約は#303で後続。 |
+
+| 2026-10-19 | 11:24 | #338 | AI-First責務分担と3方式を調査・比較し、本番未接続PoCを追加。実DeepSeekの合成12ケース×3方式で直接経路に改善を観測したが、引用翻訳の失敗等が残るため本番移行は見送り。PR #337の安全機能・元checkoutは保持。結果/手順/未確認は docs/ai-first-agent-design.md。 |
+| 2026-10-17 | 14:16 | #333 | v0.31.0: 画像添付/Vision観測/Read専用Brain回答とPython比率検証、明示cloud同意・TTL・session境界を実装。関連125件と11 subtests、Desktop64件、隔離Chromeの3 UI×2幅成功。実Provider/Discord/実端末は未確認。 |
+
+| 2026-10-23 | 14:48 | #345 | Project Continuityと既存ローカル観測を確認済みフォルダで接続。登録/解除・同名衝突・Task.project_id・mtime/出典/Git・stale・許可撤回・private/リンク拒否を一時Gitで検証（34件成功）。実データ/実Provider/実端末は未確認。 |
+| 2026-10-23 | 14:35 | #345 | 元発言の横断検索と長期記憶の期限/置換/visibilityを追加。無制限保存・bounded取得・旧行保護・並行重複・private除外・予定の完全一致再登録抑止を一時DBで検証。実Provider/Discord/実端末は未確認。 |
+| 2026-10-23 | 14:10 | #345 | 単一BrainとThread/Turnの永続化を実装。再送・同時受付・承認・局所書込receipt・履歴分離・SQLiteバックアップを隔離データで検証。旧実行ループと重複登録を削減。実サービス/実端末の受入とRenaissance後続能力は未確認。 |
+
+| 2026-10-24 | 22:20 | #349 | 公式SDKも可という最新指示に従い独立SDK/単一Brain接続PoCを専用branchへ追加。SDK設定と合成契約32件成功、実SDK通信はキー未設定でskipped。本番未接続・目標未達。個人CLI制約と認証/課金/受入の残件を記録。 |
+
+| 2026-10-24 | 22:46 | #349 | v0.33.0: 再更新されたSDK+LM Studio方針に従い、公式SDKを限定Read専用Brainへ接続。実runtime/ローカル推論・会話/Read/履歴・SDK保存再開・取消/timeout・ChromiumのWeb/Desktop sourceを確認。関連81件+5 subtests/Node5件成功。個人CLI・Gemini SDK実通信・配布Desktop/macOS/Writeは未確認、Issue Open・PR #351未マージを維持。 |
+
+| 2026-10-25 | 11:03 | #353 | 2026-10-25-01: v0.34.0 初期設定・AI順位・Google読取連携・日次Calendar同期・運用アラートを実装。隔離Python121件/Node71件と実SDK+LM StudioのTool/承認/保存/再起動/Fallbackを確認。外部本人認証・実サービス/端末/Cloud受入、双方向/Tool後切替は未完了として保持。 |
+
+| 2026-10-28 | 13:39 | #357 | 実装済み・未確認: ACP Registry導入、状態/handshake/OAuth設定UI・APIを追加。Windows実AgentのACP v1 initializeとoauth-personal広告を確認。OAuth・推論・利用枠・PETIT Brain・OS隔離は未確認/未接続のため本番Provider化していない。隔離3件とsetup既存20件成功。 |
+
+| 2026-10-29 | 08:15 | #358 | PR #358反映済みorigin/mainとローカルmainを統合。#332のTask再開修正を保持し、新mainのv0.34.0・ACP導入・Runtimeを維持。7ファイル競合を解決。関連テスト21件+29 subtests成功（HTTP保存ケース1件はstorage/settings権限エラーで未確認）。compileall成功。diff --checkは上流追加docsの末尾空白9件を報告。DBバックアップとstorage/vision-uiを保持。 |

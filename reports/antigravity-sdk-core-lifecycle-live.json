@@ -1,0 +1,142 @@
+{
+  "status": "passed",
+  "synthetic_data_only": true,
+  "sdk_runtime": "real",
+  "inference": "real_lm_studio",
+  "fixture_marker": "sdk-fixture-1ffab924",
+  "core_recovery_invoked": true,
+  "same_request_replay_matches": true,
+  "turns": [
+    {
+      "status": "completed",
+      "reply": "CORE_SDK_OK",
+      "used_tools": [],
+      "model_route": {
+        "auth_mode": "local",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 5.516,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "runtime_startup_seconds": 2.18,
+        "sdk_conversation_id": "3c696476654a0cf6baf100e3962f8446",
+        "sdk_version": "0.1.22",
+        "usage": {
+          "cached_content_token_count": 0,
+          "candidates_token_count": 6,
+          "prompt_token_count": 3903,
+          "service_tier": null,
+          "thoughts_token_count": 23,
+          "total_token_count": 3932
+        }
+      },
+      "error": null,
+      "wall_seconds": 5.618
+    },
+    {
+      "status": "completed",
+      "reply": "sdk-fixture-1ffab924",
+      "used_tools": [
+        {
+          "arguments": "{}",
+          "name": "get_tasks"
+        }
+      ],
+      "model_route": {
+        "auth_mode": "local",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 7.829,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "runtime_startup_seconds": 2.178,
+        "sdk_conversation_id": "064aee41bd6e3be2b332c917675c1c65",
+        "sdk_version": "0.1.22",
+        "usage": {
+          "cached_content_token_count": 0,
+          "candidates_token_count": 92,
+          "prompt_token_count": 9818,
+          "service_tier": null,
+          "thoughts_token_count": 127,
+          "total_token_count": 10037
+        }
+      },
+      "error": null,
+      "wall_seconds": 7.917
+    },
+    {
+      "status": "completed",
+      "reply": "sdk-fixture-1ffab924",
+      "used_tools": [],
+      "model_route": {
+        "auth_mode": "local",
+        "fallback": false,
+        "inference_provider": "lm_studio",
+        "kind": "brain",
+        "latency_seconds": 5.91,
+        "local": true,
+        "model": "petit-agy-probe",
+        "provider": "antigravity_sdk",
+        "runtime_startup_seconds": 2.176,
+        "sdk_conversation_id": "2e37eaf7dba3ca76fffb2bc5945fdef5",
+        "sdk_version": "0.1.22",
+        "usage": {
+          "cached_content_token_count": 0,
+          "candidates_token_count": 13,
+          "prompt_token_count": 3997,
+          "service_tier": null,
+          "thoughts_token_count": 53,
+          "total_token_count": 4063
+        }
+      },
+      "error": null,
+      "wall_seconds": 6.008
+    }
+  ],
+  "timeout": {
+    "status": "failed",
+    "error": "Antigravity SDKがタイムアウトしました。自動再送していません。",
+    "wall_seconds": 0.504,
+    "model_route": {
+      "auth_mode": "local",
+      "error_type": "TimeoutError",
+      "fallback": false,
+      "inference_provider": "lm_studio",
+      "kind": "brain",
+      "latency_seconds": 0.423,
+      "local": true,
+      "model": "petit-agy-probe",
+      "provider": "antigravity_sdk",
+      "sdk_conversation_id": null,
+      "sdk_version": "0.1.22",
+      "state": "failed",
+      "usage": null
+    }
+  },
+  "cancel": {
+    "status": "cancelled",
+    "cancellation_exercised": true,
+    "wall_seconds": 4.478,
+    "effects": [],
+    "model_route": {
+      "auth_mode": "local",
+      "error_type": "TurnCancelled",
+      "fallback": false,
+      "inference_provider": "lm_studio",
+      "kind": "brain",
+      "latency_seconds": 4.382,
+      "local": true,
+      "model": "petit-agy-probe",
+      "provider": "antigravity_sdk",
+      "sdk_conversation_id": null,
+      "sdk_version": "0.1.22",
+      "state": "interrupted",
+      "usage": null
+    }
+  },
+  "packaged_desktop_verified": false
+}

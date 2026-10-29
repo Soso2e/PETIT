@@ -91,10 +91,12 @@ class WorkSessionToolTests(unittest.TestCase):
         task_id = self.add_task("HERE")
         self.dispatch("start_work_session", {"task_id": str(task_id)})
         self.dispatch("update_work_session", {"action": "pause"})
-        with patch("backend.work_sessions.resume_session", return_value=None):
+        with patch("backend.work_sessions.start_session", return_value={}):
             result = self.dispatch("start_work_session", {"task_id": str(task_id)})
         self.assertFalse(result["resumed"])
-        self.assertNotIn("already_active", result)
+        self.assertFalse(result["started"])
+        self.assertFalse(result["already_active"])
+        self.assertNotIn("session", result)
 
 
 class WorkSessionRoutingTests(unittest.TestCase):

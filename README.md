@@ -1,5 +1,9 @@
 # PETIT — Personal AI Assistant (MVP)
 
+v0.33.0開発版は、公式Antigravity SDKを選択式のRead専用Brainとして接続します。既定の推論先はloopback LM Studioで、追加のクラウドAPI課金は不要です。導入・モデル選択・実測と未確認範囲は[SDK導入記録](docs/antigravity-brain-poc.md)を参照してください。Gemini API単独の追加とは区別します。
+
+v0.32.0開発版は[単一Brainと永続Thread/Turn](docs/renaissance-core.md)を導入します。会話は明示して切り替え、再送は同じrequest IDで結果を照会します。既存DBは初回schema追加前にSQLiteバックアップを作成します。実運用はCore 1プロセス（workers=1）です。実Provider/配布版/実端末の受入は別途です。
+
 設計とデータソースの役割は [ASSISTANT_ARCHITECTURE.md](ASSISTANT_ARCHITECTURE.md) を参照。
 主要な概念の使い分けは [docs/terminology.md](docs/terminology.md) を参照。
 DesktopをPCの主入口にする全体の目標・会話/実行の正本・起動/復旧・段階移行は [Desktop・共通Core基盤設計](docs/desktop-foundation-design.md) を参照。Brain/Context Brokerの方針は [docs/jarvis-agent.md](docs/jarvis-agent.md)。目標の新API/管理Coreは未実装です。
@@ -10,7 +14,17 @@ DesktopをPCの主入口にする全体の目標・会話/実行の正本・起�
 この MVP は **ブラウザ（localhost）で動くテキストチャット** で、
 LLM は **LM Studio**（OpenAI 互換のローカルサーバー）を利用します。
 
-v0.30.3では「HERE再開」「HEREタスク再開」「HERE作業再開」を既存タスクと照合し、作業計測を再開します。同じタスクが一時停止中なら経過時間を保持して再開し、作業中なら計測を継続します。複数候補や同名プロジェクトとの競合時は対象を確認します。
+v0.30.3の開発ブランチでは、会話からの作業セッション開始、対象IDの引き継ぎ、重複開始と失敗再試行を改善します。開始報告はTool結果と保存状態を照合します。実モデルE2Eは未確認です。[再現・修正範囲・受入条件](docs/conversation-action-reliability.md)を参照。
+
+DeepSeek中心の意図理解とTool Callingへの方針・3方式の比較・本番未接続の実験は [AI-First Agent Architecture](docs/ai-first-agent-design.md) を参照。既存の会話経路はまだ移行していません。
+
+v0.31.0の開発ブランチでは、Web/旧UI/Desktop小型会話に画像添付を追加します。PNG/JPEG/WebPを4枚・各8MiBまで、画像だけでも送信できます。観測と考察を分離し、既知のSteam指標はPythonで比率を検証します。実Providerの画像認識品質・配布Desktop/macOS/PWA実機は未確認です。[設計とフェーズ](docs/multimodal-discord-plan.md)、[受入セット](docs/multimodal-acceptance.md)を参照。
+
+画像はCoreに24時間保存します。クラウドへの画像・認識内容送信は既定OFFです。利用者が明示許可する場合だけ、サーバーの`.env`に `PETIT_ALLOW_CLOUD_IMAGES=true` を追加しBackendを再起動してください。Visionは既存の `PETIT_DEEPSEEK_API_KEY` / `PETIT_DEEPSEEK_FLASH_MODEL=deepseek-flash` を使用します。APIキーをClientやGitへ置かないでください。Chatの回答Providerは既存設定を使用します。
+
+ローカル画像認識は `PETIT_VISION_PROFILE=local` とし、Chat側のLM Studioモデルを画像対応モデルに設定します。選択モデルの `GET /api/v1/models` が `capabilities.vision=true` を返す場合だけ利用できます。能力不明の旧LM Studioは更新してください。外部ホスト名のLM Studio接続もクラウド送信許可の対象です。ローカルはlocalhost・プライベートIP・`.local`ホストを使用します。
+
+HTTP契約は `POST /api/attachments` に画像実体（multipart不要）、`X-PETIT-Session` に既存会話ID（16〜200文字）を送り、返された`id`を `/api/chat` の `attachment_ids` で参照します。参照と削除も同じheaderで `GET / DELETE /api/attachments/{id}`。既存の文字だけの `/api/chat` は維持します。会話IDはローカルClientの境界でありユーザー認証の代わりではありません。無認証のCoreをインターネット公開しない構成を維持してください。
 
 v0.30.0ではUnivの遠景星空・ドラッグ操作とRemindersの通知センター配置を改善しました。 v0.30.1では予定名のキーワード検索とCAPCOM/カプコン別名に対応しました。 v0.30.2ではDesktopのOS通知音を任意で有効化でき、通知の表示診断を改善しました（OS上の受信・実音は未確認）。v0.29.0から、上部同期表示・Settingsから接続ステータスとNotion同期失敗の詳細を確認できます。保存済み状態を表示し、接続確認・再試行は明示操作で実行します。[接続ステータス](docs/connection-status.md)を参照。
 
@@ -39,6 +53,18 @@ v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeを
 設計比較、権限、ビルド、検証範囲は [docs/desktop.md](docs/desktop.md) を参照。iPhoneは既存PWAを継続します。
 
 AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
+
+## ローカル開発状況の参照（#341 / 開発ブランチ）
+
+既存PC観測をOpt-inで拡張し、登録済みローカルGitリポジトリのHEAD・ブランチ・ahead/behind・直近コミットと、直下の`Concept.md`・`PROGRESS.md`・`README.md`を読み取り専用で参照します。PETITのDesktop・iPhone PWAからの会話でも、同じCoreの観測キャッシュを利用できます。文書記載は実装・動作検証を証明しません。Git fetchは行いません。
+
+`PETIT_WORKSPACE_CONTEXT_ENABLED=1`、`PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1`、`PETIT_WORKSPACE_CONTEXT_DIRS`（最大8件の明示したGitルート）が必要。既定OFFで、自動フォルダ探索や任意パス読取はありません。設定、API、テスト、制限は[ローカル開発環境の読取](docs/local-development-insight.md)を参照。
+
+## 初期設定・接続管理（v0.34.0 開発版）
+
+初回起動時は管理者認証付きウィザードへ進み、AI優先順位、Codex公式認証、Antigravity SDK / DeepSeek、Notion、Google Calendar / Gmail、TimeTreeを設定できます。設定はGit管理外の`storage/settings/`へ暗号化保存します。API料金・クラウド文脈送信は事前同意が必要です。Local / Cloudのコードは共通で、Cloudの初期登録にはHTTPSと`PETIT_BOOTSTRAP_TOKEN`を用意します。
+
+Calendarは読み取り専用で、選択した外部サービスからSQLiteへ02:00 JSTに差分同期します。未解決エラーは通知と会話へ反映します。Google双方向同期・Tool実行後のProvider間継続・本人の外部認証を伴う全サービス受入は未完了です。導入前提・既存クライアントの認証への影響・検証手順は[初期設定と接続](docs/setup-integrations.md)を参照してください。
 
 ## セットアップ
 

@@ -3,7 +3,7 @@
 importScripts("/static/petit-version.js");
 
 const CACHE_NAME = `petit-shell-v${self.PETIT_ASSET_VERSION}-webgl1-voice2-motion1`;
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-polish1-rail1-context2-stats2-ux2-connections1`;
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-polish1-rail1-context2-stats2-ux2-connections1-setup1`;
 const THREE_CDN_ORIGIN = "https://esm.sh";
 const THREE_CDN_PREFIX = "/three@0.185.1";
 
@@ -15,6 +15,12 @@ const assetUrl = (path) => {
 };
 
 const SHELL = [
+  "/static/setup.html",
+  "/static/setup.js",
+  "/static/setup.css",
+  "/static/setup-gate.js",
+  "/static/chat_attachments.js",
+  "/static/chat_attachments.css",
   "/static/connection-status.js",
   "/static/connection-status.css",
   "/",
@@ -147,6 +153,7 @@ self.addEventListener("push", (event) => {
     badge: payload.badge || "/static/favicon-64.png",
     tag: payload.tag ? `${payload.tag}-${targetUrl}` : `petit-notif-${Date.now()}`,
     renotify: true,
+    requireInteraction: payload.priority === "high",
     vibrate: [200, 100, 200],
     data: {
       url: targetUrl,

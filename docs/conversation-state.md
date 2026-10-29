@@ -122,3 +122,7 @@ Task照応は「その/それ/これ/こいつ/さっきの/前の」の子作�
 `tests.test_dialogue_state`、`tests.test_dialogue_resolution`、`tests.test_project_router_context_guard`でAcceptance Criteria 1〜9と安全回帰をLLMなしで検証します。`model_route`およびChat observabilityの`dialogue_state_used` / `dialogue_resolution_source`で、pending、成功Tool、選択、曖昧、stale等の解決元を確認できます。
 
 受入手順: 同じブラウザsessionで「ゲーム開発タスク追加」「その子にWEVORA追加」を送信し、返答と親タスクのCHILD TASKSを確認。サーバー再起動後に「その期限明日にして」を送信し、同じWEVORAのIDが更新されることを確認します。
+
+## Work Session開始の継続（#335）
+
+Task所有の既存Pendingは `start_work_session` にも対応する。10分TTL・元依頼・対象ID・失敗状態を保持し、失敗後の補足では実行しない。`focus_stack` の言及対象、`last_action` の結果、保存された作業中セッションを区別する。明示的な話題転換・キャンセル後は短い開始で旧操作を再実行しない。詳細と保証範囲は [conversation-action-reliability.md](conversation-action-reliability.md) を参照。

@@ -73,10 +73,13 @@ class TaskPhase2WiringTests(unittest.TestCase):
         }
 
         instance = worker.JobWorker(interval_seconds=0.01)
-        # This verifies outbound writes; a real repair pull must not outlive the fixture DB.
-        with patch.object(task_sync_queue, "create_task_page", return_value=remote), patch.object(
-            worker, "_notion_task_sync_enabled", return_value=False
-        ):
+        # Explicitly test the legacy eager worker; daily mode holds writes
+        # until the JST 02:00 slot and must not flush this queue immediately.
+        with patch.object(task_sync_queue, "create_task_page", return_value=remote), \
+             patch.object(config, "NOTION_TASK_SYNC_MODE", "legacy"), \
+             patch.object(worker, "_notion_task_sync_enabled", return_value=True), \
+             patch.object(worker.notion_task_sync, "run_due_sync", return_value=False), \
+             patch.object(worker.notion_task_sync, "process_inbox_next", return_value=False):
             instance.start()
             deadline = time.monotonic() + 2
             while time.monotonic() < deadline:

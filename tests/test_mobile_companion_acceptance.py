@@ -47,7 +47,7 @@ class MobileCompanionAcceptanceTests(unittest.TestCase):
 
     def test_internal_events_never_render_as_user_messages(self):
         self.assertIn('[PETIT_INTERNAL_EVENT]', self.session)
-        self.assertIn('next.user_text = ""', self.session)
+        self.assertIn('"user_text": ""', (ROOT / "backend" / "db.py").read_text(encoding="utf-8"))
         self.assertIn("internalPrefix()", self.companion)
         self.assertIn("history: []", self.companion)
 
@@ -57,8 +57,8 @@ class MobileCompanionAcceptanceTests(unittest.TestCase):
         self.assertIn("直近3ラリー", self.companion)
 
     def test_idle_session_split_is_two_hours(self):
-        self.assertIn("const IDLE_SPLIT_MS = 2 * 60 * 60 * 1000", self.session)
-        self.assertIn("now - lastActiveAt >= IDLE_SPLIT_MS", self.session)
+        self.assertIn("Explicit, stable conversation identity", self.session)
+        self.assertNotIn("IDLE_SPLIT_MS", self.session)
 
     def test_work_completion_is_sent_back_to_petit(self):
         self.assertIn('kind === "finish"', self.companion)
