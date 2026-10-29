@@ -109,3 +109,32 @@ def test_unauthenticated_blocked_from_admin_endpoints(app_client):
 
     res = app_client.get("/api/setup/config")
     assert res.status_code == 200
+
+
+def test_guest_cannot_access_admin_thread_or_private_conversation_endpoints(app_client, monkeypatch):
+    store.create_thread("admin-private-thread", source="web", title="Private")
+    monkeypatch.setattr("backend.lmstudio_client.chat_completion",
+                        lambda messages, tools=None, **kwargs: {"role": "assistant", "content": "guest reply"})
+
+    response = app_client.post("/api/chat", json={"message": "hello", "session_id": "admin-private-thread"})
+    assert response.status_code == 200
+    assert response.json()["reply"] == "guest reply"
+    assert "petit_guest" in app_client.cookies
+
+    guest_threads = [x for x in store.list_threads() if x["id"].startswith("guest-")]
+    assert len(guest_threads) == 1
+    guest_thread_id = guest_threads[0]["id"]
+    assert guest_thread_id != "admin-private-thread"
+    assert store.history("admin-private-thread") == []
+
+    second = app_client.post("/api/chat", json={"message": "again", "session_id": "admin-private-thread"})
+    assert second.status_code == 200
+    assert len([x for x in store.list_threads() if x["id"].startswith("guest-")]) == 1
+
+    assert app_client.get("/api/threads").status_code == 401
+    assert app_client.get("/api/threads/admin-private-thread/snapshot").status_code == 401
+    assert app_client.get("/api/threads/admin-private-thread/events").status_code == 401
+    assert app_client.get("/api/turns/" + response.json()["request_id"]).status_code == 401
+    assert app_client.post("/api/turns/" + response.json()["request_id"] + "/cancel").status_code == 401
+    assert app_client.post("/api/threads/admin-private-thread/turns",
+                           json={"message": "hijack", "request_id": "hijack"}).status_code == 401
