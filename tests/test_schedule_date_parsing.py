@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import json
-import sys
 import unittest
 from datetime import date, timedelta
-from types import ModuleType
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
-import backend
-from backend import agent, config
+from backend import agent
 from backend.date_parser import has_schedule_date_expression, parse_schedule_date
 from backend.lmstudio_client import LMStudioError
 from backend.tools import registry
@@ -107,27 +104,14 @@ class ForcedScheduleReadTests(unittest.TestCase):
         self.assertIn("打ち合わせ", result["reply"])
         self.assertEqual(result["model_route"]["actual_route"], "deterministic")
 
-    def test_legacy_and_sona_core_receive_the_same_date_argument(self) -> None:
+    def test_registry_dispatch_preserves_schedule_date_argument(self) -> None:
         register_builtin_tools()
         target = {"date": "2026-07-13"}
         tool_obj = registry._REGISTRY["get_schedule"]
-
-        with (
-            patch.object(config, "USE_SONA_CORE", False),
-            patch.object(tool_obj, "handler", return_value={"date": target["date"], "events": []}) as legacy,
-        ):
-            registry.dispatch("get_schedule", target)
-        legacy.assert_called_once_with(date="2026-07-13")
-
-        fake_core = ModuleType("backend.sona_core_schedule")
-        fake_core.dispatch_get_schedule = Mock(return_value="{}")
-        with (
-            patch.object(config, "USE_SONA_CORE", True),
-            patch.dict(sys.modules, {"backend.sona_core_schedule": fake_core}),
-            patch.object(backend, "sona_core_schedule", fake_core, create=True),
-        ):
-            registry.dispatch("get_schedule", target)
-        fake_core.dispatch_get_schedule.assert_called_once_with(target)
+        with patch.object(tool_obj, "handler", return_value={"date": target["date"], "events": []}) as handler:
+            result = registry.dispatch("get_schedule", target)
+        handler.assert_called_once_with(date="2026-07-13")
+        self.assertEqual(json.loads(result)["date"], "2026-07-13")
 
 
 if __name__ == "__main__":

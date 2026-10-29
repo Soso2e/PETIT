@@ -28,7 +28,6 @@ class RenaissanceCoreTests(unittest.TestCase):
         for target, value in (
             ("DB_PATH", Path(self.temp.name) / "app.db"),
             ("notion_configured", lambda: False),
-            ("USE_SONA_CORE", False),
         ):
             p = patch.object(config, target, value)
             p.start()
