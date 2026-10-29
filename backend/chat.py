@@ -28,7 +28,7 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest, request: Request) -> ChatResponse:
+def chat(req: ChatRequest, request: Request = None) -> ChatResponse:
     request_id = (req.request_id or "").strip() or uuid4().hex
     session_id = (req.session_id or "").strip() or None
     message = (req.message or "").strip()
@@ -36,7 +36,7 @@ def chat(req: ChatRequest, request: Request) -> ChatResponse:
         return ChatResponse(reply="", error="メッセージが空です。", request_id=request_id)
 
     from . import conversation_api, setup_store as settings
-    is_admin = settings.valid_session(request.cookies.get("petit_admin", ""))
+    is_admin = settings.valid_session(request.cookies.get("petit_admin", "")) if request is not None else False
     result = conversation_api.submit(session_id or uuid4().hex, request_id, message,
         source=req.source, conversation_mode=req.conversation_mode, attachment_ids=req.attachment_ids,
         is_admin=is_admin)
