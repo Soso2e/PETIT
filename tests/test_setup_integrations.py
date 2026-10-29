@@ -332,7 +332,7 @@ def test_sdk_core_bridge_write_receipt_and_approval_resume(monkeypatch):
         read("add_schedule", '{"title":"合成承認予定","start_time":"2026-10-25T12:00:00+09:00"}')
         return ""
     monkeypatch.setattr(sdk, "run_isolated", runtime)
-    result = conversations.submit("sdk-write", "sdk-write-1", "合成予定を追加")
+    result = conversations.submit("sdk-write", "sdk-write-1", "合成予定を追加", is_admin=True)
     assert result["status"] == "waiting_approval"
     with db.get_connection() as c:
         assert c.execute("SELECT count(*) FROM calendar_events_cache").fetchone()[0] == 0
