@@ -29,7 +29,6 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "TIMETREE_PASSWORD", "")
     monkeypatch.setattr(config, "TIMETREE_CALENDAR_CODE", "")
     monkeypatch.setattr(config, "notion_configured", lambda: False)
-    monkeypatch.setattr(config, "USE_SONA_CORE", False)
     monkeypatch.setattr("backend.chat._artifact_executor.submit", Mock())
     monkeypatch.setattr("backend.chroma_client.add", Mock())
     monkeypatch.setattr("backend.chroma_client.sync_structured_data", Mock())

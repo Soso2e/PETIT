@@ -15,6 +15,8 @@ and propose a concrete next action.
 
 ## Source roles
 
+As of v0.34.3, the Linkraft adapter is removed; legacy provider records stay in SQLite and are skipped, not deleted.
+
 - BRAIN (Obsidian Markdown): canonical personal knowledge, decisions, project
   notes, and reusable context. PETIT retrieves a small ranked set; it never puts
   the whole vault into one prompt. `_private`, attachments, and Obsidian internals
@@ -23,9 +25,6 @@ and propose a concrete next action.
   preserves project/task Relations, assignees, hierarchy, blockers, source IDs,
   and separate project/task freshness. Name similarity creates a candidate only;
   an internal project mapping requires confirmation.
-- Linkraft: canonical Life is Tech / student project state. PETIT reads only
-  projects owned by the configured Linkraft user through a dedicated read-only
-  bearer identity. Confirmed projects use per-project delta cursors.
 - GitHub: read-only engineering evidence. PETIT preserves repository metadata,
   commits, pull requests, check runs, and deployment statuses as distinct facts.
   A commit alone never proves implementation completion; a successful check proves
@@ -87,7 +86,7 @@ stopped and never loads every memory, Vault note, or external source.
 
 ### Start and resume
 
-For `Linkraftやる`, `PETITに戻る`, or a confirmed alias, PETIT resolves one project,
+For `WEVORAやる`, `PETITに戻る`, or a confirmed alias, PETIT resolves one project,
 updates `active_project_state`, refreshes only that project's confirmed sources,
 and builds a bounded `ProjectResumeContext` in this priority order:
 
@@ -107,8 +106,6 @@ rows where the internal project matches, `status=active`, and `confirmed_at` is 
 
 - Notion runs at most once for the resume turn and keeps its normal TTL-aware,
   independent project/task synchronization.
-- Linkraft refreshes only the selected project's confirmed external IDs. It does
-  not use the broad all-linked-project sync and retains a cursor per external ID.
 - GitHub refreshes only the selected project's confirmed `owner/name` repositories.
   It reads bounded commit and PR changes, rechecks current default-branch checks so
   asynchronous status changes are observed, and evaluates recent deployment-status
@@ -229,7 +226,6 @@ one-model setup remains valid and an Agent can instead run on another PC/GPU.
 ### Phase 2 implemented
 
 - Notion project/task Relation adapter and confirmation-first mappings
-- Linkraft owner-only read API and PETIT adapter
 - GitHub commit/PR/check/deployment evidence adapter and confirmation-first mappings
 - external project events and per-source freshness
 - confirmed-source refresh immediately before project resume
@@ -242,7 +238,7 @@ one-model setup remains valid and an Agent can instead run on another PC/GPU.
 ## Current limitations
 
 - Automated tests and compile checks cover the continuity and source adapters, but
-  real Notion, Linkraft, GitHub, LM Studio tool-template behavior, and browser
+  real Notion, GitHub, LM Studio tool-template behavior, and browser
   approval/cancel/restart E2E remain required.
 - BRAIN project mappings are not yet connected to internal project IDs.
 - GitHub evidence is bounded polling rather than webhook delivery. Check and
@@ -259,7 +255,7 @@ one-model setup remains valid and an Agent can instead run on another PC/GPU.
   and `project_events`.
 - Register calendar write providers behind `backend/calendar_providers.py`.
 - Preserve source freshness timestamps and stale-data warnings.
-- Add a weekly review that compares active projects, Notion tasks, Linkraft state,
+- Add a weekly review that compares active projects, Notion tasks,
   GitHub evidence, BRAIN notes, and calendar commitments.
 - Route every external write through scoped approval, idempotency, and audit.
 - Add evaluation cases for routing, retrieval relevance, source conflicts, and

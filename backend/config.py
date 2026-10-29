@@ -113,12 +113,7 @@ TOOL_RESULT_MODE = os.getenv("PETIT_TOOL_RESULT_MODE", "auto").strip().lower() o
 if TOOL_RESULT_MODE not in {"auto", "tool", "user"}:
     TOOL_RESULT_MODE = "auto"
 
-# Sona Agent Core is opt-in while PETIT validates the first vertical slice.
-USE_SONA_CORE = os.getenv("PETIT_USE_SONA_CORE", "0") not in ("0", "false", "False")
-SONA_CORE_AUDIT_PATH = _path_from_env("PETIT_SONA_CORE_AUDIT_PATH", STORAGE_DIR / "audit" / "sona_agent_core.jsonl")
-SONA_CORE_APPROVAL_TTL_SECONDS = int(os.getenv("PETIT_SONA_CORE_APPROVAL_TTL_SECONDS", "600"))
 PETIT_OWNER_ID = os.getenv("PETIT_OWNER_ID", "soso").strip() or "soso"
-PETIT_PERSONAL_SCOPE_ID = os.getenv("PETIT_PERSONAL_SCOPE_ID", "soso").strip() or "soso"
 
 # Autonomous episode summarization (existing background scheduler).
 AUTO_SUMMARY_ENABLED = os.getenv("PETIT_AUTO_SUMMARY_ENABLED", "1") not in ("0", "false", "False")

@@ -36,15 +36,15 @@ CAPABILITY_GROUPS: dict[str, tuple[str, ...]] = {
     ),
     "projects": (
         "get_project_status", "get_tasks", "get_notion_project_candidates",
-        "get_linkraft_project_candidates", "get_brain_note_candidates", "get_github_repository_candidates",
-        "sync_notion_tasks", "sync_linkraft_projects", "sync_github_evidence",
+         "get_brain_note_candidates", "get_github_repository_candidates",
+        "sync_notion_tasks",  "sync_github_evidence",
         "get_local_development_status",
     ),
     "fallback_read": (
         "get_lists", "get_list_items", "get_tasks", "get_task_sync_status", "get_current_time",
         "get_schedule", "get_reminders", "get_weather", "search_memory", "search_brain_notes",
         "search_notion", "review_github_activity", "inspect_github_repository", "search_news",
-        "get_project_status", "get_notion_project_candidates", "get_linkraft_project_candidates",
+        "get_project_status", "get_notion_project_candidates", 
         "get_brain_note_candidates", "get_github_repository_candidates", "get_work_status", "get_work_report",
         "get_local_development_status",
     ),
