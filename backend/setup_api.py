@@ -57,7 +57,7 @@ def install(app):
             chat_public = path == "/api/chat"
             setup_public = path in {"/api/setup/session", "/api/setup/login", "/api/setup/bootstrap", "/api/health", "/api/setup/google/callback"}
             is_public_api = setup_public or (chat_public and initialized and settings.load().get("completed"))
-            if path.startswith("/api/") and initialized and not is_public_api:
+            if path.startswith("/api/") and not is_public_api:
                 _admin(request)
             if path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} and (initialized or path.startswith("/api/setup/")):
                 _same_origin(request)
