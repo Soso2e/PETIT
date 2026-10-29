@@ -226,6 +226,7 @@ class ActionReliabilityTests(unittest.TestCase):
             {"content": "そのタスクを計測中だよ"},
         ]
         with TestClient(app) as client, patch.object(chat_api._artifact_executor, "submit"), \
+             patch("backend.setup_store.valid_session", return_value=True), \
              patch.object(brain.lmstudio_client, "chat_completion", side_effect=responses) as llm:
             for text in ("作業に取り掛かろう", "いまカットを進めている", "計測はどうなってる？"):
                 data = client.post("/api/chat", json={"message": text, "session_id": "reliability-http"}).json()
