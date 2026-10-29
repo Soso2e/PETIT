@@ -179,7 +179,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         if messages is not None and not target.get("core_tools"):
             raise lmstudio_client.LMStudioError("Antigravity SDKはRead専用です。保存済みWrite承認の再開には使用できません。")
         return antigravity_brain.run(request_id, target, messages=messages, used_tools=used_tools)
-    catalog = schemas()
+    catalog = schemas() if request_context.current_is_admin() else []
     allowed = {item["function"]["name"] for item in catalog}
     used = list(used_tools or [])
     if messages is None:

@@ -1,10 +1,6 @@
 {
   "name": "PETIT",
-  "version": "0.34.3",
-  "release": "remove-sona-linkraft-integrations",
-  "includes": [
-    "Sona runtime branch and external dependency removed",
-    "Linkraft owner-only sync adapter removed; legacy SQLite records preserved",
-    "Renaissance Core, GitHub/Notion/BRAIN, calendar and approval retained"
-  ]
+  "version": "0.35.0",
+  "release_tag": "v0.35.0",
+  "release_channel": "local-main"
 }

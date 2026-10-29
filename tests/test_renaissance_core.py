@@ -32,6 +32,11 @@ class RenaissanceCoreTests(unittest.TestCase):
             p = patch.object(config, target, value)
             p.start()
             self.addCleanup(p.stop)
+        p_env = patch.dict("os.environ", {"PETIT_SETTINGS_DIR": str(Path(self.temp.name) / "settings")})
+        p_env.start()
+        self.addCleanup(p_env.stop)
+        from backend import setup_store as _settings
+        _settings._sessions.clear()
         for target in ("backend.chroma_client.sync_structured_data", "backend.chroma_client.add",
                        "backend.chroma_client.delete_ids", "backend.chat._artifact_executor.submit"):
             p = patch(target)
@@ -41,9 +46,9 @@ class RenaissanceCoreTests(unittest.TestCase):
         store.ensure_schema()
         tools.register_builtin_tools()
 
-    def turn(self, responses, message="相談", request_id="r", thread="a"):
+    def turn(self, responses, message="相談", request_id="r", thread="a", is_admin=True):
         with patch.object(brain.lmstudio_client, "chat_completion", side_effect=responses) as model:
-            result = api.submit(thread, request_id, message)
+            result = api.submit(thread, request_id, message, is_admin=is_admin)
         return result, model
 
     def task(self, name="卒研"):

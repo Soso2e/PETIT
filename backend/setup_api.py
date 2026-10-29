@@ -51,11 +51,13 @@ def install(app):
         try:
             initialized = settings.initialized()
             if path in {"/", "/static/universe.html", "/static/legacy.html", "/static/desktop/index.html"} and request.method == "GET":
-                if not initialized or not settings.load()["completed"] or not settings.valid_session(request.cookies.get("petit_admin", "")):
+                if not initialized or not settings.load()["completed"]:
                     from urllib.parse import urlencode
                     return RedirectResponse("/static/setup.html?" + urlencode({"next": path if path != "/" else "/static/universe.html", "resume": "1"}))
-            public = path in {"/api/setup/session", "/api/setup/login", "/api/setup/bootstrap", "/api/health", "/api/setup/google/callback"}
-            if path.startswith("/api/") and initialized and not public:
+            chat_public = path in {"/api/chat", "/api/threads", "/api/conversations", "/api/history"} or path.startswith(("/api/turns/", "/api/threads/"))
+            setup_public = path in {"/api/setup/session", "/api/setup/login", "/api/setup/bootstrap", "/api/health", "/api/setup/google/callback"}
+            is_public_api = setup_public or (chat_public and initialized and settings.load().get("completed"))
+            if path.startswith("/api/") and initialized and not is_public_api:
                 _admin(request)
             if path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} and (initialized or path.startswith("/api/setup/")):
                 _same_origin(request)
@@ -80,7 +82,7 @@ def _session_response(request, password):
     if not token:
         raise HTTPException(401, "パスワードを確認してください。")
     result = JSONResponse({"authenticated": True})
-    result.set_cookie("petit_admin", token, httponly=True, secure=request.url.scheme == "https", samesite="lax", max_age=43200, path="/")
+    result.set_cookie("petit_admin", token, httponly=True, secure=request.url.scheme == "https", samesite="lax", max_age=settings.SESSION_TTL_SECONDS, path="/")
     return result
 
 

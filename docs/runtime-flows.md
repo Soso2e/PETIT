@@ -79,9 +79,11 @@ initialize handshakeはモデル推論・認証成功・Google契約枠の使用
 
 ```mermaid
 flowchart TD
-    C[Web / Desktop / voice] --> Auth[管理者session検査 / 初回は設定UI]
-    Auth --> A[chat adapter または Turn API]
+    C[Web / Desktop / voice] --> Auth[初回は設定UI / 管理者session検査]
+    Auth -->|管理者ログイン中| A[全Tool有効のchat adapter / Turn API]
+    Auth -->|非管理者・通常モード| Safe[通常会話モード: Tool全般禁止・テキスト応答のみ]
     A --> L[request ID / 入力hash / Threadを原子的に受付]
+    Safe --> L
     L -->|同一入力の再送| R[保存済み結果 / 承認 / receipt]
     L -->|ID衝突 / 同じThread実行中| Conflict[409 / 429]
     L --> Select[順位または従来選択 / local_only / 接続と費用同意を検査]
