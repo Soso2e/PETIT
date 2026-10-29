@@ -20,6 +20,8 @@ _depth = threading.local()
 _sessions: dict[str, float] = {}
 DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["codex", "antigravity", "deepseek"],
             "brain_transport": "mixed",
+            "antigravity_cli_enabled": False, "antigravity_cli_model": "",
+            "coding_roots": [],
             "paid_allowed": [], "connected": [], "calendar": "local", "google_calendar_id": "primary",
             "notion_tasks_db": "", "notion_projects_db": "", "notion_pages": [],
             "antigravity_auth": "local", "antigravity_model": "", "antigravity_url": "http://127.0.0.1:1234/v1",

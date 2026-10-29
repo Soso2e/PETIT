@@ -38,3 +38,6 @@ storage/wakeword/
 # Host-local setup secrets and official CLI credentials
 storage/settings/
 storage/setup-e2e/
+storage/coding-e2e/
+storage/coding-jobs/
+storage/*.before-coding-jobs.bak

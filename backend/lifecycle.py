@@ -36,9 +36,13 @@ def startup() -> None:
     from . import task_hierarchy
     task_hierarchy.ensure_task_hierarchy_schema()
     service_sync.start()
+    from . import coding_jobs
+    coding_jobs.start()
 
 
 def shutdown() -> None:
+    from . import coding_jobs
+    coding_jobs.stop()
     from . import service_sync, codex_brain
     service_sync.stop()
     codex_brain.shutdown()

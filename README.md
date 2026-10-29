@@ -1,6 +1,8 @@
 # PETIT — Personal AI Assistant (MVP)
 
-v0.34.1ではSettingsに公式Antigravity CLIの導入検出と未検証状態を追加しました。
+開発ブランチ（#362 / #225）では、Antigravity CLIを明示接続するBrainと、Codex CLI／Antigravity CLIへローカル開発を依頼するタスクを追加しました。Tasksの「CLIの開発タスク・進捗を見る」から、許可したGitルート・目的・CLIを選び、承認後の状態・差分・静的チェックを確認できます。元checkoutは変更せず、専用コピーで作業します。任意Shell・実テストコード実行・削除・Push/PR/mergeは未対応です。[設計・制約](docs/coding-tasks.md)、[実CLIの合成受入](reports/antigravity-cli-brain-live.json)を参照。Antigravity個人契約のアプリ内利用は公式非サポートのままです。
+
+v0.34.1時点ではSettingsに公式Antigravity CLIの導入検出と未検証状態を追加しました。
 Googleログインの既存契約枠でPETITを動かす接続は、公式資料の矛盾とRead専用境界が
 未解決のため本番無効です。SDK+LM Studio/Gemini APIはこの目的の達成には含めません。
 [Windows/macOS導入・直接診断・Mock検証・残る受入](docs/antigravity-cli.md)を参照。
@@ -69,7 +71,7 @@ AccessKey不要の方式に向けた「へいプティ」の実験モデル学�
 
 初回起動時は管理者認証付きウィザードへ進み、AI優先順位、Codex公式認証、Antigravity SDK / DeepSeek、Notion、Google Calendar / Gmail、TimeTreeを設定できます。設定はGit管理外の`storage/settings/`へ暗号化保存します。API料金・クラウド文脈送信は事前同意が必要です。Local / Cloudのコードは共通で、Cloudの初期登録にはHTTPSと`PETIT_BOOTSTRAP_TOKEN`を用意します。
 
-CLI中心で使う場合は「Brainの接続方式」を「CLIのみ」にして、CodexをChatGPT認証し、優先順位の会話利用をONにして保存します。PETITサーバー上の公式Codex CLIへ会話・Tool選択を渡し、承認・実行・保存は既存Coreが管理します。SDK/APIへ自動切替しません。既存設定は従来どおり引き継ぎ、Antigravity個人CLIは許諾確認待ち、CLI画像対応は未実装です。実Codex推論の受入は未確認です。
+CLI中心で使う場合は「Brainの接続方式」を「CLIのみ」にして、CodexのChatGPT認証またはAntigravity CLIの明示接続を行い、優先順位の会話利用をONにして保存します。サーバー上の公式CLIへ会話・Tool選択を渡し、承認・実行・保存は既存Coreが管理します。SDK/APIへ自動切替しません。既存設定は従来どおり引き継ぎ、CLI画像対応は未実装です。実Codex推論の受入は未確認です。
 
 Calendarは読み取り専用で、選択した外部サービスからSQLiteへ02:00 JSTに差分同期します。未解決エラーは通知と会話へ反映します。Google双方向同期・Tool実行後のProvider間継続・本人の外部認証を伴う全サービス受入は未完了です。導入前提・既存クライアントの認証への影響・検証手順は[初期設定と接続](docs/setup-integrations.md)を参照してください。
 

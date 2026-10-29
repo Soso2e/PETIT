@@ -22,11 +22,12 @@
 
 ## AIと単一Turn
 
-- **CLI中心の運用（#359）**: 「Brainの接続方式」を「CLIのみ」にし、Codexを認証して「この優先順位を会話で使う」をONにしてAI設定を保存する。現時点の有効候補はCodex CLIのみ。SDK/APIの既存順位・接続・キーは保存したまま、会話の選択候補から除外する。CLI障害時もSDK/APIへ自動切替しない。既存設定は`mixed`として引き継ぐため、利用者が明示して変更する。OFF時は従来のProvider選択を使用する。
+- **CLI中心の運用（#359 / #362）**: 「Brainの接続方式」を「CLIのみ」にし、Codexを認証またはAntigravity CLIを明示接続して「この優先順位を会話で使う」をONにして保存する。SDK/APIの既存順位・接続・キーは保存したまま、会話の選択候補から除外する。CLI障害時もSDK/APIへ自動切替しない。既存設定は`mixed`として引き継ぐため、利用者が明示して変更する。OFF時は従来のProvider選択を使用する。
 - 接続経路は`端末 → Tailscale → PETIT Core → 同じホストのCodex CLI（stdio）`。Tailscale自体が推論先やCLI認証を提供するわけではない。CLI用のネットワークport公開は不要。「CLI導入・認証状態を確認」は推論しない。`account/read`が成功してもモデル利用可否は未確認で、「接続テスト」の完了が必要。権限エラー時はCore実行ユーザーと`PETIT_SETTINGS_DIR`のアクセス権を確認し、既存暗号化設定を削除・再作成しない。
 - CodexのTool要求は既存Core bridgeでschema/risk/承認を検査し、結果とreceiptをSQLiteへ保存する。同一外部call IDの再送は同じ応答を返し、異なる引数なら拒否する。承認後は保存済みTool結果と履歴でCodexを再開する。Codex固有のShell/ファイル編集は許可していない。CLIのみの画像付き会話はVision/API実行前に拒否する（未対応）。
 - **Codex**: [公式app-server](https://learn.chatgpt.com/docs/app-server)をstdioで使用。PETIT専用`CODEX_HOME`と公式keyring、ChatGPT device-code認証。利用者の既存Codexトークンを読み出して流用しない。`account/read`と公式Thread/dynamic Toolのプロトコルを使う。ChatGPT認証以外のAPIキーアカウントでは推論しない。
-- **Antigravity**: [公式FAQ](https://antigravity.google/docs/faq)により個人CLIラップを採用しない。[公式SDK](https://antigravity.google/docs/sdk/overview)0.1.22を再利用。loopback LM Studioか、明示許可したGemini APIで推論する。SDKの内蔵Toolはfinishだけに限定する。今回の管理UIで選ぶSDKはCoreの公開Toolをbridgeし、schema/risk/承認/receiptはPETITが管理する。従来`antigravity_sdk` profileのRead専用契約はそのまま。
+- **Antigravity CLI**: #362で利用者の明示依頼により追加。公式CLIのheadless/NDJSONをfinish専用Agentで使い、構造化された返答とPETIT Tool要求を既存Core Loopへ返す。ログインは公式CLIが管理しPETITはtokenを読まない。個人契約の第三者アプリ内利用は[公式FAQ](https://antigravity.google/docs/faq)で非サポートのままであり、利用者の選択をGoogleの許諾取得とは扱わない。モデル/契約枠/overageはCLI管理で、取得できない値はunknown。接続ボタンは設定を保存するだけで、実推論の証明は接続テストで行う。
+- **Antigravity SDK**: [公式SDK](https://antigravity.google/docs/sdk/overview)0.1.22を再利用。loopback LM Studioか、明示許可したGemini APIで推論する。SDKの内蔵Toolはfinishだけに限定する。管理UIで選ぶSDKはCoreの公開Toolをbridgeし、schema/risk/承認/receiptはPETITが管理する。従来`antigravity_sdk` profileのRead専用契約はそのまま。CLIとは別の推論先・費用・認証方式である。
 - **DeepSeek**: 既存OpenAI互換native Tool Loopを再利用。APIキーと費用/文脈送信許可が必要。
 - 各依頼の冒頭で優先順位を評価する。未接続・依存不足・未許可の候補を飛ばし、認証切れ/使用量上限/接続障害時に次へ進む。次Turnでは上位から再試行し、復旧後に戻る。
 - 同一Turnは既存claimとProvider pinを使用。各Runtimeを終了してから次の候補を起動する。Tool呼出し・承認・receipt・保存済みmessagesがある場合は、Loopを再起動するFallbackを禁止する。外部処理のunknownを再実行しない。**Tool実行後のProvider間継続は未対応**で、保存した結果を返し、利用者が次の依頼を送る。安全に途中Tool文脈を移植する拡張は別途受入が必要。

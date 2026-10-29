@@ -6,11 +6,15 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #359（CLIのみ選択を実装・実Codex推論は未確認）: 既存Codex app-server/Core Tool bridgeを再利用し、CLIのみではSDK/APIへFallbackしない接続方式、明示したCLI/認証診断、call ID再送防止・最終返答・外部session記録を追加。承認/receipt/再開は既存Coreを使用。隔離pytest90件とChrome 1440/390pxの設定/保存/再起動確認に成功。実CLI 0.165.0-alpha.1.2のinitialize・dynamic Tool登録・process終了を確認したが、一時認証homeは未認証でモデル推論/実Toolは未検証。作業環境から既存storage/settingsへのアクセス権エラーあり、本人認証結果待ち。CLI画像はVision前に拒否。Antigravity個人CLI/ACP本番は無効を維持。次は本人のCodex接続テストと実会話/Tool受入。docs/setup-integrations.md、reports/codex-cli-validation.jsonを参照。
+- #225（CLI開発タスクの初期実装・合成データ受入済み）: 明示したGitルート・開始commit・目的・CLIをTask/Jobへ保存し、会話の既存ApprovalまたはWebの開始確認後に1件ずつ実行する。元checkoutと未コミット変更を保ち、remoteを除いた専用cloneでCore限定のlist/read/SHA照合write/静的checkを使う。Webに状態・進捗・差分・取消・レビュー完了を追加。再送/二重承認/取消/設定解除/再起動中断を検証し、実Antigravity CLIで合成repositoryの編集・静的check・元repo不変を確認。Codexの実推論、実プロジェクトの機能テスト、任意Shell/依存導入/削除/Push/PR/merge、実端末は未確認または対象外。次は本人Codex認証と、許可repositoryでの利用者レビュー。docs/coding-tasks.md参照。
+
+- #362（利用者の明示依頼でCLI Brainを追加・実CLI合成受入済み）: Settingsの明示接続でantigravity_cliを優先順位とCLIのみ候補へ追加。finish専用Agentの公式headless/NDJSONから返答/PETIT Tool要求JSONを受け、既存Core Loopのschema/risk/承認/receipt/再送へ接続。認証token抽出/APIキー継承/迂回APIなし。実CLIで会話・Read・予定承認/再開/同一依頼再送に成功。個人契約での第三者アプリ内利用は公式非サポートのままで、許諾取得済みとは扱わない。契約枠由来/quotaはunknown、実WEVORA/実iPhone/配布版/Cloudは未確認。本人の本番設定は変更せず、初期設定から接続できる状態。reports/antigravity-cli-brain-live.json参照。
+
+- #359（CLIのみ選択を実装・実Codex推論は未確認）: 既存Codex app-server/Core Tool bridgeを再利用し、CLIのみではSDK/APIへFallbackしない接続方式、明示したCLI/認証診断、call ID再送防止・最終返答・外部session記録を追加。承認/receipt/再開は既存Coreを使用。隔離pytest90件とChrome 1440/390pxの設定/保存/再起動確認に成功。実CLI 0.165.0-alpha.1.2のinitialize・dynamic Tool登録・process終了を確認したが、一時認証homeは未認証でモデル推論/実Toolは未検証。作業環境から既存storage/settingsへのアクセス権エラーあり、本人認証結果待ち。CLI画像はVision前に拒否。Antigravity CLIの現在地は#362を参照、ACPは未接続。次は本人のCodex接続テストと実会話/Tool受入。docs/setup-integrations.md、reports/codex-cli-validation.jsonを参照。
 
 - #357 ACP初回導入（PR #358 main反映済み・本番Brain未接続）: 公式ACP Agentの検証付き導入、ACP initialize、oauth-personal設定UI/APIを追加。Windows実Agentのinitializeと認証方式広告を確認。OAuth、モデル応答、契約枠、PETIT Thread/Turn/Receipt接続、Session復元、OS隔離、実フォルダ読取は未確認または未実装。通常会話・実フォルダ・Terminal・backgroundは無効のまま。次は本人操作のOAuth、Windows隔離の実証、既存Core/Approvalとの接続を分けて受入する。既存agy CLI経路は変更なし。
 
-- #355 / #349（実CLI直接検証済み・PETIT本番接続は無効）: Windowsの公式agy 1.4.8を使い、APIキー環境変数を除いて日本語JSON会話、同一conversation IDのNDJSON継続、/model、/usage、/creditsを実測。gemini-4-argon-medium、Gemini 4 Argon週次枠98%残、AI Premium credits残高0を確認したが、契約プランと呼出ごとの枠消費はunknown。plan+sandbox/request-reviewで一時READMEのみread_file読取、検証文字列を確認し、書込/削除/コマンド/subagentなし・ファイル不変。GoogleアカウントID、規約許諾、PETIT Core保存、実WEVORA、429/認証切れ/取消、macOS/実端末は未確認。docs/antigravity-cli.mdとreports/antigravity-cli-direct.jsonを参照。
+- #355 / #349（過去の直接検証記録。本番接続の後継は#362）: Windowsの公式agy 1.4.8を使い、APIキー環境変数を除いて日本語JSON会話、同一conversation IDのNDJSON継続、/model、/usage、/creditsを実測。gemini-4-argon-medium、Gemini 4 Argon週次枠98%残、AI Premium credits残高0を確認したが、契約プランと呼出ごとの枠消費はunknown。plan+sandbox/request-reviewで一時READMEのみread_file読取、検証文字列を確認し、書込/削除/コマンド/subagentなし・ファイル不変。GoogleアカウントID、規約許諾、PETIT Core保存、実WEVORA、429/認証切れ/取消、macOS/実端末は未確認。docs/antigravity-cli.mdとreports/antigravity-cli-direct.jsonを参照。
 
 - #353 / PR #354（main統合済み・外部認証受入未確認）: PR #352のSDKを再利用し、管理者認証付き初回ウィザード、暗号化ホスト設定、AI順位と同意付きFallback、Codex公式app-server、Google共通OAuth/Gmail Read Tool、Notion対象選択、Calendar 02:00 JST差分同期、永続アラートと会話警告を追加。Python121件+8 subtests成功/1 skip、Desktop66件成功/1 skip・Thread Node5件、Chromium1440/390pxを確認。公式SDK+実LM StudioでRead/記憶Write/予定承認/再送/再起動/未認証Codex→SDKのFallbackを合成DBで確認し、承認引数・receipt・保存行を照合。初期の依存競合・小型モデルのTool未呼出/誤成功発言も検出し、最終は明示bridge契約プロンプトで成功。自然文の一般的な実行品質、本人のCodex/課金API/Notion/Google/TimeTree認証、実02:00/Push/Cloud/配布端末は未検証。Google双方向・Tool後のProvider間継続・画像順位Fallbackは未実装。次は利用者による実接続受入。設計/制約はdocs/setup-integrations.md、証跡要約はreports/setup-integrations-validation.json。
 
@@ -305,3 +309,7 @@
 | 2026-10-29 | 08:15 | #358 | PR #358反映済みorigin/mainとローカルmainを統合。#332のTask再開修正を保持し、新mainのv0.34.0・ACP導入・Runtimeを維持。7ファイル競合を解決。関連テスト21件+29 subtests成功（HTTP保存ケース1件はstorage/settings権限エラーで未確認）。compileall成功。diff --checkは上流追加docsの末尾空白9件を報告。DBバックアップとstorage/vision-uiを保持。 |
 
 | 2026-10-29 | 09:51 | #359 | 2026-10-29-02: CLIのみ接続方式とCodex診断/Tool再送防止を追加。隔離90件・Chrome 1440/390px成功、実CLIのinitialize/Tool登録/終了を確認。本人認証/実推論・Toolは未確認、既存settingsの権限エラーを保持し本番設定は未変更。Antigravity個人CLIは現行FAQの制限で無効を維持。 |
+
+| 2026-10-29 | 10:44 | #362 | 2026-10-29-03: 利用者の明示依頼で公式Antigravity CLIをfinish専用Agent/構造化JSONのBrainへ接続。実CLI+合成DBで会話/Read/予定承認・再開・再送を確認。公式非サポート表示とquota unknownを維持。CLIのみ候補と接続UIを追加し、本番設定の自動変更は行わない。 |
+
+| 2026-10-29 | 10:44 | #225 | 2026-10-29-04: 承認付きCLI開発タスク、Task/Job永続化、専用clone/Core限定Tool、Web進捗・差分・取消・レビュー完了を追加。関連143件/Chrome 1440・390px成功。実Antigravity CLIの合成コード編集・静的check・元repo不変を確認。実Codex/実project機能テスト/任意Shell・削除・Push/PR/mergeは未確認または対象外。 |

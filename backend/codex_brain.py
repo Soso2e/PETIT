@@ -45,6 +45,8 @@ class RPC:
             self.process = subprocess.Popen(argv, cwd=self.temp.name, env=env, stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
                         **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}))
+            from .cli_job import ProcessJob
+            self.job = ProcessJob(self.process)
             threading.Thread(target=self._read, daemon=True).start()
             self.request("initialize", {"clientInfo": {"name": "petit", "title": "PETIT", "version": "0.34.1"},
                         "capabilities": {"experimentalApi": True}}, timeout=20)
@@ -99,6 +101,8 @@ class RPC:
             for stream in (self.process.stdin, self.process.stdout):
                 if not stream.closed:
                     stream.close()
+        if getattr(self, "job", None):
+            self.job.close()
         self.temp.cleanup()
 
 

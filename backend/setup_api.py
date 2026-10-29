@@ -139,7 +139,7 @@ def get_config():
     from . import codex_brain
     from .antigravity_cli import status
     return {"settings": settings.public(), "brain": brain_priority.public_status(), "sync": service_sync.status(),
-            "antigravity_cli": status(), "codex_cli": codex_brain.status()}
+            "antigravity_cli": status(settings.load()), "codex_cli": codex_brain.status()}
 
 
 @router.get("/antigravity-acp", dependencies=[Depends(_admin)])
@@ -207,12 +207,12 @@ async def antigravity_acp_authenticate():
 def antigravity_cli_status():
     # File existence only. No login, prompt, process, credential inspection or network.
     from .antigravity_cli import status
-    return status()
+    return status(settings.load())
 
 
 class SettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    priority: list[Literal["codex", "antigravity", "deepseek"]] | None = None
+    priority: list[Literal["codex", "antigravity", "deepseek", "antigravity_cli"]] | None = None
     paid_allowed: list[Literal["antigravity", "deepseek"]] | None = None
     brain_enabled: bool | None = None
     brain_transport: Literal["mixed", "cli_only"] | None = None
@@ -224,14 +224,16 @@ class SettingsUpdate(BaseModel):
     antigravity_url: str | None = Field(default=None, max_length=500)
     deepseek_model: str | None = Field(default=None, max_length=200)
     codex_model: str | None = Field(default=None, max_length=200)
+    antigravity_cli_model: str | None = Field(default=None, max_length=200)
     sync_notifications: bool | None = None
 
 
 @router.put("/config", dependencies=[Depends(_admin)])
 def put_config(payload: SettingsUpdate):
     values = payload.model_dump(exclude_none=True)
-    if "priority" in values and (len(values["priority"]) != 3 or len(set(values["priority"])) != 3):
-        raise HTTPException(400, "AI優先順位には3種類を1回ずつ指定してください。")
+    if "priority" in values and (len(values["priority"]) != len(set(values["priority"]))
+            or not {"codex", "antigravity", "deepseek"} <= set(values["priority"])):
+        raise HTTPException(400, "既存3種類と、任意のAntigravity CLIを重複なく指定してください。")
     if values.get("google_redirect_uri"):
         uri = urlsplit(values["google_redirect_uri"])
         if (uri.scheme != "https" and not (uri.scheme == "http" and uri.hostname in {"localhost", "127.0.0.1", "::1"})) or uri.username or uri.query or uri.fragment or uri.path != "/api/setup/google/callback":
@@ -351,8 +353,13 @@ def notion_selection(payload: NotionSelection):
 @router.post("/services/{service}/connect", dependencies=[Depends(_admin)])
 def connect(service: str):
     if service == "antigravity_cli":
-        from .antigravity_cli import POLICY_MESSAGE
-        raise HTTPException(409, POLICY_MESSAGE)
+        if not brain_priority.target(service)["configured"]:
+            raise HTTPException(400, "公式agy CLIをサーバーへ導入してください。")
+        data = settings.load()
+        settings.update({"antigravity_cli_enabled": True,
+                         "connected": sorted(set(data["connected"]) | {service}),
+                         "priority": [service] + [x for x in data["priority"] if x != service]})
+        return {"connected": True, "tested": False, "authentication": "unknown", "officially_supported": False}
     data = settings.load()
     if service == "codex":
         from . import codex_brain
@@ -397,15 +404,13 @@ def disconnect(service: str):
     credentials = {"deepseek": {"deepseek_key": ""}, "antigravity": {"antigravity_key": ""},
                    "notion": {"notion_key": ""}, "timetree": {"timetree_email": "", "timetree_password": "", "timetree_calendar": ""}}
     settings.update({"connected": [x for x in settings.load()["connected"] if x != service],
+                     **({"antigravity_cli_enabled": False} if service == "antigravity_cli" else {}),
                      **({"calendar": "local"} if data["calendar"] == service else {})}, credentials.get(service))
     return {"disconnected": True, "remote_revocation_confirmed": remote_confirmed}
 
 
 @router.post("/services/{service}/test", dependencies=[Depends(_admin)])
 def test_connection(service: str):
-    if service == "antigravity_cli":
-        from .antigravity_cli import POLICY_MESSAGE
-        raise HTTPException(409, POLICY_MESSAGE)
     try:
         if service in {"google_calendar", "gmail"}:
             result = google_services.calendars() if service == "google_calendar" else google_services.get("gmail", "profile")
@@ -419,7 +424,7 @@ def test_connection(service: str):
             from .calendar_sync import parse_ics
             events = parse_ics(timetree.fetch_ics())
             return {"ok": True, "read_only": True, "count": len(events)}
-        if service in {"codex", "antigravity", "deepseek"}:
+        if service in {"codex", "antigravity", "deepseek", "antigravity_cli"}:
             from . import brain, conversation_store as store, request_context
             data = settings.load()
             if not brain_priority.permitted(service, data):
