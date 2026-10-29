@@ -20,7 +20,7 @@ class SDKCoreContracts(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         for name, value in (("DB_PATH", Path(self.temp.name) / "app.db"),
-                            ("notion_configured", lambda: False), ("USE_SONA_CORE", False)):
+                            ("notion_configured", lambda: False)):
             context = patch.object(config, name, value)
             context.start(); self.addCleanup(context.stop)
         for name in ("backend.chroma_client.sync_structured_data", "backend.chroma_client.add",

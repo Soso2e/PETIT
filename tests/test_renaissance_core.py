@@ -28,11 +28,15 @@ class RenaissanceCoreTests(unittest.TestCase):
         for target, value in (
             ("DB_PATH", Path(self.temp.name) / "app.db"),
             ("notion_configured", lambda: False),
-            ("USE_SONA_CORE", False),
         ):
             p = patch.object(config, target, value)
             p.start()
             self.addCleanup(p.stop)
+        p_env = patch.dict("os.environ", {"PETIT_SETTINGS_DIR": str(Path(self.temp.name) / "settings")})
+        p_env.start()
+        self.addCleanup(p_env.stop)
+        from backend import setup_store as _settings
+        _settings._sessions.clear()
         for target in ("backend.chroma_client.sync_structured_data", "backend.chroma_client.add",
                        "backend.chroma_client.delete_ids", "backend.chat._artifact_executor.submit"):
             p = patch(target)
@@ -42,9 +46,9 @@ class RenaissanceCoreTests(unittest.TestCase):
         store.ensure_schema()
         tools.register_builtin_tools()
 
-    def turn(self, responses, message="相談", request_id="r", thread="a"):
+    def turn(self, responses, message="相談", request_id="r", thread="a", is_admin=True):
         with patch.object(brain.lmstudio_client, "chat_completion", side_effect=responses) as model:
-            result = api.submit(thread, request_id, message)
+            result = api.submit(thread, request_id, message, is_admin=is_admin)
         return result, model
 
     def task(self, name="卒研"):
@@ -251,17 +255,20 @@ class RenaissanceCoreTests(unittest.TestCase):
 
     def test_shared_http_adapter_ignores_client_supplied_history(self):
         from backend.app import create_app
-        from backend import lifecycle
-        with patch.object(lifecycle, "startup", store.recover), patch.object(lifecycle, "shutdown"), TestClient(create_app()) as client, patch.object(
+        from backend import lifecycle, setup_store as settings
+        settings.set_password("test-password-for-guest")
+        settings.update({"completed": True})
+        with patch.object(lifecycle, "startup", store.recover), patch.object(lifecycle, "shutdown"), TestClient(create_app(), headers={"Origin": "http://testserver"}) as client, patch.object(
             brain.lmstudio_client, "chat_completion", return_value={"content": "確認したよ"}
         ) as model:
             response = client.post("/api/chat", json={
                 "message": "この相談", "request_id": "http", "session_id": "http-thread",
                 "history": [{"role": "user", "content": "別スレッドを勝手に注入"}]})
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["thread_id"], "http-thread")
+            self.assertTrue(response.json()["thread_id"].startswith("guest-"))
+            self.assertNotEqual(response.json()["thread_id"], "http-thread")
             self.assertNotIn("勝手に注入", json.dumps(model.call_args.args[0], ensure_ascii=False))
-            self.assertEqual(client.get("/api/turns/http").json()["reply"], "確認したよ")
+            self.assertEqual(client.get("/api/turns/http").status_code, 401)
 
 
 if __name__ == "__main__":

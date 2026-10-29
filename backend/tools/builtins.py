@@ -22,7 +22,6 @@ _BUILTIN_MODULES = (
     "backend.tools.github",
     "backend.tools.gmail",
     "backend.tools.local_development",
-    "backend.tools.linkraft",
     "backend.tools.lists",
     "backend.tools.memory",
     "backend.tools.notion",

@@ -46,7 +46,7 @@ def test_cli_read_and_approved_write_resume(selected, monkeypatch):
         output(calls=[{"name": "add_schedule", "arguments": {"title": "CLI予定", "start_time": "2026-10-29T21:00:00+09:00"}}]),
         output("保存結果を確認しました")])
     monkeypatch.setattr(runtime, "invoke", invoke)
-    result = conversations.submit("thread", "write", "合成予定を追加")
+    result = conversations.submit("thread", "write", "合成予定を追加", is_admin=True)
     assert result["status"] == "waiting_approval"
     with db.get_connection() as connection:
         assert connection.execute("SELECT count(*) FROM calendar_events_cache").fetchone()[0] == 0

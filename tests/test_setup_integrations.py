@@ -29,7 +29,6 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "TIMETREE_PASSWORD", "")
     monkeypatch.setattr(config, "TIMETREE_CALENDAR_CODE", "")
     monkeypatch.setattr(config, "notion_configured", lambda: False)
-    monkeypatch.setattr(config, "USE_SONA_CORE", False)
     monkeypatch.setattr("backend.chat._artifact_executor.submit", Mock())
     monkeypatch.setattr("backend.chroma_client.add", Mock())
     monkeypatch.setattr("backend.chroma_client.sync_structured_data", Mock())
@@ -333,7 +332,7 @@ def test_sdk_core_bridge_write_receipt_and_approval_resume(monkeypatch):
         read("add_schedule", '{"title":"合成承認予定","start_time":"2026-10-25T12:00:00+09:00"}')
         return ""
     monkeypatch.setattr(sdk, "run_isolated", runtime)
-    result = conversations.submit("sdk-write", "sdk-write-1", "合成予定を追加")
+    result = conversations.submit("sdk-write", "sdk-write-1", "合成予定を追加", is_admin=True)
     assert result["status"] == "waiting_approval"
     with db.get_connection() as c:
         assert c.execute("SELECT count(*) FROM calendar_events_cache").fetchone()[0] == 0

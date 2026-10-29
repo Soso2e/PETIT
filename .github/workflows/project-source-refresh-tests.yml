@@ -9,7 +9,6 @@ on:
       - "backend/project_source_refresh.py"
       - "backend/project_resume.py"
       - "backend/notion_project_sync.py"
-      - "backend/linkraft_*.py"
       - "tests/test_project_source_refresh.py"
       - "tests/test_project_resume.py"
       - ".github/workflows/project-source-refresh-tests.yml"
@@ -35,5 +34,5 @@ jobs:
           python -m unittest \
             tests.test_project_source_refresh \
             tests.test_project_resume \
-            tests.test_linkraft_owner_sync \
+            tests.test_removed_integrations \
             tests.test_notion_adapter_v2

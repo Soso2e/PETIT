@@ -62,4 +62,4 @@ jobs:
       - name: Bounded resume excerpt
         run: python -m unittest tests.test_brain_project_mapping.BrainProjectMappingTests.test_resume_excerpt_is_bounded
       - name: Source adapter regressions
-        run: python -m unittest tests.test_project_source_refresh tests.test_project_resume tests.test_github_evidence tests.test_linkraft_owner_sync tests.test_notion_adapter_v2
+        run: python -m unittest tests.test_project_source_refresh tests.test_project_resume tests.test_github_evidence tests.test_removed_integrations tests.test_notion_adapter_v2

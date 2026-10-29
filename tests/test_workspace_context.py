@@ -131,6 +131,7 @@ class WorkspaceContextTests(unittest.TestCase):
             patch.object(context, "_command") as command,
             patch.object(capability_router.situation, "build_active_work_context", return_value=""),
             patch.object(capability_router, "chat_completion", return_value={"content": "変更はないよ。"}) as llm,
+            patch("backend.setup_store.valid_session", return_value=True),
         ):
             client = TestClient(create_app())  # do not start live services
             response = client.get("/api/workspace-context")

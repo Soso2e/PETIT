@@ -151,7 +151,7 @@ def test_chat_delegation_uses_existing_approval_and_receipt(repository, monkeypa
         "name":"delegate_coding_task","arguments":json.dumps(arguments)}}]}, {"role":"assistant","content":"キューへ登録しました。"}])
     monkeypatch.setattr(brain.lmstudio_client,"chat_completion",lambda *a,**k:next(responses))
     monkeypatch.setattr(brain,"check_provider",lambda thread:{"provider":"lm_studio","profile":"local","model":"synthetic","base_url":"http://localhost","configured":True})
-    result=conversations.submit("coding-chat","coding-request","開発をお願い")
+    result=conversations.submit("coding-chat","coding-request","開発をお願い", is_admin=True)
     assert result["status"] == "waiting_approval" and not jobs.list_jobs()
     approval=store.approvals("coding-request")[0]["approval_id"]
     assert conversations.decide(approval,True)["status"] == "completed"

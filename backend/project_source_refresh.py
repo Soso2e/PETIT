@@ -6,19 +6,15 @@ rendered as a saved-cache warning by ``project_resume``.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Callable
 
 from . import (
     brain_project_sync,
     db,
     github_sync,
-    linkraft_config,
-    linkraft_sync,
     notion_project_sync,
     project_continuity,
 )
-from .linkraft_client import LinkraftError, get_project_snapshot
 
 
 def confirmed_source_links(project_id: str) -> list[dict[str, Any]]:
@@ -32,111 +28,6 @@ def confirmed_source_links(project_id: str) -> list[dict[str, Any]]:
             (project_id,),
         ).fetchall()
     return [dict(row) for row in rows]
-
-
-def _parse_time(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
-
-
-def _fresh_enough(source: str, ttl_seconds: float) -> bool:
-    state = db.sync_state(source)
-    success = _parse_time(state.get("last_success_at"))
-    failure = _parse_time(state.get("last_failure_at"))
-    if success is None or (failure is not None and failure >= success):
-        return False
-    age = (datetime.now(timezone.utc) - success).total_seconds()
-    return age < max(0.0, ttl_seconds)
-
-
-def _record_linkraft_failure(external_id: str, error: str) -> None:
-    with db.get_connection() as conn:
-        conn.execute(
-            "INSERT INTO linkraft_sync_cursors (external_project_id, last_failure_at, last_error) "
-            "VALUES (?, ?, ?) ON CONFLICT(external_project_id) DO UPDATE SET "
-            "last_failure_at=excluded.last_failure_at, last_error=excluded.last_error",
-            (external_id, db.now_iso(), error),
-        )
-
-
-def refresh_linkraft_link(
-    project_id: str,
-    external_id: str,
-    *,
-    force: bool = False,
-    snapshot_loader: Callable[[str, str | None], dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    """Refresh one confirmed Linkraft project without touching other linked projects."""
-    source = f"linkraft:project:{external_id}"
-    if snapshot_loader is None and not linkraft_config.configured():
-        return {
-            "provider": "linkraft",
-            "source": source,
-            "external_id": external_id,
-            "ok": False,
-            "configured": False,
-            "skipped": True,
-            "stale": bool(db.sync_state(source).get("last_success_at")),
-            "error": "未設定",
-        }
-    if not force and _fresh_enough(source, linkraft_config.SYNC_TTL_SECONDS):
-        state = db.sync_state(source)
-        return {
-            "provider": "linkraft",
-            "source": source,
-            "external_id": external_id,
-            "ok": True,
-            "configured": True,
-            "skipped": False,
-            "cached": True,
-            "stale": False,
-            "last_synced_at": state.get("last_success_at"),
-            "error": None,
-        }
-
-    loader = snapshot_loader or get_project_snapshot
-    try:
-        snapshot = loader(external_id, linkraft_sync._cursor(external_id))
-        applied = linkraft_sync.apply_snapshot(snapshot, project_id)
-        count = sum(int(value) for value in applied.get("counts", {}).values())
-        synced_at = db.record_sync_success(source, count)
-        return {
-            "provider": "linkraft",
-            "source": source,
-            "external_id": external_id,
-            "ok": True,
-            "configured": True,
-            "skipped": False,
-            "cached": False,
-            "stale": False,
-            "last_synced_at": synced_at,
-            "error": None,
-            "result": applied,
-        }
-    except Exception as exc:  # LinkraftError plus defensive adapter boundary.
-        error = linkraft_sync._safe_error(exc if isinstance(exc, Exception) else LinkraftError(str(exc)))
-        db.record_sync_failure(source, error)
-        _record_linkraft_failure(external_id, error)
-        state = db.sync_state(source)
-        return {
-            "provider": "linkraft",
-            "source": source,
-            "external_id": external_id,
-            "ok": False,
-            "configured": True,
-            "skipped": False,
-            "cached": bool(state.get("last_success_at")),
-            "stale": bool(state.get("last_success_at")),
-            "last_synced_at": state.get("last_success_at"),
-            "error": error,
-        }
 
 
 def _refresh_notion(*, force: bool) -> dict[str, Any]:
@@ -164,7 +55,6 @@ def refresh_project_sources(
     *,
     force: bool = False,
     notion_refresher: Callable[..., dict[str, Any]] | None = None,
-    linkraft_refresher: Callable[..., dict[str, Any]] | None = None,
     github_refresher: Callable[..., dict[str, Any]] | None = None,
     brain_refresher: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -195,15 +85,6 @@ def refresh_project_sources(
             if provider == "notion":
                 refresh = notion_refresher or _refresh_notion
                 result = refresh(force=force)
-            elif provider == "linkraft":
-                refresh = linkraft_refresher or refresh_linkraft_link
-                result = _provider_result(
-                    "linkraft",
-                    [
-                        refresh(project_id, str(link["external_id"]), force=force)
-                        for link in grouped[provider]
-                    ],
-                )
             elif provider == "github":
                 refresh = github_refresher or github_sync.refresh_repository_link
                 result = _provider_result(

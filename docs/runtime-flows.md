@@ -1,8 +1,8 @@
 # PETIT Runtime Flows
 
-## Antigravity CLI Brainと開発タスク（#362 / #225、開発ブランチ）
+## Antigravity CLI Brainと開発タスク（#362 / #225）
 
-2026-10-29の利用者の明示依頼により、CLI準備段階の一律拒否をSettingsの明示接続へ変更した。個人契約の第三者アプリ内利用は公式非サポートのままで、許諾取得済みとは扱わない。環境変数や旧model-routingからは有効化せず、SDK/ACPと別Providerとして表示する。
+2026-10-29の利用者の明示依頼により、CLI準備段階の一律拒否をSettingsの明示接続へ変更した。環境変数や旧model-routingからは有効化せず、SDK/ACPと別Providerとして表示する。
 
 ```mermaid
 flowchart TD
@@ -47,7 +47,28 @@ flowchart TD
 
 初期実装では任意Shell、任意テストコード実行、削除、Push/PR/mergeを公開しない。Python/JavaScript構文とdiff whitespaceだけを静的検証し、実テスト・実ホスト受入と区別する。[設計・移行境界](coding-tasks.md)を参照。
 
-## v0.34.1時点のCLI準備・本番無効（#355、以下は過去段階の記録）
+## v0.34.3: Sona Core / Linkraft撤去（#363）
+
+現行の`get_schedule`は既存Tool Registry、`add_schedule`は現在の承認・実行経路で処理する。Sona専用分岐は削除する。
+Project Source RefreshはNotion/GitHub/BRAINを維持し、既存のLinkraft source linkはデータを保持して`skipped`とする。旧図の旧Runtime/承認フローは履歴・比較用であり、現在のRenaissance Core正本は上位のThread/Turn/Receipt図に従う。
+
+```mermaid
+flowchart TD
+    User[会話 / 既存Thread] --> Brain[Renaissance Brain / 公開Tool]
+    Brain --> Registry[現行Tool Registry]
+    Registry --> Schedule[get_schedule / 保存済みカレンダー]
+    Registry --> Writes[add_schedule / 承認対象]
+    Writes --> Approval[Thread/Turn / Approval / Receipt]
+    Approval --> Local[ローカル予定DB]
+    Resume[プロジェクト再開] --> Sources[確認済みsource link]
+    Sources --> Notion[Notion]
+    Sources --> Github[GitHub]
+    Sources --> Obsidian[BRAIN]
+    Sources --> Other[未対応provider / 旧Linkraft]
+    Other --> Skipped[skipped / 既存DB行は保持]
+```
+
+## v0.34.1: Antigravity CLI準備・本番無効（#355）
 
 CLIのGoogleログイン・既存契約枠はSDK/LM Studioとは別。FAQ/規約とフォーラムの矛盾が
 未解決のため、本番Providerに追加していない。`antigravity_cli`の明示指定は拒否し、
@@ -104,9 +125,11 @@ initialize handshakeはモデル推論・認証成功・Google契約枠の使用
 
 ```mermaid
 flowchart TD
-    C[Web / Desktop / voice] --> Auth[管理者session検査 / 初回は設定UI]
-    Auth --> A[chat adapter または Turn API]
+    C[Web / Desktop / voice] --> Auth[初回は設定UI / 管理者session検査]
+    Auth -->|管理者ログイン中| A[全Tool有効のchat adapter / Turn API]
+    Auth -->|非管理者・通常モード| Safe[通常会話モード: Tool全般禁止・テキスト応答のみ]
     A --> L[request ID / 入力hash / Threadを原子的に受付]
+    Safe --> L
     L -->|同一入力の再送| R[保存済み結果 / 承認 / receipt]
     L -->|ID衝突 / 同じThread実行中| Conflict[409 / 429]
     L --> Select[順位または従来選択 / local_only / 接続と費用同意を検査]
@@ -720,7 +743,7 @@ flowchart TD
     failed -->|はい| resume --> readOnly --> final --> delete
 ```
 
-`pending_actions.py` が短期のapproval状態、10分TTL、承認API、Sona Core互換分岐、承認後のTool dispatchを所有します。`chat.py` はAgent Runtimeが返した`pending_actions`を`pending_actions.register(...)`へ渡し、返された`approval_id`を`ChatResponse`へ載せるだけです。APIモデルは`chat_models.py`で共有し、確認Routerから`main.py`を参照しません。
+`pending_actions.py` が短期のapproval状態、10分TTL、承認API、承認後のTool dispatchを所有します。`chat.py` はAgent Runtimeが返した`pending_actions`を`pending_actions.register(...)`へ渡し、返された`approval_id`を`ChatResponse`へ載せるだけです。APIモデルは`chat_models.py`で共有し、確認Routerから`main.py`を参照しません。
 
 Agentが自然文だけで「実行しますか？」と返した場合は承認として扱わず、確認対象Toolをcallするよう1回だけ再指示します。
 

@@ -1,22 +1,24 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.34.1**
+**Current Version: v0.35.0**
 
 **Last Updated: 2026-10-29 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #365 / v0.35.0 管理者セッションDB永続化と非管理者向け安全な会話モード（実装済み・単体テスト完了）: 管理者セッションをSQLite（admin_sessions）に保存し、サーバー再起動やリロードによるセッション喪失を解消（1年間有効）。UI設定から管理者セッションの終了（ログアウト）を可能にし、非管理者状態でもチャット（/api/chat）を許可。非管理者時はTool全般を禁止して純粋なテキスト応答のみに制限（コード変更や副作用操作を防止）。関連テスト23件成功。
+
 - #362/#359 CLIモデル選択: 従来のID手入力に加え、公式agy models/Codex model/listの一覧取得・選択・PETIT設定保存を追加。Windows実agyから13候補を取得。catalogは実推論や利用枠の証明と区別し、既存接続テストで確認する。CLI本体の既定値は変更しない。
 
-- #362 接続テスト診断: 実CLI推論に加えPETIT用JSON検証・保存を行うテストで、従来は失敗理由が一律表示だった。固定のreasonと説明をAPI/Turnへ返すよう変更。利用者環境の今回の失敗原因はまだ未特定で、再試行結果から切り分ける。
+- #362 接続テスト診断: 実CLI推論に加えPETIT用JSON検証・保存を行うテストで、従来は失敗理由が一律表示だった。固定のreasonと説明をAPI/Turnへ返すよう変更。
 
-- #359 Codex検出修正: サーバーのPATHにCodexがなくてもWindowsの公式launcher標準先から検出・Brain選択・起動する共通resolverへ変更。別配置はPETIT_CODEX_EXECUTABLEで絶対パスを指定でき、無効な明示指定はfail closed。PATH検出を無効化した実launcherでapp-server接続を確認。本人の既存認証・モデル推論は未確認のまま。
+- #359 Codex検出修正: サーバーのPATHにCodexがなくてもWindowsの公式launcher標準先から検出・Brain選択・起動する共通resolverへ変更。別配置はPETIT_CODEX_EXECUTABLEで絶対パスを指定でき、無効な明示指定はfail closed。
 
-- #225（CLI開発タスクの初期実装・合成データ受入済み）: 明示したGitルート・開始commit・目的・CLIをTask/Jobへ保存し、会話の既存ApprovalまたはWebの開始確認後に1件ずつ実行する。元checkoutと未コミット変更を保ち、remoteを除いた専用cloneでCore限定のlist/read/SHA照合write/静的checkを使う。Webに状態・進捗・差分・取消・レビュー完了を追加。再送/二重承認/取消/設定解除/再起動中断を検証し、実Antigravity CLIで合成repositoryの編集・静的check・元repo不変を確認。Codexの実推論、実プロジェクトの機能テスト、任意Shell/依存導入/削除/Push/PR/merge、実端末は未確認または対象外。次は本人Codex認証と、許可repositoryでの利用者レビュー。docs/coding-tasks.md参照。
+- #225（CLI開発タスクの初期実装・合成データ受入済み）: 明示したGitルート・開始commit・目的・CLIをTask/Jobへ保存し、会話の既存ApprovalまたはWebの開始確認後に1件ずつ実行する。元checkoutと未コミット変更を保ち、remoteを除いた専用cloneでCore限定のlist/read/SHA照合write/静的checkを使う。Webに状態・進捗・差分・取消・レビュー完了を追加。
 
-- #362（利用者の明示依頼でCLI Brainを追加・実CLI合成受入済み）: Settingsの明示接続でantigravity_cliを優先順位とCLIのみ候補へ追加。finish専用Agentの公式headless/NDJSONから返答/PETIT Tool要求JSONを受け、既存Core Loopのschema/risk/承認/receipt/再送へ接続。認証token抽出/APIキー継承/迂回APIなし。実CLIで会話・Read・予定承認/再開/同一依頼再送に成功。個人契約での第三者アプリ内利用は公式非サポートのままで、許諾取得済みとは扱わない。契約枠由来/quotaはunknown、実WEVORA/実iPhone/配布版/Cloudは未確認。本人の本番設定は変更せず、初期設定から接続できる状態。reports/antigravity-cli-brain-live.json参照。
+- #362（利用者の明示依頼でCLI Brainを追加・実CLI合成受入済み）: Settingsの明示接続でantigravity_cliを優先順位とCLIのみ候補へ追加。finish専用Agentの公式headless/NDJSONから返答/PETIT Tool要求JSONを受け、既存Core Loopのschema/risk/承認/receipt/再送へ接続。
 
-- #359（CLIのみ選択を実装・実Codex推論は未確認）: 既存Codex app-server/Core Tool bridgeを再利用し、CLIのみではSDK/APIへFallbackしない接続方式、明示したCLI/認証診断、call ID再送防止・最終返答・外部session記録を追加。承認/receipt/再開は既存Coreを使用。隔離pytest90件とChrome 1440/390pxの設定/保存/再起動確認に成功。実CLI 0.165.0-alpha.1.2のinitialize・dynamic Tool登録・process終了を確認したが、一時認証homeは未認証でモデル推論/実Toolは未検証。作業環境から既存storage/settingsへのアクセス権エラーあり、本人認証結果待ち。CLI画像はVision前に拒否。Antigravity CLIの現在地は#362を参照、ACPは未接続。次は本人のCodex接続テストと実会話/Tool受入。docs/setup-integrations.md、reports/codex-cli-validation.jsonを参照。
+- #359（CLIのみ選択を実装・実Codex推論は未確認）: 既存Codex app-server/Core Tool bridgeを再利用し、CLIのみではSDK/APIへFallbackしない接続方式、明示したCLI/認証診断、call ID再送防止・最終返答・外部session記録を追加。承認/receipt/再開は既存Coreを使用。
 
 - #357 ACP初回導入（PR #358 main反映済み・本番Brain未接続）: 公式ACP Agentの検証付き導入、ACP initialize、oauth-personal設定UI/APIを追加。Windows実Agentのinitializeと認証方式広告を確認。OAuth、モデル応答、契約枠、PETIT Thread/Turn/Receipt接続、Session復元、OS隔離、実フォルダ読取は未確認または未実装。通常会話・実フォルダ・Terminal・backgroundは無効のまま。次は本人操作のOAuth、Windows隔離の実証、既存Core/Approvalとの接続を分けて受入する。既存agy CLI経路は変更なし。
 
@@ -313,15 +315,12 @@
 | 2026-10-28 | 13:39 | #357 | 実装済み・未確認: ACP Registry導入、状態/handshake/OAuth設定UI・APIを追加。Windows実AgentのACP v1 initializeとoauth-personal広告を確認。OAuth・推論・利用枠・PETIT Brain・OS隔離は未確認/未接続のため本番Provider化していない。隔離3件とsetup既存20件成功。 |
 
 | 2026-10-29 | 08:15 | #358 | PR #358反映済みorigin/mainとローカルmainを統合。#332のTask再開修正を保持し、新mainのv0.34.0・ACP導入・Runtimeを維持。7ファイル競合を解決。関連テスト21件+29 subtests成功（HTTP保存ケース1件はstorage/settings権限エラーで未確認）。compileall成功。diff --checkは上流追加docsの末尾空白9件を報告。DBバックアップとstorage/vision-uiを保持。 |
-
-| 2026-10-29 | 09:51 | #359 | 2026-10-29-02: CLIのみ接続方式とCodex診断/Tool再送防止を追加。隔離90件・Chrome 1440/390px成功、実CLIのinitialize/Tool登録/終了を確認。本人認証/実推論・Toolは未確認、既存settingsの権限エラーを保持し本番設定は未変更。Antigravity個人CLIは現行FAQの制限で無効を維持。 |
-
-| 2026-10-29 | 10:44 | #362 | 2026-10-29-03: 利用者の明示依頼で公式Antigravity CLIをfinish専用Agent/構造化JSONのBrainへ接続。実CLI+合成DBで会話/Read/予定承認・再開・再送を確認。公式非サポート表示とquota unknownを維持。CLIのみ候補と接続UIを追加し、本番設定の自動変更は行わない。 |
-
-| 2026-10-29 | 10:44 | #225 | 2026-10-29-04: 承認付きCLI開発タスク、Task/Job永続化、専用clone/Core限定Tool、Web進捗・差分・取消・レビュー完了を追加。関連143件/Chrome 1440・390px成功。実Antigravity CLIの合成コード編集・静的check・元repo不変を確認。実Codex/実project機能テスト/任意Shell・削除・Push/PR/mergeは未確認または対象外。 |
-
-| 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH依存検出を公式Windows標準launcher対応の共通resolverへ修正。PATH検出なしの実launcherでapp-server接続、関連42件と構文/diff確認に成功。本人認証/実推論とは区別し、無効な明示実行パスは拒否。 |
-
-| 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの一律エラーを固定reason別の説明・Turn保存へ変更。生のCLI診断を返さない境界を保持。利用者環境の失敗原因は未特定。 |
-
-| 2026-10-29 | 10:59 | #362 | 2026-10-29-07: Codex/Antigravity CLIの公式モデル一覧取得・選択・保存UIを追加。実CLI catalogはCodex9件・agy13件、関連24テストとChrome 1440/390pxの合成一覧選択/保存に成功。catalogと実推論/利用枠を区別し、接続失敗の解消は未確認。 |
+| 2026-10-29 | 09:48 | #360 | v0.34.2: AGENTSにコード削除の影響調査・互換性/データ保護・独立PR/回帰確認を明文化。Linkraft/Sona等は監査候補のみ、機能削除なし。実行テストは文書変更のため未実施。 |
+| 2026-10-29 | 10:23 | #363 | v0.34.3: Sona Core/Linkraftの旧Adapter・実行分岐・依存・専用テストを撤去。Project Continuity、Notion/GitHub/BRAIN、予定/承認を保持し、既存SQLite行と旧Linkraftリンクは削除せずunsupported/skipped。新回帰追加、GitHub CIと実DB受入はPRで追跡。 |
+| 2026-10-29 | 11:30 | #365 | v0.35.0: 管理者セッションのSQLite DB永続化（再起動耐性・1年有効期限）、UIログアウト、非管理者時の通常会話モード（ツール全般禁止）を実装。 |
+| 2026-10-29 | 09:51 | #359 | 2026-10-29-02: CLIのみ接続方式とCodex診断/Tool再送防止を追加。 |
+| 2026-10-29 | 10:44 | #362 | 2026-10-29-03: 利用者の明示依頼で公式Antigravity CLIをfinish専用Agent/構造化JSONのBrainへ接続。 |
+| 2026-10-29 | 10:44 | #225 | 2026-10-29-04: 承認付きCLI開発タスク、Task/Job永続化、専用clone/Core限定Tool、Web進捗・差分・取消・レビュー完了を追加。 |
+| 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH依存検出を公式Windows標準launcher対応の共通resolverへ修正。 |
+| 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの一律エラーを固定reason別の説明・Turn保存へ変更。 |
+| 2026-10-29 | 10:59 | #362 | 2026-10-29-07: Codex/Antigravity CLIの公式モデル一覧取得・選択・保存UIを追加。 |

@@ -1,8 +1,12 @@
 # PETIT — Personal AI Assistant (MVP)
 
-開発ブランチ（#362 / #225）では、Antigravity CLIを明示接続するBrainと、Codex CLI／Antigravity CLIへローカル開発を依頼するタスクを追加しました。Tasksの「CLIの開発タスク・進捗を見る」から、許可したGitルート・目的・CLIを選び、承認後の状態・差分・静的チェックを確認できます。元checkoutは変更せず、専用コピーで作業します。任意Shell・実テストコード実行・削除・Push/PR/mergeは未対応です。[設計・制約](docs/coding-tasks.md)、[実CLIの合成受入](reports/antigravity-cli-brain-live.json)を参照。Antigravity個人契約のアプリ内利用は公式非サポートのままです。
+開発ブランチ（#362 / #225）では、Antigravity CLIを明示接続するBrainと、Codex CLI／Antigravity CLIへローカル開発を依頼するタスクを追加しました。Tasksの「CLIの開発タスク・進捗を見る」から、許可したGitルート・目的・CLIを選び、承認後の状態・差分・静的チェックを確認できます。元checkoutは変更せず、専用コピーで作業します。任意Shell・実テストコード実行・削除・Push/PR/mergeは未対応です。[設計・制約](docs/coding-tasks.md)、[実CLIの合成受入](reports/antigravity-cli-brain-live.json)を参照。
 
-v0.34.1時点ではSettingsに公式Antigravity CLIの導入検出と未検証状態を追加しました。
+v0.34.3ではSona Coreの実行分岐とLinkraft専用同期を撤去し、予定/承認は既存Renaissance Core・Registryへ統一しました。既存SQLiteデータと過去のLinkraftリンク/イベントは削除しません。移行・検証は[撤去ガイド](docs/integration-removal.md)を参照してください。
+
+v0.34.2は開発規約の更新です。`AGENTS.md`にコード削除の事前調査・互換性保護・回帰検証と段階的整理の方針を明文化しました。実機能の削除・変更はありません。
+
+v0.34.1ではSettingsに公式Antigravity CLIの導入検出と未検証状態を追加しました。
 Googleログインの既存契約枠でPETITを動かす接続は、公式資料の矛盾とRead専用境界が
 未解決のため本番無効です。SDK+LM Studio/Gemini APIはこの目的の達成には含めません。
 [Windows/macOS導入・直接診断・Mock検証・残る受入](docs/antigravity-cli.md)を参照。
@@ -193,10 +197,7 @@ tailscale serve reset
 | `PETIT_LIGHT_MAX_TOKENS` | `512` | 軽量回答の最大生成量 |
 | `PETIT_MAX_TOOL_ITERATIONS` | `3` | 1ターンで許可するツール実行ラウンド数。最終回答用のLLM呼び出しは別に許可 |
 | `PETIT_TOOL_RESULT_MODE` | `auto` | `role=tool`を優先し、LM Studioのテンプレート非対応時だけ互換user follow-upへ退避。`tool` / `user`固定も可能 |
-| `PETIT_USE_SONA_CORE` | `0` | `1`の場合のみ、予定取得とローカル予定追加をSona Agent Core経由で実行 |
-| `PETIT_OWNER_ID` / `PETIT_PERSONAL_SCOPE_ID` | `soso` / `soso` | PETIT内部ユーザー、Core Actor、`personal` Scopeの識別子 |
-| `PETIT_SONA_CORE_AUDIT_PATH` | `storage/audit/sona_agent_core.jsonl` | Core Tool実行の監査ログ |
-| `PETIT_SONA_CORE_APPROVAL_TTL_SECONDS` | `600` | Core Approvalの有効期限（秒） |
+| `PETIT_OWNER_ID` | `soso` | PETIT内部ユーザーID |
 | `PETIT_HOST` / `PETIT_PORT` | `127.0.0.1` / `8000` | サーバーの待受 |
 | `PETIT_TTS_PROVIDER` | `aivis` | 読み上げProvider。AivisSpeech未利用時もチャットは動作 |
 | `PETIT_TTS_BASE_URL` | `http://127.0.0.1:10101` | PETITプロセスから見たAivisSpeech Engine接続先 |
@@ -219,9 +220,6 @@ tailscale serve reset
 | `NOTION_PROP_PRIORITY` | `Priority` | 優先度プロパティ |
 | `NOTION_PROP_CATEGORY` | `Category` | 分類プロパティ |
 | `NOTION_PROP_DONE_DATE` | `DoneDate` | 完了日プロパティ |
-| `LINKRAFT_BASE_URL` | なし | owner-only PETIT read APIを公開したLinkraftのURL |
-| `LINKRAFT_PETIT_READ_TOKEN` | なし | Linkraftと共有する読み取り専用Bearer Token |
-| `LINKRAFT_SYNC_TTL_SECONDS` | `300` | Linkraftプロジェクト差分同期のTTL |
 | `PETIT_GITHUB_TOKEN` | なし | private repositoryにも使える最小権限のGitHub read token |
 | `PETIT_GITHUB_API_URL` | `https://api.github.com` | GitHub REST APIの接続先 |
 | `PETIT_GITHUB_SYNC_TTL_SECONDS` | `300` | GitHub evidence同期のTTL |
@@ -233,11 +231,10 @@ tailscale serve reset
 | `PETIT_VAPID_SUBJECT` | なし | VAPID連絡先。`mailto:`または公開可能な`https:` URL |
 | `PETIT_WEB_PUSH_TTL_SECONDS` | `300` | Push Serviceが通知を保持する秒数 |
 
-AivisSpeech、Notion Adapter v2、Notion会話検索、Linkraft、GitHub evidence、Web Pushの詳細設定は、
+AivisSpeech、Notion Adapter v2、Notion会話検索、GitHub evidence、Web Pushの詳細設定は、
 [`docs/aivis_speech.md`](docs/aivis_speech.md)、
 [`docs/notion_adapter_v2.md`](docs/notion_adapter_v2.md)、
 [`docs/notion_search.md`](docs/notion_search.md)、
-[`docs/linkraft_owner_sync.md`](docs/linkraft_owner_sync.md)、
 [`docs/github_evidence.md`](docs/github_evidence.md)、
 [`docs/web_push_notifications.md`](docs/web_push_notifications.md) を参照してください。
 
@@ -258,7 +255,6 @@ AivisSpeech、Notion Adapter v2、Notion会話検索、Linkraft、GitHub evidenc
 - `save_project_completion` — 確認済み到達状態をcheckpointとイベントへ保存
 - `search_notion` — 共有済みNotionページを限定検索し、プロパティ・本文抜粋・更新日時・URLを取得
 - `sync_notion_tasks` / `get_notion_project_candidates` / `link_notion_project_candidate` — Notion Relation同期と確認付き紐付け
-- `sync_linkraft_projects` / `get_linkraft_project_candidates` / `link_linkraft_project_candidate` — Linkraft owner-only同期と確認付き紐付け
 - `inspect_github_repository` / `sync_github_evidence` — GitHub repository候補の読取と確認済みrepositoryの証拠同期
 - `get_github_repository_candidates` / `link_github_repository_candidate` — GitHub候補一覧と確認付き紐付け
 
@@ -269,7 +265,7 @@ PETITは複数プロジェクトの開始・終了・切り替え・再開をSQL
 ### 開始・再開
 
 ```text
-Linkraftやる
+WEVORAやる
 プチ進める
 PETITに戻る
 さっきの続きやる
@@ -284,9 +280,8 @@ confirmed_at IS NOT NULL
 ```
 
 - Notionは再開ターン内で最大1回だけ、既存TTLを尊重して同期します。
-- Linkraftは選択プロジェクトの確認済み外部IDだけを、保存済みcursorから差分同期します。
 - GitHubは選択プロジェクトの確認済み`owner/name`だけを読み、commit・PR・check・deploymentを別種のevidenceとして同期します。
-- 未確認候補、removed link、別プロジェクト、未対応providerは呼びません。
+- 未確認候補、removed link、別プロジェクト、未対応providerは呼びません。旧Linkraftリンクは保存したまま `skipped` 扱いとします。
 - 1ソースが失敗しても、保存済みcheckpointからの再開は止めません。
 - 前回成功キャッシュがある場合は保持し、staleと明示します。
 
@@ -342,7 +337,6 @@ SQLiteは外部正本を置き換えず、内部ID、別名、確認状態、che
 現在接続済み:
 
 - 個人プロジェクト・個人タスク: Notion Adapter v2
-- Life is Tech／教え子向けプロジェクト: Linkraft（そそ本人所有のみ）
 - コード・PR・CI・deploymentの事実: GitHub evidence Adapter
 
 次の対象:
@@ -399,7 +393,6 @@ Notionタスク作成・完了、ローカル予定追加、長期記憶、引�
 
 BRAIN編集は設定済みVault内の既存`.md`だけに限定し、`_private`・除外フォルダ・Vault外パスを拒否します。
 
-`PETIT_USE_SONA_CORE=1`では`add_schedule`だけがCoreのSQLite Approval Storeへ切り替わります。他の書き込みToolは従来の確認経路を維持します。
 
 LM Studioが未起動でもサーバーは落ちず、UI上にエラーを表示します。
 
@@ -423,7 +416,6 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
     tests.test_project_registration \
     tests.test_project_source_refresh \
     tests.test_notion_adapter_v2 \
-    tests.test_linkraft_owner_sync \
     tests.test_github_evidence \
     tests.test_github_client_evidence \
     tests.test_github_evidence_routing
