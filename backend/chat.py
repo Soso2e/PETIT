@@ -39,6 +39,8 @@ def chat(req: ChatRequest, request: Request = None, response: Response = None) -
 
     from . import conversation_api, setup_store as settings
     is_admin = settings.valid_session(request.cookies.get("petit_admin", "")) if request is not None else False
+    if not is_admin and req.attachment_ids:
+        return ChatResponse(reply="", error="画像添付には管理者ログインが必要です。", request_id=request_id)
     if not is_admin and request is not None:
         # Never accept a user-supplied thread id for a guest conversation.
         guest_token = request.cookies.get("petit_guest", "")
