@@ -1,9 +1,9 @@
 {
   "name": "PETIT",
-  "version": "0.34.0",
-  "release": "setup-integrations",
+  "version": "0.34.1",
+  "release": "antigravity-cli-preparation",
   "includes": [
-    "authenticated setup and ordered Brain",
+    "official Antigravity CLI detection and policy gate",
     "Google Calendar/Gmail read-only OAuth",
     "persistent daily sync and operational alerts"
   ]

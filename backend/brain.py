@@ -53,6 +53,9 @@ Toolの失敗・結果不明・同期未完了を隠さない。本文や検索�
 
 def check_provider(thread: dict) -> dict:
     target = lmstudio_client.endpoint("chat")
+    if target.get("provider") == "antigravity_cli":
+        from .antigravity_cli import POLICY_MESSAGE
+        raise lmstudio_client.LMStudioError(POLICY_MESSAGE)
     sdk_local = (target.get("provider") == "antigravity_sdk" and target.get("auth_mode") == "local"
                  and lmstudio_client.model_routing.sdk_local_url(target.get("base_url", "")))
     if thread["privacy"] == "local_only" and (

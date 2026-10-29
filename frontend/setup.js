@@ -34,6 +34,8 @@
   }
   function render() {
     const s=state.settings;order=[...s.priority];priority();
+    const cli=state.antigravity_cli;
+    $('antigravity-cli-status').textContent=cli?(cli.installed?'公式CLIの候補を検出':'CLI未検出（サーバーのPATH・標準配置先）')+' / 本番接続: 無効 / バージョン・ログイン・モデル・契約枠残量: unknown（未検証）':'CLIの診断情報を取得できません。';
     for (const [id,key] of [['codex-model','codex_model'],['deepseek-model','deepseek_model'],['antigravity-auth','antigravity_auth'],['antigravity-model','antigravity_model'],['antigravity-url','antigravity_url'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
     if (!$('google-redirect').value) $('google-redirect').value=location.origin+'/api/setup/google/callback';
     $('paid-deepseek').checked=s.paid_allowed.includes('deepseek');$('paid-antigravity').checked=s.paid_allowed.includes('antigravity');$('brain-enabled').checked=s.brain_enabled;$('sync-notifications').checked=s.sync_notifications;
@@ -48,6 +50,7 @@
   }
   function renderAcp(){if(!acpState)return;$('acp-install-state').textContent=acpState.installed?'導入済み / '+acpState.agent_version:'未導入';$('acp-auth-state').textContent='現在の認証状態はunknown'+(acpState.auth_last_success_utc?' / OAuth成功記録: '+acpState.auth_last_success_utc:'');$('acp-usage-state').textContent=[acpState.model,acpState.token_usage,acpState.plan_quota,acpState.additional_credits].join(' / ');$('acp-error').textContent=acpState.last_error||'なし';}
   async function refresh(){state=await api('/config');try{acpState=await api('/antigravity-acp');}catch{acpState=null;}render();}
+  action($('antigravity-cli-diagnose'),async()=>{state.antigravity_cli=await api('/antigravity-cli');render();notice('CLIの配置だけを確認しました。ログイン・推論は実行していません。');});
   async function save(values){state=await api('/config','PUT',values);render();}
   async function saveKeys(fields){const values={};for(const [id,key]of fields){if($(id).value)values[key]=$(id).value;}if(Object.keys(values).length){await api('/credentials','PUT',{values});fields.forEach(([id])=>$(id).value='');}}
   async function saveAI(){await save({priority:order,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,antigravity_auth:$('antigravity-auth').value,antigravity_model:$('antigravity-model').value,antigravity_url:$('antigravity-url').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null,$('paid-antigravity').checked?'antigravity':null].filter(Boolean)});}

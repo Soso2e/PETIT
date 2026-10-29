@@ -20,6 +20,13 @@ async function main(){launch();await wait();const browser=await chromium.launch(
 try{
   const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();const pageErrors=[];page.on('pageerror',e=>pageErrors.push(e.message));
   await page.goto(url+'/static/universe.html');await page.waitForURL(/\/static\/setup\.html(?:\?.*)?$/);await login(page);
+  await page.locator('#antigravity-cli-status').filter({hasText:'unknown'}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'接続・有効化（許諾確認待ち）'}).isDisabled(),true);
+  await clickReady(page,'#antigravity-cli-diagnose','CLIの配置だけを確認');
+  const cliStatus=await (await page.request.get(url+'/api/setup/antigravity-cli')).json();
+  assert.equal(cliStatus.production_enabled,false);assert.equal(cliStatus.authentication,'unknown');
+  for(const operation of ['connect','test'])assert.equal((await page.request.post(url+'/api/setup/services/antigravity_cli/'+operation,{headers:{'X-PETIT-Request':'1'}})).status(),409);
+  results.push({antigravity_cli:'production blocked',authentication:'unknown',live_cli_verified:false});
   await page.locator('#antigravity-model').fill('petit-setup-probe');await clickReady(page,'[data-connect="antigravity"]','接続設定を保存');
   await clickReady(page,'[data-test="antigravity"]','実応答を確認');
   await page.locator('#brain-enabled').check();await clickReady(page,'#save-brain','AI設定を保存');

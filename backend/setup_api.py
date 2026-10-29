@@ -136,7 +136,9 @@ def logout(request: Request):
 
 @router.get("/config", dependencies=[Depends(_admin)])
 def get_config():
-    return {"settings": settings.public(), "brain": brain_priority.public_status(), "sync": service_sync.status()}
+    from .antigravity_cli import status
+    return {"settings": settings.public(), "brain": brain_priority.public_status(), "sync": service_sync.status(),
+            "antigravity_cli": status()}
 
 
 @router.get("/antigravity-acp", dependencies=[Depends(_admin)])
@@ -198,6 +200,13 @@ async def antigravity_acp_authenticate():
         settings.update({"antigravity_acp_auth_last_success_utc": datetime.now(timezone.utc).isoformat(),
                          "antigravity_acp_last_error": None})
     return {**result, "auth_last_success_utc": settings.load().get("antigravity_acp_auth_last_success_utc")}
+
+
+@router.get("/antigravity-cli", dependencies=[Depends(_admin)])
+def antigravity_cli_status():
+    # File existence only. No login, prompt, process, credential inspection or network.
+    from .antigravity_cli import status
+    return status()
 
 
 class SettingsUpdate(BaseModel):
@@ -332,6 +341,9 @@ def notion_selection(payload: NotionSelection):
 
 @router.post("/services/{service}/connect", dependencies=[Depends(_admin)])
 def connect(service: str):
+    if service == "antigravity_cli":
+        from .antigravity_cli import POLICY_MESSAGE
+        raise HTTPException(409, POLICY_MESSAGE)
     data = settings.load()
     if service == "codex":
         from . import codex_brain
@@ -382,6 +394,9 @@ def disconnect(service: str):
 
 @router.post("/services/{service}/test", dependencies=[Depends(_admin)])
 def test_connection(service: str):
+    if service == "antigravity_cli":
+        from .antigravity_cli import POLICY_MESSAGE
+        raise HTTPException(409, POLICY_MESSAGE)
     try:
         if service in {"google_calendar", "gmail"}:
             result = google_services.calendars() if service == "google_calendar" else google_services.get("gmail", "profile")

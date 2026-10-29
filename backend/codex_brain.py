@@ -46,7 +46,7 @@ class RPC:
                         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
                         **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}))
             threading.Thread(target=self._read, daemon=True).start()
-            self.request("initialize", {"clientInfo": {"name": "petit", "title": "PETIT", "version": "0.34.0"},
+            self.request("initialize", {"clientInfo": {"name": "petit", "title": "PETIT", "version": "0.34.1"},
                         "capabilities": {"experimentalApi": True}}, timeout=20)
             self.send({"method": "initialized", "params": {}})
         except BaseException:
