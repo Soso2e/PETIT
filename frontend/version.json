@@ -1,8 +1,9 @@
 {
   "name": "PETIT",
-  "version": "0.34.1",
-  "release": "antigravity-cli-preparation",
+  "version": "0.34.2",
+  "release": "development-rule-maintenance",
   "includes": [
+    "code removal review and compatibility safeguards",
     "official Antigravity CLI detection and policy gate",
     "Google Calendar/Gmail read-only OAuth",
     "persistent daily sync and operational alerts"
