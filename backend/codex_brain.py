@@ -17,6 +17,30 @@ _auth = None
 _auth_lock = threading.RLock()
 
 
+def executable() -> str | None:
+    """Resolve once consistently for status, selection and process startup."""
+    override = os.getenv("PETIT_CODEX_EXECUTABLE", "").strip()
+    if override:
+        path = Path(override).expanduser()
+        try:
+            return str(path) if path.is_absolute() and path.is_file() else None
+        except OSError:
+            return None
+    found = shutil.which("codex")
+    if found:
+        return found
+    # Stable official desktop launcher; never guess a versioned hash directory.
+    local = os.getenv("LOCALAPPDATA")
+    if os.name == "nt" and local:
+        candidate = Path(local) / "OpenAI" / "Codex" / "bin" / "codex.exe"
+        try:
+            if candidate.is_file():
+                return str(candidate)
+        except OSError:
+            pass
+    return None
+
+
 class CodexUnavailable(lmstudio_client.LMStudioError):
     def __init__(self, reason, message):
         self.reason = reason
@@ -25,9 +49,9 @@ class CodexUnavailable(lmstudio_client.LMStudioError):
 
 class RPC:
     def __init__(self):
-        executable = shutil.which("codex")
-        if not executable:
-            raise lmstudio_client.LMStudioError("Codex CLIが未導入です。公式CLIをサーバーへ導入してください。")
+        binary = executable()
+        if not binary:
+            raise lmstudio_client.LMStudioError("Codex CLIが見つかりません。サーバーのPATH・標準配置先またはPETIT_CODEX_EXECUTABLEを確認してください。")
         home = settings.root() / "codex"
         home.mkdir(parents=True, mode=0o700, exist_ok=True)
         self.temp = tempfile.TemporaryDirectory(prefix="petit-codex-")
@@ -38,7 +62,7 @@ class RPC:
         flags = ["features.shell_tool=false", "features.multi_agent=false", "features.apps=false", "features.plugins=false",
                  "features.memories=false", 'web_search="disabled"', 'cli_auth_credentials_store="keyring"',
                  'approval_policy="never"', 'sandbox_mode="read-only"']
-        argv = [executable, "app-server", "--listen", "stdio://"]
+        argv = [binary, "app-server", "--listen", "stdio://"]
         for flag in flags:
             argv.extend(["-c", flag])
         try:
@@ -134,14 +158,14 @@ def logout():
 
 def status():
     # Rendering settings must not start a CLI or infer login from a saved flag.
-    return {"installed": bool(shutil.which("codex")), "transport": "cli", "protocol": "app-server/stdio",
+    return {"installed": bool(executable()), "transport": "cli", "protocol": "app-server/stdio",
             "authenticated": None, "inference": "unknown"}
 
 
 def diagnose():
     result = status()
     if not result["installed"]:
-        return {**result, "error": "Codex CLIが未導入です。サーバーのPATHを確認してください。"}
+        return {**result, "error": "Codex CLIが見つかりません。サーバーのPATH・標準配置先またはPETIT_CODEX_EXECUTABLEを確認してください。"}
     client = None
     try:
         client = RPC()

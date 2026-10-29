@@ -22,8 +22,9 @@ def target(provider: str, data: dict | None = None) -> dict:
                 "model": data["antigravity_cli_model"], "base_url": "", "api_key": "", "timeout_seconds": 90,
                 "configured": bool(executable())}
     if provider == "codex":
+        from .codex_brain import executable
         return {"provider": "codex", "profile": "codex", "label": "Codex（ChatGPT）", "external": True,
-                "model": data["codex_model"], "base_url": "", "configured": bool(shutil.which("codex")), "api_key": ""}
+                "model": data["codex_model"], "base_url": "", "configured": bool(executable()), "api_key": ""}
     if provider == "antigravity":
         from .antigravity_brain import installed
         from .model_routing import sdk_local_url

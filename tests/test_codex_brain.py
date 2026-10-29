@@ -228,3 +228,22 @@ def test_unavailable_cli_brain_can_be_disabled(client):
     settings.update({"brain_enabled": True, "brain_transport": "cli_only", "connected": []})
     response = client.put("/api/setup/config", json={"brain_transport": "cli_only", "brain_enabled": False})
     assert response.status_code == 200 and settings.load()["brain_enabled"] is False
+
+
+@pytest.mark.skipif(codex.os.name != "nt", reason="Windows desktop launcher location")
+def test_codex_resolves_standard_launcher_without_path(tmp_path, monkeypatch):
+    monkeypatch.delenv("PETIT_CODEX_EXECUTABLE", raising=False)
+    monkeypatch.setattr(codex.shutil, "which", lambda _: None)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    launcher = tmp_path / "OpenAI" / "Codex" / "bin" / "codex.exe"
+    launcher.parent.mkdir(parents=True);launcher.write_bytes(b"synthetic")
+    assert codex.executable() == str(launcher)
+    assert codex.status()["installed"] and priority.target("codex")["configured"]
+
+
+def test_explicit_codex_path_is_not_silently_replaced(tmp_path, monkeypatch):
+    launcher = tmp_path / "codex.exe";launcher.write_bytes(b"synthetic")
+    monkeypatch.setenv("PETIT_CODEX_EXECUTABLE", str(launcher))
+    assert codex.executable() == str(launcher)
+    monkeypatch.setenv("PETIT_CODEX_EXECUTABLE", str(tmp_path / "missing.exe"))
+    assert codex.executable() is None
