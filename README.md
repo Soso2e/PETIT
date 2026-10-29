@@ -1,5 +1,7 @@
 # PETIT — Personal AI Assistant (MVP)
 
+v0.34.2は開発規約の更新です。`AGENTS.md`にコード削除の事前調査・互換性保護・回帰検証と段階的整理の方針を明文化しました。実機能の削除・変更はありません。
+
 v0.34.1ではSettingsに公式Antigravity CLIの導入検出と未検証状態を追加しました。
 Googleログインの既存契約枠でPETITを動かす接続は、公式資料の矛盾とRead専用境界が
 未解決のため本番無効です。SDK+LM Studio/Gemini APIはこの目的の達成には含めません。
