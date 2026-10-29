@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.34.1（CLI準備の開発ブランチ・未マージ）**
+**Current Version: v0.34.1**
 
-**Last Updated: 2026-10-27 UTC**
+**Last Updated: 2026-10-29 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #357 ACP初回導入（PR #358 main反映済み・本番Brain未接続）: 公式ACP Agentの検証付き導入、ACP initialize、oauth-personal設定UI/APIを追加。Windows実Agentのinitializeと認証方式広告を確認。OAuth、モデル応答、契約枠、PETIT Thread/Turn/Receipt接続、Session復元、OS隔離、実フォルダ読取は未確認または未実装。通常会話・実フォルダ・Terminal・backgroundは無効のまま。次は本人操作のOAuth、Windows隔離の実証、既存Core/Approvalとの接続を分けて受入する。既存agy CLI経路は変更なし。
 
 - #355 / #349（実CLI直接検証済み・PETIT本番接続は無効）: Windowsの公式agy 1.4.8を使い、APIキー環境変数を除いて日本語JSON会話、同一conversation IDのNDJSON継続、/model、/usage、/creditsを実測。gemini-4-argon-medium、Gemini 4 Argon週次枠98%残、AI Premium credits残高0を確認したが、契約プランと呼出ごとの枠消費はunknown。plan+sandbox/request-reviewで一時READMEのみread_file読取、検証文字列を確認し、書込/削除/コマンド/subagentなし・ファイル不変。GoogleアカウントID、規約許諾、PETIT Core保存、実WEVORA、429/認証切れ/取消、macOS/実端末は未確認。docs/antigravity-cli.mdとreports/antigravity-cli-direct.jsonを参照。
 
@@ -276,6 +278,7 @@
 
 | 2026-10-13 | 11:49 | #327 | v0.29.0: 保存済みの接続・同期診断メニューと明示接続確認、Notion失敗対象/再試行/競合導線を追加。秘密情報の伏せ字と部分障害を検証し、競合採用のsnapshot/監査を同一トランザクションへ修正。実サービス・実端末受入は未確認。 |
 
+| 2026-10-15 | 02:39 | #332 | v0.30.3: Task再開のProject誤認と同一Taskのpaused再開を修正。関連86件と隔離HTTP会話の保存・LLM不要を動作確認済み、稼働アプリ/実データは未確認。ローカル固有コミットdc865feを退避ブランチに保持し、新mainとの統合を実施。 |
 | 2026-10-19 | 10:52 | #335 | v0.30.3: 会話からSession開始の原因を先に再現し、既存Dialogue/Brain/Agentで対象ID・失敗再試行・実行結果照合・同時開始を改善。隔離HTTP/自動回帰とVision重ね合わせを検証、実モデル/実Notion/配布Desktopは未確認。変更前の旧テスト失敗は#336、一般Action契約は#303で後続。 |
 
 | 2026-10-19 | 11:24 | #338 | AI-First責務分担と3方式を調査・比較し、本番未接続PoCを追加。実DeepSeekの合成12ケース×3方式で直接経路に改善を観測したが、引用翻訳の失敗等が残るため本番移行は見送り。PR #337の安全機能・元checkoutは保持。結果/手順/未確認は docs/ai-first-agent-design.md。 |
@@ -294,3 +297,7 @@
 | 2026-10-25 | 15:25 | #355 | 2026-10-25-02: v0.34.1 CLI導入検出UI・本番拒否・独立直接probe・JSON/NDJSONのMock契約と既存Eventsのsession分離/再送防止を追加。隔離テスト/Chrome/合成process tree終了は動作確認済み。実CLIは未導入でskipped、Google推論/契約枠/実ファイル/実端末は未確認。許諾矛盾とRead専用/Approval境界を残し、導入手順・問い合わせ案を文書化。 |
 
 | 2026-10-27 | 10:11 | #355 | 2026-10-27-01: Windowsの公式agy 1.4.8でAPIキー環境変数なしの日本語JSON/同一conversation NDJSON/合成README read_fileを実証。modelと週次枠98%をCLIで観測、credits 0。月額契約利用はunknown、規約・PETIT本番/実WEVORA・Approval境界は未解決のため無効を維持。
+
+| 2026-10-28 | 13:39 | #357 | 実装済み・未確認: ACP Registry導入、状態/handshake/OAuth設定UI・APIを追加。Windows実AgentのACP v1 initializeとoauth-personal広告を確認。OAuth・推論・利用枠・PETIT Brain・OS隔離は未確認/未接続のため本番Provider化していない。隔離3件とsetup既存20件成功。 |
+
+| 2026-10-29 | 08:15 | #358 | PR #358反映済みorigin/mainとローカルmainを統合。#332のTask再開修正を保持し、新mainのv0.34.0・ACP導入・Runtimeを維持。7ファイル競合を解決。関連テスト21件+29 subtests成功（HTTP保存ケース1件はstorage/settings権限エラーで未確認）。compileall成功。diff --checkは上流追加docsの末尾空白9件を報告。DBバックアップとstorage/vision-uiを保持。 |

@@ -7,7 +7,7 @@
   $('back').href=next;
   const labels = {codex:'Codex / ChatGPT',antigravity:'Antigravity SDK',deepseek:'DeepSeek',notion:'Notion',google_calendar:'Googleカレンダー',gmail:'Gmail',timetree:'TimeTree',local:'PETITローカル'};
   const reasons = {not_configured:'未設定・依存不足',authentication_expired:'認証切れ',usage_limit:'使用量上限',connection_or_runtime_failure:'接続またはRuntime障害'};
-  let state, session, step = 0, order = [], notionItems = [], notionCursor = null, dragging = null;
+  let state, session, step = 0, order = [], notionItems = [], notionCursor = null, dragging = null, acpState = null;
   function notice(text, error=false) { $('notice').textContent=text; $('notice').classList.toggle('error',error); }
   async function api(path, method='GET', body) {
     const response = await fetch('/api/setup'+path,{method,credentials:'same-origin',headers:{'Content-Type':'application/json','X-PETIT-Request':'1'},body:body===undefined?undefined:JSON.stringify(body)});
@@ -46,14 +46,19 @@
     $('summary').replaceChildren(); for(const text of ['AI優先順位: '+order.map(x=>labels[x]).join(' → '),'接続設定: '+(s.connected.map(x=>labels[x]).join('、')||'なし（スキップ可能）'),'カレンダー: '+labels[s.calendar]+' / 読み取り専用 / 毎日02:00 JST']){const p=document.createElement('p');p.textContent=text;$('summary').append(p);}
     for(const select of ['notion-tasks','notion-projects'])if(!$(select).options.length){const option=new Option('未選択','');$(select).add(option);const id=select==='notion-tasks'?s.notion_tasks_db:s.notion_projects_db;if(id)$(select).add(new Option('保存済みDB: '+id,id));$(select).value=id||'';}
     if(!Array.from($('google-calendar').options).some(x=>x.value===s.google_calendar_id))$('google-calendar').add(new Option(s.google_calendar_id,s.google_calendar_id));$('google-calendar').value=s.google_calendar_id;
+    $('acp-install-root').value=s.antigravity_acp_install_path||'';renderAcp();
   }
-  async function refresh(){state=await api('/config');render();}
+  function renderAcp(){if(!acpState)return;$('acp-install-state').textContent=acpState.installed?'導入済み / '+acpState.agent_version:'未導入';$('acp-auth-state').textContent='現在の認証状態はunknown'+(acpState.auth_last_success_utc?' / OAuth成功記録: '+acpState.auth_last_success_utc:'');$('acp-usage-state').textContent=[acpState.model,acpState.token_usage,acpState.plan_quota,acpState.additional_credits].join(' / ');$('acp-error').textContent=acpState.last_error||'なし';}
+  async function refresh(){state=await api('/config');try{acpState=await api('/antigravity-acp');}catch{acpState=null;}render();}
   action($('antigravity-cli-diagnose'),async()=>{state.antigravity_cli=await api('/antigravity-cli');render();notice('CLIの配置だけを確認しました。ログイン・推論は実行していません。');});
   async function save(values){state=await api('/config','PUT',values);render();}
   async function saveKeys(fields){const values={};for(const [id,key]of fields){if($(id).value)values[key]=$(id).value;}if(Object.keys(values).length){await api('/credentials','PUT',{values});fields.forEach(([id])=>$(id).value='');}}
   async function saveAI(){await save({priority:order,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,antigravity_auth:$('antigravity-auth').value,antigravity_model:$('antigravity-model').value,antigravity_url:$('antigravity-url').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null,$('paid-antigravity').checked?'antigravity':null].filter(Boolean)});}
   document.querySelectorAll('[data-step]').forEach(x=>action(x,()=>showStep(Number(x.dataset.step))));
   action($('previous'),()=>showStep(step-1));action($('next'),()=>{showStep(step+1);notice('未設定のサービスはスキップできます。');});action($('refresh'),async()=>{await refresh();notice('保存済み状態を更新しました。');});
+  action($('acp-install'),async()=>{const root=$('acp-install-root').value.trim();acpState=await api('/antigravity-acp/install','POST',root?{destination:root}:{});await refresh();notice('公式ACP AgentをRegistry SHA-256照合後に導入しました。');});
+  action($('acp-handshake'),async()=>{const started=performance.now();const result=await api('/antigravity-acp/handshake','POST');acpState={...acpState,...result};$('acp-latency').textContent=((performance.now()-started)/1000).toFixed(2)+'秒';$('acp-install-state').textContent='ACP initialize成功 / '+(result.agent_info?.version||'unknown');$('acp-auth-state').textContent='oauth-personal がAgentから提供 / 認証状態unknown';$('acp-error').textContent='なし';notice('ACP v'+result.protocol_version+' initialize成功。認証・モデル推論は未確認です。');});
+  action($('acp-auth'),async()=>{const result=await api('/antigravity-acp/authenticate','POST');await refresh();notice(result.ok?'公式ACP Agentのoauth-personal認証処理が完了しました。利用枠とモデル応答は別途未確認です。':'認証を確認できませんでした。',!result.ok);});
   $('auth-form').addEventListener('submit',async event=>{event.preventDefault();const button=$('auth-submit');button.disabled=true;try{await api(session.initialized?'/login':'/bootstrap','POST',{password:$('password').value,bootstrap_token:$('bootstrap-token').value});$('password').value='';$('bootstrap-token').value='';await start();if(session.completed&&params.get('resume')==='1'){location.replace(next);return;}notice('ログインしました。');}catch(error){notice(error.message,true);}finally{button.disabled=false;}});
   action($('logout'),async()=>{await api('/logout','POST');await start();notice('ログアウトしました。');});
   action($('save-brain'),async()=>{const enabled=$('brain-enabled').checked;await saveAI();await save({brain_enabled:enabled});notice('AI設定を保存しました。');});

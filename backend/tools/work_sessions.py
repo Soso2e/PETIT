@@ -39,7 +39,9 @@ def _public_task(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def resolve_task(*, task_id: str | None = None, task: str | None = None) -> dict[str, Any]:
+def resolve_task(
+    *, task_id: str | None = None, task: str | None = None, allow_partial: bool = True,
+) -> dict[str, Any]:
     rows = _task_rows()
     identifier = _normalize(task_id)
     if identifier:
@@ -53,7 +55,7 @@ def resolve_task(*, task_id: str | None = None, task: str | None = None) -> dict
         if not query:
             return {"error": "作業を開始するタスク名またはtask_idを指定してください。"}
         exact = [row for row in rows if _normalize(row.get("title")) == query]
-        matches = exact or [row for row in rows if query in _normalize(row.get("title"))]
+        matches = exact or ([row for row in rows if query in _normalize(row.get("title"))] if allow_partial else [])
     excluded = [row for row in matches if not _eligible(row)]
     matches = [row for row in matches if _eligible(row)]
     if len(matches) == 1:
@@ -140,6 +142,13 @@ def start_work_session(task_id: str | None = None, task: str | None = None) -> d
         project_id=selected.get("project_id"),
         reuse_task=True,
     )
+    if not isinstance(session, dict) or not session.get("session_id") or session.get("status") != "active":
+        return {
+            "started": False,
+            "already_active": False,
+            "resumed": False,
+            "error": "作業セッションを開始または再開できませんでした。",
+        }
     reused = session.get("session_id") != new_id
     return {
         "started": not reused,

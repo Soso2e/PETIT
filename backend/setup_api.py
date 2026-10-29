@@ -6,6 +6,7 @@ import ipaddress
 import os
 import threading
 import time
+from datetime import datetime, timezone
 from typing import Literal
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -138,6 +139,67 @@ def get_config():
     from .antigravity_cli import status
     return {"settings": settings.public(), "brain": brain_priority.public_status(), "sync": service_sync.status(),
             "antigravity_cli": status()}
+
+
+@router.get("/antigravity-acp", dependencies=[Depends(_admin)])
+def antigravity_acp_status():
+    from . import antigravity_acp
+    data = settings.load()
+    return {**antigravity_acp.status(data.get("antigravity_acp_install_path") or None),
+            "install_root": data.get("antigravity_acp_install_path") or str(antigravity_acp.DEFAULT_ROOT),
+            "auth_last_success_utc": data.get("antigravity_acp_auth_last_success_utc"),
+            "last_error": data.get("antigravity_acp_last_error")}
+
+
+class AntigravityACPInstall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    destination: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/antigravity-acp/install", dependencies=[Depends(_admin)])
+def install_antigravity_acp(payload: AntigravityACPInstall | None = None):
+    from pathlib import Path
+    from . import antigravity_acp
+    from scripts.install_antigravity_acp import install
+    destination = payload.destination if payload else None
+    try:
+        root = Path(destination).expanduser() if destination else None
+        result = install(root)
+        settings.update({"antigravity_acp_install_path": str(root.resolve()) if root else "",
+                         "antigravity_acp_last_error": None})
+        return {**result, **antigravity_acp.status(root)}
+    except Exception as exc:
+        settings.update({"antigravity_acp_last_error": "ACP Agent installation failed (" + type(exc).__name__ + ")."})
+        return JSONResponse({"installed": False, "error": "ACP Agent installation failed.",
+                             "error_type": type(exc).__name__}, status_code=400)
+
+
+@router.post("/antigravity-acp/handshake", dependencies=[Depends(_admin)])
+async def antigravity_acp_handshake():
+    from . import antigravity_acp
+    try:
+        result = await antigravity_acp.inspect_agent()
+        settings.update({"antigravity_acp_last_error": None})
+        return result
+    except Exception as exc:
+        settings.update({"antigravity_acp_last_error": "ACP initialization failed (" + type(exc).__name__ + ")."})
+        return JSONResponse({"ok": False, "error": "ACP initialization failed.",
+                             "error_type": type(exc).__name__}, status_code=400)
+
+
+@router.post("/antigravity-acp/authenticate", dependencies=[Depends(_admin)])
+async def antigravity_acp_authenticate():
+    from . import antigravity_acp
+    try:
+        result = await antigravity_acp.authenticate_personal()
+    except Exception as exc:
+        settings.update({"antigravity_acp_last_error": "Google OAuth via the official ACP agent failed (" + type(exc).__name__ + ")."})
+        return JSONResponse({"ok": False, "error": "Google OAuth via the official ACP agent did not complete.",
+                             "error_type": type(exc).__name__}, status_code=400)
+    if result.get("ok"):
+        settings.update({"antigravity_acp_auth_last_success_utc": datetime.now(timezone.utc).isoformat(),
+                         "antigravity_acp_last_error": None})
+    return {**result, "auth_last_success_utc": settings.load().get("antigravity_acp_auth_last_success_utc")}
 
 
 @router.get("/antigravity-cli", dependencies=[Depends(_admin)])
