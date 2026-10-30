@@ -57,7 +57,15 @@ def forget(thread_id, provider):
         c.execute("DELETE FROM provider_sessions WHERE thread_id=? AND provider=?", (thread_id, provider))
 
 
+def assert_owner(thread_id, provider, session_id):
+    with db.get_connection() as c:
+        owner = c.execute("SELECT thread_id FROM provider_sessions WHERE provider=? AND session_id=?", (provider,session_id)).fetchone()
+    if owner and owner[0] != thread_id:
+        raise lmstudio_client.LMStudioError("Provider Threadが別のPETIT会話に対応しています。処理を停止しました。")
+
+
 def remember(thread_id, provider, boundary_key, session_id, request_id):
     with db.get_connection() as c:
-        c.execute("INSERT OR REPLACE INTO provider_sessions(thread_id,provider,boundary_key,session_id,last_request_id) VALUES(?,?,?,?,?)",
+        c.execute("INSERT INTO provider_sessions(thread_id,provider,boundary_key,session_id,last_request_id) VALUES(?,?,?,?,?) "
+                  "ON CONFLICT(thread_id,provider) DO UPDATE SET boundary_key=excluded.boundary_key,session_id=excluded.session_id,last_request_id=excluded.last_request_id",
                   (thread_id,provider,boundary_key,session_id,request_id))

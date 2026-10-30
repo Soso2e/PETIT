@@ -180,3 +180,18 @@ def test_weather_missing_place_is_rejected_without_request(monkeypatch):
     result=api.submit("weather", "w1", "天気は？", is_admin=True)
     assert result["status"] == "completed" and result["used_tools"] == []
     fetch.assert_not_called()
+
+
+def test_duplicate_provider_thread_is_rejected_before_turn(fake, monkeypatch):
+    api.submit("a", "a1", "hello", is_admin=True)
+    original = fake.request
+    def duplicated(self, method, params=None, **kwargs):
+        result = original(self, method, params, **kwargs)
+        if method == "thread/start":result["thread"]["id"] = "external-1"
+        return result
+    monkeypatch.setattr(fake,"request",duplicated)
+    result = api.submit("b", "b1", "other thread", is_admin=True)
+    assert result["status"] == "failed"
+    assert len([m for m,p in fake.calls if m == "turn/start"]) == 1
+    with db.get_connection() as c:
+        assert c.execute("SELECT thread_id FROM provider_sessions WHERE session_id='external-1'").fetchone()[0] == "a"

@@ -214,6 +214,7 @@ def run(request_id, target, *, messages=None, used_tools=None):
         thread = result["thread"]["id"]
         if saved and thread != saved["session_id"]:
             raise lmstudio_client.LMStudioError("Codex Threadの対応が一致しません。")
+        agent_workspace.assert_owner(row["thread_id"], "codex", thread)
         sources = result.get("instructionSources")
         if not isinstance(sources, list) or {Path(x).resolve() for x in sources} != {(workspace / "AGENTS.md").resolve()}:
             raise lmstudio_client.LMStudioError("WorkspaceのAGENTS.md読込を確認できません。")
