@@ -45,5 +45,3 @@ def stop_worker(process) -> None:
     if process.poll() is None:
         process.kill()
     process.wait(timeout=5)
-
-

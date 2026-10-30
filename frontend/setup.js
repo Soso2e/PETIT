@@ -36,7 +36,7 @@
     const s=state.settings;order=s.priority.filter(x=>x!=="antigravity");priority();$("sdk-migration").textContent=s.priority.includes("antigravity")?"旧SDK設定があります。利用するAIの接続・費用許可を確認し、AI設定を保存してください。":"";
     const cli=state.antigravity_cli;
     $('antigravity-cli-status').textContent=cli?(cli.installed?'公式CLIの候補を検出':'CLI未検出（サーバーのPATH・標準配置先）')+' / 本番接続: 無効 / バージョン・ログイン・モデル・契約枠残量: unknown（未検証）':'CLIの診断情報を取得できません。';
-    for (const [id,key] of [['codex-model','codex_model'],['deepseek-model','deepseek_model'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
+    for (const [id,key] of [['codex-model','codex_model'],['codex-web-search','codex_web_search'],['deepseek-model','deepseek_model'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
     if (!$('google-redirect').value) $('google-redirect').value=location.origin+'/api/setup/google/callback';
     $('paid-deepseek').checked=s.paid_allowed.includes('deepseek');$('brain-enabled').checked=s.brain_enabled;$('sync-notifications').checked=s.sync_notifications;
     const latest=state.brain.latest;$('active-brain').textContent=latest?'最新のAI: '+labels[latest.provider_id]+' / '+latest.state+(latest.reason?' / 切替理由: '+(reasons[latest.reason]||latest.reason):''):'AIの実行記録はまだありません。';
@@ -53,7 +53,7 @@
   action($('antigravity-cli-diagnose'),async()=>{state.antigravity_cli=await api('/antigravity-cli');render();notice('CLIの配置だけを確認しました。ログイン・推論は実行していません。');});
   async function save(values){state=await api('/config','PUT',values);render();}
   async function saveKeys(fields){const values={};for(const [id,key]of fields){if($(id).value)values[key]=$(id).value;}if(Object.keys(values).length){await api('/credentials','PUT',{values});fields.forEach(([id])=>$(id).value='');}}
-  async function saveAI(){await save({priority:order,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null].filter(Boolean)});}
+  async function saveAI(){await save({priority:order,codex_web_search:$('codex-web-search').value,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null].filter(Boolean)});}
   document.querySelectorAll('[data-step]').forEach(x=>action(x,()=>showStep(Number(x.dataset.step))));
   action($('previous'),()=>showStep(step-1));action($('next'),()=>{showStep(step+1);notice('未設定のサービスはスキップできます。');});action($('refresh'),async()=>{await refresh();notice('保存済み状態を更新しました。');});
   action($('acp-install'),async()=>{const root=$('acp-install-root').value.trim();acpState=await api('/antigravity-acp/install','POST',root?{destination:root}:{});await refresh();notice('公式ACP AgentをRegistry SHA-256照合後に導入しました。');});
