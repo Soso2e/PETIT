@@ -1,6 +1,6 @@
 """Small model-facing index over the existing registry, with live availability checks."""
 from __future__ import annotations
-from . import config, request_context, setup_store as settings, tools
+from . import config, request_context, tools
 
 DISCOVER = "discover_tools"
 # A small useful first-call set, independent of utterance spelling or provider.
@@ -11,18 +11,17 @@ DISCOVERY_SCHEMA = {"type":"function", "function": {"name":DISCOVER,
                   "required":["names"], "additionalProperties":False}}}
 
 
-def available(schema: dict) -> bool:
+def available(schema: dict, *, local_only: bool, setup: dict) -> bool:
     name = schema["function"]["name"]
     if name not in tools.registered_names():
         return False
     if name in {"get_weather", "search_news"} and tools.risk_for(name) != "safe_read":
         return False
     # A local-only Thread may use internal state, never external read services.
-    if request_context.local_only() and name in {"get_weather", "search_news", "search_notion", "gmail_search", "gmail_get_message"}:
+    if local_only and name in {"get_weather", "search_news", "search_notion", "gmail_search", "gmail_get_message"}:
         return False
     if name in {"gmail_search", "gmail_get_message"}:
-        data = settings.load()
-        return "gmail" in data["connected"] and bool(data["secrets"].get("google_tokens"))
+        return "gmail" in setup["connected"] and bool(setup["secrets"].get("google_tokens"))
     if name == "search_notion":
         return bool(config.NOTION_API_KEY)
     if name in {"get_local_development_status", "list_project_workspaces", "link_project_workspace", "unlink_project_workspace"}:

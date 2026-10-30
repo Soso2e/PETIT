@@ -69,8 +69,10 @@ def check_provider(thread: dict) -> dict:
 
 def schemas() -> list[dict]:
     from .brain_catalog import available
+    from . import setup_store
+    local_only, setup = request_context.local_only(), setup_store.load()
     return [item for item in tools.openai_tools_schema()
-            if item["function"]["name"] in PUBLIC_TOOLS and available(item)]
+            if item["function"]["name"] in PUBLIC_TOOLS and available(item, local_only=local_only, setup=setup)]
 
 
 def failed(raw: str) -> bool:

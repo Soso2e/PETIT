@@ -195,3 +195,13 @@ def test_duplicate_provider_thread_is_rejected_before_turn(fake, monkeypatch):
     assert len([m for m,p in fake.calls if m == "turn/start"]) == 1
     with db.get_connection() as c:
         assert c.execute("SELECT thread_id FROM provider_sessions WHERE session_id='external-1'").fetchone()[0] == "a"
+
+
+def test_catalog_reads_live_policy_once_per_snapshot(monkeypatch):
+    from unittest.mock import Mock
+    privacy = Mock(return_value=False)
+    load = Mock(wraps=settings.load)
+    monkeypatch.setattr(request_context,"local_only",privacy)
+    monkeypatch.setattr(settings,"load",load)
+    assert brain.schemas()
+    assert privacy.call_count == load.call_count == 1
