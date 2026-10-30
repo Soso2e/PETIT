@@ -33,12 +33,12 @@
     });
   }
   function render() {
-    const s=state.settings;order=[...s.priority];priority();
+    const s=state.settings;order=s.priority.filter(x=>x!=="antigravity");priority();$("sdk-migration").textContent=s.priority.includes("antigravity")?"旧SDK設定があります。利用するAIの接続・費用許可を確認し、AI設定を保存してください。":"";
     const cli=state.antigravity_cli;
     $('antigravity-cli-status').textContent=cli?(cli.installed?'公式CLIの候補を検出':'CLI未検出（サーバーのPATH・標準配置先）')+' / 本番接続: 無効 / バージョン・ログイン・モデル・契約枠残量: unknown（未検証）':'CLIの診断情報を取得できません。';
-    for (const [id,key] of [['codex-model','codex_model'],['deepseek-model','deepseek_model'],['antigravity-auth','antigravity_auth'],['antigravity-model','antigravity_model'],['antigravity-url','antigravity_url'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
+    for (const [id,key] of [['codex-model','codex_model'],['deepseek-model','deepseek_model'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
     if (!$('google-redirect').value) $('google-redirect').value=location.origin+'/api/setup/google/callback';
-    $('paid-deepseek').checked=s.paid_allowed.includes('deepseek');$('paid-antigravity').checked=s.paid_allowed.includes('antigravity');$('brain-enabled').checked=s.brain_enabled;$('sync-notifications').checked=s.sync_notifications;
+    $('paid-deepseek').checked=s.paid_allowed.includes('deepseek');$('brain-enabled').checked=s.brain_enabled;$('sync-notifications').checked=s.sync_notifications;
     const latest=state.brain.latest;$('active-brain').textContent=latest?'最新のAI: '+labels[latest.provider_id]+' / '+latest.state+(latest.reason?' / 切替理由: '+(reasons[latest.reason]||latest.reason):''):'AIの実行記録はまだありません。';
     $('sync-status').replaceChildren(); for(const x of state.sync.states){const p=document.createElement('p');p.textContent=(labels[x.service]||x.service)+' / 最終成功: '+(x.last_success||'なし')+' / 更新 '+x.updated_count+'件'+(x.error?' / '+x.error:'');$('sync-status').append(p);}
     $('alert-list').replaceChildren();for(const alert of state.sync.alerts){const box=document.createElement('div');box.className='alert';const text=document.createElement('p');text.textContent=(labels[alert.service]||alert.service)+' / '+alert.last_failure;const detail=document.createElement('details');const heading=document.createElement('summary');heading.textContent='詳細を確認';const description=document.createElement('p');description.textContent=alert.error;detail.append(heading,description);const retry=document.createElement('button');retry.textContent='再試行';action(retry,async()=>{const result=await api('/sync/'+alert.service,'POST');await refresh();notice(result.ok?'同期が成功しました。':result.error||'同期が失敗しました。',!result.ok);});box.append(text,detail,retry);$('alert-list').append(box);}
@@ -53,7 +53,7 @@
   action($('antigravity-cli-diagnose'),async()=>{state.antigravity_cli=await api('/antigravity-cli');render();notice('CLIの配置だけを確認しました。ログイン・推論は実行していません。');});
   async function save(values){state=await api('/config','PUT',values);render();}
   async function saveKeys(fields){const values={};for(const [id,key]of fields){if($(id).value)values[key]=$(id).value;}if(Object.keys(values).length){await api('/credentials','PUT',{values});fields.forEach(([id])=>$(id).value='');}}
-  async function saveAI(){await save({priority:order,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,antigravity_auth:$('antigravity-auth').value,antigravity_model:$('antigravity-model').value,antigravity_url:$('antigravity-url').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null,$('paid-antigravity').checked?'antigravity':null].filter(Boolean)});}
+  async function saveAI(){await save({priority:order,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null].filter(Boolean)});}
   document.querySelectorAll('[data-step]').forEach(x=>action(x,()=>showStep(Number(x.dataset.step))));
   action($('previous'),()=>showStep(step-1));action($('next'),()=>{showStep(step+1);notice('未設定のサービスはスキップできます。');});action($('refresh'),async()=>{await refresh();notice('保存済み状態を更新しました。');});
   action($('acp-install'),async()=>{const root=$('acp-install-root').value.trim();acpState=await api('/antigravity-acp/install','POST',root?{destination:root}:{});await refresh();notice('公式ACP AgentをRegistry SHA-256照合後に導入しました。');});
@@ -63,7 +63,7 @@
   action($('logout'),async()=>{await api('/logout','POST');await start();notice('ログアウトしました。');});
   action($('save-brain'),async()=>{const enabled=$('brain-enabled').checked;await saveAI();await save({brain_enabled:enabled});notice('AI設定を保存しました。');});
   document.querySelectorAll('[data-connect]').forEach(button=>action(button,async()=>{const id=button.dataset.connect;
-    if(['codex','antigravity','deepseek'].includes(id)){await saveKeys([['deepseek-key','deepseek_key'],['antigravity-key','antigravity_key']]);await saveAI();}
+    if(['codex','antigravity','deepseek'].includes(id)){await saveKeys([['deepseek-key','deepseek_key']]);await saveAI();}
     if(id==='notion')await saveKeys([['notion-key','notion_key']]);
     if(id==='timetree')await saveKeys([['timetree-email','timetree_email'],['timetree-password','timetree_password'],['timetree-calendar','timetree_calendar']]);
     const result=await api('/services/'+id+'/connect','POST');if(id==='codex'){const url=result.verificationUrl||result.authUrl;if(url){const parsed=new URL(url);if(!['https:'].includes(parsed.protocol))throw new Error('公式認証URLを確認できません。');$('codex-link').href=url;$('codex-link').hidden=false;}$('codex-code').textContent=result.userCode?'認証コード: '+result.userCode:'公式ページで認証してください。';notice('公式ページで認証した後、「認証完了を確認」を押してください。');}else{await refresh();notice('接続設定を保存しました。接続テストで実際の応答を確認してください。');}}));

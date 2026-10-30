@@ -1,3 +1,5 @@
+> #368: Antigravity SDKは廃止。旧SDKの説明・検証値は履歴です。現在の移行方法は [SDK撤去](docs/sdk-retirement.md)。
+
 # PETIT — Personal AI Assistant (MVP)
 
 v0.34.3ではSona Coreの実行分岐とLinkraft専用同期を撤去し、予定/承認は既存Renaissance Core・Registryへ統一しました。既存SQLiteデータと過去のLinkraftリンク/イベントは削除しません。移行・検証は[撤去ガイド](docs/integration-removal.md)を参照してください。

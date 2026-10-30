@@ -56,10 +56,11 @@ def check_provider(thread: dict) -> dict:
     if target.get("provider") == "antigravity_cli":
         from .antigravity_cli import POLICY_MESSAGE
         raise lmstudio_client.LMStudioError(POLICY_MESSAGE)
-    sdk_local = (target.get("provider") == "antigravity_sdk" and target.get("auth_mode") == "local"
-                 and lmstudio_client.model_routing.sdk_local_url(target.get("base_url", "")))
+    if target.get("provider") == "antigravity_sdk":
+        from .provider_runtime import RETIRED_SDK_MESSAGE
+        raise lmstudio_client.LMStudioError(RETIRED_SDK_MESSAGE)
     if thread["privacy"] == "local_only" and (
-        (target.get("provider") != "lm_studio" and not sdk_local) or lmstudio_client.image_egress_is_external(target)
+        target.get("provider") != "lm_studio" or lmstudio_client.image_egress_is_external(target)
     ):
         raise lmstudio_client.LMStudioError("ローカル専用の会話です。ローカルProviderを選択してください。")
     return target
@@ -162,8 +163,6 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
     thread = store.thread(row["thread_id"])
     target = check_provider(thread)
     identity_keys = ("provider", "profile", "model", "base_url")
-    if target.get("provider") == "antigravity_sdk":
-        identity_keys += ("auth_mode",)
     provider_key = hashlib.sha256(store.encode({k: target.get(k) for k in
         identity_keys}).encode()).hexdigest()
     with db.get_connection() as connection:
@@ -174,13 +173,6 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
     if target.get("provider") == "codex":
         from . import codex_brain
         return codex_brain.run(request_id, target, messages=messages, used_tools=used_tools)
-    if target.get("provider") == "antigravity_sdk":
-        from . import antigravity_brain
-        if messages is not None and not target.get("core_tools"):
-            raise lmstudio_client.LMStudioError("Antigravity SDKはRead専用です。保存済みWrite承認の再開には使用できません。")
-        safe_target = {**target, "no_tools": not request_context.current_is_admin(),
-                       "core_tools": bool(target.get("core_tools")) and request_context.current_is_admin()}
-        return antigravity_brain.run(request_id, safe_target, messages=messages, used_tools=used_tools)
     catalog = schemas() if request_context.current_is_admin() else []
     allowed = {item["function"]["name"] for item in catalog}
     used = list(used_tools or [])

@@ -1,3 +1,5 @@
+> #368: Antigravity SDKは廃止。以下のSDK記述は過去の実装・検証記録です。[現在の移行方法](sdk-retirement.md)を参照。
+
 # 初期セットアップ・接続管理（v0.34.0 / #353）
 
 同じFastAPI / SQLite / Module RegistryでLocalとCloudを動かす。サービス接続は`/static/setup.html`に集約し、初回起動・未ログイン時にWeb入口から案内する。従来Settingsのテーマ・音声・通知は残し、接続設定へのリンクを置く。
