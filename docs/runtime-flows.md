@@ -1,3 +1,17 @@
+> #368 更新: SDK Brain/Workerは撤去。下記旧SDKの説明は過去経路。現行Provider境界は次図を参照。
+
+```mermaid
+flowchart LR
+    Core[PETIT Thread/Turn 正本] --> Select{Provider選択}
+    Select -->|旧SDK選択| Migrate[実行停止・明示再選択]
+    Select -->|Codex| Codex[App Server]
+    Select -->|LM Studio / DeepSeek| Native[既存Native Loop]
+    Codex --> Bridge[Provider共通 Core bridge]
+    Native --> Validate[Registry / schema / 権限]
+    Bridge --> Validate
+    Validate --> Approval[既存承認 / Receipt / 状態保存]
+```
+
 # PETIT Runtime Flows
 
 ## v0.34.3: Sona Core / Linkraft撤去（#363）

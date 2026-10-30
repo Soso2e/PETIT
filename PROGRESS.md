@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.35.0**
+**Current Version: v0.35.1**
 
-**Last Updated: 2026-10-29 UTC**
+**Last Updated: 2026-10-30 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #368 SDK撤去（実装済み・契約テスト確認）: SDK専用Brain/Worker/依存・導入スクリプトを撤去し、Codexが使う共通validator/Provider照合/プロセス停止をprovider_runtimeへ移動。旧SDK設定・秘密・DBを保持し再選択必須、新規接続禁止。78件成功、Thread Node5件・Chromium1440/390pxの設定/再起動受入成功（合成Provider）。Workspace/永続Thread/動的Tool公開/性能測定は後続。実Provider・配布端末は未確認。詳細はdocs/sdk-retirement.md。
 
 - #366 セキュリティ/回帰修正（PR上で確認中）: 誤削除された petit-version.js の起動・遅延ロードを復旧。公開APIを /api/chat に限定し、ゲスト会話はHttpOnlyのpetit_guest Cookieから独立Threadを導出して管理者/他ゲストの履歴を分離。未認証SDK経路はTool全禁止、承認再開では管理者権限Contextを復元。DBをセッション真実源とし、プロセスを跨ぐログアウトを反映。既存テストの新しい認証境界への追従とゲストAPIアクセス拒否の回帰テストを追加。GitHub CI完了待ち、未ログインUIでの履歴/再取得・Discord等のサービス認証経路は実機受入が必要。
 
@@ -308,3 +310,5 @@
 | 2026-10-29 | 09:48 | #360 | v0.34.2: AGENTSにコード削除の影響調査・互換性/データ保護・独立PR/回帰確認を明文化。Linkraft/Sona等は監査候補のみ、機能削除なし。実行テストは文書変更のため未実施。 |
 | 2026-10-29 | 11:30 | #365 | v0.35.0: 管理者セッションのSQLite DB永続化（再起動耐性・1年有効期限）、UIログアウト、非管理者時の通常会話モード（ツール全般禁止）を実装。 |
 | 2026-10-29 | 10:23 | #363 | v0.34.3: Sona Core/Linkraftの旧Adapter・実行分岐・依存・専用テストを撤去。Project Continuity、Notion/GitHub/BRAIN、予定/承認を保持し、既存SQLite行と旧Linkraftリンクは削除せずunsupported/skipped。新回帰追加、GitHub CIと実DB受入はPRで追跡。 |
+
+| 2026-10-30 | 08:32 | #368 | 2026-10-30-01: 実装済み・未確認: SDK撤去と旧設定の明示移行、Provider共通Core境界を追加。関連Python78件・Node5件・Chromium設定/再起動成功（合成Provider）。実Provider/配布端末未確認、Workspaceと会話性能は後続。 |

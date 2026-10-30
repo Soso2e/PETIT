@@ -89,7 +89,7 @@ class RPC:
 
     def close(self):
         if hasattr(self, "process"):
-            from .antigravity_brain import stop_worker
+            from .provider_runtime import stop_worker
             if self.process.poll() is None:
                 self.process.stdin.close()
                 try:
