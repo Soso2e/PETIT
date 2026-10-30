@@ -134,7 +134,7 @@ def test_resume_mismatch_and_cancel_timeout_never_resume_partial_work():
         parser.feed(lines(OTHER)[0])
 
 
-def test_config_api_detects_without_spawning_and_cannot_enable(client):
+def test_config_api_detects_passively_and_explicitly_connects(client):
     assert client.get("/api/setup/antigravity-cli").status_code == 401
     admin(client)
     with patch.object(cli, "executable", return_value="synthetic-agy"), patch.object(subprocess, "Popen", side_effect=AssertionError("no process")):
@@ -142,10 +142,13 @@ def test_config_api_detects_without_spawning_and_cannot_enable(client):
         assert response.status_code == 200 and response.json()["installed"]
         assert response.json()["authentication"] == "unknown"
         assert not response.json()["production_enabled"]
-        for operation in ("connect", "test"):
-            assert client.post("/api/setup/services/antigravity_cli/" + operation).status_code == 409
+        assert client.post("/api/setup/services/antigravity_cli/test").status_code == 400
+        assert client.post("/api/setup/services/antigravity_cli/connect").json()["tested"] is False
         response = client.put("/api/setup/config", json={"priority": ["antigravity_cli", "codex", "deepseek"]})
-        assert response.status_code == 422
+        assert response.status_code == 200
+        # 重複指定は拒否される
+        dup = client.put("/api/setup/config", json={"priority": ["antigravity_cli", "antigravity_cli"]})
+        assert dup.status_code == 400
 
 
 def test_explicit_cli_never_defaults_or_falls_back_to_another_provider(tmp_path, monkeypatch):
@@ -157,10 +160,7 @@ def test_explicit_cli_never_defaults_or_falls_back_to_another_provider(tmp_path,
         model_routing._read_selection()
     with patch.object(brain.lmstudio_client, "endpoint", return_value={"provider": "antigravity_cli"}), pytest.raises(brain.lmstudio_client.LMStudioError):
         brain.check_provider({"privacy": "standard"})
-    with patch.object(brain_priority.settings, "load", return_value={"priority": ["antigravity_cli", "antigravity"]}), pytest.raises(brain.lmstudio_client.LMStudioError):
-        brain_priority.run("request", Mock(side_effect=AssertionError("no fallback")))
-    with pytest.raises(ValueError):
-        brain_priority.target("antigravity_cli")
+    assert brain_priority.target("antigravity_cli")["provider"] == "antigravity_cli"
     with patch.dict("os.environ", {"PETIT_ALLOW_ANTIGRAVITY_CLI": "true"}), pytest.raises(ValueError):
         cli.require_production_permission()
 

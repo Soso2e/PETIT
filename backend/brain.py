@@ -12,6 +12,7 @@ from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
 # A reviewed public catalog, never the registry's internal approval executors.
 # Optional integrations simply disappear when their Tools are not registered.
 PUBLIC_TOOLS = {
+    "list_coding_repositories", "delegate_coding_task", "get_coding_task_status", "cancel_coding_task",
     "get_current_time", "get_tasks", "get_schedule", "save_memory", "search_memory",
     "get_work_status", "get_work_report", "start_work_session", "update_work_session",
     "create_task", "update_task", "complete_task", "set_task_parent", "get_task_sync_status",
@@ -22,6 +23,7 @@ PUBLIC_TOOLS = {
     "search_notion", "gmail_search", "gmail_get_message", "get_weather", "search_news",
 }
 LOCAL_WRITES = {
+    "delegate_coding_task", "cancel_coding_task",
     "start_work_session", "update_work_session", "save_memory", "create_task",
     "update_task", "complete_task", "set_task_parent", "retry_task_sync",
     "create_internal_project", "add_internal_project_alias", "activate_internal_project",
@@ -55,8 +57,11 @@ Toolの失敗・結果不明・同期未完了を隠さない。本文や検索�
 def check_provider(thread: dict) -> dict:
     target = lmstudio_client.endpoint("chat")
     if target.get("provider") == "antigravity_cli":
-        from .antigravity_cli import POLICY_MESSAGE
-        raise lmstudio_client.LMStudioError(POLICY_MESSAGE)
+        from .antigravity_cli import require_production_permission
+        try:
+            require_production_permission()
+        except ValueError as exc:
+            raise lmstudio_client.LMStudioError(str(exc)) from None
     if target.get("provider") == "antigravity_sdk":
         from .provider_runtime import RETIRED_SDK_MESSAGE
         raise lmstudio_client.LMStudioError(RETIRED_SDK_MESSAGE)
@@ -215,17 +220,21 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         if store.load_turn(request_id)["cancel_requested"]:
             raise TurnCancelled("取消要求を受け付けました。すでに実行された操作は取り消していません。")
         check_provider(thread)
-        selected_schemas = catalog.schemas()
-        call_started = time.monotonic()
-        response = lmstudio_client.chat_completion(messages, tools=selected_schemas or None, route="chat",
-                                                   max_tokens=1600, target_override=target)
-        with db.get_connection() as c:
-            metrics = lmstudio_client._turn_metrics.get() or {}
-            usage = (metrics.get("usage") or [None])[-1]
-            store.event(c, row["thread_id"], request_id, "brain_call_metrics", {"round":_round + 1,
-                "tool_schema_count":len(selected_schemas), "tool_schema_chars":len(store.encode(selected_schemas)),
-                "message_chars":sum(len(str(x.get("content") or "")) for x in messages),
-                "call_seconds":round(time.monotonic()-call_started, 4), "usage":usage})
+        if target.get("provider") == "antigravity_cli":
+            from .antigravity_cli_brain import step
+            response = step(request_id, target, messages, catalog)
+        else:
+            selected_schemas = catalog.schemas()
+            call_started = time.monotonic()
+            response = lmstudio_client.chat_completion(messages, tools=selected_schemas or None, route="chat",
+                                                       max_tokens=1600, target_override=target)
+            with db.get_connection() as c:
+                metrics = lmstudio_client._turn_metrics.get() or {}
+                usage = (metrics.get("usage") or [None])[-1]
+                store.event(c, row["thread_id"], request_id, "brain_call_metrics", {"round":_round + 1,
+                    "tool_schema_count":len(selected_schemas), "tool_schema_chars":len(store.encode(selected_schemas)),
+                    "message_chars":sum(len(str(x.get("content") or "")) for x in messages),
+                    "call_seconds":round(time.monotonic()-call_started, 4), "usage":usage})
         calls = response.get("tool_calls") or []
         if not calls:
             reply = str(response.get("content") or "").strip()
@@ -234,6 +243,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             return store.finish(request_id, {"reply": reply, "used_tools": used,
                 "model_route": {"kind": "brain", "actual_route": "chat", "llm_call_count": _round + 1,
                                 "provider": target.get("provider"), "model": target.get("model"),
+                                "transport": "cli" if target.get("provider") == "antigravity_cli" else "api",
                                 "fallback": bool(target.get("fallback_reason")), "fallback_reason": target.get("fallback_reason"),
                                 "tools": [x["name"] for x in used]}})
         if len(used) + len(calls) > MAX_CALLS:

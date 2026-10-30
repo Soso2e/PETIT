@@ -165,6 +165,31 @@ def logout():
         auth_client().request("account/logout")
 
 
+
+def status():
+    # Rendering settings must not start a CLI or infer login from a saved flag.
+    return {"installed": bool(executable()), "transport": "cli", "protocol": "app-server/stdio",
+            "authenticated": None, "inference": "unknown"}
+
+
+def diagnose():
+    result = status()
+    if not result["installed"]:
+        return {**result, "error": "Codex CLIが見つかりません。サーバーのPATH・標準配置先またはPETIT_CODEX_EXECUTABLEを確認してください。"}
+    client = None
+    try:
+        client = RPC()
+        acct = client.request("account/read", {"refreshToken": False}).get("account") or {}
+        return {**result, "authenticated": acct.get("type") == "chatgpt", "auth_mode": acct.get("type"),
+                "plan": acct.get("planType"), "protocol_ready": True}
+    except PermissionError:
+        return {**result, "error": "PETIT専用Codex設定フォルダにアクセスできません。Core実行ユーザーとフォルダ権限を確認してください。"}
+    except (OSError, lmstudio_client.LMStudioError):
+        return {**result, "error": "Codex CLIとの接続に失敗しました。公式CLIの導入・互換性を確認してください。"}
+    finally:
+        if client is not None:
+            client.close()
+
 def run(request_id, target, *, messages=None, used_tools=None):
     from . import brain, external_brain
     used = list(used_tools or [])
@@ -261,7 +286,7 @@ def run(request_id, target, *, messages=None, used_tools=None):
                 completed_calls[call_id] = (signature, result)
                 client.send({"id":item["id"], "result":result})
                 if store.approvals(request_id):
-                    return external_brain.finish(request_id, "", used, {"provider": "codex", "kind": "brain"})
+                    return external_brain.finish(request_id, "", used, {"provider": "codex", "transport": "cli", "kind": "brain"})
             elif "id" in item and method:
                 # No built-in command/file/network approval is delegated to the model.
                 client.send({"id": item["id"], "error": {"code": -32601, "message": "PETIT tools only"}})
@@ -279,7 +304,7 @@ def run(request_id, target, *, messages=None, used_tools=None):
                     raise lmstudio_client.LMStudioError("CodexのTurnが完了しませんでした。認証・使用量・接続を確認してください。")
                 brain.check_provider(store.thread(row["thread_id"]))
                 outcome = external_brain.finish(request_id, (final_reply or reply).strip(), used, {"provider":"codex", "model":target.get("model"),
-                    "kind":"brain", "resumed":bool(saved), "startup_seconds":round(startup_seconds,3),
+                    "kind":"brain", "transport":"cli", "resumed":bool(saved), "startup_seconds":round(startup_seconds,3),
                     "first_text_seconds":round(first_response,3) if first_response is not None else None,
                     "latency_seconds":round(time.monotonic()-started,3), "tokens":None, "llm_call_count":None, "tool_call_count":len(used), "web_search":web_search})
                 if outcome["status"] == "completed":

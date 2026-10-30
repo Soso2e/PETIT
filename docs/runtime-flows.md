@@ -1,5 +1,52 @@
 # PETIT Runtime Flows
 
+## Antigravity CLI Brainと開発タスク（#362 / #225）
+
+2026-10-29の利用者の明示依頼により、CLI準備段階の一律拒否をSettingsの明示接続へ変更した。環境変数や旧model-routingからは有効化せず、SDK/ACPと別Providerとして表示する。
+
+```mermaid
+flowchart TD
+    Settings[管理者が公式CLIへ明示接続] --> Priority[antigravity_cliを順位へ追加 / CLIのみの候補]
+    Settings --> Models[公式agy models / Codex model list / 選択をPETIT設定へ保存]
+    Priority --> Turn[既存Thread / Turn / Provider pin]
+    Turn --> Step[Turn専用の空workspace / finish専用Agent / stdin NDJSON]
+    Step --> Official[未改変の公式agy / 本人のCLI管理認証]
+    Official --> JSON[content / PETIT Tool要求JSONを厳格検証]
+    JSON -->|返答| Save[既存conversations / Events]
+    JSON -->|Tool要求| Core[既存公開catalog / schema / risk / receipt]
+    Core -->|承認必須| Approval[既存確認UI / SQLite承認 / 一度だけ消費]
+    Approval --> Core
+    Core --> Result[Tool結果とmessagesを保存]
+    Result --> Step
+    Official -->|cancel / timeout / 上限 / 接続変更| Stop[所有CLI process treeを終了 / 自動再送なし]
+```
+
+CLIは専用Agentの直接Toolをfinishだけに絞る。Core ToolはJSON要求から既存native Loopで実行し、CLIが独自にShellやファイルを実行する経路を作らない。CLIに会話をargvで渡さず、APIキー・Core秘密値を子へ継承しない。各roundの外部conversation ID/usageは同じSQLite Eventsへ記録する。quotaはunknown。
+
+```mermaid
+flowchart TD
+    Chat[会話 / 開発依頼] --> Catalog[list_coding_repositoriesで許可ルートとHEADを取得]
+    Catalog --> Propose[delegate_coding_task / repository・base_commit・goal・CLI]
+    Propose --> Approval[既存確認カード / Effect ReceiptとJobを同じtransaction]
+    Web[Web開発タスク画面] --> Review[対象・開始コミット・目的・CLIを表示]
+    Review -->|明示開始| Queue[同じSQLite coding_jobs / queued]
+    Approval --> Queue
+    Queue --> Claim[一度だけclaim / running]
+    Claim --> Copy[許可ルートとHEADを再検査 / 専用clone / remote除去]
+    Copy --> Agent[Jobで選んだCodexまたはAntigravity CLI]
+    Agent --> Scoped[CoreのJob限定Tool / list・read・SHA照合write・静的check]
+    Scoped -->|結果| Agent
+    Agent --> Done[ready_for_review または checks_failed / 実テストnot_run]
+    Done -->|利用者のレビュー完了| Complete[completed / 所有するローカルTaskのみ完了]
+    Queue --> Status[Job状態・イベント・差分・未確認をWeb poll / 会話で照会]
+    Claim --> Status
+    Done --> Status
+    Cancel[取消 / 設定解除 / deadline] --> Preserve[CLI停止 / 変更とcopyは保持]
+    Restart[Core再起動] --> Interrupted[runningはinterrupted / 自動再実行なし]
+```
+
+初期実装では任意Shell、任意テストコード実行、削除、Push/PR/mergeを公開しない。Python/JavaScript構文とdiff whitespaceだけを静的検証し、実テスト・実ホスト受入と区別する。[設計・移行境界](coding-tasks.md)を参照。
+
 ## #368: Workspace・永続Provider補助Thread・動的Tool公開
 
 ```mermaid
@@ -31,6 +78,7 @@ Tool Discoveryは最大8名ずつ、完全schemaを返す。内部承認Toolとb
 承認待ち・失敗・取消・権限変更では補助Threadを再利用せず、Core保存状態から復元する。
 AGENTSは認可境界ではなく、read-only sandbox・機能無効化・Core bridge検証が境界。モデルの個人情報を含む検索語を完全検出するDLPは未実装で、Webは既定OFF。
 
+>>>>>>> main
 
 ## v0.34.3: Sona Core / Linkraft撤去（#363）
 
@@ -52,7 +100,6 @@ flowchart TD
     Sources --> Other[未対応provider / 旧Linkraft]
     Other --> Skipped[skipped / 既存DB行は保持]
 ```
-
 
 ## v0.34.1: Antigravity CLI準備・本番無効（#355）
 
@@ -119,13 +166,18 @@ flowchart TD
     L -->|同一入力の再送| R[保存済み結果 / 承認 / receipt]
     L -->|ID衝突 / 同じThread実行中| Conflict[409 / 429]
     L --> Select[順位または従来選択 / local_only / 接続と費用同意を検査]
-    Select --> Pin[選択Event / Provider pin / 同じThreadの履歴と運用アラート]
+    Select --> Transport{Brain接続方式}
+    Transport -->|mixed| Pin[選択Event / Provider pin / 同じThreadの履歴と運用アラート]
+    Transport -->|cli_only| CLIOnly[Codexと明示接続したAntigravity CLI / SDK・APIを除外]
+    CLIOnly --> Pin
     Pin --> Backend{単一Runtimeの所有者}
     Backend -->|DeepSeek / LM Studio| Native[既存native Tool Loop]
-    Backend -->|Codex| Codex[公式app-server Agent Loop]
-    Backend -->|旧SDK選択| Migrate[停止して明示再選択を案内]
-    Native --> Gate[既存Registry / 公開catalog / schema / risk / cancel]
+    Backend -->|Codex| Codex[app-server Agent Loop]
+    Backend -->|Antigravity CLI| AgCli[公式agy CLI Agent Loop]
+    Backend -->|旧SDK選択| Migrate[停止して再選択案内]
+    Native --> Gate[Registry / 公開catalog / schema / risk / cancel]
     Codex -->|dynamic PETIT Tool| Gate
+    AgCli -->|dynamic Tool| Gate
     Gate -->|確認必須| Approval[SQLite承認とmessages / Runtime終了]
     Approval --> UI[既存確認UI / 再起動復元]
     UI -->|一度だけ承認消費| Execute[既存Domain Tool]
@@ -137,7 +189,7 @@ flowchart TD
     Unknown --> Return
     Return --> Backend
     Backend -->|Tool開始前の障害のみ| Stop[現在のRuntimeを完全終了]
-    Stop --> Next{接続済み・許可済み次候補}
+    Stop --> Next{接続方式で許可された接続済み次候補}
     Next -->|あり| Pin
     Next -->|なし| Failed[失敗状態 / 次Turnは順位の上位から再試行]
     Backend -->|Tool後の障害| Failed
@@ -146,6 +198,8 @@ flowchart TD
 ```
 
 SDKは撤去済み。Codexのshell/apps/plugins/subagentは無効、許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
+`brain_transport=cli_only`はCodexと明示接続したAntigravity CLIを許可し、障害時もSDK/APIへFallbackしない。既存設定は`mixed`のまま引き継ぐ。
+CLIの導入検出は受動的に行い、明示した診断で`account/read`を確認する。認証確認と実推論の接続テストは別。
 画像は既存Vision観測→Read専用回答で、画像Providerの順位Fallbackは未対応。
 8 rounds / 12 callsと取消/deadlineを維持し、local_onlyは外部へ送らない。
 

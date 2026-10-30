@@ -4,6 +4,8 @@ v0.36.0開発版（#368）は、Codex専用Workspace・成功したThreadの継�
 
 # PETIT — Personal AI Assistant (MVP)
 
+開発ブランチ（#362 / #225）では、Antigravity CLIを明示接続するBrainと、Codex CLI／Antigravity CLIへローカル開発を依頼するタスクを追加しました。Tasksの「CLIの開発タスク・進捗を見る」から、許可したGitルート・目的・CLIを選び、承認後の状態・差分・静的チェックを確認できます。元checkoutは変更せず、専用コピーで作業します。任意Shell・実テストコード実行・削除・Push/PR/mergeは未対応です。[設計・制約](docs/coding-tasks.md)、[実CLIの合成受入](reports/antigravity-cli-brain-live.json)を参照。
+
 v0.34.3ではSona Coreの実行分岐とLinkraft専用同期を撤去し、予定/承認は既存Renaissance Core・Registryへ統一しました。既存SQLiteデータと過去のLinkraftリンク/イベントは削除しません。移行・検証は[撤去ガイド](docs/integration-removal.md)を参照してください。
 
 v0.34.2は開発規約の更新です。`AGENTS.md`にコード削除の事前調査・互換性保護・回帰検証と段階的整理の方針を明文化しました。実機能の削除・変更はありません。
@@ -76,6 +78,8 @@ AccessKey不要の方式に向けた「へいプティ」の実験モデル学�
 ## 初期設定・接続管理（v0.34.0 開発版）
 
 初回起動時は管理者認証付きウィザードへ進み、AI優先順位、Codex公式認証、Antigravity SDK / DeepSeek、Notion、Google Calendar / Gmail、TimeTreeを設定できます。設定はGit管理外の`storage/settings/`へ暗号化保存します。API料金・クラウド文脈送信は事前同意が必要です。Local / Cloudのコードは共通で、Cloudの初期登録にはHTTPSと`PETIT_BOOTSTRAP_TOKEN`を用意します。
+
+CLI中心で使う場合は「Brainの接続方式」を「CLIのみ」にして、CodexのChatGPT認証またはAntigravity CLIの明示接続を行い、優先順位の会話利用をONにして保存します。サーバー上の公式CLIへ会話・Tool選択を渡し、承認・実行・保存は既存Coreが管理します。SDK/APIへ自動切替しません。既存設定は従来どおり引き継ぎ、CLI画像対応は未実装です。実Codex推論の受入は未確認です。
 
 Calendarは読み取り専用で、選択した外部サービスからSQLiteへ02:00 JSTに差分同期します。未解決エラーは通知と会話へ反映します。Google双方向同期・Tool実行後のProvider間継続・本人の外部認証を伴う全サービス受入は未完了です。導入前提・既存クライアントの認証への影響・検証手順は[初期設定と接続](docs/setup-integrations.md)を参照してください。
 

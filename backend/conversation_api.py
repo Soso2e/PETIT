@@ -43,6 +43,10 @@ def process(request_id: str) -> dict:
             with lmstudio_client.observe_turn():
                 attachment_ids = payload.get("attachment_ids") or []
                 if attachment_ids:
+                    from . import setup_store
+                    settings = setup_store.load()
+                    if settings["brain_enabled"] and settings.get("brain_transport") == "cli_only":
+                        raise lmstudio_client.LMStudioError("CLIのみの画像付き会話は未対応です。画像を外して送信してください。SDK/APIへ自動送信しません。")
                     from . import attachments, brain_runtime, vision
                     brain.check_provider(store.thread(row["thread_id"]))
                     observations = vision.analyze(attachment_ids, row["thread_id"])

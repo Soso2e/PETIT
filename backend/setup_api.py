@@ -138,9 +138,10 @@ def logout(request: Request):
 
 @router.get("/config", dependencies=[Depends(_admin)])
 def get_config():
+    from . import codex_brain
     from .antigravity_cli import status
     return {"settings": settings.public(), "brain": brain_priority.public_status(), "sync": service_sync.status(),
-            "antigravity_cli": status()}
+            "antigravity_cli": status(settings.load()), "codex_cli": codex_brain.status()}
 
 
 @router.get("/antigravity-acp", dependencies=[Depends(_admin)])
@@ -208,14 +209,15 @@ async def antigravity_acp_authenticate():
 def antigravity_cli_status():
     # File existence only. No login, prompt, process, credential inspection or network.
     from .antigravity_cli import status
-    return status()
+    return status(settings.load())
 
 
 class SettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    priority: list[Literal["codex", "antigravity", "deepseek"]] | None = None
+    priority: list[Literal["codex", "antigravity", "deepseek", "antigravity_cli"]] | None = None
     paid_allowed: list[Literal["antigravity", "deepseek"]] | None = None
     brain_enabled: bool | None = None
+    brain_transport: Literal["mixed", "cli_only"] | None = None
     calendar: Literal["local", "google_calendar", "timetree"] | None = None
     google_calendar_id: str | None = Field(default=None, max_length=300)
     google_redirect_uri: str | None = Field(default=None, max_length=1000)
@@ -225,6 +227,7 @@ class SettingsUpdate(BaseModel):
     deepseek_model: str | None = Field(default=None, max_length=200)
     codex_web_search: Literal["disabled", "cached", "live"] | None = None
     codex_model: str | None = Field(default=None, max_length=200)
+    antigravity_cli_model: str | None = Field(default=None, max_length=200)
     sync_notifications: bool | None = None
 
 
@@ -246,15 +249,22 @@ def put_config(payload: SettingsUpdate):
     if "priority" in values and "antigravity" in values["priority"]:
         from .provider_runtime import RETIRED_SDK_MESSAGE
         raise HTTPException(409, RETIRED_SDK_MESSAGE)
-    if values.get("brain_enabled"):
+    if values.get("brain_enabled", data["brain_enabled"]) and ("brain_enabled" in values or "brain_transport" in values):
         candidate = {**data, **values}
-        if not any(brain_priority.permitted(x, candidate) and brain_priority.target(x)["configured"] for x in candidate["priority"]):
+        if not any(brain_priority.permitted(x, candidate) and brain_priority.target(x, candidate)["configured"] for x in candidate["priority"]):
             raise HTTPException(400, "AIを接続し、必要な費用許可を設定してください。")
     settings.update(values)
     if "sync_notifications" in values:
         from . import notifications
         notifications.update_preferences({"sync_failure": values["sync_notifications"]})
     return get_config()
+
+
+@router.post("/codex/diagnose", dependencies=[Depends(_admin)])
+def codex_diagnose():
+    """Explicit local CLI/auth check; does not start inference or log in."""
+    from . import codex_brain
+    return codex_brain.diagnose()
 
 
 class Credentials(BaseModel):
@@ -344,8 +354,13 @@ def notion_selection(payload: NotionSelection):
 @router.post("/services/{service}/connect", dependencies=[Depends(_admin)])
 def connect(service: str):
     if service == "antigravity_cli":
-        from .antigravity_cli import POLICY_MESSAGE
-        raise HTTPException(409, POLICY_MESSAGE)
+        if not brain_priority.target(service)["configured"]:
+            raise HTTPException(400, "公式agy CLIをサーバーへ導入してください。")
+        data = settings.load()
+        settings.update({"antigravity_cli_enabled": True,
+                         "connected": sorted(set(data["connected"]) | {service}),
+                         "priority": [service] + [x for x in data["priority"] if x != service]})
+        return {"connected": True, "tested": False, "authentication": "unknown", "officially_supported": False}
     if service == "antigravity":
         from .provider_runtime import RETIRED_SDK_MESSAGE
         raise HTTPException(409, RETIRED_SDK_MESSAGE)
@@ -393,15 +408,13 @@ def disconnect(service: str):
     credentials = {"deepseek": {"deepseek_key": ""}, "antigravity": {"antigravity_key": ""},
                    "notion": {"notion_key": ""}, "timetree": {"timetree_email": "", "timetree_password": "", "timetree_calendar": ""}}
     settings.update({"connected": [x for x in settings.load()["connected"] if x != service],
+                     **({"antigravity_cli_enabled": False} if service == "antigravity_cli" else {}),
                      **({"calendar": "local"} if data["calendar"] == service else {})}, credentials.get(service))
     return {"disconnected": True, "remote_revocation_confirmed": remote_confirmed}
 
 
 @router.post("/services/{service}/test", dependencies=[Depends(_admin)])
 def test_connection(service: str):
-    if service == "antigravity_cli":
-        from .antigravity_cli import POLICY_MESSAGE
-        raise HTTPException(409, POLICY_MESSAGE)
     if service == "antigravity":
         from .provider_runtime import RETIRED_SDK_MESSAGE
         raise HTTPException(409, RETIRED_SDK_MESSAGE)
@@ -418,7 +431,7 @@ def test_connection(service: str):
             from .calendar_sync import parse_ics
             events = parse_ics(timetree.fetch_ics())
             return {"ok": True, "read_only": True, "count": len(events)}
-        if service in {"codex", "antigravity", "deepseek"}:
+        if service in {"codex", "antigravity", "deepseek", "antigravity_cli"}:
             from . import brain, conversation_store as store, request_context
             data = settings.load()
             if not brain_priority.permitted(service, data):
@@ -432,15 +445,49 @@ def test_connection(service: str):
                 with request_context.bind(request_id=request_id, session_id=thread_id):
                     result = brain._run(request_id)
                 return {"ok": result["status"] == "completed", "status": result["status"], "provider": service}
-            except Exception:
-                store.finish(request_id, {"reply": "", "error": "接続テスト失敗"}, status="failed")
+            except Exception as exc:
+                failure = _test_failure(exc)
+                store.finish(request_id, {"reply": "", "error": failure["error"], "reason": failure["reason"]}, status="failed")
                 raise
             finally:
                 brain_priority._active.reset(token)
         raise ValueError("unknown_service")
     except Exception as exc:
         # Provider response bodies and secret URLs never cross this boundary.
-        return JSONResponse({"ok": False, "error": "接続テストに失敗しました。認証・権限・モデル・依存を確認してください。", "error_type": type(exc).__name__}, status_code=400)
+        return JSONResponse(_test_failure(exc), status_code=400)
+
+
+@router.post("/services/{service}/models", dependencies=[Depends(_admin)])
+def models(service: str):
+    from . import cli_models
+    try:return cli_models.list_models(service)
+    except Exception as exc:
+        return JSONResponse({"error": "モデル一覧を取得できません。公式CLIの導入・認証・接続を確認してください。",
+                             "error_type": type(exc).__name__}, status_code=400)
+
+
+def _test_failure(exc):
+    """Only fixed diagnostic codes/messages cross the API, never provider text."""
+    messages = {
+        "authentication_required": "公式CLIへのログインが必要です。サーバーPCのCLIで認証してください。",
+        "authentication_expired": "CLIの認証を確認できません。公式の認証をやり直してください。",
+        "usage_limit": "CLIが利用枠の上限を報告しました。公式CLIで利用状況を確認してください。",
+        "timeout": "CLIの応答が90秒の制限を超えました。公式CLIの応答速度・モデル・混雑を確認してください。",
+        "invalid_cli_response": "CLIは応答しましたが、PETIT用の返答JSON（content・tool_calls）を検証できませんでした。",
+        "invalid_cli_protocol": "CLIが返したイベント形式をPETITで検証できませんでした。",
+        "direct_tool_detected": "CLIの直接Toolを検出したため、接続テストを停止しました。",
+        "cli_start_failed": "CLIを起動できません。実行ユーザー・配置・実行権限を確認してください。",
+        "not_configured": "CLIが見つかりません。サーバー上の導入状態を確認してください。",
+        "permission_denied": "CLIの実行または保存場所へのアクセスが拒否されました。サーバーの実行ユーザーと権限を確認してください。",
+        "output_limit": "CLIの出力が上限を超えました。",
+        "provider_changed": "テスト中にAI設定が変更されました。設定を保存してから再試行してください。",
+        "cli_error": "公式CLIがエラーを返しました。公式CLI本体で認証・モデル・利用枠を確認してください。",
+    }
+    reason = getattr(exc, "reason", None)
+    if isinstance(exc, PermissionError):reason = "permission_denied"
+    if reason not in messages:reason = "unknown"
+    return {"ok": False, "reason": reason, "error": messages.get(reason,
+        "接続テストに失敗しました。認証・権限・モデル・依存を確認してください。"), "error_type": type(exc).__name__}
 
 
 @router.post("/sync/{service}", dependencies=[Depends(_admin)])
