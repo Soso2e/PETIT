@@ -120,27 +120,44 @@ function addMessage(role, text, { tools, error, actions, modelRoute, silent = fa
     cancel.addEventListener("click", () => decideAction(action.approval_id, false, controls));
   }
 
-  if (modelRoute && modelRoute.observability) {
-    const o = modelRoute.observability;
+  if (modelRoute && (modelRoute.observability || modelRoute.provider || modelRoute.model || modelRoute.actual_route)) {
+    const o = modelRoute.observability || {
+      actual_route: modelRoute.actual_route || modelRoute.kind || "brain",
+      model: modelRoute.model,
+      provider: modelRoute.provider,
+      profile: modelRoute.profile || modelRoute.transport,
+      tools: modelRoute.tools || (tools || []).map((x) => x.name),
+      fallback: modelRoute.fallback,
+      fallback_reason: modelRoute.fallback_reason,
+      llm_calls: modelRoute.llm_call_count,
+    };
     const details = document.createElement("details");
     details.className = "turn-details";
+    details.setAttribute("data-developer-only", "");
+    const isDev = window.PetitUiPreferences?.developer?.() || document.documentElement.dataset.petitDeveloper === "true";
+    if (!isDev) details.setAttribute("hidden", "");
+
     const summary = document.createElement("summary");
-    const fallback = o.fallback ? " · Agentフォールバック" : "";
-    summary.textContent = `詳細 · ${o.actual_route || "instant"}${fallback}`;
+    const fallback = o.fallback ? " · フォールバック" : "";
+    const routeOrProvider = o.provider ? `${o.provider}${o.model ? ` (${o.model})` : ""}` : (o.actual_route || "instant");
+    summary.textContent = `詳細 · ${routeOrProvider}${fallback}`;
+
     const body = document.createElement("div");
-    body.textContent = [
-      `経路: ${o.actual_route || "instant"}`,
+    const lines = [
+      `Provider: ${o.provider || "なし"}${o.profile ? ` (${o.profile})` : ""}`,
       `モデル: ${o.model || "LLM未使用"}`,
-      `プロファイル: ${o.profile || "なし"}`,
-      `Provider: ${o.provider || "なし"}`,
+      `経路: ${o.actual_route || "instant"}`,
       `ツール: ${(o.tools || []).join(", ") || "なし"}`,
-      freshnessLabel(o.notion_sync, "Notion"),
-      freshnessLabel(o.calendar_sync, "Calendar"),
-      `BRAIN: ${o.brain_references || 0}件`,
-      `Memory: ${o.memory_references || 0}件`,
-      `LLM: ${o.llm_calls || 0}回 / Embedding: ${o.embedding_calls || 0}回`,
-      `処理時間: ${((o.elapsed_ms || 0) / 1000).toFixed(1)}秒`,
-    ].join("\n");
+    ];
+    if (o.llm_calls) lines.push(`LLM呼出: ${o.llm_calls}回`);
+    if (o.fallback_reason) lines.push(`フォールバック理由: ${o.fallback_reason}`);
+    if (o.notion_sync) lines.push(freshnessLabel(o.notion_sync, "Notion"));
+    if (o.calendar_sync) lines.push(freshnessLabel(o.calendar_sync, "Calendar"));
+    if (o.brain_references) lines.push(`BRAIN: ${o.brain_references}件`);
+    if (o.memory_references) lines.push(`Memory: ${o.memory_references}件`);
+    if (o.elapsed_ms) lines.push(`処理時間: ${((o.elapsed_ms || 0) / 1000).toFixed(1)}秒`);
+    body.textContent = lines.join("\n");
+
     details.append(summary, body);
     bubble.appendChild(details);
   }
