@@ -55,14 +55,20 @@ def prepare(root: Path):
     (agents / (AGENT + ".md")).write_text(AGENT_SOURCE, encoding="utf-8")
 
 
-def parse_response(raw: str, catalog: list[dict]) -> dict:
+def parse_response(raw: str, catalog) -> dict:
     try:
         value = json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
         if not isinstance(value, dict) or set(value) != {"content", "tool_calls"}:
             raise ValueError()
         if not isinstance(value["content"], str) or not isinstance(value["tool_calls"], list):
             raise ValueError()
-        names = {x["function"]["name"] for x in catalog}
+        if hasattr(catalog, "full"):
+            allowed = catalog.full()
+        elif hasattr(catalog, "schemas"):
+            allowed = catalog.schemas()
+        else:
+            allowed = catalog
+        names = {x["function"]["name"] for x in allowed}
         calls = []
         if len(value["tool_calls"]) > 12:
             raise ValueError()
@@ -80,7 +86,7 @@ def parse_response(raw: str, catalog: list[dict]) -> dict:
 
 def invoke(command, root, prompt, check, *, timeout=90):
     """No user text in argv; close the owned process tree on every exit."""
-    from .antigravity_brain import stop_worker
+    from .provider_runtime import stop_worker
     from .cli_job import ProcessJob
     with tempfile.TemporaryFile() as source, tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error:
         source.write((json.dumps({"event": "user", "message": {"content": prompt}}, ensure_ascii=False) + "\n").encode())
@@ -139,7 +145,7 @@ def completion(target: dict, messages: list, catalog: list, check):
         raise CLIError("not_configured", "公式Antigravity CLIが見つかりません。")
     check()
     prompt = ("PETIT Core request. Follow the PETIT system messages. Respond using the JSON contract below.\n"
-              + AGENT_SOURCE.split("---", 2)[-1] + "\nInput data:\n" + store.encode({"messages": messages, "tools": catalog}))
+              + AGENT_SOURCE.split("---", 2)[-1] + "\nInput data:\n" + store.encode({"messages": messages, "tools": catalog.schemas() if hasattr(catalog, "schemas") else catalog}))
     if len(prompt.encode("utf-8")) > 512_000:
         raise CLIError("input_limit", "CLIへ渡す文脈の上限に達しました。")
     started = time.monotonic()

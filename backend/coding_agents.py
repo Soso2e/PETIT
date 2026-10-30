@@ -53,7 +53,7 @@ def run(provider, target, goal, invoke, check, progress):
     try:
         if (client.request("account/read", {"refreshToken": False}).get("account") or {}).get("type") != "chatgpt":
             raise codex_brain.CodexUnavailable("authentication_required", "CodexのChatGPT認証が必要です。")
-        params = {"cwd": client.temp.name, "sandbox": "read-only", "approvalPolicy": "never", "ephemeral": True,
+        params = {"cwd": str(client.workspace), "sandbox": "read-only", "approvalPolicy": "never", "ephemeral": True,
             "baseInstructions": INSTRUCTIONS + "\nUse petit_coding_tool with a catalog name and JSON arguments: " + json.dumps(CATALOG),
             "dynamicTools": [{"name": "petit_coding_tool", "description": "Job-scoped PETIT coding tools",
                 "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "arguments_json": {"type": "string"}},
@@ -63,7 +63,7 @@ def run(provider, target, goal, invoke, check, progress):
         progress("model_request")
         client.request("turn/start", {"threadId": thread, "input": [{"type": "text", "text": goal}],
             "sandboxPolicy": {"type": "readOnly", "access": {"type": "restricted", "includePlatformDefaults": False,
-                "readableRoots": [client.temp.name]}}})
+                "readableRoots": [str(client.workspace)]}}})
         deadline = time.monotonic() + 900
         while time.monotonic() < deadline:
             check()

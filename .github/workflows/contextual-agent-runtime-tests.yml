@@ -14,6 +14,12 @@ on:
       - "backend/google_services.py"
       - "backend/brain_priority.py"
       - "backend/codex_brain.py"
+      - "backend/provider_runtime.py"
+      - "backend/agent_workspace.py"
+      - "backend/brain_catalog.py"
+      - "backend/cli_job.py"
+      - "tests/test_agent_workspace.py"
+      - "tests/test_provider_runtime.py"
       - "backend/external_brain.py"
       - "backend/tools/gmail.py"
       - "frontend/setup*"
@@ -21,16 +27,11 @@ on:
       - "backend/conversation_api.py"
       - "backend/conversation_store.py"
       - "tests/test_renaissance_core.py"
-      - "backend/antigravity_brain.py"
       - "backend/antigravity_cli.py"
       - "tests/test_antigravity_cli.py"
       - "scripts/probe_antigravity_cli.py"
-      - "backend/antigravity_worker.py"
       - "backend/model_routing.py"
       - "backend/lmstudio_client.py"
-      - "tests/test_antigravity_sdk.py"
-      - "tests/test_antigravity_sdk_probe.py"
-      - "scripts/probe_antigravity_sdk.py"
       - "frontend/session.js"
       - "scripts/test-thread-client.cjs"
       - "backend/chat.py"
@@ -124,7 +125,7 @@ jobs:
           node --check frontend/chat_attachments.js
       - name: Run Renaissance Core and Thread client contracts
         run: |
-          python -m pytest tests/test_setup_integrations.py tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_antigravity_sdk.py tests/test_antigravity_sdk_probe.py tests/test_antigravity_cli.py -q
+          python -m pytest tests/test_setup_integrations.py tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_provider_runtime.py tests/test_agent_workspace.py tests/test_antigravity_cli.py -q
           node --test scripts/test-thread-client.cjs
       - name: Run image intake and Vision regressions
         run: python -m pytest tests/test_vision.py tests/test_vision_calculations.py tests/test_chat_router.py tests/test_module_registry.py -q

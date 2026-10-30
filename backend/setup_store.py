@@ -18,7 +18,7 @@ from . import config
 _lock = threading.RLock()
 _depth = threading.local()
 _sessions: dict[str, float] = {}
-DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["codex", "antigravity", "deepseek"],
+DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["codex", "deepseek"],
             "brain_transport": "mixed",
             "antigravity_cli_enabled": False, "antigravity_cli_model": "",
             "coding_roots": [],
@@ -27,7 +27,7 @@ DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["codex", "a
             "antigravity_auth": "local", "antigravity_model": "", "antigravity_url": "http://127.0.0.1:1234/v1",
             "antigravity_acp_auth_last_success_utc": None, "antigravity_acp_install_path": "",
             "antigravity_acp_last_error": None,
-            "deepseek_model": "deepseek-flash", "codex_model": "", "google_redirect_uri": "",
+            "codex_web_search": "disabled", "deepseek_model": "deepseek-flash", "codex_model": "", "google_redirect_uri": "",
             "sync_notifications": True}
 
 

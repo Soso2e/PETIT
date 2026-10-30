@@ -1,3 +1,5 @@
+> #368: Antigravity SDKは廃止。以下のSDK記述は過去の実装・検証記録です。[現在の移行方法](sdk-retirement.md)を参照。
+
 # 公式Antigravity SDK Brain — Refs #349
 
 確認日: 2026-10-24 UTC / 2026-10-25 JST。基準main: `4135053`。

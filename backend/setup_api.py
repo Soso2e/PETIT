@@ -225,6 +225,7 @@ class SettingsUpdate(BaseModel):
     antigravity_model: str | None = Field(default=None, max_length=200)
     antigravity_url: str | None = Field(default=None, max_length=500)
     deepseek_model: str | None = Field(default=None, max_length=200)
+    codex_web_search: Literal["disabled", "cached", "live"] | None = None
     codex_model: str | None = Field(default=None, max_length=200)
     antigravity_cli_model: str | None = Field(default=None, max_length=200)
     sync_notifications: bool | None = None
@@ -233,23 +234,21 @@ class SettingsUpdate(BaseModel):
 @router.put("/config", dependencies=[Depends(_admin)])
 def put_config(payload: SettingsUpdate):
     values = payload.model_dump(exclude_none=True)
-    if "priority" in values and (len(values["priority"]) != len(set(values["priority"]))
-            or not {"codex", "antigravity", "deepseek"} <= set(values["priority"])):
-        raise HTTPException(400, "既存3種類と、任意のAntigravity CLIを重複なく指定してください。")
+    if "priority" in values and (not values["priority"] or len(set(values["priority"])) != len(values["priority"])):
+        raise HTTPException(400, "AI優先順位には利用するAIを重複なく指定してください。")
     if values.get("google_redirect_uri"):
         uri = urlsplit(values["google_redirect_uri"])
         if (uri.scheme != "https" and not (uri.scheme == "http" and uri.hostname in {"localhost", "127.0.0.1", "::1"})) or uri.username or uri.query or uri.fragment or uri.path != "/api/setup/google/callback":
             raise HTTPException(400, "Redirect URIはHTTPS（localhostのみHTTP可）の/api/setup/google/callbackを指定してください。")
-    if values.get("antigravity_url"):
-        from .model_routing import sdk_local_url
-        if not sdk_local_url(values["antigravity_url"]):
-            raise HTTPException(400, "SDKローカル接続にはloopback URLを指定してください。")
     data = settings.load()
     if values.get("calendar", "local") != "local" and values["calendar"] not in data["connected"]:
         raise HTTPException(400, "接続済みのカレンダーを選択してください。")
     if "google_calendar_id" in values and "google_calendar" in data["connected"]:
         if values["google_calendar_id"] not in {x["id"] for x in google_services.calendars()} and values["google_calendar_id"] != "primary":
             raise HTTPException(400, "アクセス可能なカレンダーを選択してください。")
+    if "priority" in values and "antigravity" in values["priority"]:
+        from .provider_runtime import RETIRED_SDK_MESSAGE
+        raise HTTPException(409, RETIRED_SDK_MESSAGE)
     if values.get("brain_enabled", data["brain_enabled"]) and ("brain_enabled" in values or "brain_transport" in values):
         candidate = {**data, **values}
         if not any(brain_priority.permitted(x, candidate) and brain_priority.target(x, candidate)["configured"] for x in candidate["priority"]):
@@ -362,6 +361,9 @@ def connect(service: str):
                          "connected": sorted(set(data["connected"]) | {service}),
                          "priority": [service] + [x for x in data["priority"] if x != service]})
         return {"connected": True, "tested": False, "authentication": "unknown", "officially_supported": False}
+    if service == "antigravity":
+        from .provider_runtime import RETIRED_SDK_MESSAGE
+        raise HTTPException(409, RETIRED_SDK_MESSAGE)
     data = settings.load()
     if service == "codex":
         from . import codex_brain
@@ -413,6 +415,9 @@ def disconnect(service: str):
 
 @router.post("/services/{service}/test", dependencies=[Depends(_admin)])
 def test_connection(service: str):
+    if service == "antigravity":
+        from .provider_runtime import RETIRED_SDK_MESSAGE
+        raise HTTPException(409, RETIRED_SDK_MESSAGE)
     try:
         if service in {"google_calendar", "gmail"}:
             result = google_services.calendars() if service == "google_calendar" else google_services.get("gmail", "profile")

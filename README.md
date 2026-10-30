@@ -1,3 +1,7 @@
+v0.36.0開発版（#368）は、Codex専用Workspace・成功したThreadの継続・必要なToolだけの詳細取得を追加します。SDKは廃止し、旧設定は明示再選択が必要です。実モデルでの会話速度改善は未確認です。[設計・測定・残課題](docs/persistent-agent-workspace.md)。
+
+> #368: Antigravity SDKは廃止。旧SDKの説明・検証値は履歴です。現在の移行方法は [SDK撤去](docs/sdk-retirement.md)。
+
 # PETIT — Personal AI Assistant (MVP)
 
 開発ブランチ（#362 / #225）では、Antigravity CLIを明示接続するBrainと、Codex CLI／Antigravity CLIへローカル開発を依頼するタスクを追加しました。Tasksの「CLIの開発タスク・進捗を見る」から、許可したGitルート・目的・CLIを選び、承認後の状態・差分・静的チェックを確認できます。元checkoutは変更せず、専用コピーで作業します。任意Shell・実テストコード実行・削除・Push/PR/mergeは未対応です。[設計・制約](docs/coding-tasks.md)、[実CLIの合成受入](reports/antigravity-cli-brain-live.json)を参照。

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 import json
-import shutil
 
 from . import setup_store as settings, conversation_store as store, db, lmstudio_client
 
@@ -26,14 +25,8 @@ def target(provider: str, data: dict | None = None) -> dict:
         return {"provider": "codex", "profile": "codex", "label": "Codex（ChatGPT）", "external": True,
                 "model": data["codex_model"], "base_url": "", "configured": bool(executable()), "api_key": ""}
     if provider == "antigravity":
-        from .antigravity_brain import installed
-        from .model_routing import sdk_local_url
-        local = data["antigravity_auth"] == "local"
-        key = data["secrets"].get("antigravity_key", "")
-        return {"provider": "antigravity_sdk", "profile": "antigravity", "label": "Antigravity SDK", "external": not local,
-                "model": data["antigravity_model"], "base_url": data["antigravity_url"] if local else "https://generativelanguage.googleapis.com",
-                "api_key": key, "auth_mode": data["antigravity_auth"], "timeout_seconds": 90, "core_tools": True,
-                "configured": bool(installed() and data["antigravity_model"] and (sdk_local_url(data["antigravity_url"]) if local else key))}
+        return {"provider": "antigravity_sdk", "profile": "antigravity", "label": "Antigravity SDK（廃止・再選択が必要）",
+                "configured": False, "model": data["antigravity_model"], "external": True, "base_url": "", "api_key": ""}
     if provider == "deepseek":
         import os
         key = data["secrets"].get("deepseek_key", os.getenv("PETIT_DEEPSEEK_API_KEY", os.getenv("DEEPSEEK_API_KEY", "")))
@@ -47,7 +40,7 @@ def permitted(provider: str, data: dict, privacy="standard") -> bool:
         return False
     if provider == "antigravity_cli" and not data.get("antigravity_cli_enabled"):
         return False
-    if provider not in data["connected"]:
+    if provider == "antigravity" or provider not in data["connected"]:
         return False
     paid = provider == "deepseek" or (provider == "antigravity" and data["antigravity_auth"] != "local")
     if paid and provider not in data["paid_allowed"]:
@@ -77,6 +70,9 @@ def diagnostic(request_id, provider, state, reason=None):
 
 def run(request_id, execute, *, messages=None, used_tools=None):
     data = settings.load()
+    if any(x in data["connected"] for x in ("antigravity", "antigravity_sdk")) and "antigravity" in data["priority"]:
+        from .provider_runtime import RETIRED_SDK_MESSAGE
+        raise lmstudio_client.LMStudioError(RETIRED_SDK_MESSAGE)
     row = store.load_turn(request_id)
     privacy = store.thread(row["thread_id"])["privacy"]
     candidates = list(data["priority"])

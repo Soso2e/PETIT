@@ -33,6 +33,7 @@
     });
   }
   function render() {
+<<<<<<< HEAD
     const s=state.settings;order=[...s.priority];priority();
     $('brain-transport').value=s.brain_transport||'mixed';
     const codex=state.codex_cli;
@@ -41,8 +42,14 @@
     $('antigravity-cli-status').textContent=cli?(cli.installed?'公式CLIを検出':'CLI未検出（サーバーのPATH・標準配置先）')+' / Brain接続: '+(cli.production_enabled?'設定済み':'未接続')+' / ログイン・モデル・契約枠残量: unknown（接続テストと公式CLIで確認）':'CLIの診断情報を取得できません。';
     $('antigravity-cli-model').value=s.antigravity_cli_model||'';
     for (const [id,key] of [['codex-model','codex_model'],['deepseek-model','deepseek_model'],['antigravity-auth','antigravity_auth'],['antigravity-model','antigravity_model'],['antigravity-url','antigravity_url'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
+=======
+    const s=state.settings;order=s.priority.filter(x=>x!=="antigravity");priority();$("sdk-migration").textContent=s.priority.includes("antigravity")?"旧SDK設定があります。利用するAIの接続・費用許可を確認し、AI設定を保存してください。":"";
+    const cli=state.antigravity_cli;
+    $('antigravity-cli-status').textContent=cli?(cli.installed?'公式CLIの候補を検出':'CLI未検出（サーバーのPATH・標準配置先）')+' / 本番接続: 無効 / バージョン・ログイン・モデル・契約枠残量: unknown（未検証）':'CLIの診断情報を取得できません。';
+    for (const [id,key] of [['codex-model','codex_model'],['codex-web-search','codex_web_search'],['deepseek-model','deepseek_model'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
+>>>>>>> main
     if (!$('google-redirect').value) $('google-redirect').value=location.origin+'/api/setup/google/callback';
-    $('paid-deepseek').checked=s.paid_allowed.includes('deepseek');$('paid-antigravity').checked=s.paid_allowed.includes('antigravity');$('brain-enabled').checked=s.brain_enabled;$('sync-notifications').checked=s.sync_notifications;
+    $('paid-deepseek').checked=s.paid_allowed.includes('deepseek');$('brain-enabled').checked=s.brain_enabled;$('sync-notifications').checked=s.sync_notifications;
     const latest=state.brain.latest;$('active-brain').textContent=latest?'最新のAI: '+labels[latest.provider_id]+' / '+latest.state+(latest.reason?' / 切替理由: '+(reasons[latest.reason]||latest.reason):''):'AIの実行記録はまだありません。';
     $('sync-status').replaceChildren(); for(const x of state.sync.states){const p=document.createElement('p');p.textContent=(labels[x.service]||x.service)+' / 最終成功: '+(x.last_success||'なし')+' / 更新 '+x.updated_count+'件'+(x.error?' / '+x.error:'');$('sync-status').append(p);}
     $('alert-list').replaceChildren();for(const alert of state.sync.alerts){const box=document.createElement('div');box.className='alert';const text=document.createElement('p');text.textContent=(labels[alert.service]||alert.service)+' / '+alert.last_failure;const detail=document.createElement('details');const heading=document.createElement('summary');heading.textContent='詳細を確認';const description=document.createElement('p');description.textContent=alert.error;detail.append(heading,description);const retry=document.createElement('button');retry.textContent='再試行';action(retry,async()=>{const result=await api('/sync/'+alert.service,'POST');await refresh();notice(result.ok?'同期が成功しました。':result.error||'同期が失敗しました。',!result.ok);});box.append(text,detail,retry);$('alert-list').append(box);}
@@ -62,7 +69,11 @@
   document.querySelectorAll('[data-models]').forEach(button=>action(button,async()=>{const id=button.dataset.models,[input]=modelFields[id];const result=await api('/services/'+id+'/models','POST');const select=$(input+'-options');select.replaceChildren(new Option('CLIの既定モデル',''));for(const item of result.models)select.add(new Option(item.label+' / '+item.id,item.id));select.value=$(input).value;notice(result.models.length+'件のモデル候補を取得しました。選択して保存後、接続テストで実応答を確認してください。');}));
   document.querySelectorAll('[data-save-model]').forEach(button=>action(button,async()=>{const [input,key]=modelFields[button.dataset.saveModel];await save({[key]:$(input).value});notice('モデル設定を保存しました。接続テストで実応答を確認してください。');}));
   async function saveKeys(fields){const values={};for(const [id,key]of fields){if($(id).value)values[key]=$(id).value;}if(Object.keys(values).length){await api('/credentials','PUT',{values});fields.forEach(([id])=>$(id).value='');}}
+<<<<<<< HEAD
   async function saveAI(extra={}){await save({priority:order,codex_model:$('codex-model').value,antigravity_cli_model:$('antigravity-cli-model').value,deepseek_model:$('deepseek-model').value,antigravity_auth:$('antigravity-auth').value,antigravity_model:$('antigravity-model').value,antigravity_url:$('antigravity-url').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null,$('paid-antigravity').checked?'antigravity':null].filter(Boolean),...extra});}
+=======
+  async function saveAI(){await save({priority:order,codex_web_search:$('codex-web-search').value,codex_model:$('codex-model').value,deepseek_model:$('deepseek-model').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null].filter(Boolean)});}
+>>>>>>> main
   document.querySelectorAll('[data-step]').forEach(x=>action(x,()=>showStep(Number(x.dataset.step))));
   action($('previous'),()=>showStep(step-1));action($('next'),()=>{showStep(step+1);notice('未設定のサービスはスキップできます。');});action($('refresh'),async()=>{await refresh();notice('保存済み状態を更新しました。');});
   action($('acp-install'),async()=>{const root=$('acp-install-root').value.trim();acpState=await api('/antigravity-acp/install','POST',root?{destination:root}:{});await refresh();notice('公式ACP AgentをRegistry SHA-256照合後に導入しました。');});
@@ -72,7 +83,7 @@
   action($('logout'),async()=>{await api('/logout','POST');await start();notice('ログアウトしました。');});
   action($('save-brain'),async()=>{await saveAI({brain_enabled:$('brain-enabled').checked,brain_transport:$('brain-transport').value});notice('AI設定を保存しました。');});
   document.querySelectorAll('[data-connect]').forEach(button=>action(button,async()=>{const id=button.dataset.connect;
-    if(['codex','antigravity','deepseek'].includes(id)){await saveKeys([['deepseek-key','deepseek_key'],['antigravity-key','antigravity_key']]);await saveAI();}
+    if(['codex','deepseek'].includes(id)){await saveKeys([['deepseek-key','deepseek_key']]);await saveAI();}
     if(id==='antigravity_cli')await save({antigravity_cli_model:$('antigravity-cli-model').value});
     if(id==='notion')await saveKeys([['notion-key','notion_key']]);
     if(id==='timetree')await saveKeys([['timetree-email','timetree_email'],['timetree-password','timetree_password'],['timetree-calendar','timetree_calendar']]);

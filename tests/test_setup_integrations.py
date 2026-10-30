@@ -96,8 +96,8 @@ def test_bootstrap_login_csrf_and_legacy_protection(client):
     assert client.put("/api/setup/config", json={"completed": True}).status_code == 422
     assert client.put("/api/setup/config", json={"priority": ["codex", "codex", "deepseek"]}).status_code == 400
     assert client.put("/api/setup/config", json={"calendar": "google_calendar"}).status_code == 400
-    assert client.put("/api/setup/config", json={"priority": ["deepseek", "codex", "antigravity"]}, headers={"Origin": "https://evil.example"}).status_code == 403
-    assert client.put("/api/setup/config", json={"priority": ["deepseek", "codex", "antigravity"]}).status_code == 200
+    assert client.put("/api/setup/config", json={"priority": ["deepseek", "codex"]}, headers={"Origin": "https://evil.example"}).status_code == 403
+    assert client.put("/api/setup/config", json={"priority": ["deepseek", "codex"]}).status_code == 200
     assert settings.load()["priority"][0] == "deepseek"
     assert client.post("/api/setup/logout").status_code == 200
     assert client.post("/api/model-routing").status_code == 401
@@ -247,7 +247,7 @@ def test_gmail_tools_read_only_and_body(monkeypatch):
 
 
 def configure_priority(monkeypatch):
-    settings.update({"brain_enabled":True,"connected":["codex","antigravity","deepseek"],"paid_allowed":["deepseek"]}, {"deepseek_key":"synthetic"})
+    settings.update({"brain_enabled":True,"connected":["codex","deepseek"],"paid_allowed":["deepseek"]}, {"deepseek_key":"synthetic"})
     def target(provider):
         return {"provider": provider, "profile": provider,"model":"synthetic","base_url":"", "configured":True,"external":True,"api_key":""}
     monkeypatch.setattr(priority,"target",target)
@@ -261,7 +261,7 @@ def test_priority_fallback_and_top_recovery_use_one_attempt_at_a_time(monkeypatc
         if name=="codex":raise brain.lmstudio_client.LMStudioError("connection failed")
         return {"ok":True}
     assert priority.run("request",run)["ok"]
-    assert seen==["codex","antigravity"] and priority.current() is None
+    assert seen==["codex","deepseek"] and priority.current() is None
     seen.clear()
     assert priority.run("request",lambda *a,**k: seen.append(priority.current()["profile"]) or {"ok":True})["ok"]
     assert seen==["codex"]
@@ -313,36 +313,6 @@ def test_setup_calendar_filters_inactive_sources(monkeypatch):
     settings.update({"calendar":"local"})
     assert {x["title"] for x in get_schedule()["events"]}=={"local"}
     assert {x["title"] for x in _events_for("2026-10-25")}=={"local"}
-
-
-def test_sdk_core_bridge_write_receipt_and_approval_resume(monkeypatch):
-    from backend import antigravity_brain as sdk
-    settings.update({"brain_enabled": True, "priority": ["antigravity", "codex", "deepseek"],
-                     "connected": ["antigravity"], "antigravity_model": "synthetic"})
-    monkeypatch.setattr(sdk, "installed", lambda: True)
-    count = []
-    def runtime(request_id, target, instructions, prompt, used, metadata):
-        count.append(request_id)
-        if not store.approvals(request_id):
-            with db.get_connection() as c:
-                done = c.execute("SELECT 1 FROM effect_receipts WHERE request_id=?", (request_id,)).fetchone()
-            if done:
-                return "保存結果を確認しました。"
-        read = sdk.bridge(request_id, target, used)
-        read("add_schedule", '{"title":"合成承認予定","start_time":"2026-10-25T12:00:00+09:00"}')
-        return ""
-    monkeypatch.setattr(sdk, "run_isolated", runtime)
-    result = conversations.submit("sdk-write", "sdk-write-1", "合成予定を追加", is_admin=True)
-    assert result["status"] == "waiting_approval"
-    with db.get_connection() as c:
-        assert c.execute("SELECT count(*) FROM calendar_events_cache").fetchone()[0] == 0
-    approved = conversations.decide(store.approvals("sdk-write-1")[0]["approval_id"], True)
-    assert approved["status"] == "completed"
-    replay = conversations.submit("sdk-write", "sdk-write-1", "合成予定を追加")
-    assert replay["reply"] == approved["reply"] and len(count) == 2
-    with db.get_connection() as c:
-        assert c.execute("SELECT count(*) FROM calendar_events_cache WHERE title='合成承認予定'").fetchone()[0] == 1
-        assert c.execute("SELECT count(*) FROM effect_receipts").fetchone()[0] == 1
 
 
 def test_sync_failure_notification_is_high_priority_and_auto_resolved():

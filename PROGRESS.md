@@ -1,12 +1,20 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.35.0**
+**Current Version: v0.36.0**
 
-**Last Updated: 2026-10-29 UTC**
+**Last Updated: 2026-10-30 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #365 / v0.35.0 管理者セッションDB永続化と非管理者向け安全な会話モード（実装済み・単体テスト完了）: 管理者セッションをSQLite（admin_sessions）に保存し、サーバー再起動やリロードによるセッション喪失を解消（1年間有効）。UI設定から管理者セッションの終了（ログアウト）を可能にし、非管理者状態でもチャット（/api/chat）を許可。非管理者時はTool全般を禁止して純粋なテキスト応答のみに制限（コード変更や副作用操作を防止）。関連テスト23件成功。
+- #368 Workspace/Tool公開（実装済み・実モデル未確認）: Codexの専用AGENTS読込、Core DBへの補助Thread保存/resume/履歴重送防止、権限/モデル/途中失敗時の分離、別会話とのThread ID衝突拒否、欠損復元、Webの明示許可を実装。通常Brainへ天気/newsを公開、未設定サービスを除外し小さなindex/詳細schema発見へ変更。実CLI0.130.0-alpha.5で専用AGENTSと3検索mode設定受理を確認（未認証・推論/検索なし）。関連pytest95件・Thread Node5件・Chromium1440/390px成功（合成Provider）。合成31schema 15,290文字→初期6schema 3,021文字+index766文字。実応答p50/p95/枠/自然さはunknown。docs/persistent-agent-workspace.mdと測定report参照。
+
+- #368 SDK撤去（実装済み・契約テスト確認）: SDK専用Brain/Worker/依存・導入スクリプトを撤去し、Codexが使う共通validator/Provider照合/プロセス停止をprovider_runtimeへ移動。旧SDK設定・秘密・DBを保持し再選択必須、新規接続禁止。78件成功、Thread Node5件・Chromium1440/390pxの設定/再起動受入成功（合成Provider）。Workspace/永続Thread/動的Tool公開は別PRで実装（本節の#368 Workspace/Tool公開を参照）。実会話の性能比較は後続。実Provider・配布端末は未確認。詳細はdocs/sdk-retirement.md。
+
+- #366 セキュリティ/回帰修正（PR上で確認中）: 誤削除された petit-version.js の起動・遅延ロードを復旧。公開APIを /api/chat に限定し、ゲスト会話はHttpOnlyのpetit_guest Cookieから独立Threadを導出して管理者/他ゲストの履歴を分離。未認証SDK経路はTool全禁止、承認再開では管理者権限Contextを復元。DBをセッション真実源とし、プロセスを跨ぐログアウトを反映。既存テストの新しい認証境界への追従とゲストAPIアクセス拒否の回帰テストを追加。GitHub CI完了待ち、未ログインUIでの履歴/再取得・Discord等のサービス認証経路は実機受入が必要。
+
+- #365 / v0.35.0 管理者セッションDB永続化と非管理者向け安全な会話モード（実装済み・単体テスト完了）: 管理者セッションをSQLite（admin_sessions）に保存し、サーバー再起動やリロードによるセッション喪失を解消（1年間有効）。UI設定から管理者セッションの終了（ログアウト）を可能にし、非管理者状態でもチャット（/api/chat）を許可。非管理者時はTool全般を禁止して純粋なテキスト応答のみに制限（コード変更や副作用操作を防止）。関連テスト23件成功。次は実画面でのログイン・ログアウト受入。
+
+- #362 / #225 Antigravity CLI Brain接続・承認付きCoding Job統合（実験実装・実機対話1件確認）: 公式agy CLIの接続許可・モデル選択・推論実行・開発支援タスク画面を統合。実機CLI対話1件（10,372 tokens / 44.8秒）を記録。最新mainのWorkspace/Tool Discovery/Provider共通基盤への適合を検証中。
 
 - #362/#359 CLIモデル選択: 従来のID手入力に加え、公式agy models/Codex model/listの一覧取得・選択・PETIT設定保存を追加。Windows実agyから13候補を取得。catalogは実推論や利用枠の証明と区別し、既存接続テストで確認する。CLI本体の既定値は変更しない。
 
@@ -317,10 +325,12 @@
 | 2026-10-29 | 08:15 | #358 | PR #358反映済みorigin/mainとローカルmainを統合。#332のTask再開修正を保持し、新mainのv0.34.0・ACP導入・Runtimeを維持。7ファイル競合を解決。関連テスト21件+29 subtests成功（HTTP保存ケース1件はstorage/settings権限エラーで未確認）。compileall成功。diff --checkは上流追加docsの末尾空白9件を報告。DBバックアップとstorage/vision-uiを保持。 |
 | 2026-10-29 | 09:48 | #360 | v0.34.2: AGENTSにコード削除の影響調査・互換性/データ保護・独立PR/回帰確認を明文化。Linkraft/Sona等は監査候補のみ、機能削除なし。実行テストは文書変更のため未実施。 |
 | 2026-10-29 | 10:23 | #363 | v0.34.3: Sona Core/Linkraftの旧Adapter・実行分岐・依存・専用テストを撤去。Project Continuity、Notion/GitHub/BRAIN、予定/承認を保持し、既存SQLite行と旧Linkraftリンクは削除せずunsupported/skipped。新回帰追加、GitHub CIと実DB受入はPRで追跡。 |
-| 2026-10-29 | 11:30 | #365 | v0.35.0: 管理者セッションのSQLite DB永続化（再起動耐性・1年有効期限）、UIログアウト、非管理者時の通常会話モード（ツール全般禁止）を実装。 |
-| 2026-10-29 | 09:51 | #359 | 2026-10-29-02: CLIのみ接続方式とCodex診断/Tool再送防止を追加。 |
-| 2026-10-29 | 10:44 | #362 | 2026-10-29-03: 利用者の明示依頼で公式Antigravity CLIをfinish専用Agent/構造化JSONのBrainへ接続。 |
-| 2026-10-29 | 10:44 | #225 | 2026-10-29-04: 承認付きCLI開発タスク、Task/Job永続化、専用clone/Core限定Tool、Web進捗・差分・取消・レビュー完了を追加。 |
-| 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH依存検出を公式Windows標準launcher対応の共通resolverへ修正。 |
-| 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの一律エラーを固定reason別の説明・Turn保存へ変更。 |
-| 2026-10-29 | 10:59 | #362 | 2026-10-29-07: Codex/Antigravity CLIの公式モデル一覧取得・選択・保存UIを追加。 |
+| 2026-10-29 | 11:30 | #365 | v0.35.0: 管理者セッションSQLite DB永続化（再起動耐性・1年有効）、UIログアウト、非管理者時の通常会話モード（ツール全般禁止）。 |
+| 2026-10-29 | 09:51 | #359 | 2026-10-29-02: CLIのみ接続・Codexモデル診断/Tool重複防止を追加。 |
+| 2026-10-29 | 10:44 | #362 | 2026-10-29-03: 利用者の明示許可で公式Antigravity CLIをfinish専用Agent/構造化JSON Brainへ接続。 |
+| 2026-10-29 | 10:44 | #225 | 2026-10-29-04: 承認付きCLI開発タスク（Task/Job分離、専用clone/Core承認Tool、Web進捗・差分レビュー）を追加。 |
+| 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH非依存検出をWindows標準launcher対応の堅牢resolverへ修正。 |
+| 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの画一エラーを特定reason別の説明・Turn保存へ変更。 |
+| 2026-10-29 | 10:59 | #362 | 2026-10-29-07: Codex/Antigravity CLIの候補モデル一覧取得・選択・保存UIを追加。 |
+| 2026-10-30 | 08:32 | #368 | 2026-10-30-01: 実装・未確認: SDK撤去と共通設定の安全移行、Provider共通Core境界を追加。関連Python78件・Node5件・Chromium設定/再起動受入（合成Provider）。実Provider/配布端末未確認、Workspaceと会話性能は後続。 |
+| 2026-10-30 | 08:46 | #368 | 2026-10-30-02: 実装・未確認: Provider専用Workspace/補助session、Codex resume、動的Tool詳細取得、天気/news公開、usage/時間計測を追加。関連pytest95件・Node5件・Chromium1440/390px（合成Provider）。実CLIの専用AGENTS読込と検索mode設定確認。未認証のため推論・実会話遅延/品質/自然さ/枠は未確認。 |

@@ -25,7 +25,7 @@ def repository(tmp_path, monkeypatch):
     jobs.git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture")
     settings.update({"coding_roots": [str(root)], "connected": ["codex", "antigravity_cli"], "antigravity_cli_enabled": True})
     monkeypatch.setattr("backend.antigravity_cli.executable", lambda: "synthetic-agy")
-    monkeypatch.setattr("backend.brain_priority.shutil.which", lambda _: "synthetic-codex")
+    monkeypatch.setattr("backend.codex_brain.executable", lambda: "synthetic-codex")
     jobs._stop.clear()
     jobs.ensure_schema()
     return root

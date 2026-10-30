@@ -15,3 +15,6 @@ google-auth-httplib2>=0.2
 # Host-local authenticated setup secrets
 cryptography>=43
 agent-client-protocol==0.12.1
+
+# Core bridge argument validation (formerly supplied by the optional SDK).
+jsonschema>=4,<5

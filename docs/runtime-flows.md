@@ -1,5 +1,6 @@
 # PETIT Runtime Flows
 
+<<<<<<< HEAD
 ## Antigravity CLI Brainと開発タスク（#362 / #225）
 
 2026-10-29の利用者の明示依頼により、CLI準備段階の一律拒否をSettingsの明示接続へ変更した。環境変数や旧model-routingからは有効化せず、SDK/ACPと別Providerとして表示する。
@@ -46,6 +47,39 @@ flowchart TD
 ```
 
 初期実装では任意Shell、任意テストコード実行、削除、Push/PR/mergeを公開しない。Python/JavaScript構文とdiff whitespaceだけを静的検証し、実テスト・実ホスト受入と区別する。[設計・移行境界](coding-tasks.md)を参照。
+=======
+## #368: Workspace・永続Provider補助Thread・動的Tool公開
+
+```mermaid
+flowchart TD
+    Accept[既存Core Thread/Turn] --> Provider{Provider固定 / 権限 / privacy}
+    Provider -->|Codex| Workspace[専用AGENTS.md / CONTEXT.md / restricted read roots]
+    Workspace --> Mapping{同じThread・モデル・権限・公開条件で直前Turnが成功?}
+    Mapping -->|はい| Resume[thread/resume / 履歴を二重送信しない]
+    Mapping -->|いいえ / rollout欠損| Start[thread/start / Core履歴で復元]
+    Resume --> Agent[公式App Server Loop / native Webは明示許可時のみ]
+    Start --> Agent
+    Provider -->|DeepSeek / LM Studio| Native[既存Native Loop]
+    Native --> Compact[初期5 Read + discover_tools / 小さなCapability一覧]
+    Agent --> Bridge[petit_read_tool / 小さなCapability一覧]
+    Compact --> Discovery{必要schemaの追加発見?}
+    Bridge --> Discovery
+    Discovery -->|はい| Schemas[その時点の許可済みRegistry schemaを取得 / 操作しない]
+    Schemas --> Continue[同じBrainで継続 / 別Routerなし]
+    Discovery -->|操作| Validate[実行直前の登録・公開条件・schema・risk・権限を検査]
+    Validate --> Effects[既存Approval / Effect Receipt / 保存結果]
+    Continue --> Provider
+    Effects --> Result[Coreへ結果保存 / 成功時のみ補助session対応保存]
+    Result --> Metrics[文字数・利用可能なusage・Call/Tool時間 / 未取得はunknown]
+```
+
+SDK旧選択は停止して再選択が必要。guestはToolもNative Webも禁止。local_onlyは外部Readを公開せずCodexへ送信しない。
+未設定のGmail/Notion/ローカル開発Toolを除外するが、内部Task/予定/Reminder/Memoryは空データでも利用可能。
+Tool Discoveryは最大8名ずつ、完全schemaを返す。内部承認Toolとbackgroundキュー作成は公開しない。
+承認待ち・失敗・取消・権限変更では補助Threadを再利用せず、Core保存状態から復元する。
+AGENTSは認可境界ではなく、read-only sandbox・機能無効化・Core bridge検証が境界。モデルの個人情報を含む検索語を完全検出するDLPは未実装で、Webは既定OFF。
+
+>>>>>>> main
 
 ## v0.34.3: Sona Core / Linkraft撤去（#363）
 
@@ -116,7 +150,7 @@ flowchart TD
     Disabled --> Gate[Windows OS隔離とACP権限制御の実機検証後に別変更で解禁]
 ```
 
-initialize handshakeはモデル推論・認証成功・Google契約枠の使用を証明しない。ACP Agentが内部Toolを直接実行するため、PETITのPermission callbackだけではWindows上のファイル書込みやShellを遮断できない。OSレベルの隔離とPETIT既存Approval/Receiptへの正確な接続が完成するまで、会話Providerとしては公開しない。既存 `agy` CLI診断とAntigravity SDKは独立して維持する。
+initialize handshakeはモデル推論・認証成功・Google契約枠の使用を証明しない。ACP Agentが内部Toolを直接実行するため、PETITのPermission callbackだけではWindows上のファイル書込みやShellを遮断できない。OSレベルの隔離とPETIT既存Approval/Receiptへの正確な接続が完成するまで、会話Providerとしては公開しない。既存 `agy` CLI診断は維持する。Antigravity SDKは#368で撤去済み。
 
 ## v0.34.0: 初期設定・優先順位と単一Brain（#353）
 
@@ -139,15 +173,12 @@ flowchart TD
     CLIOnly --> Pin
     Pin --> Backend{単一Runtimeの所有者}
     Backend -->|DeepSeek / LM Studio| Native[既存native Tool Loop]
-    Backend -->|Codex| Codex[サーバー上の公式CLI / app-server stdio Agent Loop]
-    Backend -->|Antigravity| SDK[公式SDK Agent Loop / Turn専用Worker]
-    Native --> Gate[既存Registry / 公開catalog / schema / risk / cancel]
-    Codex --> CallID{同じdynamic Tool call ID}
-    CallID -->|初回| Gate
-    CallID -->|同じ引数で再送| Cached[保存したTool応答を再送 / 再実行なし]
-    Cached --> Codex
-    CallID -->|異なる引数| Failed
-    SDK -->|Python PETIT bridge| Gate
+    Backend -->|Codex| Codex[app-server Agent Loop]
+    Backend -->|Antigravity CLI| AgCli[公式agy CLI Agent Loop]
+    Backend -->|旧SDK選択| Migrate[停止して再選択案内]
+    Native --> Gate[Registry / 公開catalog / schema / risk / cancel]
+    Codex -->|dynamic PETIT Tool| Gate
+    AgCli -->|dynamic Tool| Gate
     Gate -->|確認必須| Approval[SQLite承認とmessages / Runtime終了]
     Approval --> UI[既存確認UI / 再起動復元]
     UI -->|一度だけ承認消費| Execute[既存Domain Tool]
@@ -167,6 +198,7 @@ flowchart TD
     Save --> R
 ```
 
+<<<<<<< HEAD
 管理UIのSDK bridgeはCoreのWrite承認/receiptも使う。従来`antigravity_sdk` profileは
 限定Read専用のまま。SDK内蔵Toolはfinishのみ、Codexのshell/apps/plugins/subagentは無効、
 許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
@@ -174,6 +206,10 @@ flowchart TD
 CLIの導入検出は受動的に行い、明示した診断で`account/read`を確認する。認証確認と実推論の接続テストは別。
 Thread/Turn/承認再開はPETIT SQLiteが正本で、Codexは各実行でephemeral Threadを作り、既存Eventsに外部session IDを記録する。
 画像はmixedで既存Vision観測→Read専用回答を維持し、CLIのみではVision実行前に拒否する。CLI画像対応と画像Providerの順位Fallbackは未対応。
+=======
+SDKは撤去済み。Codexのshell/apps/plugins/subagentは無効、許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
+画像は既存Vision観測→Read専用回答で、画像Providerの順位Fallbackは未対応。
+>>>>>>> main
 8 rounds / 12 callsと取消/deadlineを維持し、local_onlyは外部へ送らない。
 
 ```mermaid

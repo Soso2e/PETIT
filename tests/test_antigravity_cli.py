@@ -145,7 +145,10 @@ def test_config_api_detects_passively_and_explicitly_connects(client):
         assert client.post("/api/setup/services/antigravity_cli/test").status_code == 400
         assert client.post("/api/setup/services/antigravity_cli/connect").json()["tested"] is False
         response = client.put("/api/setup/config", json={"priority": ["antigravity_cli", "codex", "deepseek"]})
-        assert response.status_code == 400
+        assert response.status_code == 200
+        # 重複指定は拒否される
+        dup = client.put("/api/setup/config", json={"priority": ["antigravity_cli", "antigravity_cli"]})
+        assert dup.status_code == 400
 
 
 def test_explicit_cli_never_defaults_or_falls_back_to_another_provider(tmp_path, monkeypatch):

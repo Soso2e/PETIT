@@ -45,6 +45,11 @@ CREATE TABLE IF NOT EXISTS effect_receipts (
     tool TEXT NOT NULL, arguments_json TEXT NOT NULL, status TEXT NOT NULL,
     result TEXT, updated_at TEXT NOT NULL, PRIMARY KEY(request_id, call_id)
 );
+CREATE TABLE IF NOT EXISTS provider_sessions (
+    thread_id TEXT NOT NULL REFERENCES threads(id), provider TEXT NOT NULL,
+    boundary_key TEXT NOT NULL, session_id TEXT NOT NULL, last_request_id TEXT NOT NULL REFERENCES turns(request_id),
+    PRIMARY KEY(thread_id,provider), UNIQUE(provider,session_id)
+);
 CREATE TABLE IF NOT EXISTS turn_approvals (
     id TEXT PRIMARY KEY, request_id TEXT NOT NULL REFERENCES turns(request_id),
     call_id TEXT NOT NULL, tool TEXT NOT NULL, arguments_json TEXT NOT NULL,
