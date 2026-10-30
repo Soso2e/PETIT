@@ -1,6 +1,5 @@
 # PETIT Runtime Flows
 
-<<<<<<< HEAD
 ## Antigravity CLI Brainと開発タスク（#362 / #225）
 
 2026-10-29の利用者の明示依頼により、CLI準備段階の一律拒否をSettingsの明示接続へ変更した。環境変数や旧model-routingからは有効化せず、SDK/ACPと別Providerとして表示する。
@@ -47,7 +46,7 @@ flowchart TD
 ```
 
 初期実装では任意Shell、任意テストコード実行、削除、Push/PR/mergeを公開しない。Python/JavaScript構文とdiff whitespaceだけを静的検証し、実テスト・実ホスト受入と区別する。[設計・移行境界](coding-tasks.md)を参照。
-=======
+
 ## #368: Workspace・永続Provider補助Thread・動的Tool公開
 
 ```mermaid
@@ -198,18 +197,10 @@ flowchart TD
     Save --> R
 ```
 
-<<<<<<< HEAD
-管理UIのSDK bridgeはCoreのWrite承認/receiptも使う。従来`antigravity_sdk` profileは
-限定Read専用のまま。SDK内蔵Toolはfinishのみ、Codexのshell/apps/plugins/subagentは無効、
-許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
+SDKは撤去済み。Codexのshell/apps/plugins/subagentは無効、許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
 `brain_transport=cli_only`はCodexと明示接続したAntigravity CLIを許可し、障害時もSDK/APIへFallbackしない。既存設定は`mixed`のまま引き継ぐ。
 CLIの導入検出は受動的に行い、明示した診断で`account/read`を確認する。認証確認と実推論の接続テストは別。
-Thread/Turn/承認再開はPETIT SQLiteが正本で、Codexは各実行でephemeral Threadを作り、既存Eventsに外部session IDを記録する。
-画像はmixedで既存Vision観測→Read専用回答を維持し、CLIのみではVision実行前に拒否する。CLI画像対応と画像Providerの順位Fallbackは未対応。
-=======
-SDKは撤去済み。Codexのshell/apps/plugins/subagentは無効、許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
 画像は既存Vision観測→Read専用回答で、画像Providerの順位Fallbackは未対応。
->>>>>>> main
 8 rounds / 12 callsと取消/deadlineを維持し、local_onlyは外部へ送らない。
 
 ```mermaid
