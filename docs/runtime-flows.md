@@ -1,18 +1,36 @@
-> #368 更新: SDK Brain/Workerは撤去。下記旧SDKの説明は過去経路。現行Provider境界は次図を参照。
+# PETIT Runtime Flows
+
+## #368: Workspace・永続Provider補助Thread・動的Tool公開
 
 ```mermaid
-flowchart LR
-    Core[PETIT Thread/Turn 正本] --> Select{Provider選択}
-    Select -->|旧SDK選択| Migrate[実行停止・明示再選択]
-    Select -->|Codex| Codex[App Server]
-    Select -->|LM Studio / DeepSeek| Native[既存Native Loop]
-    Codex --> Bridge[Provider共通 Core bridge]
-    Native --> Validate[Registry / schema / 権限]
-    Bridge --> Validate
-    Validate --> Approval[既存承認 / Receipt / 状態保存]
+flowchart TD
+    Accept[既存Core Thread/Turn] --> Provider{Provider固定 / 権限 / privacy}
+    Provider -->|Codex| Workspace[専用AGENTS.md / CONTEXT.md / restricted read roots]
+    Workspace --> Mapping{同じThread・モデル・権限・公開条件で直前Turnが成功?}
+    Mapping -->|はい| Resume[thread/resume / 履歴を二重送信しない]
+    Mapping -->|いいえ / rollout欠損| Start[thread/start / Core履歴で復元]
+    Resume --> Agent[公式App Server Loop / native Webは明示許可時のみ]
+    Start --> Agent
+    Provider -->|DeepSeek / LM Studio| Native[既存Native Loop]
+    Native --> Compact[初期5 Read + discover_tools / 小さなCapability一覧]
+    Agent --> Bridge[petit_read_tool / 小さなCapability一覧]
+    Compact --> Discovery{必要schemaの追加発見?}
+    Bridge --> Discovery
+    Discovery -->|はい| Schemas[その時点の許可済みRegistry schemaを取得 / 操作しない]
+    Schemas --> Continue[同じBrainで継続 / 別Routerなし]
+    Discovery -->|操作| Validate[実行直前の登録・公開条件・schema・risk・権限を検査]
+    Validate --> Effects[既存Approval / Effect Receipt / 保存結果]
+    Continue --> Provider
+    Effects --> Result[Coreへ結果保存 / 成功時のみ補助session対応保存]
+    Result --> Metrics[文字数・利用可能なusage・Call/Tool時間 / 未取得はunknown]
 ```
 
-# PETIT Runtime Flows
+SDK旧選択は停止して再選択が必要。guestはToolもNative Webも禁止。local_onlyは外部Readを公開せずCodexへ送信しない。
+未設定のGmail/Notion/ローカル開発Toolを除外するが、内部Task/予定/Reminder/Memoryは空データでも利用可能。
+Tool Discoveryは最大8名ずつ、完全schemaを返す。内部承認Toolとbackgroundキュー作成は公開しない。
+承認待ち・失敗・取消・権限変更では補助Threadを再利用せず、Core保存状態から復元する。
+AGENTSは認可境界ではなく、read-only sandbox・機能無効化・Core bridge検証が境界。モデルの個人情報を含む検索語を完全検出するDLPは未実装で、Webは既定OFF。
+
 
 ## v0.34.3: Sona Core / Linkraft撤去（#363）
 
@@ -84,7 +102,7 @@ flowchart TD
     Disabled --> Gate[Windows OS隔離とACP権限制御の実機検証後に別変更で解禁]
 ```
 
-initialize handshakeはモデル推論・認証成功・Google契約枠の使用を証明しない。ACP Agentが内部Toolを直接実行するため、PETITのPermission callbackだけではWindows上のファイル書込みやShellを遮断できない。OSレベルの隔離とPETIT既存Approval/Receiptへの正確な接続が完成するまで、会話Providerとしては公開しない。既存 `agy` CLI診断とAntigravity SDKは独立して維持する。
+initialize handshakeはモデル推論・認証成功・Google契約枠の使用を証明しない。ACP Agentが内部Toolを直接実行するため、PETITのPermission callbackだけではWindows上のファイル書込みやShellを遮断できない。OSレベルの隔離とPETIT既存Approval/Receiptへの正確な接続が完成するまで、会話Providerとしては公開しない。既存 `agy` CLI診断は維持する。Antigravity SDKは#368で撤去済み。
 
 ## v0.34.0: 初期設定・優先順位と単一Brain（#353）
 
@@ -105,10 +123,9 @@ flowchart TD
     Pin --> Backend{単一Runtimeの所有者}
     Backend -->|DeepSeek / LM Studio| Native[既存native Tool Loop]
     Backend -->|Codex| Codex[公式app-server Agent Loop]
-    Backend -->|Antigravity| SDK[公式SDK Agent Loop / Turn専用Worker]
+    Backend -->|旧SDK選択| Migrate[停止して明示再選択を案内]
     Native --> Gate[既存Registry / 公開catalog / schema / risk / cancel]
     Codex -->|dynamic PETIT Tool| Gate
-    SDK -->|Python PETIT bridge| Gate
     Gate -->|確認必須| Approval[SQLite承認とmessages / Runtime終了]
     Approval --> UI[既存確認UI / 再起動復元]
     UI -->|一度だけ承認消費| Execute[既存Domain Tool]
@@ -128,9 +145,7 @@ flowchart TD
     Save --> R
 ```
 
-管理UIのSDK bridgeはCoreのWrite承認/receiptも使う。従来`antigravity_sdk` profileは
-限定Read専用のまま。SDK内蔵Toolはfinishのみ、Codexのshell/apps/plugins/subagentは無効、
-許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
+SDKは撤去済み。Codexのshell/apps/plugins/subagentは無効、許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
 画像は既存Vision観測→Read専用回答で、画像Providerの順位Fallbackは未対応。
 8 rounds / 12 callsと取消/deadlineを維持し、local_onlyは外部へ送らない。
 

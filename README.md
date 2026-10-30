@@ -1,3 +1,5 @@
+v0.36.0開発版（#368）は、Codex専用Workspace・成功したThreadの継続・必要なToolだけの詳細取得を追加します。SDKは廃止し、旧設定は明示再選択が必要です。実モデルでの会話速度改善は未確認です。[設計・測定・残課題](docs/persistent-agent-workspace.md)。
+
 > #368: Antigravity SDKは廃止。旧SDKの説明・検証値は履歴です。現在の移行方法は [SDK撤去](docs/sdk-retirement.md)。
 
 # PETIT — Personal AI Assistant (MVP)

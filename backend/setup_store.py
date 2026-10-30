@@ -24,7 +24,7 @@ DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["codex", "d
             "antigravity_auth": "local", "antigravity_model": "", "antigravity_url": "http://127.0.0.1:1234/v1",
             "antigravity_acp_auth_last_success_utc": None, "antigravity_acp_install_path": "",
             "antigravity_acp_last_error": None,
-            "deepseek_model": "deepseek-flash", "codex_model": "", "google_redirect_uri": "",
+            "codex_web_search": "disabled", "deepseek_model": "deepseek-flash", "codex_model": "", "google_redirect_uri": "",
             "sync_notifications": True}
 
 

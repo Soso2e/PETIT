@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import time
 from typing import Any
 
 from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, request_context, time_context, tools
@@ -18,7 +19,7 @@ PUBLIC_TOOLS = {
     "get_local_development_status", "search_conversations", "list_project_workspaces",
     "link_project_workspace", "unlink_project_workspace", "find_projects",
     "get_reminders", "create_reminder", "manage_reminder", "search_brain_notes",
-    "search_notion", "gmail_search", "gmail_get_message",
+    "search_notion", "gmail_search", "gmail_get_message", "get_weather", "search_news",
 }
 LOCAL_WRITES = {
     "start_work_session", "update_work_session", "save_memory", "create_task",
@@ -67,8 +68,9 @@ def check_provider(thread: dict) -> dict:
 
 
 def schemas() -> list[dict]:
+    from .brain_catalog import available
     return [item for item in tools.openai_tools_schema()
-            if item["function"]["name"] in PUBLIC_TOOLS]
+            if item["function"]["name"] in PUBLIC_TOOLS and available(item)]
 
 
 def failed(raw: str) -> bool:
@@ -173,13 +175,23 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
     if target.get("provider") == "codex":
         from . import codex_brain
         return codex_brain.run(request_id, target, messages=messages, used_tools=used_tools)
-    catalog = schemas() if request_context.current_is_admin() else []
-    allowed = {item["function"]["name"] for item in catalog}
+    from .brain_catalog import Catalog, DISCOVER
+    from .provider_runtime import validate_arguments
+    catalog = Catalog()
+    # Restore requested detail schemas after Approval without a second router.
+    for prior in messages or []:
+        for call in prior.get("tool_calls", []):
+            if call.get("function", {}).get("name") == DISCOVER:
+                try:
+                    catalog.discover(call["function"].get("arguments", "{}"))
+                except ValueError:
+                    pass
     used = list(used_tools or [])
     if messages is None:
         payload = json.loads(row["input_json"])
         focus = dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:]
-        messages = [{"role": "system", "content": CORE_SYSTEM_PROMPT + voice_turn_instructions() + INSTRUCTIONS},
+        messages = [{"role": "system", "content": CORE_SYSTEM_PROMPT + voice_turn_instructions() + INSTRUCTIONS +
+                    "\n必要ならdiscover_toolsで詳細schemaを取得する。場所は確認済みの情報だけを使い、不明なら質問する。タイムゾーンから推定しない。\nCapability一覧: " + catalog.index()},
                     {"role": "user", "content": "Coreの現在時刻（参考メタデータ）: " +
                      time_context.current_datetime().isoformat(timespec="seconds")}]
         messages.extend(store.history(row["thread_id"]))
@@ -190,12 +202,28 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         if alert:
             messages.append({"role": "system", "content": "運用アラートはCoreが末尾に表示する。本文には重ねて書かない。未解決の事実: " + alert})
         messages.append({"role": "user", "content": payload["message"]})
+    from . import service_sync
+    with db.get_connection() as c:
+        store.event(c, row["thread_id"], request_id, "brain_context_metrics", {
+            "prompt_chars":len(CORE_SYSTEM_PROMPT + voice_turn_instructions() + INSTRUCTIONS),
+            "history_chars":sum(len(str(x.get("content") or "")) for x in store.history(row["thread_id"])),
+            "state_chars":len(store.encode(dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:])),
+            "index_chars":len(catalog.index()), "alerts_chars":len(service_sync.warning()), "tokens":None})
     for _round in range(MAX_ROUNDS):
         if store.load_turn(request_id)["cancel_requested"]:
             raise TurnCancelled("取消要求を受け付けました。すでに実行された操作は取り消していません。")
         check_provider(thread)
-        response = lmstudio_client.chat_completion(messages, tools=catalog or None, route="chat",
+        selected_schemas = catalog.schemas()
+        call_started = time.monotonic()
+        response = lmstudio_client.chat_completion(messages, tools=selected_schemas or None, route="chat",
                                                    max_tokens=1600, target_override=target)
+        with db.get_connection() as c:
+            metrics = lmstudio_client._turn_metrics.get() or {}
+            usage = (metrics.get("usage") or [None])[-1]
+            store.event(c, row["thread_id"], request_id, "brain_call_metrics", {"round":_round + 1,
+                "tool_schema_count":len(selected_schemas), "tool_schema_chars":len(store.encode(selected_schemas)),
+                "message_chars":sum(len(str(x.get("content") or "")) for x in messages),
+                "call_seconds":round(time.monotonic()-call_started, 4), "usage":usage})
         calls = response.get("tool_calls") or []
         if not calls:
             reply = str(response.get("content") or "").strip()
@@ -219,10 +247,19 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             if not isinstance(call_id, str) or not call_id:
                 raise lmstudio_client.LMStudioError("Tool call IDを取得できませんでした。")
             raw = None
+            tool_started = time.monotonic()
             try:
-                if name not in allowed:
-                    raise ValueError("tool_not_public")
-                arguments = tools.parse_arguments(name, call["function"].get("arguments", "{}"))
+                if name == DISCOVER:
+                    if len(used) >= MAX_CALLS:
+                        raise ValueError("tool_limit")
+                    raw = catalog.discover(call["function"].get("arguments", "{}"))
+                    used.append({"name": name, "arguments": call["function"].get("arguments", "{}")})
+                    messages.append({"role":"tool", "tool_call_id":call_id, "content":raw})
+                    continue
+                live = {x["function"]["name"]:x["function"] for x in catalog.full()}
+                if name not in live:
+                    raise ValueError("tool_not_public_or_unavailable")
+                arguments = tools.parse_arguments(name, validate_arguments(live[name]["parameters"], call["function"].get("arguments", "{}")))
                 if tools.requires_confirmation(name):
                     store.propose(request_id, call, arguments)
                     waiting = True
@@ -233,6 +270,9 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
                 used.append({"name": name, "arguments": store.encode(arguments)})
             except (ValueError, TypeError) as exc:
                 raw = store.encode({"error": str(exc)})
+            with db.get_connection() as c:
+                store.event(c, row["thread_id"], request_id, "brain_tool_metrics", {"tool":name if name in PUBLIC_TOOLS else "unknown",
+                    "seconds":round(time.monotonic()-tool_started,4), "failed":failed(raw)})
             messages.append({"role": "tool", "tool_call_id": call_id, "content": compact(raw, name)})
         store.save_messages(request_id, messages)
         if waiting:

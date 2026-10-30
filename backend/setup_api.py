@@ -223,6 +223,7 @@ class SettingsUpdate(BaseModel):
     antigravity_model: str | None = Field(default=None, max_length=200)
     antigravity_url: str | None = Field(default=None, max_length=500)
     deepseek_model: str | None = Field(default=None, max_length=200)
+    codex_web_search: Literal["disabled", "cached", "live"] | None = None
     codex_model: str | None = Field(default=None, max_length=200)
     sync_notifications: bool | None = None
 

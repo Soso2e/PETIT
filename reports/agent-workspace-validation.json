@@ -1,0 +1,50 @@
+{
+  "baseline_main": "3620ea1",
+  "synthetic_data_only": true,
+  "old_schema_count": 31,
+  "old_schema_chars": 15290,
+  "initial_schema_count": 6,
+  "initial_schema_chars": 3021,
+  "capability_index_chars": 766,
+  "cli_instructions_chars": 1086,
+  "cli_prompt_chars": 145,
+  "tokens": null,
+  "real_inference": null,
+  "conversation_p50_seconds": null,
+  "conversation_p95_seconds": null,
+  "tool_success_rate": null,
+  "cli_version": "codex-cli 0.130.0-alpha.5",
+  "protocol_modes": {
+    "disabled": {
+      "configured_without_query": true,
+      "agents_md_loaded": true,
+      "authenticated": false,
+      "inference": null
+    },
+    "cached": {
+      "configured_without_query": true,
+      "agents_md_loaded": true,
+      "authenticated": false,
+      "inference": null
+    },
+    "live": {
+      "configured_without_query": true,
+      "agents_md_loaded": true,
+      "authenticated": false,
+      "inference": null
+    }
+  },
+  "startup_to_thread_seconds": [
+    0.2156,
+    0.119,
+    0.172
+  ],
+  "startup_to_thread_median_seconds": 0.172,
+  "empty_thread_resume": "No model turn was sent; persistence of a completed conversation is unverified",
+  "limitations": [
+    "Characters are not tokenizer input tokens",
+    "CLI instruction characters exclude Workspace instructions and Codex default system prompt",
+    "Synthetic RPC tests are not authenticated inference",
+    "Native web query privacy and prompt injection acceptance remain open"
+  ]
+}

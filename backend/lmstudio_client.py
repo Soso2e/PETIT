@@ -107,6 +107,8 @@ def _record_usage(data: dict[str, Any], target: dict[str, Any]) -> None:
     for key in ("prompt_tokens", "completion_tokens", "total_tokens", "prompt_cache_hit_tokens", "prompt_cache_miss_tokens"):
         value = usage.get(key)
         entry[key] = value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+    thinking = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+    entry["reasoning_tokens"] = thinking if isinstance(thinking, int) and not isinstance(thinking, bool) and thinking >= 0 else None
     metrics.setdefault("usage", []).append(entry)
 
 

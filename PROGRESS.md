@@ -1,12 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.35.1**
+**Current Version: v0.36.0**
 
 **Last Updated: 2026-10-30 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #368 SDK撤去（実装済み・契約テスト確認）: SDK専用Brain/Worker/依存・導入スクリプトを撤去し、Codexが使う共通validator/Provider照合/プロセス停止をprovider_runtimeへ移動。旧SDK設定・秘密・DBを保持し再選択必須、新規接続禁止。78件成功、Thread Node5件・Chromium1440/390pxの設定/再起動受入成功（合成Provider）。Workspace/永続Thread/動的Tool公開/性能測定は後続。実Provider・配布端末は未確認。詳細はdocs/sdk-retirement.md。
+- #368 Workspace/Tool公開（実装済み・実モデル未確認）: Codexの専用AGENTS読込、Core DBへの補助Thread保存/resume/履歴重送防止、権限/モデル/途中失敗時の分離、欠損復元、Webの明示許可を実装。通常Brainへ天気/newsを公開、未設定サービスを除外し小さなindex/詳細schema発見へ変更。実CLI0.130.0-alpha.5で専用AGENTSと3検索mode設定受理を確認（未認証・推論/検索なし）。関連pytest93件・Thread Node5件・Chromium1440/390px成功（合成Provider）。合成31schema 15,290文字→初期6schema 3,021文字+index766文字。実応答p50/p95/枠/自然さはunknown。docs/persistent-agent-workspace.mdと測定report参照。
+
+- #368 SDK撤去（実装済み・契約テスト確認）: SDK専用Brain/Worker/依存・導入スクリプトを撤去し、Codexが使う共通validator/Provider照合/プロセス停止をprovider_runtimeへ移動。旧SDK設定・秘密・DBを保持し再選択必須、新規接続禁止。78件成功、Thread Node5件・Chromium1440/390pxの設定/再起動受入成功（合成Provider）。Workspace/永続Thread/動的Tool公開は別PRで実装（本節の#368 Workspace/Tool公開を参照）。実会話の性能比較は後続。実Provider・配布端末は未確認。詳細はdocs/sdk-retirement.md。
 
 - #366 セキュリティ/回帰修正（PR上で確認中）: 誤削除された petit-version.js の起動・遅延ロードを復旧。公開APIを /api/chat に限定し、ゲスト会話はHttpOnlyのpetit_guest Cookieから独立Threadを導出して管理者/他ゲストの履歴を分離。未認証SDK経路はTool全禁止、承認再開では管理者権限Contextを復元。DBをセッション真実源とし、プロセスを跨ぐログアウトを反映。既存テストの新しい認証境界への追従とゲストAPIアクセス拒否の回帰テストを追加。GitHub CI完了待ち、未ログインUIでの履歴/再取得・Discord等のサービス認証経路は実機受入が必要。
 
@@ -312,3 +314,5 @@
 | 2026-10-29 | 10:23 | #363 | v0.34.3: Sona Core/Linkraftの旧Adapter・実行分岐・依存・専用テストを撤去。Project Continuity、Notion/GitHub/BRAIN、予定/承認を保持し、既存SQLite行と旧Linkraftリンクは削除せずunsupported/skipped。新回帰追加、GitHub CIと実DB受入はPRで追跡。 |
 
 | 2026-10-30 | 08:32 | #368 | 2026-10-30-01: 実装済み・未確認: SDK撤去と旧設定の明示移行、Provider共通Core境界を追加。関連Python78件・Node5件・Chromium設定/再起動成功（合成Provider）。実Provider/配布端末未確認、Workspaceと会話性能は後続。 |
+
+| 2026-10-30 | 08:46 | #368 | 2026-10-30-02: 実装済み・未確認: Provider共通Workspace/補助session、Codex resume、動的Tool詳細取得、天気/news公開、usage/時間計測を追加。関連pytest93件・Node5件・Chromium1440/390px成功（合成Provider）。実CLIの専用AGENTS読込と検索mode設定を確認。未認証のため実推論・会話速度/品質/検索/実端末は未確認。 |

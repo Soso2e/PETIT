@@ -24,7 +24,7 @@
         <button id="save-brain">AI設定を保存</button><p class="muted">Tool実行後の障害では、自動切替で処理を再実行せず、保存済み結果を保持します。</p>
       </section>
       <section class="card"><h2>Codex / ChatGPT</h2><p>サーバーの公式Codex CLIを使います。PETIT専用の認証を公式の資格情報ストアへ保存します。</p>
-        <label>モデル（空欄でCodexの既定）<input id="codex-model" maxlength="200"></label>
+        <label>モデル（空欄でCodexの既定）<input id="codex-model" maxlength="200"></label><label>CodexのWeb検索（外部検索を許可）<select id="codex-web-search"><option value="disabled">無効</option><option value="cached">許可：キャッシュ検索</option><option value="live">許可：ライブ検索</option></select></label><p class="muted">検索すると検索語が外部へ送信されます。私的情報を含む会話では無効にしてください。許可はOSのネットワーク権限とは別です。</p>
         <div class="actions"><button data-connect="codex">ChatGPTで認証</button><button id="codex-confirm">認証完了を確認</button><button data-test="codex">接続テスト</button><button data-disconnect="codex" class="quiet">切断</button></div>
         <p id="codex-code" role="status"></p><a id="codex-link" target="_blank" rel="noopener noreferrer" hidden>公式認証ページを開く</a>
       </section>

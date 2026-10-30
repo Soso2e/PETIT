@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 import json
-import shutil
 
 from . import setup_store as settings, conversation_store as store, db, lmstudio_client
 
@@ -20,8 +19,9 @@ def target(provider: str) -> dict:
         require_production_permission()
     data = settings.load()
     if provider == "codex":
+        from .codex_brain import executable
         return {"provider": "codex", "profile": "codex", "label": "Codex（ChatGPT）", "external": True,
-                "model": data["codex_model"], "base_url": "", "configured": bool(shutil.which("codex")), "api_key": ""}
+                "model": data["codex_model"], "base_url": "", "configured": bool(executable()), "api_key": ""}
     if provider == "antigravity":
         return {"provider": "antigravity_sdk", "profile": "antigravity", "label": "Antigravity SDK（廃止・再選択が必要）",
                 "configured": False, "model": data["antigravity_model"], "external": True, "base_url": "", "api_key": ""}
