@@ -1,10 +1,13 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.39.0**
+**Current Version: v0.40.0**
 
 **Last Updated: 2026-11-03 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #372 Coding Job Activity統合（v0.40.0）: coding_jobsの状態を機密本文なしの認証済みGET /api/coding/activityで表示し、Development HubのActivityへ通常jobsと並列表示。未初期化の場合はテーブル/DBバックアップを生成しない。作成・承認・キャンセル・完了は既存Coding UIのまま。実行中はDB記録でありプロセス生存保証なし。永続Job復旧・実端末受入・実Codex推論は未検証。
+
 
 - #362 / #225 CLI Brain・Coding Job統合（v0.39.0、実機会話の利用者確認あり）: PR #371のAntigravity CLI専用Brain、モデル一覧、CLI-only接続、承認付きCoding Job、開発タスク画面を最新mainのDevelopment Hub/Activityと統合。公式agyの推論1件、旧PR CI7件を確認。CLI規約の適用範囲、実Codex推論、開発Jobの実行品質、配布端末のUI、再起動復旧は未確認。Coding Jobは既存jobs Activityとは別正本であり統合表示は今後の課題。ユーザーの会話性能テストは変更しない。
 
@@ -329,3 +332,4 @@
 | 2026-10-29 | 10:52 | #359 | 2026-10-29-05: CodexのPATH非依存検出をWindows標準launcher対応の堅牢resolverへ修正。 |
 | 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの画一エラーを特定reason別の説明・Turn保存へ変更。 |
 | 2026-10-29 | 10:59 | #362 | 2026-10-29-07: Codex/Antigravity CLIの候補モデル一覧取得・選択・保存UIを追加。 |
+| 2026-11-03 | 06:39 | #372 | v0.40.0: Coding Jobの管理者read-only Activity状態一覧を既存Development Hubへ接続。非機密のID/status/provider/時刻のみ投影、Coding Job未初期化時の副作用なし。実機・再起動回復は未確認。 |

@@ -1,5 +1,20 @@
 # PETIT Runtime Flows
 
+## #372: Coding Job Activity read-only integration (v0.40.0)
+
+```mermaid
+flowchart LR
+    CodingWorker[CLI開発Worker / 既存承認] --> CodingDB[(SQLite coding_jobs)]
+    CodingDB --> Projection[activity_summary / 項目限定]
+    Projection --> Admin[認証済み GET /api/coding/activity]
+    Admin --> Dev[Development Hub / Coding Activity]
+    Dev --> Detail[既存development.htmlで詳細・承認・差分]
+    CodingDB -->|未初期化| Empty[空表示 / DB schemaは作らない]
+    BackgroundDB[(SQLite jobs)] --> OldActivity[従来のBackground Activity]
+```
+
+このAPIと画面はread-only。Coding Jobの作成・承認・取消・実行・状態更新の所有者は既存Coding Core。目的文・ローカルパス・生成差分・エラー本文をActivityへ公開しない。runningはDB記録でありプロセス生存を保証しない。未初期化でもbackup/Jobを新規作成しない。
+
 ## Antigravity CLI Brainと開発タスク（#362 / #225）
 
 2026-10-29の利用者の明示依頼により、CLI準備段階の一律拒否をSettingsの明示接続へ変更した。環境変数や旧model-routingからは有効化せず、SDK/ACPと別Providerとして表示する。

@@ -69,6 +69,10 @@ v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeを
 
 AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
 
+## Coding Job Activity（v0.40.0）
+
+Development Hubには、一般のバックグラウンドJobに加え、Codex／Antigravity CLIへ委譲したCoding Jobの保存済み状態も表示されます。開発の詳細確認・承認・差分レビューは引き続き [開発タスク画面](/static/development.html) で行います。GET /api/coding/activity?limit=30 は管理者認証が必要で、ID・Task ID・Provider・状態・時刻だけを返します。秘密の目的文・リポジトリパス・生成差分・エラー本文はActivityには含みません。未初期化の場合は空の状態を返し、アクセスだけでDBバックアップを作りません。Coding Jobの状態は永続記録で、稼働中プロセス・再起動後の自動再開を保証しません。
+
 ## Activity（v0.38.0・ジョブ状態の確認）
 
 Development Hubに、PETITの既存SQLite Job（background_research / agent_followup）の実行待ち・実行中記録・完了・失敗の一覧を追加しました。管理者認証後、Dev画面の「ジョブ状態を更新」で結果を取得できます。APIは GET /api/activity/jobs?limit=30。最大100件で、入力本文・出力本文・エラー本文を返さず、通知の既読/ACKも変更しません。runningはDB上の状態であり実プロセス生存の保証ではありません。PR #371のCoding Jobs、長時間処理の自動復旧・lease・通知連携は未統合です。

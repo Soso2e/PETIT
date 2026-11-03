@@ -117,6 +117,7 @@
     loadScript("/static/development-hub.js", "development-hub-script");
     loadStylesheet("/static/activity-jobs.css", "activity-jobs-style");
     loadScript("/static/activity-jobs.js", "activity-jobs-script");
+    loadScript("/static/coding-activity.js", "coding-activity-script");
     if (!document.querySelector('[data-view-panel="universe"]')) return;
     loadStylesheet("/static/life-map.css", "life-map-style");
     loadStylesheet("/static/life-transition.css", "life-transition-style");

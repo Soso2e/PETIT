@@ -57,6 +57,7 @@ const SHELL = [
   "/static/development.css",
   "/static/activity-jobs.js",
   "/static/activity-jobs.css",
+  "/static/coding-activity.js",
   "/static/univ-space.js",
   "/static/universe-render-scheduler.js",
   "/static/univ-detail-children.js",
