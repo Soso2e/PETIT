@@ -7,11 +7,14 @@ ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
 
 
-class ThreeAreaAppShellTests(unittest.TestCase):
-    def test_app_shell_defines_three_primary_areas(self):
+class FourAreaAppShellTests(unittest.TestCase):
+    def test_app_shell_defines_chat_first_four_primary_areas(self):
         source = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")
-        for label in ('label: "Univ"', 'label: "Tasks"', 'label: "PETIT"'):
+        self.assertIn('const HOME_VIEW = "chat"', source)
+        for label in ('label: "Chat"', 'label: "Univ"', 'label: "Develop"', 'label: "Dashboard"'):
             self.assertIn(label, source)
+        self.assertEqual(source.count('{ view: "'), 4)
+        self.assertIn('data-shell-target="tasks"', source)
         self.assertNotIn('label: "Home"', source)
         self.assertNotIn('label: "Focus"', source)
         self.assertNotIn('textContent = "More"', source)
@@ -25,16 +28,19 @@ class ThreeAreaAppShellTests(unittest.TestCase):
         self.assertNotIn("target.click()", source)
         self.assertNotIn("clickPanelTrigger", source)
 
-    def test_mobile_navigation_uses_top_right_icon_tabs(self):
+    def test_mobile_navigation_uses_bottom_four_tabs(self):
         source = (FRONTEND / "petit-corner-shell.js").read_text(encoding="utf-8")
         style = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
         self.assertIn('planet:', source)
-        self.assertIn('check:', source)
+        self.assertIn('code:', source)
         self.assertIn('chat:', source)
+        self.assertIn('development: { label: "Develop"', source)
+        self.assertIn('stats: { label: "Dashboard"', source)
         self.assertIn('.view-tabs.petit-corner-nav', style)
-        self.assertIn('top: var(--petit-corner-top)', style)
+        self.assertIn('grid-template-columns: repeat(4, minmax(0, 1fr))', style)
+        self.assertIn('inset: auto max(8px, env(safe-area-inset-right))', style)
         self.assertIn('.petit-corner-nav__label', style)
-        self.assertIn('env(safe-area-inset-top)', style)
+        self.assertIn('env(safe-area-inset-bottom)', style)
 
     def test_desktop_uses_adaptive_workspace_rail(self):
         source = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
