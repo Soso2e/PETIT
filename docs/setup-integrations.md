@@ -24,8 +24,15 @@
 
 ## AIと単一Turn
 
+- CodexとAntigravity CLIは「モデル一覧を取得」→選択→「このモデル設定を保存」に対応する。公式`model/list`と`agy models`を使用し、空欄はCLIの既定、入力欄でIDの直接指定もできる。一覧はcatalogであり認証・契約枠・実推論の成功を証明しない。保存後の接続テストで実応答を確認する。モデル指定はPETIT側だけに保存し、CLI本体の既定設定を書き換えない。
+- **CLI中心の運用（#359 / #362）**: 「Brainの接続方式」を「CLIのみ」にし、Codexを認証またはAntigravity CLIを明示接続して「この優先順位を会話で使う」をONにして保存する。SDK/APIの既存順位・接続・キーは保存したまま、会話の選択候補から除外する。CLI障害時もSDK/APIへ自動切替しない。既存設定は`mixed`として引き継ぐため、利用者が明示して変更する。OFF時は従来のProvider選択を使用する。
+- 接続経路は`端末 → Tailscale → PETIT Core → 同じホストのCodex CLI（stdio）`。Tailscale自体が推論先やCLI認証を提供するわけではない。CLI用のネットワークport公開は不要。「CLI導入・認証状態を確認」は推論しない。`account/read`が成功してもモデル利用可否は未確認で、「接続テスト」の完了が必要。権限エラー時はCore実行ユーザーと`PETIT_SETTINGS_DIR`のアクセス権を確認し、既存暗号化設定を削除・再作成しない。
+- CodexのTool要求は既存Core bridgeでschema/risk/承認を検査し、結果とreceiptをSQLiteへ保存する。同一外部call IDの再送は同じ応答を返し、異なる引数なら拒否する。承認後は保存済みTool結果と履歴でCodexを再開する。Codex固有のShell/ファイル編集は許可していない。CLIのみの画像付き会話はVision/API実行前に拒否する（未対応）。
 - **Codex**: [公式app-server](https://learn.chatgpt.com/docs/app-server)をstdioで使用。PETIT専用`CODEX_HOME`と公式keyring、ChatGPT device-code認証。利用者の既存Codexトークンを読み出して流用しない。`account/read`と公式Thread/dynamic Toolのプロトコルを使う。ChatGPT認証以外のAPIキーアカウントでは推論しない。
-- **Antigravity**: [公式FAQ](https://antigravity.google/docs/faq)により個人CLIラップを採用しない。[公式SDK](https://antigravity.google/docs/sdk/overview)0.1.22を再利用。loopback LM Studioか、明示許可したGemini APIで推論する。SDKの内蔵Toolはfinishだけに限定する。今回の管理UIで選ぶSDKはCoreの公開Toolをbridgeし、schema/risk/承認/receiptはPETITが管理する。従来`antigravity_sdk` profileのRead専用契約はそのまま。
+- Codexの導入検出・Brain選択・起動は同じresolverを使用する。PATHにないWindowsでは`%LOCALAPPDATA%\OpenAI\Codex\bin\codex.exe`の公式launcherを確認する。別配置はサーバーの`.env`に`PETIT_CODEX_EXECUTABLE`で実在する絶対パスを指定して再起動する。明示パスが無効なら別CLIへ黙って切り替えない。導入検出とChatGPT認証・実推論は別である。
+- **Antigravity CLI**: #362で利用者の明示依頼により追加。公式CLIのheadless/NDJSONをfinish専用Agentで使い、構造化された返答とPETIT Tool要求を既存Core Loopへ返す。ログインは公式CLIが管理しPETITはtokenを読まない。個人契約の第三者アプリ内利用は[公式FAQ](https://antigravity.google/docs/faq)で非サポートのままであり、利用者の選択をGoogleの許諾取得とは扱わない。モデル/契約枠/overageはCLI管理で、取得できない値はunknown。接続ボタンは設定を保存するだけで、実推論の証明は接続テストで行う。
+- 接続テストは専用Thread/Turnを作り「Toolを呼ばず、接続しました、とだけ返答」と依頼し、通常Brain経路でCLIの起動・推論・イベント/返答JSON検証・Core保存まで確認する。CLIは1回90秒制限。CLI単体の成功とPETITまでの成功は異なる。失敗時は固定のreasonコードと説明をAPI/Turnへ保存し、認証・利用枠・timeout・構造化JSON等を区別する。生のCLIログや秘密値は画面へ返さない。
+- **Antigravity SDK**: [公式SDK](https://antigravity.google/docs/sdk/overview)0.1.22を再利用。loopback LM Studioか、明示許可したGemini APIで推論する。SDKの内蔵Toolはfinishだけに限定する。管理UIで選ぶSDKはCoreの公開Toolをbridgeし、schema/risk/承認/receiptはPETITが管理する。従来`antigravity_sdk` profileのRead専用契約はそのまま。CLIとは別の推論先・費用・認証方式である。
 - **DeepSeek**: 既存OpenAI互換native Tool Loopを再利用。APIキーと費用/文脈送信許可が必要。
 - 各依頼の冒頭で優先順位を評価する。未接続・依存不足・未許可の候補を飛ばし、認証切れ/使用量上限/接続障害時に次へ進む。次Turnでは上位から再試行し、復旧後に戻る。
 - 同一Turnは既存claimとProvider pinを使用。各Runtimeを終了してから次の候補を起動する。Tool呼出し・承認・receipt・保存済みmessagesがある場合は、Loopを再起動するFallbackを禁止する。外部処理のunknownを再実行しない。**Tool実行後のProvider間継続は未対応**で、保存した結果を返し、利用者が次の依頼を送る。安全に途中Tool文脈を移植する拡張は別途受入が必要。
@@ -46,6 +53,8 @@
 ## 検証
 
 `python -m pytest tests/test_setup_integrations.py -q`で認証/暗号化/OAuth/Calendar delta/再起動相当のschedule/lease/通知/Brain fallback/Gmail契約を検証する。実サービスをMock成功で代替したという主張はしない。
+
+`tests/test_codex_brain.py`は合成app-server RPCでCodex会話/Read/Write承認・再開/receipt/再送/取消/終了/CLIのみの送信制限を検証する。旧`test_renaissance_core.py`を含めて実行する場合は、`PETIT_SETTINGS_DIR`も一時フォルダへ向け、本人の設定・認証を使わない。ブラウザ用`tests/setup_ui_server.py`も本番bootstrap tokenとACP配置を引き継がず隔離する。
 
 `node scripts/test-setup-ui.cjs`はPlaywright+Chromeの実HTTP/合成Providerで1440/390px、ウィザード、優先順位、再送、サーバー再起動後の設定/会話を検証する。`PETIT_SETUP_REAL_SDK=1`ではMockを外し、公式SDK+`petit-setup-probe`というLM Studioモデルを使う。`PETIT_TEST_PYTHON`で環境を指定する。証跡はGit管理外`storage/setup-e2e/`。
 
