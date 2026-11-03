@@ -45,6 +45,12 @@ def configure(payload: Repositories):
     return config()
 
 
+@router.get("/activity")
+def activity(limit: int = 30):
+    """Authenticated, read-only status list; never creates coding jobs."""
+    return jobs.activity_summary(limit)
+
+
 @router.get("/jobs")
 def listing():return {"jobs": jobs.list_jobs()}
 
