@@ -67,6 +67,12 @@ v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeを
 
 AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
 
+## Development Hub（v0.37.0・読み取り専用）
+
+PETITのメイン画面から **Dev** を選ぶと、許可済みのローカルGitリポジトリのブランチ・HEAD・未コミット変更数・コンフリクト数・直近コミット・Concept/PROGRESS/READMEの存在を確認できます。PCの既存観測キャッシュを表示するだけで、Git fetch・コマンド実行・ファイル編集・AI Coding Job作成は行いません。macOS/iPhone実機の表示確認は今後実施します。
+
+利用には PETIT_WORKSPACE_CONTEXT_ENABLED=1、PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1 と PETIT_WORKSPACE_CONTEXT_DIRS（明示許可するGitルート、最大8件）の設定が必要です。観測の鮮度が切れた場合は過去の情報を現在値とみなさず、状態を表示します。PC上のローカル追跡refの比較であり、GitHubの最新状態を保証しません。正式な開発ジョブ・Codexの稼働セッション管理は後続の開発項目です。詳細は [Runtime Flows](docs/runtime-flows.md) と [ローカル開発環境の読取](docs/local-development-insight.md)。
+
 ## ローカル開発状況の参照（#341 / 開発ブランチ）
 
 既存PC観測をOpt-inで拡張し、登録済みローカルGitリポジトリのHEAD・ブランチ・ahead/behind・直近コミットと、直下の`Concept.md`・`PROGRESS.md`・`README.md`を読み取り専用で参照します。PETITのDesktop・iPhone PWAからの会話でも、同じCoreの観測キャッシュを利用できます。文書記載は実装・動作検証を証明しません。Git fetchは行いません。

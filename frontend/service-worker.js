@@ -50,6 +50,8 @@ const SHELL = [
   "/static/task-flow.js",
   "/static/today.js",
   "/static/app_shell.js",
+  "/static/development-hub.js",
+  "/static/development-hub.css",
   "/static/univ-space.js",
   "/static/universe-render-scheduler.js",
   "/static/univ-detail-children.js",

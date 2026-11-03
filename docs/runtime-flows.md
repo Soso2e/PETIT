@@ -1,5 +1,19 @@
 # PETIT Runtime Flows
 
+## #372: Development Hub read-only projection (v0.37.0)
+
+```mermaid
+flowchart LR
+    Config[許可したGit root / opt-in] --> Observer[既存WorkspaceObserver]
+    Observer --> Cache[メモリ内Snapshot / freshness判定]
+    Cache --> API[認証済みGET /api/workspace-context]
+    API --> Dev[Development Hub / Desktop・PWA]
+    Dev --> Meta[ブランチ・HEAD・変更数・コミット・文書存在]
+    Cache --> Stale[未取得・期限切れは状態のみ / 現在値と偽装しない]
+```
+
+観測は既存Observerが行い、UIアクセスは保存済みsnapshotを読むだけ。Web/PWAからGitコマンド・任意ファイル取得・Worker起動を行うAPIは追加しない。ドキュメントのexcerpt/ファイルパスはDevelopment Hubに投影しない。認可は既存setup middlewareを共有する。#371のCoding Jobsには接続していない。
+
 ## #368: Workspace・永続Provider補助Thread・動的Tool公開
 
 ```mermaid
