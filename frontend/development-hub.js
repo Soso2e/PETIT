@@ -24,9 +24,15 @@
           upstream: typeof detail.upstream === "string" ? detail.upstream.slice(0, 120) : "",
           ahead: Number.isInteger(detail.upstream_ahead) ? detail.upstream_ahead : null,
           behind: Number.isInteger(detail.upstream_behind) ? detail.upstream_behind : null,
-          commits: Array.isArray(detail.recent_commits) ? detail.recent_commits.slice(0, 5) : [],
+          commits: Array.isArray(detail.recent_commits) ? detail.recent_commits.slice(0, 5).map((commit) => ({
+            sha: String(commit?.sha || "").slice(0, 20),
+            subject: String(commit?.subject || "").slice(0, 150),
+          })) : [],
           documents: Array.isArray(detail.documents) ? detail.documents.filter((d) =>
-            ["Concept.md", "PROGRESS.md", "README.md"].includes(d?.name)) : [],
+            ["Concept.md", "PROGRESS.md", "README.md"].includes(d?.name)).map((d) => ({
+              name: d.name, status: String(d.status || "unknown"),
+              modified_at: typeof d.modified_at === "string" ? d.modified_at : null,
+            })) : [],
           evidence: Boolean(item?.development),
         };
       });
