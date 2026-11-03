@@ -1,4 +1,4 @@
-"""Official CLI protocol preparation. Production inference is deliberately unavailable.
+"""Official CLI protocol and host-local detection.
 
 No credential files, SDK, model API, subprocess prompt runner or Tool dispatcher.
 Fixture replay is explicitly labelled mock and uses Core's existing Events only.
@@ -13,16 +13,19 @@ import shutil
 import time
 from uuid import UUID
 
-POLICY_REASON = "official_policy_conflict"
-POLICY_MESSAGE = "Antigravity CLIは公式FAQ・規約とフォーラム回答の矛盾が未解決のため、PETITからの本番接続を無効にしています。"
+POLICY_REASON = "explicit_connection_required"
+POLICY_MESSAGE = "Antigravity CLIは初期設定で明示的に接続してください。環境変数や旧Provider設定からは有効化しません。"
+POLICY_NOTICE = "個人契約CLIの第三者アプリ内利用は公式FAQで非サポートです。利用者の選択はGoogleの許諾取得を意味しません。"
 MAX_BYTES = 2_000_000
 MAX_EVENTS = 2000
 TOKEN_FIELDS = ("input_tokens", "output_tokens", "thinking_tokens", "cache_read_tokens", "total_tokens")
 
 
 def require_production_permission():
-    # No environment variable or UI toggle can overrule the unresolved policy.
-    raise ValueError(POLICY_MESSAGE)
+    from . import setup_store
+    data = setup_store.load()
+    if not data.get("antigravity_cli_enabled") or "antigravity_cli" not in data["connected"]:
+        raise ValueError(POLICY_MESSAGE)
 
 
 def executable() -> str | None:
@@ -38,9 +41,11 @@ def executable() -> str | None:
     return str(candidate) if candidate and candidate.is_file() else None
 
 
-def status() -> dict:
+def status(data: dict | None = None) -> dict:
+    enabled = bool(data and data.get("antigravity_cli_enabled") and "antigravity_cli" in data["connected"])
     return {"provider": "antigravity_cli", "installed": executable() is not None,
-            "production_enabled": False, "reason": POLICY_REASON, "message": POLICY_MESSAGE,
+            "production_enabled": enabled, "reason": None if enabled else POLICY_REASON, "message": POLICY_NOTICE,
+            "officially_supported": False, "transport": "cli",
             "authentication": "unknown", "model": "unknown", "quota_remaining": "unknown",
             "version": "unknown", "tested": False,
             "guide": "https://www.antigravity.google/docs/getting-started/"}

@@ -1,6 +1,16 @@
 # Antigravity CLIと既存契約枠（#355 / #349）
 
-## 現在の状態
+## 2026-10-29の明示接続実装（#362、開発ブランチ）
+
+利用者が非サポートの説明を受けた上で実装を明示依頼したため、Settingsで接続する選択式CLI Brainを追加した。これはGoogleによる許諾取得・規約適合の証明ではない。以下の#355段階の本番無効化記録は過去の判断として残す。
+
+`backend/antigravity_cli_brain.py`は毎回空workspaceにfinish専用Agentを作り、公式agyへstdin NDJSONで文脈を渡す。CLIは返答またはPETIT Tool要求のJSONを返し、既存Core Loopがschema/risk/承認/receipt/再送を管理する。環境変数だけで有効にせず、SDK/ACPと別Providerとして扱う。APIキー/Coreの秘密値を子へ渡さず、認証tokenを抽出しない。cancel/timeout/出力上限/設定変更で所有CLIを止め、Windows Jobでその子processも終了する。
+
+Settingsの「CLIへ接続・優先順位の先頭へ」→「接続テスト」→「CLIのみ」＋順位の会話利用ONを保存する。会話用モデルと開発Jobの実行CLIは独立して選べる。開発は[開発タスク設計](coding-tasks.md)を参照。
+
+`scripts/smoke_antigravity_cli_brain.py --live --coding --output reports/antigravity-cli-brain-live.json`は本人の既存CLI認証で、合成DB/合成Gitのみを使用する。実CLIの会話・Read Tool・予定承認/再開/再送・コード変更・静的checkと元repository不変を確認した。実Codex推論、実プロジェクトの機能テスト、実WEVORA、iPhone/配布Desktop/Cloudは未確認。契約枠の由来・quota消費はunknownのまま。
+
+## #355の直接検証段階の記録
 
 目的は **PETIT → 未改変の公式agy → 本人のGoogleログイン → 既存Antigravity契約枠**。
 SDK+LM Studio、SDK+Gemini API、Gemini API単独はこの目的の達成に含めない。

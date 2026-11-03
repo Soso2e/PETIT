@@ -1,0 +1,29 @@
+{
+  "cli_version": "codex-cli 0.165.0-alpha.1.2",
+  "initialize": true,
+  "dynamic_tool_registration": true,
+  "authenticated_in_temporary_home": false,
+  "inference": "not_run_no_auth",
+  "live_tool_execution": "not_verified",
+  "production_settings_access": "permission_denied",
+  "tailscale_device_acceptance": "not_verified",
+  "evidence": "real_cli_protocol_only",
+  "owned_process_exited": true,
+  "checked_at_utc": "2026-10-29T09:51:16.365117+00:00",
+  "issue": 359,
+  "automated_validation": {
+    "pytest_passed": 90,
+    "pytest_warnings": 2,
+    "pytest_settings": "isolated temporary directory",
+    "browser_provider": "synthetic",
+    "browser_widths": [
+      1440,
+      390
+    ],
+    "browser_cli_only_save": true,
+    "browser_restart_settings_and_conversation": true,
+    "node_syntax": true,
+    "compileall": true
+  },
+  "live_inference_pending": "PETIT専用の本人ChatGPT認証と接続テスト待ち"
+}

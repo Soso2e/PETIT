@@ -1,0 +1,113 @@
+{
+  "evidence": "real_cli_synthetic_data",
+  "status": "completed",
+  "subscription_quota_used": "unknown",
+  "checks": [
+    {
+      "name": "chat",
+      "ok": true,
+      "error": null
+    },
+    {
+      "name": "read_tool",
+      "ok": true,
+      "error": null
+    },
+    {
+      "name": "approval_before_write",
+      "ok": true,
+      "error": null
+    },
+    {
+      "name": "approval_resume_and_replay",
+      "ok": true,
+      "error": null
+    },
+    {
+      "name": "real_cli_coding_job",
+      "ok": true,
+      "status": "ready_for_review",
+      "original_unchanged": true,
+      "static_checks": {
+        "ok": true,
+        "static": [
+          {
+            "path": "answer.py",
+            "ok": true,
+            "kind": "python_syntax"
+          },
+          {
+            "kind": "diff_whitespace",
+            "ok": true
+          }
+        ],
+        "tests": "not_run",
+        "host": "not_verified"
+      },
+      "error": null
+    }
+  ],
+  "usage": [
+    {
+      "cache_read_tokens": 0,
+      "input_tokens": 9725,
+      "output_tokens": 793,
+      "thinking_tokens": 764,
+      "total_tokens": 10518
+    },
+    {
+      "cache_read_tokens": 0,
+      "input_tokens": 9787,
+      "output_tokens": 791,
+      "thinking_tokens": 768,
+      "total_tokens": 10578
+    },
+    {
+      "cache_read_tokens": 0,
+      "input_tokens": 9996,
+      "output_tokens": 1320,
+      "thinking_tokens": 1280,
+      "total_tokens": 11316
+    },
+    {
+      "cache_read_tokens": 0,
+      "input_tokens": 9872,
+      "output_tokens": 1058,
+      "thinking_tokens": 1001,
+      "total_tokens": 10930
+    },
+    {
+      "cache_read_tokens": 0,
+      "input_tokens": 10105,
+      "output_tokens": 1176,
+      "thinking_tokens": 1134,
+      "total_tokens": 11281
+    }
+  ],
+  "production_db_used": false,
+  "real_service_acceptance": "not_verified",
+  "codex_live_acceptance": "not_verified",
+  "checked_at_utc": "2026-10-29T10:44:46.877835+00:00",
+  "issues": [
+    362,
+    225
+  ],
+  "automated_validation": {
+    "pytest_passed": 143,
+    "warnings": 2,
+    "settings_and_db": "temporary isolated fixtures",
+    "browser_widths": [
+      1440,
+      390
+    ],
+    "setup_connect_disconnect": true,
+    "coding_web_approval_diff_reload_review": true,
+    "windows_child_cleanup": true,
+    "additional_private_thread_regression_passed": 1
+  },
+  "remaining": [
+    "Codex本人認証での実推論・開発タスク",
+    "本人repositoryの機能テストとレビュー",
+    "実iPhone/Tailscale/配布Desktop/Cloud受入"
+  ]
+}

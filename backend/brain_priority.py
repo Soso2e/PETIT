@@ -13,11 +13,13 @@ def enabled() -> bool:
     return settings.load()["brain_enabled"]
 
 
-def target(provider: str) -> dict:
+def target(provider: str, data: dict | None = None) -> dict:
+    data = settings.load() if data is None else data
     if provider == "antigravity_cli":
-        from .antigravity_cli import require_production_permission
-        require_production_permission()
-    data = settings.load()
+        from .antigravity_cli import executable
+        return {"provider": "antigravity_cli", "profile": "antigravity_cli", "label": "Antigravity CLI", "external": True,
+                "model": data["antigravity_cli_model"], "base_url": "", "api_key": "", "timeout_seconds": 90,
+                "configured": bool(executable())}
     if provider == "codex":
         from .codex_brain import executable
         return {"provider": "codex", "profile": "codex", "label": "Codex（ChatGPT）", "external": True,
@@ -34,6 +36,10 @@ def target(provider: str) -> dict:
 
 
 def permitted(provider: str, data: dict, privacy="standard") -> bool:
+    if data.get("brain_transport") == "cli_only" and provider not in {"codex", "antigravity_cli"}:
+        return False
+    if provider == "antigravity_cli" and not data.get("antigravity_cli_enabled"):
+        return False
     if provider == "antigravity" or provider not in data["connected"]:
         return False
     paid = provider == "deepseek" or (provider == "antigravity" and data["antigravity_auth"] != "local")
@@ -64,10 +70,6 @@ def diagnostic(request_id, provider, state, reason=None):
 
 def run(request_id, execute, *, messages=None, used_tools=None):
     data = settings.load()
-    if "antigravity_cli" in data["priority"]:
-        from .antigravity_cli import POLICY_MESSAGE
-        # A blocked explicit CLI selection must never silently become another AI.
-        raise lmstudio_client.LMStudioError(POLICY_MESSAGE)
     if any(x in data["connected"] for x in ("antigravity", "antigravity_sdk")) and "antigravity" in data["priority"]:
         from .provider_runtime import RETIRED_SDK_MESSAGE
         raise lmstudio_client.LMStudioError(RETIRED_SDK_MESSAGE)
@@ -112,6 +114,8 @@ def run(request_id, execute, *, messages=None, used_tools=None):
                 c.execute("UPDATE turns SET provider_key=NULL WHERE request_id=?", (request_id,))
         finally:
             _active.reset(token)
+    if data.get("brain_transport") == "cli_only":
+        raise lmstudio_client.LMStudioError("利用可能なCLI Brainがありません。CLIの導入・公式ログイン・接続テストを確認してください。CLIのみの設定ではSDK/APIへ切り替えません。")
     raise lmstudio_client.LMStudioError("利用可能なAIがありません。設定で認証・モデル・費用許可を確認してください。")
 
 
@@ -121,6 +125,7 @@ def public_status():
     for provider in data["priority"]:
         item = target(provider)
         options.append({"id": provider, "configured": item["configured"], "model": item["model"],
+                        "transport": "cli" if provider in {"codex", "antigravity_cli"} else "sdk" if provider == "antigravity" else "api",
                         "connected": provider in data["connected"], "permitted": permitted(provider, data)})
     with db.get_connection() as c:
         exists = c.execute("SELECT 1 FROM sqlite_master WHERE name='turn_events'").fetchone()

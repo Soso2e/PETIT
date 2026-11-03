@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from . import (
     attachments,
     setup_api,
+    coding_api,
     vision,
     chat,
     conversation_api,
@@ -32,6 +33,7 @@ def build_modules() -> tuple[ModuleDefinition, ...]:
         ModuleDefinition(id="builtin-tools", registrars=(tools.register_builtin_tools,)),
         ModuleDefinition(id="health", routers=(health.router,)),
         ModuleDefinition(id="setup", routers=(setup_api.router,), registrars=(setup_api.install,)),
+        ModuleDefinition(id="coding-jobs", routers=(coding_api.router,)),
         ModuleDefinition(id="conversations", routers=(conversation_api.router,)),
         ModuleDefinition(id="model-routing", routers=(model_routing_api.router,)),
         ModuleDefinition(id="attachments", routers=(attachments.router,)),
