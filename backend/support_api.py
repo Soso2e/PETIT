@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
 
 from . import briefing, calendar_sync, db, proactive, request_context, scheduler, vault_indexer
@@ -64,6 +64,21 @@ def conversations(limit: int = 20, session_id: str | None = None) -> dict[str, A
 def jobs(limit: int = 10, session_id: str | None = None) -> dict[str, Any]:
     """Read completed jobs without mutating delivery state."""
     return {"jobs": db.undelivered_jobs(limit=limit, session_id=(session_id or "").strip() or None)}
+
+
+@router.get("/api/activity/jobs")
+def activity_jobs(response: Response, limit: int = 30) -> dict[str, Any]:
+    """Show durable SQLite Job states without consuming delivery receipts.
+
+    The shared setup middleware requires an authenticated administrator for
+    every nonpublic /api endpoint, including this one.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    items = db.list_job_activity(limit)
+    counts = {status: sum(row["status"] == status for row in items)
+              for status in ("queued", "running", "done", "failed")}
+    return {"jobs": items, "counts": counts, "scope": "recent_jobs",
+            "running_is_persisted_state": True, "coding_jobs_included": False}
 
 
 @router.post("/api/jobs/ack")
