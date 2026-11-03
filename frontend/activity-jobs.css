@@ -39,6 +39,12 @@
 .development-activity__status[data-status="done"] { color: #9ae5ca; background: rgba(98,202,169,.12); }
 .development-activity__status[data-status="failed"] { color: #ffd3a4; background: rgba(244,169,98,.14); }
 .development-activity__status[data-status="running"] { color: #b7d5ff; background: rgba(98,145,220,.15); }
+.development-activity__link { display: inline-block; margin-top: 4px; color: #b7d5ff; text-decoration: underline; text-underline-offset: 3px; }
+.development-activity__status[data-status="ready_for_review"],
+.development-activity__status[data-status="completed"] { color: #9ae5ca; background: rgba(98,202,169,.12); }
+.development-activity__status[data-status="checks_failed"],
+.development-activity__status[data-status="interrupted"] { color: #ffd3a4; background: rgba(244,169,98,.14); }
+.development-activity__status[data-status="proposed"] { color: #b7d5ff; background: rgba(98,145,220,.15); }
 @media (max-width: 520px) {
   .development-activity__item { align-items: start; flex-direction: column; }
 }
