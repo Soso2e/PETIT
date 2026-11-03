@@ -1,0 +1,125 @@
+// Activity: read-only projection of PETIT's existing SQLite jobs.
+// Does not submit, retry, cancel or acknowledge any job.
+(() => {
+  "use strict";
+  const summarize = (payload) => {
+    const allowed = new Set(["queued", "running", "done", "failed"]);
+    const jobs = (Array.isArray(payload?.jobs) ? payload.jobs : []).slice(0, 100).map((item) => ({
+      id: Number.isSafeInteger(item?.id) ? item.id : 0,
+      type: String(item?.type || "unknown").slice(0, 80),
+      status: allowed.has(item?.status) ? item.status : "unknown",
+      updatedAt: typeof item?.updated_at === "string" ? item.updated_at : null,
+      createdAt: typeof item?.created_at === "string" ? item.created_at : null,
+      delivered: Boolean(item?.delivered),
+    }));
+    return { jobs, counts: payload?.counts || {}, excludesCoding: payload?.coding_jobs_included === false };
+  };
+  window.PetitActivityJobs = { summarize };
+  const panel = document.querySelector('[data-view-panel="development"]');
+  if (!panel) return;
+  const section = document.createElement("section");
+  section.className = "development-activity";
+  section.setAttribute("aria-labelledby", "development-activity-title");
+  const header = document.createElement("div");
+  header.className = "development-activity__header";
+  const title = document.createElement("h2");
+  title.id = "development-activity-title";
+  title.textContent = "Activity · バックグラウンド";
+  const refresh = document.createElement("button");
+  refresh.type = "button";
+  refresh.textContent = "ジョブ状態を更新";
+  header.append(title, refresh);
+  const state = document.createElement("p");
+  state.className = "development-state";
+  state.setAttribute("role", "status");
+  state.setAttribute("aria-live", "polite");
+  state.textContent = "未取得";
+  const list = document.createElement("ul");
+  list.className = "development-activity__list";
+  const note = document.createElement("p");
+  note.className = "development-note";
+  note.textContent = "既存SQLiteジョブの記録。実行中はDB上の状態で、プロセス稼働の保証ではありません。入力・結果本文は表示しません。Codex等のCoding Jobsは未統合です。";
+  section.append(header, state, list, note);
+  const firstNote = panel.querySelector(".development-note");
+  if (firstNote) firstNote.before(section);
+  else panel.append(section);
+
+  const statuses = {
+    queued: "実行待ち",
+    running: "実行中（DB記録）",
+    done: "完了",
+    failed: "失敗",
+    unknown: "状態不明",
+  };
+  const kinds = {
+    background_research: "情報調査",
+    agent_followup: "AIフォローアップ",
+  };
+  const dateLabel = (value) => {
+    const time = Date.parse(value || "");
+    return Number.isFinite(time) ? new Date(time).toLocaleString("ja-JP") : "時刻未確認";
+  };
+  const render = (payload) => {
+    const data = summarize(payload);
+    list.replaceChildren();
+    if (!data.jobs.length) {
+      const item = document.createElement("li");
+      item.className = "development-activity__empty";
+      item.textContent = "最近のバックグラウンドジョブはありません。";
+      list.append(item);
+      state.textContent = "0件";
+      return;
+    }
+    for (const job of data.jobs) {
+      const item = document.createElement("li");
+      item.className = "development-activity__item";
+      const main = document.createElement("div");
+      const heading = document.createElement("strong");
+      heading.textContent = (kinds[job.type] || job.type) + " · #" + job.id;
+      const sub = document.createElement("span");
+      sub.textContent = "更新 " + dateLabel(job.updatedAt || job.createdAt)
+        + (job.delivered ? " · 結果確認済" : "");
+      main.append(heading, sub);
+      const badge = document.createElement("span");
+      badge.className = "development-activity__status";
+      badge.dataset.status = job.status;
+      badge.textContent = statuses[job.status] || statuses.unknown;
+      item.append(main, badge);
+      list.append(item);
+    }
+    const n = data.jobs.length;
+    const active = data.jobs.filter((j) => j.status === "queued" || j.status === "running").length;
+    state.textContent = "最近 " + n + "件 · 待機/実行中 " + active + "件"
+      + (data.excludesCoding ? " · Coding Jobs未統合" : "");
+  };
+
+  let loading = false;
+  let loadedAt = 0;
+  const load = async (force = false) => {
+    if (loading || (!force && Date.now() - loadedAt < 30000)) return;
+    loading = true;
+    refresh.disabled = true;
+    state.textContent = "状態を更新中…";
+    try {
+      const response = await fetch("/api/activity/jobs?limit=30", {
+        credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) throw new Error(response.status === 401
+        ? "管理者ログインが必要です。" : "Activity取得失敗（HTTP " + response.status + "）");
+      render(await response.json());
+      loadedAt = Date.now();
+    } catch (error) {
+      state.textContent = error.message || "Activityを取得できません。";
+    } finally {
+      refresh.disabled = false;
+      loading = false;
+    }
+  };
+
+  refresh.addEventListener("click", () => void load(true));
+  window.addEventListener("petit:area-change", (event) => {
+    if (event.detail?.area === "development") void load();
+  });
+  window.PetitActivityJobs.reload = () => load(true);
+  if (!panel.hidden) void load();
+})();
