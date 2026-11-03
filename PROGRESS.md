@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.36.0**
+**Current Version: v0.37.0**
 
-**Last Updated: 2026-10-30 UTC**
+**Last Updated: 2026-11-03 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #372 Development Hub read-only 初段（v0.37.0）: Chat/Tasks/Univの既存導線を壊さず、開発パネルをナビ・検索パレットに追加。明示許可したローカルGitの観測キャッシュからブランチ・HEAD・変更・直近コミット・文書の存在を表示し、stale/disabledを区別。ファイル本文・秘密・任意パス・Git fetchは扱わない。Node契約テスト追加。実Windows/iPhoneおよび実ローカルrepoでの表示は未検証。次は永続バックグラウンドJobとCodex等の開発セッションを結び、Activityへ進捗表示する。
 
 - #368 Workspace/Tool公開（実装済み・実モデル未確認）: Codexの専用AGENTS読込、Core DBへの補助Thread保存/resume/履歴重送防止、権限/モデル/途中失敗時の分離、別会話とのThread ID衝突拒否、欠損復元、Webの明示許可を実装。通常Brainへ天気/newsを公開、未設定サービスを除外し小さなindex/詳細schema発見へ変更。実CLI0.130.0-alpha.5で専用AGENTSと3検索mode設定受理を確認（未認証・推論/検索なし）。関連pytest95件・Thread Node5件・Chromium1440/390px成功（合成Provider）。合成31schema 15,290文字→初期6schema 3,021文字+index766文字。実応答p50/p95/枠/自然さはunknown。docs/persistent-agent-workspace.mdと測定report参照。
 
