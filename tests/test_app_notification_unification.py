@@ -34,11 +34,15 @@ class AppNotificationUnificationTests(unittest.TestCase):
         self.assertIn('/static/chat_input.js', html)
         self.assertNotIn('/static/chat_keyboard.js', html)
 
-    def test_universe_app_shell_has_univ_first_primary_navigation(self):
+    def test_app_shell_has_chat_first_four_primary_areas(self):
         source = (ROOT / "frontend" / "app_shell.js").read_text(encoding="utf-8")
-        self.assertIn('{ view: "univ", target: "universe", label: "Univ", title: "Universe"', source)
-        self.assertIn('{ view: "tasks", target: "tasks", label: "Tasks", title: "Tasks"', source)
-        self.assertIn('{ view: "chat", target: "chat", label: "PETIT", title: "PETIT"', source)
+        self.assertIn('const HOME_VIEW = "chat"', source)
+        self.assertIn('{ view: "chat", target: "chat", label: "Chat"', source)
+        self.assertIn('{ view: "univ", target: "universe", label: "Univ"', source)
+        self.assertIn('{ view: "development", target: "development", label: "Develop"', source)
+        self.assertIn('{ view: "stats", target: "today", label: "Dashboard"', source)
+        self.assertEqual(source.count('{ view: "'), 4)
+        self.assertIn('data-shell-target="tasks"', source)
         self.assertIn('reminders: "reminders"', source)
         self.assertIn('focus: "univ"', source)
 

@@ -3,7 +3,7 @@
 importScripts("/static/petit-version.js");
 
 const CACHE_NAME = `petit-shell-v${self.PETIT_ASSET_VERSION}-webgl1-voice2-motion1`;
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-polish1-rail1-context2-stats2-ux2-connections1-setup1`;
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-polish1-rail1-context2-stats2-ux2-connections1-setup1-chatfirst1-dashboard90`;
 const THREE_CDN_ORIGIN = "https://esm.sh";
 const THREE_CDN_PREFIX = "/three@0.185.1";
 
@@ -33,6 +33,7 @@ const SHELL = [
   "/static/task-flow.css",
   "/static/today.css",
   "/static/statistics.css",
+  "/static/dashboard-activity.css",
   "/static/reminders.css",
   "/static/petit-ui-system.css",
   "/static/petit-ui-polish.css",
@@ -49,6 +50,7 @@ const SHELL = [
   "/static/life-map.js",
   "/static/task-flow.js",
   "/static/today.js",
+  "/static/dashboard-activity.js",
   "/static/app_shell.js",
   "/static/development-hub.js",
   "/static/development-hub.css",

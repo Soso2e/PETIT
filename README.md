@@ -1,5 +1,10 @@
 v0.36.0開発版（#368）は、Codex専用Workspace・成功したThreadの継続・必要なToolだけの詳細取得を追加します。SDKは廃止し、旧設定は明示再選択が必要です。実モデルでの会話速度改善は未確認です。[設計・測定・残課題](docs/persistent-agent-workspace.md)。
 
+## PETIT UI v0.41.0 — Chat / Univ / Develop / Dashboard
+
+PETITはChatを初期画面にする4領域UIへ整理しました。UnivのThree.js惑星タスク表示とDevelopの既存CLI Coding Job機能は維持。Dashboardには、既存SQLite作業セッションから直近90日の活動カレンダー、直近7日/30日合計、活動日数を表示します。過去の日付を選ぶと当日のタスク・セッション・振り返りを確認できます。スマホでは下部4タブ、Electronのメイン画面も共通Web画面で同じ構成になります。DevelopのProject Thread直接連携、PCアプリ自動時間計測、実機配布確認は後続です。設計・受入条件: [Chat-first UI / Dashboard](docs/ui-chat-first-dashboard.md)。
+
+
 > #368: Antigravity SDKは廃止。旧SDKの説明・検証値は履歴です。現在の移行方法は [SDK撤去](docs/sdk-retirement.md)。
 
 # PETIT — Personal AI Assistant (MVP)

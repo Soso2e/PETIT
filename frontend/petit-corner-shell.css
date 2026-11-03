@@ -545,3 +545,58 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
     transition: none !important;
   }
 }
+
+/* Chat-first PETIT: accessible, fixed four-area navigation on phones. */
+@media (max-width: 959px) {
+  .universe-topbar .view-tabs.petit-corner-nav {
+    position: fixed;
+    inset: auto max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    width: auto;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: stretch;
+    min-height: 66px;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 20px;
+  }
+  .universe-topbar .view-tab.petit-corner-nav__item {
+    width: 100%;
+    min-width: 0;
+    min-height: 56px;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 5px 2px;
+  }
+  .petit-corner-nav__label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
+    overflow: visible;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .petit-corner-icon, .petit-corner-icon svg { width: 20px; height: 20px; }
+  .petit-utility-dock {
+    position: fixed;
+    inset: var(--petit-corner-top) var(--petit-corner-right) auto auto;
+    align-items: flex-start;
+  }
+  .petit-utility-menu {
+    left: auto;
+    right: 0;
+    bottom: auto;
+    top: calc(var(--petit-corner-control) + 10px);
+    transform-origin: right top;
+  }
+  .universe-main, .petit-univ-active .universe-main {
+    padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important;
+  }
+  .petit-univ-active #detail-panel {
+    bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+}

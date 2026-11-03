@@ -1,10 +1,13 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.40.0**
+**Current Version: v0.41.0**
 
 **Last Updated: 2026-11-03 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- v0.41.0 Chat-first UI/Dashboard: Chatを初期画面にし、Chat / Univ / Develop / Dashboardの4領域ナビに整理。スマホ下部4タブ、Desktopの共通画面にも適用。Dashboardは既存work_sessionsの90日集計APIで活動カレンダー・直近7日/30日・活動日数を追加。Three.jsと既存CLI Jobs、DB/承認機構は不変。Developの継続開発Thread/司令塔UIとDesktop二画面同期は後続。GitHub PRのJS/CIと実Win/iPhone受入は区別する。docs/ui-chat-first-dashboard.md参照。
+
 
 - #372 Coding Job Activity統合（v0.40.0）: coding_jobsの状態を機密本文なしの認証済みGET /api/coding/activityで表示し、Development HubのActivityへ通常jobsと並列表示。未初期化の場合はテーブル/DBバックアップを生成しない。作成・承認・キャンセル・完了は既存Coding UIのまま。実行中はDB記録でありプロセス生存保証なし。永続Job復旧・実端末受入・実Codex推論は未検証。
 

@@ -1,22 +1,22 @@
-// Shared PETIT application shell for the Univ-first UI.
+// Shared PETIT application shell with Chat-first navigation.
 (() => {
   if (window.PetitAppShell?.initialized) return;
-  const HOME_VIEW = "universe";
+  const HOME_VIEW = "chat";
   const ASSET_VERSION = window.PETIT_ASSET_VERSION || "0.14.1";
   const PRIMARY_VIEWS = [
-    { view: "univ", target: "universe", label: "Univ", title: "Universe", description: "タスク空間" },
-    { view: "tasks", target: "tasks", label: "Tasks", title: "Tasks", description: "やること" },
-    { view: "development", target: "development", label: "Dev", title: "Development", description: "ローカル開発状況" },
-    { view: "chat", target: "chat", label: "PETIT", title: "PETIT", description: "会話と相談" },
-    { view: "stats", target: "today", label: "統計", title: "統計", description: "頑張りと振り返り" },
+    { view: "chat", target: "chat", label: "Chat", title: "Chat", description: "PETITと会話" },
+    { view: "univ", target: "universe", label: "Univ", title: "Univ", description: "3Dタスク空間" },
+    { view: "development", target: "development", label: "Develop", title: "Develop", description: "AI開発タスク" },
+    { view: "stats", target: "today", label: "Dashboard", title: "Dashboard", description: "作業時間と活動記録" },
   ];
   const VIEW_ALIASES = {
-    home: "univ",
+    home: "chat",
     focus: "univ",
     universe: "univ",
     projects: "univ",
     petit: "chat",
     today: "stats",
+    dashboard: "stats",
     reminders: "reminders",
     dev: "development",
   };
@@ -113,6 +113,8 @@
 
   const installUniverseModules = () => {
     loadStylesheet("/static/today.css", "today-style");
+    loadStylesheet("/static/dashboard-activity.css", "dashboard-activity-style");
+    loadScript("/static/dashboard-activity.js", "dashboard-activity-script");
     loadStylesheet("/static/development-hub.css", "development-hub-style");
     loadScript("/static/development-hub.js", "development-hub-script");
     loadStylesheet("/static/activity-jobs.css", "activity-jobs-style");
@@ -136,10 +138,9 @@
       Array.from(nav.querySelectorAll("[data-view]")).map((button) => [button.dataset.view, button]),
     );
     const source = {
-      univ: buttons.get("universe") || buttons.get("today"),
-      tasks: buttons.get("tasks"),
-      development: buttons.get("development"),
       chat: buttons.get("chat"),
+      univ: buttons.get("universe") || buttons.get("focus"),
+      development: buttons.get("development"),
       stats: buttons.get("today"),
     };
 
@@ -176,8 +177,8 @@
 
     const brand = document.createElement("a");
     brand.className = "petit-area-rail__brand";
-    brand.href = "/?view=univ";
-    brand.setAttribute("aria-label", "PETITのUnivを開く");
+    brand.href = "/?view=chat";
+    brand.setAttribute("aria-label", "PETITのChatを開く");
     brand.innerHTML = '<img src="/static/branding/icon_logo.png" alt=""><span><strong>PETIT</strong><small>LOCAL WORKSPACE</small></span>';
     header.appendChild(brand);
     const pin = document.createElement("button");
@@ -239,6 +240,7 @@
     shortcuts.className = "petit-area-rail__shortcuts";
     shortcuts.innerHTML = `
       <span class="petit-area-rail__section-label">UTILITY</span>
+      <button type="button" data-shell-target="tasks" aria-label="Tasks：タスク一覧" title="Tasks"><span class="petit-area-rail__monogram" aria-hidden="true">T</span><span class="petit-area-rail__utility-label"><span>Tasks</span><small>タスク一覧</small></span></button>
       <button type="button" data-shell-target="reminders" aria-label="Reminders：通知と履歴" title="Reminders"><span class="petit-area-rail__monogram" aria-hidden="true">R</span><span class="petit-area-rail__utility-label"><span>Reminders</span><small>通知と履歴</small></span></button>
       <button type="button" data-shell-target="settings" aria-label="Settings：モデルと環境" title="Settings"><span class="petit-area-rail__monogram" aria-hidden="true">S</span><span class="petit-area-rail__utility-label"><span>Settings</span><small>モデルと環境</small></span></button>
     `;
@@ -270,13 +272,13 @@
           <button type="submit" value="cancel" aria-label="閉じる">Esc</button>
         </header>
         <label for="petit-command-input" id="petit-command-title">どこへ移動しますか？</label>
-        <input id="petit-command-input" type="search" autocomplete="off" placeholder="Universe、Tasks、設定…" />
+        <input id="petit-command-input" type="search" autocomplete="off" placeholder="Chat、Univ、Develop、Dashboard…" />
         <div class="petit-command-palette__results" role="listbox" aria-label="移動先">
-          <button type="button" data-command-view="univ"><strong>Universe</strong><small>タスク空間をひらく</small><kbd>1</kbd></button>
-          <button type="button" data-command-view="tasks"><strong>Tasks</strong><small>重要なタスクを確認</small><kbd>2</kbd></button>
-          <button type="button" data-command-view="development"><strong>Development</strong><small>登録したローカル開発状況</small></button>
-          <button type="button" data-command-view="chat"><strong>PETIT</strong><small>会話をはじめる</small><kbd>3</kbd></button>
-          <button type="button" data-command-view="stats"><strong>統計</strong><small>今日の頑張りと7日間の作業を振り返る</small><kbd>4</kbd></button>
+          <button type="button" data-command-view="chat"><strong>Chat</strong><small>PETITと会話をする</small><kbd>1</kbd></button>
+          <button type="button" data-command-view="univ"><strong>Univ</strong><small>3Dタスク空間をひらく</small><kbd>2</kbd></button>
+          <button type="button" data-command-view="development"><strong>Develop</strong><small>AIへの開発依頼と進捗</small><kbd>3</kbd></button>
+          <button type="button" data-command-view="stats"><strong>Dashboard</strong><small>日別・週別の作業時間を振り返る</small><kbd>4</kbd></button>
+          <button type="button" data-command-view="tasks"><strong>Tasks</strong><small>重要なタスク一覧を確認</small></button>
           <button type="button" data-command-view="reminders"><strong>Reminders</strong><small>通知と履歴を確認</small></button>
           <button type="button" data-command-view="settings"><strong>Settings</strong><small>モデルと環境を設定</small><kbd>⌘,</kbd></button>
         </div>
@@ -401,7 +403,7 @@
     const observer = new MutationObserver(() => {
       const visible = panels.find((panel) => !panel.hidden);
       if (!visible) return;
-      const area = visible.dataset.viewPanel === "universe" ? "univ" : visible.dataset.viewPanel;
+      const area = visible.dataset.viewPanel === "universe" ? "univ" : visible.dataset.viewPanel === "today" ? "stats" : visible.dataset.viewPanel;
       syncActiveState(area);
       const isUniv = area === "univ";
       if (document.body.classList.contains("petit-univ-active") !== isUniv) {
@@ -424,7 +426,7 @@
     createDesktopRail();
     installCommandPalette();
     syncRailStatus();
-    installPetitSubnav();
+    // Main Chat stays uncluttered; the old disabled sub-navigation is not mounted.
     installPanelObserver();
 
     const syncPill = document.querySelector("#sync-pill");
@@ -438,16 +440,16 @@
     }
 
     const requested = new URLSearchParams(window.location.search).get("view");
-    const supported = ["univ", "home", "focus", "tasks", "chat", "stats", "today", "universe", "reminders", "settings", "petit", "projects", "development", "dev"];
-    const initialView = requested && supported.includes(requested) ? requested : "univ";
+    const supported = ["univ", "home", "focus", "tasks", "chat", "stats", "today", "universe", "reminders", "settings", "petit", "projects", "development", "dev", "dashboard"];
+    const initialView = requested && supported.includes(requested) ? requested : HOME_VIEW;
     window.requestAnimationFrame(() => activateView(initialView));
   };
 
   window.addEventListener("popstate", (event) => {
-    const requested = event.state?.petitArea || new URLSearchParams(window.location.search).get("view") || "univ";
+    const requested = event.state?.petitArea || new URLSearchParams(window.location.search).get("view") || HOME_VIEW;
     activateView(requested);
   });
-  window.addEventListener("petit:navigate", (event) => activateView(event.detail?.view || "univ", event.detail || {}));
+  window.addEventListener("petit:navigate", (event) => activateView(event.detail?.view || HOME_VIEW, event.detail || {}));
 
   window.PetitAppShell = { initialize, activateView, homeView: HOME_VIEW, initialized: true };
   if (document.readyState === "loading") {
