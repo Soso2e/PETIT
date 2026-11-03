@@ -103,6 +103,26 @@ def get(job_id):
     return result
 
 
+def activity_summary(limit=30):
+    """Read-only status projection for Activity without exposing goals or paths.
+
+    Do not initialize the coding schema when merely opening the dashboard;
+    showing an uninitialized state must not create a DB backup.
+    """
+    limit = max(1, min(int(limit), 100))
+    with db.get_connection() as connection:
+        if not connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coding_jobs'"
+        ).fetchone():
+            return {"initialized": False, "jobs": []}
+        rows = connection.execute(
+            "SELECT id, task_id, project_id, provider, status, "
+            "created_at, updated_at FROM coding_jobs ORDER BY created_at DESC, id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return {"initialized": True, "jobs": [dict(row) for row in rows]}
+
+
 def list_jobs():
     ensure_schema()
     with db.get_connection() as connection:
