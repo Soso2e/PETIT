@@ -12,7 +12,7 @@
     }
     const projects = (Array.isArray(snapshot.workspaces) ? snapshot.workspaces : []).slice(0, 8)
       .map((item) => {
-        const detail = item && typeof item.development === "object" ? item.development : {};
+        const detail = item && item.development && typeof item.development === "object" ? item.development : {};
         return {
           id: String(item?.workspace_id || ""),
           name: String(item?.name || "無名のリポジトリ").slice(0, 120),
