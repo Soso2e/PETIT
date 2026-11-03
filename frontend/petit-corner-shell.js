@@ -74,7 +74,7 @@
   const areaFromPanel = () => {
     const visible = Array.from(document.querySelectorAll("[data-view-panel]"))
       .find((panel) => !panel.hidden && panel.getAttribute("aria-hidden") !== "true");
-    if (!visible) return "univ";
+    if (!visible) return "chat";
     return visible.dataset.viewPanel === "universe" ? "univ" : visible.dataset.viewPanel;
   };
 
