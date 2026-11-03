@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.37.0**
+**Current Version: v0.38.0**
 
 **Last Updated: 2026-11-03 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #372 Activity最小実装（v0.38.0）: 既存jobs SQLiteのqueued/running/done/failedを認証済みGET /api/activity/jobsで確認できるようにし、Development Hubへ結果プレビューを持たない一覧を追加。通知配信ACKを変更せず、失敗例外・input/result本文を公開しない。runningはDB上の請求状態で稼働保証なし。Coding Jobs（PR #371）は未統合。再起動回復、lease、ジョブ受付、通知・実端末テストは次段。Python/Nodeの回帰テスト追加。
 
 - #372 Development Hub read-only 初段（v0.37.0）: Chat/Tasks/Univの既存導線を壊さず、開発パネルをナビ・検索パレットに追加。明示許可したローカルGitの観測キャッシュからブランチ・HEAD・変更・直近コミット・文書の存在を表示し、stale/disabledを区別。ファイル本文・秘密・任意パス・Git fetchは扱わない。Node契約テスト追加。実Windows/iPhoneおよび実ローカルrepoでの表示は未検証。次は永続バックグラウンドJobとCodex等の開発セッションを結び、Activityへ進捗表示する。
 
