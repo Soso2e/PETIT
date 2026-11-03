@@ -2,16 +2,18 @@
 (() => {
   if (window.PetitCornerShell?.initialized) return;
   const AREA_META = {
-    univ: { label: "Univ", title: "Universe", icon: "planet" },
+    chat: { label: "Chat", title: "Chat", icon: "chat" },
+    univ: { label: "Univ", title: "Univ", icon: "planet" },
+    development: { label: "Develop", title: "Develop", icon: "code" },
+    stats: { label: "Dashboard", title: "Dashboard", icon: "chart" },
+    today: { label: "Dashboard", title: "Dashboard", icon: "chart" },
     tasks: { label: "Tasks", title: "Tasks", icon: "check" },
-    chat: { label: "PETIT", title: "Chat", icon: "chat" },
-    today: { label: "統計", title: "統計", icon: "chart" },
-    stats: { label: "統計", title: "統計", icon: "chart" },
     reminders: { label: "Reminders", title: "Reminders", icon: "bell" },
     settings: { label: "Settings", title: "Settings", icon: "settings" },
   };
 
   const ICONS = {
+    code: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"></path></svg>`,
     chart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h17M8 16v-5M13 16V6M18 16V9"></path></svg>`,
     planet: `
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -108,7 +110,7 @@
     status.innerHTML = `
       <div class="petit-corner-status__identity">
         <span class="petit-corner-status__eyebrow">PETIT</span>
-        <strong data-petit-current-area>Universe</strong>
+        <strong data-petit-current-area>Chat</strong>
       </div>
       <div class="petit-corner-status__meta">
         <span data-petit-status-copy>READY</span>
@@ -156,7 +158,7 @@
 
   const syncState = (requestedArea = "") => {
     const area = requestedArea || areaFromPanel();
-    const meta = AREA_META[area] || AREA_META.univ;
+    const meta = AREA_META[area] || AREA_META.chat;
     document.querySelectorAll("[data-petit-current-area]").forEach((element) => {
       if (element.textContent !== meta.title) element.textContent = meta.title;
     });
