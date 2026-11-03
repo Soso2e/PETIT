@@ -631,6 +631,23 @@ def fail_job(job_id: int, error: str) -> None:
         )
 
 
+def list_job_activity(limit: int = 30) -> list[dict[str, Any]]:
+    """Bounded read-only job projection for Activity.
+
+    Do not expose raw inputs, generated answers, exception strings or credentials.
+    A status of running is a persisted claim, NOT proof of a live worker.
+    Results stay available even if notification delivery was acknowledged.
+    """
+    limit = max(1, min(int(limit), 100))
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, type, status, session_id, request_id, created_at, "
+            "updated_at, claimed_at, delivered FROM jobs ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def undelivered_jobs(limit: int = 10, session_id: str | None = None) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit), 100))
     with get_connection() as conn:

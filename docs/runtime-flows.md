@@ -1,5 +1,19 @@
 # PETIT Runtime Flows
 
+## #372: Activity / persisted background Job visibility (v0.38.0)
+
+```mermaid
+flowchart LR
+    Worker[既存JobWorker] --> Jobs[(SQLite jobs / 状態正本)]
+    Jobs --> Read[db.list_job_activity / 公開項目を限定]
+    Read --> API[管理者GET /api/activity/jobs]
+    API --> Activity[Development Hub Activity / 手動更新]
+    Activity --> Labels[queued / running / done / failed]
+    Jobs --> Ack[旧GET /api/jobsとACKは変更なし]
+```
+
+Activityは読むだけ。結果本文・input_json・例外文字列は取得APIへ出さず、通知ACK・ジョブStatus・Worker進行は変更しない。runningはDB記録であり生存確認ではない。lease/restart recovery/新しいdurable Job APIは未実装で後続。
+
 ## #372: Development Hub read-only projection (v0.37.0)
 
 ```mermaid

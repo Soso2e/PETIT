@@ -67,6 +67,10 @@ v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeを
 
 AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
 
+## Activity（v0.38.0・ジョブ状態の確認）
+
+Development Hubに、PETITの既存SQLite Job（background_research / agent_followup）の実行待ち・実行中記録・完了・失敗の一覧を追加しました。管理者認証後、Dev画面の「ジョブ状態を更新」で結果を取得できます。APIは GET /api/activity/jobs?limit=30。最大100件で、入力本文・出力本文・エラー本文を返さず、通知の既読/ACKも変更しません。runningはDB上の状態であり実プロセス生存の保証ではありません。PR #371のCoding Jobs、長時間処理の自動復旧・lease・通知連携は未統合です。
+
 ## Development Hub（v0.37.0・読み取り専用）
 
 PETITのメイン画面から **Dev** を選ぶと、許可済みのローカルGitリポジトリのブランチ・HEAD・未コミット変更数・コンフリクト数・直近コミット・Concept/PROGRESS/READMEの存在を確認できます。PCの既存観測キャッシュを表示するだけで、Git fetch・コマンド実行・ファイル編集・AI Coding Job作成は行いません。macOS/iPhone実機の表示確認は今後実施します。
