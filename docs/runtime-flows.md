@@ -1,3 +1,5 @@
+# PETIT Runtime Flows
+
 ## #372: Development Hub read-only projection (v0.37.0)
 
 ```mermaid
@@ -11,8 +13,6 @@ flowchart LR
 ```
 
 観測は既存Observerが行い、UIアクセスは保存済みsnapshotを読むだけ。Web/PWAからGitコマンド・任意ファイル取得・Worker起動を行うAPIは追加しない。ドキュメントのexcerpt/ファイルパスはDevelopment Hubに投影しない。認可は既存setup middlewareを共有する。#371のCoding Jobsには接続していない。
-
-# PETIT Runtime Flows
 
 ## #368: Workspace・永続Provider補助Thread・動的Tool公開
 
