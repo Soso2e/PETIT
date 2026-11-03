@@ -46,6 +46,8 @@ test("missing Git development data remains visibly unverified", () => {
   assert.equal(value.projects[0].evidence, false);
   assert.equal(value.projects[0].changes, null);
   assert.equal(value.projects[0].ahead, null);
+  assert.equal(project({ enabled: true, status: "observed", stale: false, workspaces: [
+    { name: "null evidence", status: "ok", development: null }] }).projects[0].evidence, false);
 });
 
 test("snapshot and document catalog are bounded", () => {
