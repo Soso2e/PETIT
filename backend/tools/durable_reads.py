@@ -50,4 +50,6 @@ def delegate_background_research(kind: str, query: str):
 def get_background_research_status(job_id: int):
     if not request_context.current_is_admin():
         raise ValueError("administrator_required")
+    if request_context.local_only():
+        raise ValueError("local_only_external_research_forbidden")
     return durable_reads.get(int(job_id))
