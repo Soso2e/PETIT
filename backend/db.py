@@ -599,7 +599,7 @@ def claim_next_job() -> dict[str, Any] | None:
     with get_connection() as conn:
         row = conn.execute(
             "SELECT id, type, input_json, session_id, request_id FROM jobs "
-            "WHERE status = 'queued' ORDER BY id ASC LIMIT 1"
+            "WHERE status = 'queued' AND type IN ('background_research','agent_followup') ORDER BY id ASC LIMIT 1"
         ).fetchone()
         if row is None:
             return None
