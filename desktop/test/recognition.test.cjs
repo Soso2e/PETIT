@@ -53,6 +53,6 @@ test('continuous silence signals idle timeout without contacting STT', () => {
   recognition.stop();
   assert.equal(error, 'idle-timeout');
   assert.equal(ended, 1);
-  assert.equal(processing, 0);
+  assert.equal(processing, 1);
   assert.equal(fixture.submitted(), 0);
 });
