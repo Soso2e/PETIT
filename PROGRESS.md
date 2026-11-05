@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.41.0**
+**Current Version: v0.42.0 (PR中・未マージ)**
 
-**Last Updated: 2026-11-03 UTC**
+**Last Updated: 2026-11-04 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #372 P0 Durable Read Task（v0.42.0開発PR）: ニュース/天気の管理者依頼のみ、既存jobsのlease・fencing・冪等性・Read専用再起動復旧・取消・通知イベントを追加。通常会話と別Workerで処理。旧background_research/agent_followup、Coding Job、承認済みデータを変更しない。実Provider/実Windows・iPhone/PC停止中の実行/汎用Web調査や自律計画は未検証・未実装。docs/durable-read-tasks.md参照。テスト結果はPRに記録する。
 
 - v0.41.0 Chat-first UI/Dashboard: Chatを初期画面にし、Chat / Univ / Develop / Dashboardの4領域ナビに整理。スマホ下部4タブ、Desktopの共通画面にも適用。Dashboardは既存work_sessionsの90日集計APIで活動カレンダー・直近7日/30日・活動日数を追加。Three.jsと既存CLI Jobs、DB/承認機構は不変。Developの継続開発Thread/司令塔UIとDesktop二画面同期は後続。GitHub PRのJS/CIと実Win/iPhone受入は区別する。docs/ui-chat-first-dashboard.md参照。
 

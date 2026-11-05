@@ -59,6 +59,9 @@ jobs:
           node --check frontend/petit-version.js
           node --check frontend/univ-space.js
 
+      - name: Run durable background read task regressions
+        run: python -m unittest tests.test_durable_reads tests.test_activity_jobs -v
+
       - name: Run Life UI flow tests
         run: |
           python -m unittest tests.test_life_map_assets -v

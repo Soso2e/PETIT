@@ -1,5 +1,26 @@
 # PETIT Runtime Flows
 
+## #372: Durable Read Task P0 (v0.42.0開発版)
+
+```mermaid
+flowchart TD
+    User[Main Chat / Admin API] -->|delegate_background_research| Receipt[既存Thread / Turn / Effect Receipt]
+    Receipt -->|idempotent enqueue| Jobs[(既存SQLite jobs / durable_read)]
+    Jobs --> ReadWorker[独立ReadWorker / 期限付きclaim]
+    ReadWorker --> ReadOnly[公開ニュース・天気Read Tool]
+    ReadOnly --> Fence[claimed_by token照合 / 結果保存]
+    Fence --> Jobs
+    Jobs --> Status[認証済みGET /api/agent-tasks]
+    Jobs --> Notification[通知センター / Pushは任意]
+    ReadWorker -->|Worker停止・lease期限切れ| Retry[Readだけ再claim / 最大3回]
+    Retry --> Jobs
+    Cancel[管理者取消] -->|queued/runningのみ| Jobs
+    Legacy[旧JobWorker] -->|既存typeのみ| LegacyJobs[(旧background_research / agent_followup)]
+```
+
+既存通常会話TurnはバックグラウンドJob完了を待たずに新しい入力へ進む。leaseはプロセス生存を保証せず、外部書込みの自動再実行には使わない。公開Readだけがリトライ対象。詳細は [Durable Read Task設計](durable-read-tasks.md)。
+
+
 ## #372: Coding Job Activity read-only integration (v0.40.0)
 
 ```mermaid

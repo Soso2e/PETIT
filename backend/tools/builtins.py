@@ -17,6 +17,7 @@ _BUILTIN_MODULES = (
     "backend.tools.briefing",
     "backend.tools.context",
     "backend.tools.coding",
+    "backend.tools.durable_reads",
     "backend.tools.conversation_search",
     "backend.tools.current_time",
     "backend.tools.github",

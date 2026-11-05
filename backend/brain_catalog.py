@@ -18,7 +18,7 @@ def available(schema: dict, *, local_only: bool, setup: dict) -> bool:
     if name in {"get_weather", "search_news"} and tools.risk_for(name) != "safe_read":
         return False
     # A local-only Thread may use internal state, never external read services.
-    if local_only and name in {"get_weather", "search_news", "search_notion", "gmail_search", "gmail_get_message"}:
+    if local_only and name in {"get_weather", "search_news", "search_notion", "gmail_search", "gmail_get_message", "delegate_background_research", "get_background_research_status"}:
         return False
     if name in {"gmail_search", "gmail_get_message"}:
         return "gmail" in setup["connected"] and bool(setup["secrets"].get("google_tokens"))
