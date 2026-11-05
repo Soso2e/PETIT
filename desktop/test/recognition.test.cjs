@@ -40,3 +40,19 @@ test('STT result follows the shared SpeechRecognition final-result contract', as
   recognition.stop(); fixture.complete('今日の予定'); await new Promise(setImmediate);
   assert.equal(text, '今日の予定'); assert.equal(ended, 1);
 });
+
+test('continuous silence signals idle timeout without contacting STT', () => {
+  const fixture = setup(), recognition = fixture.recognition;
+  let error = '', ended = 0, processing = 0;
+  recognition.onerror = event => { error = event.error; };
+  recognition.onend = () => ended++;
+  recognition.onprocessing = () => processing++;
+  recognition.active = true; recognition.continuous = true;
+  recognition.endpoint = { speech: 0, idleTimedOut: true };
+  recognition.chunks = [new Float32Array(1600)];
+  recognition.stop();
+  assert.equal(error, 'idle-timeout');
+  assert.equal(ended, 1);
+  assert.equal(processing, 1);
+  assert.equal(fixture.submitted(), 0);
+});

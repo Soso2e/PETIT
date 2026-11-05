@@ -103,7 +103,7 @@ URLは認証情報・queryなしのHTTPS、または厳密なloopback HTTPだけ
 
 設定はElectron userDataの`desktop.json`。WakeはAccessKey不要のopenWakeWordのみ。旧Porcupineの秘密情報・モデルmetadataは読み込み時に除去する。STT用Bearer keyは任意の`PETIT_DESKTOP_STT_KEY`。鍵・録音・認識本文をログに書かない。
 
-録音はmono PCM16 WAV、無音8秒・発話後無音1.2秒・最大30秒で終了。サーバー送信前に形式/サイズを再検証し、STT通信は最大60秒。同時送信は1件。取消・画面非表示後の遅延結果は破棄。現状のRMS判定は簡易実装であり、騒音環境のVAD評価は後続。
+録音はmono PCM16 WAV、手動入力は未発話8秒、Wake/音声会話モードは未発話20秒・発話後無音1.2秒・最大30秒で終了。連続会話で20秒無音ならSTT送信せず、overlayを閉じてWake待機へ戻る（Wake有効時）。サーバー送信前に形式/サイズを再検証し、STT通信は最大60秒。同時送信は1件。取消・画面非表示後の遅延結果は破棄。現状のRMS判定は簡易実装であり、騒音環境のVAD評価は後続。
 
 ## 開発・導入
 

@@ -46,6 +46,7 @@
   let starting = false;
   let processing = false;
   let recognitionFailed = false;
+  let conversationIdleTimeout = false;
   let inputModeEl = null;
   let finalTranscript = "";
   let draftBeforeListening = "";
@@ -560,6 +561,7 @@
     recognition.onstart = () => {
       starting = false;
       finalTranscript = "";
+      conversationIdleTimeout = false;
       setListeningState(true);
     };
 
@@ -583,6 +585,12 @@
 
     recognition.onerror = (event) => {
       recognitionFailed = true;
+      if (event.error === "idle-timeout" && conversation?.active) {
+        conversationIdleTimeout = true;
+        conversation.stop();
+        setVoiceState("20秒間発話がなかったため、呼びかけ待機へ戻ります。");
+        return;
+      }
       conversation?.stop();
       const friendly = event.message || {
         "audio-capture": "マイクを利用できません。Macのシステム設定 → サウンド → 入力でデバイスを確認してください。",
@@ -600,6 +608,14 @@
       micEl.disabled = false;
       setListeningState(false);
       const transcript = recognitionFailed ? "" : finalTranscript.trim();
+      if (conversationIdleTimeout) {
+        conversationIdleTimeout = false;
+        inputEl.value = draftBeforeListening;
+        inputEl.dispatchEvent(new Event("input"));
+        // Wake detection only resumes after the Desktop overlay is hidden.
+        if (window.petitDesktop?.hide) void window.petitDesktop.hide().catch(() => {});
+        return;
+      }
       if (transcript) {
         inputEl.value = [draftBeforeListening.trim(), transcript].filter(Boolean).join(" ");
         inputEl.dispatchEvent(new Event("input"));

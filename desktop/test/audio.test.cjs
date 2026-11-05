@@ -40,3 +40,21 @@ test('STT uses explicit endpoint, denies redirects, bounds request and accepts t
   await assert.rejects(call(async () => { throw new Error('SECRET KEY'); }), /接続できません/);
   await assert.rejects(transcribe(wav, {}, controller.signal), /設定で/);
 });
+
+test('continuous conversation waits 20 seconds of silence while push-to-talk keeps 8 seconds', () => {
+  const silence = new Float32Array(1600);
+  const continuous = new Endpointer(16000, 20);
+  for (let i = 0; i < 199; i++) assert.equal(continuous.push(silence), false);
+  assert.equal(continuous.idleTimedOut, false);
+  assert.equal(continuous.push(silence), true);
+  assert.equal(continuous.idleTimedOut, true);
+  const manual = new Endpointer(16000);
+  for (let i = 0; i < 79; i++) assert.equal(manual.push(silence), false);
+  assert.equal(manual.push(silence), true);
+  assert.equal(manual.idleTimedOut, true);
+  const spoken = new Endpointer(16000, 20);
+  spoken.push(new Float32Array(3200).fill(.1));
+  for (let i = 0; i < 11; i++) assert.equal(spoken.push(silence), false);
+  assert.equal(spoken.push(silence), true);
+  assert.equal(spoken.idleTimedOut, false);
+});
