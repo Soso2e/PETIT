@@ -17,12 +17,13 @@
     return buffer;
   }
   class Endpointer {
-    constructor(rate) { this.rate = rate; this.total = 0; this.lastSpeech = 0; this.speech = 0; }
+    constructor(rate, idleSeconds = 8) { this.rate = rate; this.idleSeconds = idleSeconds; this.total = 0; this.lastSpeech = 0; this.speech = 0; this.idleTimedOut = false; }
     push(frame) {
       this.total += frame.length;
       const rms = Math.sqrt(frame.reduce((sum, value) => sum + value * value, 0) / frame.length);
       if (rms > 0.012) { this.lastSpeech = this.total; this.speech += frame.length; }
-      return this.total >= 30 * this.rate || (!this.speech && this.total >= 8 * this.rate) ||
+      this.idleTimedOut = !this.speech && this.total >= this.idleSeconds * this.rate;
+      return this.total >= 30 * this.rate || this.idleTimedOut ||
         (this.speech > .15 * this.rate && this.total - this.lastSpeech >= 1.2 * this.rate);
     }
   }
