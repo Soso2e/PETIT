@@ -58,12 +58,12 @@
     stop() {
       if (!this.active || this.processing) return;
       this.processing = true; this.release();
+      this.onprocessing?.();
       const generation = this.generation;
       if (!this.chunks.length || !this.endpoint?.speech) {
         const idle = this.continuous && this.endpoint?.idleTimedOut;
         this.onerror?.({ error: idle ? 'idle-timeout' : 'no-speech' }); this.finish(); return;
       }
-      this.onprocessing?.();
       const wav = PetitAudio.encodeWav(this.chunks, this.rate); this.chunks = [];
       document.getElementById('voice-state').textContent = '聞き取った音声を文字にしています…';
       window.petitDesktop.transcribe(wav).then((text) => {
