@@ -30,7 +30,9 @@
       if (generation !== this.generation) return;
       await this.context.resume();
       if (generation !== this.generation) return;
-      this.rate = this.context.sampleRate; this.endpoint = new PetitAudio.Endpointer(this.rate);
+      this.rate = this.context.sampleRate;
+      this.continuous = window.PetitVoiceConversation?.active?.() === true;
+      this.endpoint = new PetitAudio.Endpointer(this.rate, this.continuous ? 20 : 8);
       this.source = this.context.createMediaStreamSource(stream);
       this.node = new AudioWorkletNode(this.context, 'petit-capture');
       this.node.port.onmessage = ({ data }) => {
@@ -56,11 +58,12 @@
     stop() {
       if (!this.active || this.processing) return;
       this.processing = true; this.release();
-      this.onprocessing?.();
       const generation = this.generation;
       if (!this.chunks.length || !this.endpoint?.speech) {
-        this.onerror?.({ error: 'no-speech' }); this.finish(); return;
+        const idle = this.continuous && this.endpoint?.idleTimedOut;
+        this.onerror?.({ error: idle ? 'idle-timeout' : 'no-speech' }); this.finish(); return;
       }
+      this.onprocessing?.();
       const wav = PetitAudio.encodeWav(this.chunks, this.rate); this.chunks = [];
       document.getElementById('voice-state').textContent = '聞き取った音声を文字にしています…';
       window.petitDesktop.transcribe(wav).then((text) => {
