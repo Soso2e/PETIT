@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.42.0 (PR中・未マージ)**
+**Current Version: v0.42.1 (PR中・未マージ)**
 
-**Last Updated: 2026-11-04 UTC**
+**Last Updated: 2026-11-05 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #382 (v0.42.1開発PR): Desktop Wake/音声会話中の無発話待機を8秒→20秒に変更し、無音終了時はSTTを呼ばずoverlayを閉じて既存Wake待機を再開。手動マイクの8秒、発話後1.2秒、確認待ち/半二重方式は維持。音声回帰テスト追加。実Wakeモデル・実マイク・長時間稼働の受入は未確認。
 
 - #372 P0 Durable Read Task（v0.42.0開発PR）: ニュース/天気の管理者依頼のみ、既存jobsのlease・fencing・冪等性・Read専用再起動復旧・取消・通知イベントを追加。通常会話と別Workerで処理。旧background_research/agent_followup、Coding Job、承認済みデータを変更しない。実Provider/実Windows・iPhone/PC停止中の実行/汎用Web調査や自律計画は未検証・未実装。docs/durable-read-tasks.md参照。テスト結果はPRに記録する。
 
