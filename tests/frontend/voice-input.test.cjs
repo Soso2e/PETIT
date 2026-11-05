@@ -148,3 +148,25 @@ test('stopped browser playback ignores its stale callback', () => {
   old.onend();
   assert.equal(env.nodes['voice-state'].textContent, '次の再生');
 });
+
+test('20-second continuous idle returns to Wake by hiding Desktop overlay', async () => {
+  const env = environment();
+  let recognition, hidden = 0;
+  env.context.window.PetitDesktopSpeechRecognition = class {
+    constructor() { recognition = this; }
+    start() { this.onstart?.(); }
+    abort() { this.onend?.(); }
+    stop() { this.onend?.(); }
+  };
+  env.context.window.PetitVoiceConversationController = require('../../frontend/desktop/conversation.js');
+  env.context.window.petitDesktop = { hide: () => { hidden++; return Promise.resolve(); } };
+  vm.runInContext(source('voice.js'), env.context);
+  env.context.window.PetitVoiceConversation.start();
+  assert.equal(env.context.window.PetitVoiceConversation.active(), true);
+  recognition.onerror({ error: 'idle-timeout' });
+  recognition.onend();
+  await tick();
+  assert.equal(env.context.window.PetitVoiceConversation.active(), false);
+  assert.equal(hidden, 1);
+  assert.equal(env.submits, 0);
+});
