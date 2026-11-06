@@ -47,10 +47,11 @@ Thread/Turn、Context Broker、会話状態、記憶、バックグラウンド�
 
 ### Brain（AI・CLI接続）（`brain/`）
 
-Brainの選択、CLI（Antigravity / Codex）接続、モデル切り替え
+Brainの選択、CLI（Antigravity / Codex / Claude Code）接続、モデル切り替え
 
 - [antigravity-brain-poc.md](brain/antigravity-brain-poc.md) — 公式Antigravity SDK Brain — Refs #349（SDKは撤去済み。履歴として保持）
 - [antigravity-cli.md](brain/antigravity-cli.md) — Antigravity CLIと既存契約枠（#355 / #349）
+- [claude-code-cli.md](brain/claude-code-cli.md) — Claude Code CLI Executor（v0.44.0）
 - [model_route_switcher.md](brain/model_route_switcher.md) — Chat / Agent モデル切り替え
 - [persistent-agent-workspace.md](brain/persistent-agent-workspace.md) — #368 Persistent Agent Workspace / compact tools
 - [sdk-retirement.md](brain/sdk-retirement.md) — #368 SDK撤去とProvider共通境界

@@ -1,5 +1,28 @@
 # PETIT Runtime Flows
 
+## Claude Code CLI Executor（v0.44.0開発版）
+
+Concept §4 のExecutor順位（Antigravity CLI ＞ Codex ＞ Claude Code ＞ DeepSeek）の3番目。Antigravity CLIと同じ「構造化した1 round」方式で、Toolの実行・承認・receiptは既存native Loopが行う。
+
+```mermaid
+flowchart TD
+    Settings[管理者がSettingsで明示接続] --> Order[claude_codeをPOLICY_ORDERの位置へ挿入 / 既存順位は並べ替えない]
+    Order --> Select[brain_priority / cli_onlyでも許可 / 接続解除で即不許可]
+    Select --> Round[brain._run の各round]
+    Round --> Spawn[公式claude -p / 一時cwd / stdinに文脈 / argvに利用者本文なし]
+    Spawn --> Locked[--tools 空 / --strict-mcp-config / --setting-sources 空 / slash command・セッション保存なし]
+    Locked --> Env[環境変数は最小限 / APIキー・Core秘密値を継承しない / 公式CLIのログインのみ]
+    Env --> Out[--output-format json + --json-schema]
+    Out --> Check{検証}
+    Check -->|is_error / 非JSON / permission_denials / catalog外Tool| Fail[CLIError reason / 本文は保存しない / Tool未実行ならFallback]
+    Check -->|content / tool_calls| Loop[既存native Loop: discover_tools / schema / risk / 承認 / receipt]
+    Loop -->|Tool結果| Round
+    Loop -->|返答| Save[conversations / claude_code_step Event: usage・費用目安・quota unknown]
+    CodingJob[Coding Job / provider=claude_code] --> Round2[同じcompletionでJob限定catalog list/read/write/static check]
+```
+
+`discover_tools` はCLI Brain（Antigravity CLI / Claude Code）でも応答検証で許可する（v0.44.0で修正。以前はCLI Brainがdiscoveryを要求すると `invalid_cli_response` で失敗していた）。
+
 ## #372: Durable Read Task P0 (v0.42.0開発版)
 
 ```mermaid
@@ -69,7 +92,7 @@ flowchart TD
     Approval --> Queue
     Queue --> Claim[一度だけclaim / running]
     Claim --> Copy[許可ルートとHEADを再検査 / 専用clone / remote除去]
-    Copy --> Agent[Jobで選んだCodexまたはAntigravity CLI]
+    Copy --> Agent[Jobで選んだCodex・Antigravity CLI・Claude Code CLI]
     Agent --> Scoped[CoreのJob限定Tool / list・read・SHA照合write・静的check]
     Scoped -->|結果| Agent
     Agent --> Done[ready_for_review または checks_failed / 実テストnot_run]
@@ -232,16 +255,18 @@ flowchart TD
     L --> Select[順位または従来選択 / local_only / 接続と費用同意を検査]
     Select --> Transport{Brain接続方式}
     Transport -->|mixed| Pin[選択Event / Provider pin / 同じThreadの履歴と運用アラート]
-    Transport -->|cli_only| CLIOnly[Codexと明示接続したAntigravity CLI / SDK・APIを除外]
+    Transport -->|cli_only| CLIOnly[Codex・明示接続したAntigravity CLI / Claude Code CLI / SDK・APIを除外]
     CLIOnly --> Pin
     Pin --> Backend{単一Runtimeの所有者}
     Backend -->|DeepSeek / LM Studio| Native[既存native Tool Loop]
     Backend -->|Codex| Codex[app-server Agent Loop]
     Backend -->|Antigravity CLI| AgCli[公式agy CLI Agent Loop]
+    Backend -->|Claude Code CLI| CcCli[公式claude CLI 構造化round]
     Backend -->|旧SDK選択| Migrate[停止して再選択案内]
     Native --> Gate[Registry / 公開catalog / schema / risk / cancel]
     Codex -->|dynamic PETIT Tool| Gate
     AgCli -->|dynamic Tool| Gate
+    CcCli -->|JSON Tool要求| Gate
     Gate -->|確認必須| Approval[SQLite承認とmessages / Runtime終了]
     Approval --> UI[既存確認UI / 再起動復元]
     UI -->|一度だけ承認消費| Execute[既存Domain Tool]
@@ -262,7 +287,7 @@ flowchart TD
 ```
 
 SDKは撤去済み。Codexのshell/apps/plugins/subagentは無効、許可していないserver requestは拒否する。各Runtimeを終了してからFallbackし、Tool実行後はLoopを再開しない。
-`brain_transport=cli_only`はCodexと明示接続したAntigravity CLIを許可し、障害時もSDK/APIへFallbackしない。既存設定は`mixed`のまま引き継ぐ。
+`brain_transport=cli_only`はCodexと明示接続したAntigravity CLI / Claude Code CLIを許可し、障害時もSDK/APIへFallbackしない。既存設定は`mixed`のまま引き継ぐ。
 CLIの導入検出は受動的に行い、明示した診断で`account/read`を確認する。認証確認と実推論の接続テストは別。
 画像は既存Vision観測→Read専用回答で、画像Providerの順位Fallbackは未対応。
 8 rounds / 12 callsと取消/deadlineを維持し、local_onlyは外部へ送らない。

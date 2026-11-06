@@ -1,6 +1,6 @@
 # PETIT Architecture — 現行の実装概要
 
-> Status: **現行（実装済みの概要）** / Last updated: **2026-11-06**（v0.43.0 時点）
+> Status: **現行（実装済みの概要）** / Last updated: **2026-11-06**（v0.44.0 開発版）
 >
 > PETITがいまどう動いているかを1枚で把握するための入口。
 > 目指す姿は [Concept.md](../Concept.md)、会話処理・Tool実行の詳細フローの正本は [runtime-flows.md](runtime-flows.md) を見る。
@@ -25,10 +25,12 @@ flowchart TD
     Select --> Native[native Tool Loop<br/>DeepSeek / LM Studio]
     Select --> Codex[Codex app-server]
     Select --> Agy[Antigravity CLI<br/>公式 agy・明示接続時のみ]
+    Select --> Claude[Claude Code CLI<br/>公式 claude・明示接続時のみ]
 
     Native --> Gate[Tool Registry<br/>公開 catalog・schema・risk]
     Codex -->|dynamic PETIT Tool| Gate
     Agy -->|Tool 要求 JSON| Gate
+    Claude -->|Tool 要求 JSON| Gate
 
     Gate -->|確認が必要| Approval[承認<br/>SQLite に保存・一度だけ消費]
     Approval --> Domain
@@ -74,7 +76,9 @@ flowchart TD
   - **DeepSeek / LM Studio**: PETIT内部の native Tool Loop で動く（8 rounds / 12 calls で停止）。
   - **Codex CLI**: app-server の Agent Loop。PETIT の Tool は dynamic Tool として渡す。Codex の shell / apps / plugins / subagent は無効にしている。
   - **Antigravity CLI**: 公式 `agy` を本人のCLI認証で起動する。設定画面で明示的に接続したときだけ使える。規約上の許諾は未確定（[brain/antigravity-cli.md](brain/antigravity-cli.md)）。
-- `brain_transport=cli_only` にすると、CLI（Codex / Antigravity CLI）だけを使い、APIへは切り替えない。
+  - **Claude Code CLI**: 公式 `claude` をヘッドレスで起動し、組込みTool・MCP・設定読込を無効にしてJSONで判断だけを受け取る。明示接続時のみ（[brain/claude-code-cli.md](brain/claude-code-cli.md)）。
+- 既定の優先順位は Concept §4 と同じ Antigravity CLI → Codex → Claude Code → DeepSeek。未接続の候補は飛ばす。保存済みの順位は書き換えず、新しく接続したCLIは方針順の位置へ挿入する（Antigravity CLIの「先頭へ」ボタンは従来どおり）。
+- `brain_transport=cli_only` にすると、CLI（Codex / Antigravity CLI / Claude Code CLI）だけを使い、APIへは切り替えない。
 - 障害時は、Toolを実行する前に限って次の候補へ切り替える。Tool実行後に障害が起きたら、そのTurnは失敗として扱う。
 - Antigravity SDK は撤去済み（[brain/sdk-retirement.md](brain/sdk-retirement.md)）。
 - 詳細: [runtime-flows.md](runtime-flows.md) の「v0.34.0: 初期設定・優先順位と単一Brain」、[brain/persistent-agent-workspace.md](brain/persistent-agent-workspace.md)
@@ -94,7 +98,7 @@ flowchart TD
 | 作業記録 | 作業セッション、作業統計、Dashboard の90日集計、引き継ぎメモ | [life/work-statistics.md](life/work-statistics.md) |
 | 記憶 | 記憶の保存と訂正、元発言の検索、Obsidian BRAIN 検索、Chroma（置き換え可能な検索インデックス） | [core/renaissance-memory.md](core/renaissance-memory.md)、[core/assistant-architecture.md](core/assistant-architecture.md) |
 | プロジェクト | Project Continuity（開始・再開・完了の確認）、GitHub evidence、ローカル開発環境の観測 | [core/assistant-architecture.md](core/assistant-architecture.md)、[dev/](dev/) |
-| 開発の委譲 | Coding Job: 許可したGitルートを専用のcloneにコピーし、Codex / Antigravity CLI が Core の限定Tool（list / read / write / 静的check）で作業する。実テスト・Push・PRは未対応 | [dev/coding-tasks.md](dev/coding-tasks.md) |
+| 開発の委譲 | Coding Job: 許可したGitルートを専用のcloneにコピーし、Codex / Antigravity CLI / Claude Code CLI が Core の限定Tool（list / read / write / 静的check）で作業する。実テスト・Push・PRは未対応 | [dev/coding-tasks.md](dev/coding-tasks.md) |
 | バックグラウンド | Durable Read Task（ニュース・天気）、通知イベント、Web Push | [core/durable-read-tasks.md](core/durable-read-tasks.md)、[channels/web_push_notifications.md](channels/web_push_notifications.md) |
 
 ### 2.6 データの正本
@@ -143,8 +147,8 @@ PETIT/
 | 目標 | 現状 | 次の一手 |
 | --- | --- | --- |
 | Router（DeepSeek）と Executor（CLI）の分離 | 1つのBrainがTurnを最後まで担当し、優先順位で切り替える | 分けるかどうかを含めて設計する（Concept §10） |
-| Executor の優先順位 Antigravity ＞ Codex ＞ DeepSeek | 管理UIで順位を設定できる。既定値は未確認 | 既定値を方針に合わせるか確認する |
-| Claude Code CLI 対応 | 未実装 | Codex / Antigravity と同じ Provider 境界で adapter を追加する |
+| Executor の優先順位 Antigravity ＞ Codex ＞ Claude Code ＞ DeepSeek | 既定値を方針順に設定済み（v0.44.0）。保存済みの順位は変えない | 実端末で各CLIの接続テスト |
+| Claude Code CLI 対応 | 会話Brain・Coding Jobに実装（v0.44.0）。契約上の扱いは未確認 | 実ログイン環境での受入、得意分野による振り分け（§10） |
 | アカウント型の設定共通化 | ホスト別の設定と管理者1名 | アカウントのモデルと保存先を設計する |
 | Discord 常駐Bot | API の source のみ | 本人確認・配送・通知を設計する |
 | ファイルの検索と添付 | 未実装 | Everything / ローカル / Drive の読み取り境界と送信の確認を設計する |

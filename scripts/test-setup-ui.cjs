@@ -23,7 +23,7 @@ try{
   await page.locator('#codex-cli-status').filter({hasText:'ChatGPT認証: 未確認'}).waitFor();
   assert.equal(await page.locator('#brain-transport').inputValue(),'mixed');
   await page.route('**/api/setup/services/*/models',route=>route.fulfill({json:{models:[{id:'fixture-model',label:'合成モデル'}],inference_verified:false}}));
-  for(const [provider,input,key] of [['codex','codex-model','codex_model'],['antigravity_cli','antigravity-cli-model','antigravity_cli_model']]){
+  for(const [provider,input,key] of [['codex','codex-model','codex_model'],['antigravity_cli','antigravity-cli-model','antigravity_cli_model'],['claude_code','claude-code-model','claude_code_model']]){
     await clickReady(page,`[data-models="${provider}"]`,'モデル候補を取得');
     await page.locator('#'+input+'-options').selectOption('fixture-model');
     await clickReady(page,`[data-save-model="${provider}"]`,'モデル設定を保存');
@@ -41,6 +41,19 @@ try{
   await clickReady(page,'#save-brain','AI設定を保存');
   results.push({cli_only_saved:true,legacy_mixed_preserved:true,codex_auth_passive:'unknown'});
   await page.locator('#antigravity-cli-status').filter({hasText:'unknown'}).waitFor();
+  await page.locator('#claude-code-status').filter({hasText:'unknown'}).waitFor();
+  await clickReady(page,'#claude-code-diagnose','CLIの配置だけを確認');
+  const claudeStatus=await (await page.request.get(url+'/api/setup/claude-code')).json();
+  assert.equal(claudeStatus.production_enabled,false);assert.equal(claudeStatus.authentication,'unknown');
+  if(claudeStatus.installed){
+    await page.request.put(url+'/api/setup/config',{headers:{'X-PETIT-Request':'1'},data:{priority:['codex','deepseek']}});
+    await clickReady(page,'[data-connect="claude_code"]','');
+    const connected=await (await page.request.get(url+'/api/setup/config')).json();
+    assert.deepEqual(connected.settings.priority,['codex','claude_code','deepseek']);
+    assert.equal(connected.claude_code.production_enabled,true);
+    await page.request.post(url+'/api/setup/services/claude_code/disconnect',{headers:{'X-PETIT-Request':'1'}});
+    results.push({claude_code_connect_policy_order:true});
+  }
   assert.equal(await page.locator('[data-connect="antigravity_cli"]').isEnabled(),true);
   await clickReady(page,'#antigravity-cli-diagnose','CLIの配置だけを確認');
   const cliStatus=await (await page.request.get(url+'/api/setup/antigravity-cli')).json();

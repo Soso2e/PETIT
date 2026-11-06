@@ -18,9 +18,10 @@ from . import config
 _lock = threading.RLock()
 _depth = threading.local()
 _sessions: dict[str, float] = {}
-DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["codex", "deepseek"],
+DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["antigravity_cli", "codex", "claude_code", "deepseek"],
             "brain_transport": "mixed",
             "antigravity_cli_enabled": False, "antigravity_cli_model": "",
+            "claude_code_enabled": False, "claude_code_model": "",
             "coding_roots": [],
             "paid_allowed": [], "connected": [], "calendar": "local", "google_calendar_id": "primary",
             "notion_tasks_db": "", "notion_projects_db": "", "notion_pages": [],

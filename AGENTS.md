@@ -7,10 +7,10 @@ AIコーディングエージェントと開発者向けの共通ルールです
 
 ## PETIT概要
 
-PETITは、会話から意図を理解し、生活・タスク・予定・記録・記憶・開発を横断して支援する、自分専用のAI秘書です。判断と実際の処理はCLIエージェント（Antigravity CLI ＞ Codex CLI ＞ Claude Code CLI（導入予定）、受け皿としてDeepSeek）に任せ、PETIT Coreは会話・記憶・権限・承認・実行記録の土台を担う方針です（`Concept.md` §4）。
+PETITは、会話から意図を理解し、生活・タスク・予定・記録・記憶・開発を横断して支援する、自分専用のAI秘書です。判断と実際の処理はCLIエージェント（Antigravity CLI ＞ Codex CLI ＞ Claude Code CLI、受け皿としてDeepSeek）に任せ、PETIT Coreは会話・記憶・権限・承認・実行記録の土台を担う方針です（`Concept.md` §4）。
 
 - Backend: FastAPI + Python（Thread/Turn・Tool Registry・承認・SQLite）
-- Brain: Codex CLI / Antigravity CLI / DeepSeek / LM Studio から優先順位で選択（現行は1 Turn を1つのBrainが担当）
+- Brain: Antigravity CLI / Codex CLI / Claude Code CLI / DeepSeek / LM Studio から優先順位で選択（現行は1 Turn を1つのBrainが担当）
 - 記憶: SQLite、Chroma、Obsidian Markdown
 - Frontend: HTML / CSS / Vanilla JavaScript（Web / PWA）
 - Desktop: Electron（`desktop/`）

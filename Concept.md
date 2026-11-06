@@ -63,7 +63,7 @@ Executorの優先順位:
 
 1. **Antigravity CLI**（最優先）
 2. **Codex CLI**
-3. **Claude Code CLI**（導入予定。順位と得意分野の分担は未決定）
+3. **Claude Code CLI**（v0.44.0で接続可能。得意分野による分担は未決定）
 4. **DeepSeek**（APIモデル。CLIが使えないときの受け皿）
 
 DeepSeekにはできないこと（ファイル操作、開発作業、長い自律作業など）があるため、ルーティングはDeepSeekでもよいが、**実際の処理はCLIへ任せる**。
@@ -80,8 +80,8 @@ CLIに任せても、次の責任はCoreから動かさない。
 
 ### 現状との差
 
-現在の実装は「1回の会話（Turn）を、優先順位で選んだ1つのBrainが最後まで担当する」方式である。DeepSeek / LM Studio / Codex / Antigravity CLI に対応し、Antigravity SDK は撤去済み。
-**RouterとExecutorを分ける構成と、Claude Code CLIへの対応は未実装。** 詳細は [docs/architecture.md](docs/architecture.md)。
+現在の実装は「1回の会話（Turn）を、優先順位で選んだ1つのBrainが最後まで担当する」方式である。DeepSeek / LM Studio / Codex / Antigravity CLI / Claude Code CLI に対応し、Antigravity SDK は撤去済み。
+**RouterとExecutorを分ける構成は未実装。** 詳細は [docs/architecture.md](docs/architecture.md)。
 
 ---
 
@@ -95,7 +95,7 @@ CLIに任せても、次の責任はCoreから動かさない。
 | **予定** | 「明日何ある？」に答え、予定の前に声をかける | 一部実装（Google Calendar 読み取り、TimeTree取り込み、ローカル予定）。Google への書き込みは未実装 |
 | **やったことの記録** | 作業の開始・中断・再開を記録し、「今日何が進んだ？」「昨日何してたっけ？」に答える。明日の自分への引き継ぎを残す | 一部実装（作業セッション、作業統計、Dashboard、引き継ぎメモ） |
 | **記憶** | 教えたこと、過去の決定、過去の会話を、出典つきで思い出す | 一部実装（記憶、Obsidian BRAIN検索、元発言検索） |
-| **開発の司令塔** | スマホやDiscordから「WEVORAの続きを進めて」と頼むと、CLIに任せ、進捗・差分・テスト・PRを追跡する | 一部実装（承認つき Coding Job、Development Hub。実テスト実行・Push・PRは未対応） |
+| **開発の司令塔** | スマホやDiscordから「WEVORAの続きを進めて」と頼むと、CLIに任せ、進捗・差分・テスト・PRを追跡する | 一部実装（承認つき Coding Job（Codex / Antigravity CLI / Claude Code CLI）、Development Hub。実テスト実行・Push・PRは未対応） |
 | **ファイルを探して届ける** | 「前に作った履歴書の最新版を送って」で、PC・Everything・Google Driveから候補を探し、確認してから添付する | 未着手 |
 | **通知** | 本人が選んだ重要なことだけを、アプリの外でも受け取る | 一部実装（Web Push、Desktop通知） |
 | **画像・マルチモーダル** | 画像を見せて相談できる | 一部実装（画像添付・Vision） |

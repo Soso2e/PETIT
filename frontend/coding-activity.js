@@ -14,7 +14,7 @@
         id: String(row?.id || "").slice(0, 64),
         taskId: Number.isSafeInteger(row?.task_id) ? row.task_id : null,
         status: statuses.has(row?.status) ? row.status : "unknown",
-        provider: row?.provider === "codex" ? "Codex" : row?.provider === "antigravity_cli" ? "Antigravity CLI" : "不明",
+        provider: row?.provider === "codex" ? "Codex" : row?.provider === "antigravity_cli" ? "Antigravity CLI" : row?.provider === "claude_code" ? "Claude Code CLI" : "不明",
         updatedAt: typeof row?.updated_at === "string" ? row.updated_at : null,
       })),
     };

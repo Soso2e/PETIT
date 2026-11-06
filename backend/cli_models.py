@@ -2,7 +2,7 @@
 import re
 import tempfile
 from pathlib import Path
-from . import codex_brain, antigravity_cli, antigravity_cli_brain
+from . import codex_brain, antigravity_cli, antigravity_cli_brain, claude_code_brain
 
 
 def parse_agy(text):
@@ -41,5 +41,9 @@ def list_models(provider):
             else:raise ValueError("モデル一覧の上限に達しました。")
             if not models:raise ValueError("モデル一覧が空です。公式CLIの状態を確認してください。")
         finally:client.close()
-    else:raise ValueError("一覧取得はCodex CLIとAntigravity CLIに対応しています。")
+    elif provider == "claude_code":
+        # The CLI has no model-list command; only its documented aliases are offered.
+        if not claude_code_brain.executable():raise ValueError("公式Claude Code CLIが見つかりません。")
+        models = list(claude_code_brain.MODEL_ALIASES)
+    else:raise ValueError("一覧取得はCodex CLI・Antigravity CLI・Claude Code CLIに対応しています。")
     return {"models": models, "provider": provider, "inference_verified": False}

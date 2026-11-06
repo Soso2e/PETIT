@@ -4,7 +4,9 @@ from . import config, request_context, tools
 
 DISCOVER = "discover_tools"
 # A small useful first-call set, independent of utterance spelling or provider.
-DIRECT = {"get_current_time", "get_tasks", "get_schedule", "get_weather", "search_news"}
+DIRECT = {"get_current_time", "get_tasks", "get_schedule", "get_weather", "search_news",
+          # Concept §11 morning: "今日どうしよう？" answers with 今やる1個 without a discovery round.
+          "create_daily_briefing"}
 DISCOVERY_SCHEMA = {"type":"function", "function": {"name":DISCOVER,
     "description":"必要なToolの詳細schemaを取得する。候補名はCapability一覧を参照。雑談では呼ばない。複数名をまとめて指定できる。操作自体は実行しない。",
     "parameters":{"type":"object", "properties":{"names":{"type":"array", "items":{"type":"string"}, "minItems":1,"maxItems":8}},

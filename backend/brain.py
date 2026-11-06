@@ -63,6 +63,12 @@ def check_provider(thread: dict) -> dict:
             require_production_permission()
         except ValueError as exc:
             raise lmstudio_client.LMStudioError(str(exc)) from None
+    if target.get("provider") == "claude_code":
+        from .claude_code_brain import require_production_permission
+        try:
+            require_production_permission()
+        except ValueError as exc:
+            raise lmstudio_client.LMStudioError(str(exc)) from None
     if target.get("provider") == "antigravity_sdk":
         from .provider_runtime import RETIRED_SDK_MESSAGE
         raise lmstudio_client.LMStudioError(RETIRED_SDK_MESSAGE)
@@ -224,6 +230,9 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         if target.get("provider") == "antigravity_cli":
             from .antigravity_cli_brain import step
             response = step(request_id, target, messages, catalog)
+        elif target.get("provider") == "claude_code":
+            from .claude_code_brain import step as claude_step
+            response = claude_step(request_id, target, messages, catalog)
         else:
             selected_schemas = catalog.schemas()
             call_started = time.monotonic()
@@ -244,7 +253,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             return store.finish(request_id, {"reply": reply, "used_tools": used,
                 "model_route": {"kind": "brain", "actual_route": "chat", "llm_call_count": _round + 1,
                                 "provider": target.get("provider"), "model": target.get("model"),
-                                "transport": "cli" if target.get("provider") == "antigravity_cli" else "api",
+                                "transport": "cli" if target.get("provider") in {"antigravity_cli", "claude_code"} else "api",
                                 "fallback": bool(target.get("fallback_reason")), "fallback_reason": target.get("fallback_reason"),
                                 "tools": [x["name"] for x in used]}})
         if len(used) + len(calls) > MAX_CALLS:
