@@ -1,4 +1,4 @@
-> #368: Antigravity SDKは廃止。以下のSDK記述は過去の実装・検証記録です。[現在の移行方法](sdk-retirement.md)を参照。
+> #368: Antigravity SDKは廃止。以下のSDK記述は過去の実装・検証記録です。[現在の移行方法](../brain/sdk-retirement.md)を参照。
 
 # 初期セットアップ・接続管理（v0.34.0 / #353）
 
@@ -61,4 +61,4 @@
 実Codex認証/推論、Gemini/DeepSeek課金API、実Notion/Google OAuth/Gmail/Calendar/TimeTree、02:00実時計の稼働、実Push受信、Cloud実デプロイ、配布Desktop/実スマホは利用者の認証・受入が必要。全完成条件を満たした扱いにはしない。
 
 
-実行記録は[検証サマリー](../reports/setup-integrations-validation.json)。最終のSDK/LM Studio検証は合成の明示bridge契約プロンプトを用い、Read・記憶保存・予定承認/再開・再送・再起動・未認証CodexからのFallbackまで成功した。SQLiteの保存行と承認引数/receiptも一致した。一方、途中の自然文テストでは小型モデルがToolを呼ばず保存したと述べるケースを検出した。履歴と今回の依頼の分離後に契約ケースは成功したが、自然文全般の実行精度が解決済みという意味ではない。配布前の受入項目として残す。
+実行記録は[検証サマリー](../../reports/setup-integrations-validation.json)。最終のSDK/LM Studio検証は合成の明示bridge契約プロンプトを用い、Read・記憶保存・予定承認/再開・再送・再起動・未認証CodexからのFallbackまで成功した。SQLiteの保存行と承認引数/receiptも一致した。一方、途中の自然文テストでは小型モデルがToolを呼ばず保存したと述べるケースを検出した。履歴と今回の依頼の分離後に契約ケースは成功したが、自然文全般の実行精度が解決済みという意味ではない。配布前の受入項目として残す。

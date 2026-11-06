@@ -10,7 +10,7 @@ PETIT_AS_JARVISの目的は、生活・制作・開発の背景を毎回説明�
 | 文書 | 所有する判断 |
 | --- | --- |
 | `Concept.md` | 誰を支援し、何を解決するか |
-| `ASSISTANT_ARCHITECTURE.md` / `terminology.md` | 情報源の正本、Project/Task/List/Memory/Handoffの意味 |
+| `docs/core/assistant-architecture.md` / `terminology.md` | 情報源の正本、Project/Task/List/Memory/Handoffの意味 |
 | 本文書 | Desktopの入口、共有状態、起動/復旧、移行順、完成条件の新しい目標 |
 | `modular_architecture.md` | Core/Module/Integration/Clientの依存方向 |
 | `jarvis-agent.md` / `jarvis-workspace-agent.md` | Brain/Broker、状況支援、任意PC観測の方針 |

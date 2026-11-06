@@ -11,7 +11,7 @@ on:
       - "frontend/style.css"
       - "tests/test_model_route_switcher.py"
       - ".env.example"
-      - "docs/model_route_switcher.md"
+      - "docs/brain/model_route_switcher.md"
       - ".github/workflows/model-route-switcher-tests.yml"
 
 concurrency:

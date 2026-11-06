@@ -1,10 +1,10 @@
 # PETIT Assistant Architecture
 
 Desktopの入口、共有Thread/Turn、起動・復旧の目標は
-[`docs/desktop-foundation-design.md`](docs/desktop-foundation-design.md) に定義する。
+[`docs/desktop/desktop-foundation-design.md`](../desktop/desktop-foundation-design.md) に定義する。
 本書の情報源・Domainの正本は維持する。新契約は未実装で、現行Runtimeを置き換えたとは扱わない。
 
-2026-10-19の設計方針: DeepSeekを中心とするLLMが意図・文脈・情報取得・Tool選択・複数工程を判断し、Pythonは実行・権限・検証・承認・状態・冪等性・結果保証を担う。意図判定regexを拡張する方向へ進めない。現行/直接Tool Calling/Discoveryの比較は [AI-First設計・隔離PoC](docs/ai-first-agent-design.md) を参照。PoCは本番未接続で、#337の安全契約と既存APIを維持する。
+2026-10-19の設計方針: DeepSeekを中心とするLLMが意図・文脈・情報取得・Tool選択・複数工程を判断し、Pythonは実行・権限・検証・承認・状態・冪等性・結果保証を担う。意図判定regexを拡張する方向へ進めない。現行/直接Tool Calling/Discoveryの比較は [AI-First設計・隔離PoC](ai-first-agent-design.md) を参照。PoCは本番未接続で、#337の安全契約と既存APIを維持する。
 
 ## Goal
 
@@ -117,8 +117,8 @@ rows where the internal project matches, `status=active`, and `confirmed_at` is 
 - The refresh result records attempted, failed, and skipped providers without an LLM.
 
 Detailed behavior is documented in
-[`docs/project_source_refresh.md`](docs/project_source_refresh.md) and
-[`docs/github_evidence.md`](docs/github_evidence.md).
+[`docs/dev/project_source_refresh.md`](../dev/project_source_refresh.md) and
+[`docs/dev/github_evidence.md`](../dev/github_evidence.md).
 
 ### GitHub evidence boundary
 
@@ -276,7 +276,7 @@ Working memory does not replace Project Continuity, hierarchy validation,
 Context Broker's read-only policy, approval receipts, or long-term Memory. Bare
 compound nouns ending in `開発` are not Project actions; explicit verbs continue
 to work. State reads/updates are best effort, and the existing `history` API stays
-compatible. See [conversation-state.md](docs/conversation-state.md) for bounds,
+compatible. See [conversation-state.md](conversation-state.md) for bounds,
 TTL, deterministic expressions, limitations, and acceptance checks.
 
 The first Conversation-to-Action reliability slice (#335) extends this same
@@ -286,7 +286,7 @@ starts use the existing Registry and SQLite transaction; repeated starts reuse
 the same active/paused session. Brain read requests may continue into the
 existing Agent only when an unfinished action and capabilities are explicit.
 Read-only turns keep their two-call path and ordinary chat stays one-call.
-See [reproduction and acceptance limits](docs/conversation-action-reliability.md).
+See [reproduction and acceptance limits](conversation-action-reliability.md).
 
 The four responsibility layers are Turn History, Dialogue Working Memory,
 Episodic Memory, and Knowledge/Sources. The future Backend thread should own

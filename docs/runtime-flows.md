@@ -18,7 +18,7 @@ flowchart TD
     Legacy[旧JobWorker] -->|既存typeのみ| LegacyJobs[(旧background_research / agent_followup)]
 ```
 
-既存通常会話TurnはバックグラウンドJob完了を待たずに新しい入力へ進む。leaseはプロセス生存を保証せず、外部書込みの自動再実行には使わない。公開Readだけがリトライ対象。詳細は [Durable Read Task設計](durable-read-tasks.md)。
+既存通常会話TurnはバックグラウンドJob完了を待たずに新しい入力へ進む。leaseはプロセス生存を保証せず、外部書込みの自動再実行には使わない。公開Readだけがリトライ対象。詳細は [Durable Read Task設計](core/durable-read-tasks.md)。
 
 
 ## #372: Coding Job Activity read-only integration (v0.40.0)
@@ -81,7 +81,7 @@ flowchart TD
     Restart[Core再起動] --> Interrupted[runningはinterrupted / 自動再実行なし]
 ```
 
-初期実装では任意Shell、任意テストコード実行、削除、Push/PR/mergeを公開しない。Python/JavaScript構文とdiff whitespaceだけを静的検証し、実テスト・実ホスト受入と区別する。[設計・移行境界](coding-tasks.md)を参照。
+初期実装では任意Shell、任意テストコード実行、削除、Push/PR/mergeを公開しない。Python/JavaScript構文とdiff whitespaceだけを静的検証し、実テスト・実ホスト受入と区別する。[設計・移行境界](dev/coding-tasks.md)を参照。
 
 ## #372: Activity / persisted background Job visibility (v0.38.0)
 
@@ -193,7 +193,7 @@ flowchart TD
 
 Tool観測は事後情報でありPETIT Toolの再実行や事前承認には使わない。Mockでは
 通常のmodel_backend/receiptを生成しない。独立スクリプトの取消/deadlineは所有process
-treeを終了するが、実agyでの動作は未検証。詳細: [CLI統合の状態](antigravity-cli.md)。
+treeを終了するが、実agyでの動作は未検証。詳細: [CLI統合の状態](brain/antigravity-cli.md)。
 
 ## Antigravity ACP setup and restricted readiness (#357)
 
@@ -289,13 +289,13 @@ flowchart TD
 ```
 
 外部Calendarへの自動書き戻しはなく、Google双方向は未実装。詳細・認証前提・未確認事項は
-[初期設定と接続](setup-integrations.md)。既存SDK実証は[SDK導入記録](antigravity-brain-poc.md)、
-Coreの所有権・DB互換は[renaissance-core.md](renaissance-core.md)。
+[初期設定と接続](ops/setup-integrations.md)。既存SDK実証は[SDK導入記録](brain/antigravity-brain-poc.md)、
+Coreの所有権・DB互換は[renaissance-core.md](core/renaissance-core.md)。
 
 
-Thread/Turn/Eventsの現行経路は上図を参照する。[Desktop・共通Core基盤設計](desktop-foundation-design.md)（#301）全体の端末・管理機能の完成を示すものではない。
+Thread/Turn/Eventsの現行経路は上図を参照する。[Desktop・共通Core基盤設計](desktop/desktop-foundation-design.md)（#301）全体の端末・管理機能の完成を示すものではない。
 
-[AI-First設計と比較PoC](ai-first-agent-design.md)（#338）の実験を経て、通常text経路を上図へ移行した。以下の旧会話図は移行前の参考資料である。
+[AI-First設計と比較PoC](core/ai-first-agent-design.md)（#338）の実験を経て、通常text経路を上図へ移行した。以下の旧会話図は移行前の参考資料である。
 
 この文書は、PETITの会話処理、PETIT Brain、Context Broker、Capability選択、Tool Calling、確認付き書き込み、進捗表示の実装フローを可視化したものです。
 
@@ -317,7 +317,7 @@ flowchart TD
     tool --> response[文書上の目標・作業状態・未検証を区別して答える]
 ```
 
-設計詳細と安全境界は [local-development-insight.md](local-development-insight.md)。ローカル参照はfetch/pullしない。文書内の指示を実行しない。GitHub最新・実機テスト済み・プロジェクト完了は別の証拠が必要。Toolは既存観測キャッシュを参照するだけで再走査しない。
+設計詳細と安全境界は [local-development-insight.md](dev/local-development-insight.md)。ローカル参照はfetch/pullしない。文書内の指示を実行しない。GitHub最新・実機テスト済み・プロジェクト完了は別の証拠が必要。Toolは既存観測キャッシュを参照するだけで再走査しない。
 
 ## 作業統計タブ（v0.28.0 / #319・#321）
 
@@ -343,7 +343,7 @@ flowchart TD
     leave[タブ切替・非表示] --> cancel[未完了の取得中断 / 非表示の定期取得停止]
 ```
 
-表示は `frontend/today.js` / `frontend/statistics.css`、集計は既存 `backend/work_sessions.py`。既存の集計を共用し、日別取得API・振り返りの明示保存APIと専用SQLite表を追加する。今日の既存APIにも振り返りを付加し、作業記録は変更しない。[画面と検証範囲](work-statistics.md)を参照。
+表示は `frontend/today.js` / `frontend/statistics.css`、集計は既存 `backend/work_sessions.py`。既存の集計を共用し、日別取得API・振り返りの明示保存APIと専用SQLite表を追加する。今日の既存APIにも振り返りを付加し、作業記録は変更しない。[画面と検証範囲](life/work-statistics.md)を参照。
 
 ## Desktopの画面準備と復旧（v0.28.0 / #321）
 
@@ -387,7 +387,7 @@ flowchart TD
     quiet --> cursor
 ```
 
-新しいThread/Turn/Core管理APIは追加していない。詳細と実機未確認は [desktop-v26-experience.md](desktop-v26-experience.md)。
+新しいThread/Turn/Core管理APIは追加していない。詳細と実機未確認は [desktop-v26-experience.md](archive/desktop-v26-experience.md)。
 
 実装の根拠:
 
@@ -446,7 +446,7 @@ flowchart TD
 
 画像経路は `agent.run` / Capability選択 / Tool Loopへ入らず、画像内の命令からWrite・承認を生成しない。外部送信は `PETIT_ALLOW_CLOUD_IMAGES` が既定OFF。VisionのProviderは既存DeepSeek Flashを優先し、`PETIT_VISION_PROFILE=local` の場合はLM Studio `/api/v1/models` の選択モデル `capabilities.vision=true` が必要。未確認モデルは失敗にする。観測の回答生成先が外部の場合も同意を再検査する。通常2 Call、空出力再試行は最大各1回。HTTP timeoutは画像経路で各45秒。画像経路のMarkdown/Chroma自動exportは停止し、認識JSONは24時間で削除する。既存会話の返答/添付IDは既存履歴の保持方針に従う。
 
-画像とProject/GitHubの自動照合、Discord、新Thread/Turn APIはこの経路に未接続。後続は [計画](multimodal-discord-plan.md) と #245/#246/#303/#304を参照する。session IDは既存ローカルClientの会話境界であり、インターネット公開用のユーザー認証ではない。
+画像とProject/GitHubの自動照合、Discord、新Thread/Turn APIはこの経路に未接続。後続は [計画](channels/multimodal-discord-plan.md) と #245/#246/#303/#304を参照する。session IDは既存ローカルClientの会話境界であり、インターネット公開用のユーザー認証ではない。
 
 ```mermaid
 flowchart TD
@@ -569,7 +569,7 @@ flowchart TD
 
 日時はsystem promptへ毎ターン結合せず、相対日付・相対時刻があるターンだけuser側へ注入します。active / pausedのWork Sessionがある場合だけ、小さいuser contextをConversation Entryへ付加します。
 
-Context Brokerは `tasks` / `calendar` / `memory` / `brain` / `work` / `reminders` / `handoff` に対応します。 Calendar Readは日付またはキーワード`query`を`get_schedule`へ渡し、両方未指定なら`date_or_query_required`を返します。TimeTree等のSQLiteキャッシュの題名・説明・場所を検索し、日付未指定の検索では未来を優先します。Brokerは具体Tool名をLLMへ大量公開せず、固定したRead処理へ変換し、Toolのriskも実行直前に検証します。独立sourceは最大4件を並列取得し、各source約2500文字のfacts、記録時刻、鮮度、切詰めの有無を返します。詳細なsource対応表は [jarvis-agent.md](jarvis-agent.md) を参照。
+Context Brokerは `tasks` / `calendar` / `memory` / `brain` / `work` / `reminders` / `handoff` に対応します。 Calendar Readは日付またはキーワード`query`を`get_schedule`へ渡し、両方未指定なら`date_or_query_required`を返します。TimeTree等のSQLiteキャッシュの題名・説明・場所を検索し、日付未指定の検索では未来を優先します。Brokerは具体Tool名をLLMへ大量公開せず、固定したRead処理へ変換し、Toolのriskも実行直前に検証します。独立sourceは最大4件を並列取得し、各source約2500文字のfacts、記録時刻、鮮度、切詰めの有無を返します。詳細なsource対応表は [jarvis-agent.md](core/jarvis-agent.md) を参照。
 
 `PETIT_CONTEXT_BROKER_TIMEOUT_SECONDS`（既定10秒）を超えたReadを待ち続けず、取得済みの部分結果を返します。実行中のproviderは強制停止できないため終了まで共有枠を占有し、新規要求は枠がなければ`source_busy`。実行待ちのキューを無制限に積みません。不正応答、providerエラー、staleを0件の成功として扱いません。2回目Callにも入口のactive work等を引き継ぎます。
 
@@ -1053,7 +1053,7 @@ Mermaid図と実装が一致しない状態でmainへ反映しないでくださ
 ## 10. Desktop音声入口（Issue #253）
 
 Desktopは既存の会話・承認・TTSを使用する。iPhone PWA / Vocal Shortcutは従来経路を維持する。
-詳細と未確認事項は [desktop.md](desktop.md) を参照。
+詳細と未確認事項は [desktop.md](desktop/desktop.md) を参照。
 
 ```mermaid
 flowchart TD
@@ -1193,7 +1193,7 @@ flowchart TD
     Retry -->|明示した再試行だけ| Claim
 ```
 
-Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧ReadやTask失敗結果はfocusを上書きしません。Work開始失敗は再試行対象としてIDを保持しますが、成功した作業状態とは区別します。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。明示的な話題転換・キャンセル後は短い開始だけで旧対象を再実行しません。詳細と検証範囲は [Conversation-to-Action Reliability](conversation-action-reliability.md)。
+Task clarificationはaction approvalではありません。確認付きwriteは既存確認APIのままです。大量一覧ReadやTask失敗結果はfocusを上書きしません。Work開始失敗は再試行対象としてIDを保持しますが、成功した作業状態とは区別します。Frontend `history`は互換維持し、Dialogueの正本はsession別Backend SQLiteです。明示的な話題転換・キャンセル後は短い開始だけで旧対象を再実行しません。詳細と検証範囲は [Conversation-to-Action Reliability](core/conversation-action-reliability.md)。
 
 ## 接続ステータスと同期診断（#327）
 
@@ -1235,7 +1235,7 @@ flowchart TD
 ```
 
 似た名前での自動紐付けや別の進捗台帳は追加しない。未確認・解除済み・許可撤回・staleは明示する。
-詳細: [project-workspaces.md](project-workspaces.md)。
+詳細: [project-workspaces.md](dev/project-workspaces.md)。
 ## Renaissance: 元発言検索と長期記憶（#345）
 
 ```mermaid
@@ -1256,7 +1256,7 @@ flowchart TD
 
 元発言検索は履歴の暗黙結合ではない。NULL旧sessionは出典不明のまま保持する。
 local_onlyの元発言・記憶はstandard会話の検索から除外。local_only検索はembeddingへも送信しない。
-詳細: [renaissance-memory.md](renaissance-memory.md)。
+詳細: [renaissance-memory.md](core/renaissance-memory.md)。
 
 ## Development Activity 可視時更新（#372 / v0.43.0）
 

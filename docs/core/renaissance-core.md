@@ -3,7 +3,7 @@
 Refs #345 / #303 / #304 / #338。v0.32.0の会話処理は
 Core所有のThread/Turnと単一native Tool Loopを使用する。
 
-v0.33.0開発版では、同じThread/Turnを使う選択式の[公式Antigravity SDKバックエンド](antigravity-brain-poc.md)も提供する。
+v0.33.0開発版では、同じThread/Turnを使う選択式の[公式Antigravity SDKバックエンド](../brain/antigravity-brain-poc.md)も提供する。
 その場合はSDKだけがAgent Loopを担当し、native Loopと二重実行しない。SDKに公開するPETIT Toolは限定Readのみ。
 
 ## 会話と実行

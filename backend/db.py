@@ -1,6 +1,6 @@
 """SQLite access for PETIT.
 
-The schema is a subset of the design in Concept.md, focused on what the MVP
+The schema is a subset of the design in docs/archive/concept-legacy.md, focused on what the MVP
 actually uses. New tables can be added as features land.
 """
 from __future__ import annotations

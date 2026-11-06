@@ -48,7 +48,7 @@ SDKはRead専用で、Writeの受入完了を意味しない。Issueは未確認
 - Web/Desktop共通の「最新の依頼」で`antigravity_sdk`、実model、auth、推論先、usage/null、latency、session IDを確認できる。失敗時も既存Eventsから診断を復元し、生の例外本文・APIキーは保存しない。
 - 画像・旧completion API・WriteはこのSDKバックエンドの対象外。SDK未対応経路でGemini直APIや別ループへ黙って切り替えない。
 
-実装フローの正本は [runtime-flows.md](runtime-flows.md)。Notion同期コード・実DB・本番のProvider選択は変更していない。
+実装フローの正本は [runtime-flows.md](../runtime-flows.md)。Notion同期コード・実DB・本番のProvider選択は変更していない。
 
 ## 導入・選択
 
@@ -100,14 +100,14 @@ Desktop sourceのブラウザadapterを含むが、配布Electronの実機受入
 ## 実測・残件
 
 - Windows / Python 3.13.3 / SDK 0.1.22 / Qwen3.5-9B、テスト用model ID `petit-agy-probe`で実施。既存モデルを利用し、新規モデルは取得していない。
-- [独立SDKの3ターンと保存再開](../reports/antigravity-sdk-session-local-live.json): 実runtime、ダミーTool1回、stream/text一致、同じconversation IDで再開成功。起動2.177秒、各turn約3.020/0.927/2.122秒。推論品質一般の評価ではない。
-- [実Coreの初回記録](../reports/antigravity-sdk-core-local-live.json): 通常会話→実Read→次turnの参照、3/3成功。推論先はLM Studio。SDK Agentを単にimportした結果ではない。
-- [最終Worker方式の実Core検証](../reports/antigravity-sdk-core-lifecycle-live.json): 3ターン成功、再送一致、Core復旧後の会話継続。Turn約5.618/7.917/6.008秒。実timeoutは0.504秒でfailed、実取消は4秒後の要求に対して全体4.478秒でcancelled、effectsなし。終了後にlocalharness.exeの残留なしを確認。
-- [実Chromium](../reports/antigravity-sdk-browser-live.json): 1440/390pxで実SDK+LM StudioのRead Tool、backend診断、履歴の再読込を確認。390pxはDesktop source adapterで、配布Electron本体の実証ではない。
-- pytest81件＋5 subtests、Thread client Node5件、Python/JS構文とpip check成功。初期ブラウザテストはUniverseのDOM selectorと初期化待ちの誤りで失敗し、テストを修正して再確認。途中のWorker実通信ではWindows pipeの文字コード不一致（UnicodeEncodeError）を検出し、stdin/stdoutとWorker環境をUTF-8へ固定した。[失敗記録](../reports/antigravity-sdk-core-isolated-live.json)も保持する。
+- [独立SDKの3ターンと保存再開](../../reports/antigravity-sdk-session-local-live.json): 実runtime、ダミーTool1回、stream/text一致、同じconversation IDで再開成功。起動2.177秒、各turn約3.020/0.927/2.122秒。推論品質一般の評価ではない。
+- [実Coreの初回記録](../../reports/antigravity-sdk-core-local-live.json): 通常会話→実Read→次turnの参照、3/3成功。推論先はLM Studio。SDK Agentを単にimportした結果ではない。
+- [最終Worker方式の実Core検証](../../reports/antigravity-sdk-core-lifecycle-live.json): 3ターン成功、再送一致、Core復旧後の会話継続。Turn約5.618/7.917/6.008秒。実timeoutは0.504秒でfailed、実取消は4秒後の要求に対して全体4.478秒でcancelled、effectsなし。終了後にlocalharness.exeの残留なしを確認。
+- [実Chromium](../../reports/antigravity-sdk-browser-live.json): 1440/390pxで実SDK+LM StudioのRead Tool、backend診断、履歴の再読込を確認。390pxはDesktop source adapterで、配布Electron本体の実証ではない。
+- pytest81件＋5 subtests、Thread client Node5件、Python/JS構文とpip check成功。初期ブラウザテストはUniverseのDOM selectorと初期化待ちの誤りで失敗し、テストを修正して再確認。途中のWorker実通信ではWindows pipeの文字コード不一致（UnicodeEncodeError）を検出し、stdin/stdoutとWorker環境をUTF-8へ固定した。[失敗記録](../../reports/antigravity-sdk-core-isolated-live.json)も保持する。
 - SDK本体の実インストールサイズ150,487,703 bytes、うち同梱runtime 146,133,504 bytes（Windows amd64、依存パッケージ分は別）。API料金がゼロでも、このランタイムとモデルのRAM/起動コストは必要。
 - PyPIにはmacOS arm64/x86_64、Windows amd64/arm64のwheelを確認。macOS実機の動作は未確認。
-- クラウドSDKはキー未設定のため[skipped](../reports/antigravity-sdk-cloud-skipped.json)。CLIは未導入。月額枠を使えたとは表示しない。
+- クラウドSDKはキー未設定のため[skipped](../../reports/antigravity-sdk-cloud-skipped.json)。CLIは未導入。月額枠を使えたとは表示しない。
 - Write、実Notion/Calendar、画像、配布Desktop、macOS/iPhone、一般的な日本語/Tool選択精度は未確認。既存Chromaの非推奨警告は残る。
 
 SDKが実際にメインBrainで会話・Read Toolを使えることと、全端末/全機能の完成は区別する。

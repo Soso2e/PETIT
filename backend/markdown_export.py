@@ -1,6 +1,6 @@
 """Obsidian-friendly Markdown export for PETIT.
 
-役割分担（Concept.md 準拠）:
+役割分担（docs/archive/concept-legacy.md §10 準拠）:
 - SQLite  : AI が検索する正本（構造化データ）
 - Chroma  : 意味検索(RAG) の正本
 - Markdown: 人が読む・育てる・他ツールへ持ち出す副本 ← このモジュール

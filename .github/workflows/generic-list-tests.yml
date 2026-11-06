@@ -8,7 +8,7 @@ on:
       - "backend/tools/__init__.py"
       - "backend/tools/lists.py"
       - "tests/test_generic_lists.py"
-      - "docs/generic_lists.md"
+      - "docs/life/generic_lists.md"
       - ".github/workflows/generic-list-tests.yml"
 
 concurrency:

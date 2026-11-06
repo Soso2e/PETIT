@@ -20,7 +20,7 @@ on:
       - "tests/test_project_resume.py"
       - "tests/test_task_write_queue.py"
       - "tests/test_task_phase2_wiring.py"
-      - "docs/task_schedule_management_v1.md"
+      - "docs/life/task_schedule_management_v1.md"
       - ".github/workflows/notion-adapter-v2-tests.yml"
 
 concurrency:

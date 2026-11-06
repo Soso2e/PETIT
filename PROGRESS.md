@@ -6,6 +6,8 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- 文書統一 Step 1（`docs/unify-direction`、未マージ）: Concept.mdをCLI中心方針（Router=DeepSeek任意 / Executor=Antigravity CLI＞Codex＞Claude Code(予定)＞DeepSeek）の北極星として書き直し、旧全文は docs/archive/concept-legacy.md へ。docs/architecture.md（現行概要と目標との差）と docs/README.md（一覧・配置ルール）を新設し、docs を分野別フォルダへ移動。CLAUDE.mdはAGENTS.mdへの入口に縮小。次: Step 2 Issue再編（ラベル付与・epic統合・新規Issue）。このPCに gh が無いため導入・認証が必要。Router/Executor分離、Claude Code順位、アカウント範囲、Antigravity規約は未決定（Concept §10）。
+
 - #372 Activity live refresh (v0.43.0開発PR): Development Hub表示中かつタブ可視時のみ30秒間隔でSQLiteの保存済みJob状態を再取得。Codex等は別一覧と明記、永続Read調査を区別。新DB・Worker・Brain変更なし。実端末と実Providerの進捗反映は未検証。
 
 - #382 (v0.42.1開発PR): Desktop Wake/音声会話中の無発話待機を8秒→20秒に変更し、無音終了時はSTTを呼ばずoverlayを閉じて既存Wake待機を再開。手動マイクの8秒、発話後1.2秒、確認待ち/半二重方式は維持。音声回帰テスト追加。実Wakeモデル・実マイク・長時間稼働の受入は未確認。
@@ -342,3 +344,5 @@
 | 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの画一エラーを特定reason別の説明・Turn保存へ変更。 |
 | 2026-10-29 | 10:59 | #362 | 2026-10-29-07: Codex/Antigravity CLIの候補モデル一覧取得・選択・保存UIを追加。 |
 | 2026-11-03 | 06:39 | #372 | v0.40.0: Coding Jobの管理者read-only Activity状態一覧を既存Development Hubへ接続。非機密のID/status/provider/時刻のみ投影、Coding Job未初期化時の副作用なし。実機・再起動回復は未確認。 |
+| 2026-11-06 | 08:46 | #345 | 調査: ドキュメント約75本とオープンIssue 55件を棚卸し。Brain記述の不統一（LM Studio/DeepSeek/Antigravity）、Claude Code・アカウント型設定の記述なし、Issueラベル未整備を確認。変更・テストは未実施。 |
+| 2026-11-06 | 08:59 | #345 | docs: 文書統一 Step 1。Concept.mdをCLI中心の北極星へ刷新、architecture.md・docs/README.md新設、docsを分野別フォルダへ移動しリンク・workflowパス更新（リンク切れ0件、runtime-flows文書テスト6件OK）。機能変更なし。 |

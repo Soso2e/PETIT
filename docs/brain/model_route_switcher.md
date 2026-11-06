@@ -1,3 +1,5 @@
+> **Status（2026-11-06）**: 一部が古い。表の「Antigravity SDK」は撤去済み（[sdk-retirement.md](sdk-retirement.md)）。現在のBrain選択は管理UIの優先順位（[../ops/setup-integrations.md](../ops/setup-integrations.md)）と [../runtime-flows.md](../runtime-flows.md) の「v0.34.0: 初期設定・優先順位と単一Brain」を正とする。方針は [../../Concept.md](../../Concept.md) §4。
+
 # Chat / Agent モデル切り替え
 
 PETITのWeb画面上部にある `Chat:` と `Agent:` から、それぞれ別のモデル接続先を選択できます。
