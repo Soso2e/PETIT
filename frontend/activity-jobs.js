@@ -38,7 +38,7 @@
   list.className = "development-activity__list";
   const note = document.createElement("p");
   note.className = "development-note";
-  note.textContent = "既存SQLiteジョブの記録。実行中はDB上の状態で、プロセス稼働の保証ではありません。入力・結果本文は表示しません。Codex等のCoding Jobsは未統合です。";
+  note.textContent = "既存SQLiteジョブの記録。実行中はDB上の状態で、プロセス稼働の保証ではありません。入力・結果本文は表示しません。Coding Jobsは下の別一覧に表示します。";
   section.append(header, state, list, note);
   const firstNote = panel.querySelector(".development-note");
   if (firstNote) firstNote.before(section);
@@ -52,6 +52,7 @@
     unknown: "状態不明",
   };
   const kinds = {
+    durable_read: "永続Read調査",
     background_research: "情報調査",
     agent_followup: "AIフォローアップ",
   };
@@ -90,7 +91,7 @@
     const n = data.jobs.length;
     const active = data.jobs.filter((j) => j.status === "queued" || j.status === "running").length;
     state.textContent = "最近 " + n + "件 · 待機/実行中 " + active + "件"
-      + (data.excludesCoding ? " · Coding Jobs未統合" : "");
+      + (data.excludesCoding ? " · Coding Jobsは別一覧" : "");
   };
 
   let loading = false;
@@ -116,6 +117,13 @@
     }
   };
 
+  // Refresh persisted progress only while the Development panel is visible.
+  // Never claim that a running DB record proves the worker is alive.
+  const poll = () => {
+    if (document.visibilityState === "visible" && !panel.hidden) void load(true);
+  };
+  window.setInterval(poll, 30000);
+  document.addEventListener("visibilitychange", poll);
   refresh.addEventListener("click", () => void load(true));
   window.addEventListener("petit:area-change", (event) => {
     if (event.detail?.area === "development") void load();

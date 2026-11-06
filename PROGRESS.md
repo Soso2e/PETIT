@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.42.1 (PR中・未マージ)**
+**Current Version: v0.43.0 (PR中・未マージ)**
 
 **Last Updated: 2026-11-05 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #372 Activity live refresh (v0.43.0開発PR): Development Hub表示中かつタブ可視時のみ30秒間隔でSQLiteの保存済みJob状態を再取得。Codex等は別一覧と明記、永続Read調査を区別。新DB・Worker・Brain変更なし。実端末と実Providerの進捗反映は未検証。
 
 - #382 (v0.42.1開発PR): Desktop Wake/音声会話中の無発話待機を8秒→20秒に変更し、無音終了時はSTTを呼ばずoverlayを閉じて既存Wake待機を再開。手動マイクの8秒、発話後1.2秒、確認待ち/半二重方式は維持。音声回帰テスト追加。実Wakeモデル・実マイク・長時間稼働の受入は未確認。
 
