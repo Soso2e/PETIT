@@ -50,6 +50,7 @@ def available() -> list[dict[str, Any]]:
 
 def _stop(process: subprocess.Popen) -> None:
     if process.poll() is not None:
+        process.wait()
         return
     try:
         if os.name == "nt":
@@ -137,7 +138,10 @@ def probe_command(command: list[str], *, timeout: float = 8) -> dict[str, Any]:
             _stop(process)
             for stream in (process.stdin, process.stdout):
                 if stream is not None:
-                    stream.close()
+                    try:
+                        stream.close()
+                    except OSError:
+                        pass
 
 
 def diagnose(provider: str, *, timeout: float = 8) -> dict[str, Any]:
