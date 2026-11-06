@@ -1,10 +1,13 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.45.0 (PR中・未マージ)**
+**Current Version: v0.45.1 (Develop ACP診断PR中)**
 
 **Last Updated: 2026-11-06 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #357 / #378 Develop ACP初期化診断（v0.45.1開発PR）: Codexのcodex-acpとAntigravity公式agy acpについて、管理者の明示操作でinitializeだけを送り、ACP v1互換性とCapabilityを確認できる。Develop画面・CLI診断スクリプト・合成プロセステストを追加。Claude Codeはmainの既存CLI Executorを維持して導入状態のみ検出。実ACP/本人Windows認証・Session/Prompt/Permission/継続開発/共同作業は未受入・未実装。docs/dev/develop-multi-agent.md参照。
+
 
 - 旧キーワードルーティング撤去（v0.45.0、`refactor/remove-legacy-routing`、PR #386の上に積んだPR・未マージ）: 画像付き会話を `vision_reply.py`（Read専用1 Call、挙動同じ）へ移し、本番から到達不能になった21モジュール（agent / agent_legacy / agent_runtime / brain_runtime / capability_router / context_broker / model_router / dialogue_resolution / project_router / project_resume / project_source_refresh / task_completion(_intent) / task_work_intent / task_conversation / list_conversation / date_parser / recall / agent_state / agent_progress / tools.agent_actions）と比較PoC 2本を削除。DB tableは削除していない（agent_run_states等は残る）。プロジェクト再開時の外部source自動更新やNotion明示検索などの決定論的処理は#345以降すでに通常会話から使われておらず、今回コードを削除した（Brain+Toolで扱う）。旧図は docs/archive/runtime-flows-legacy-routing.md。frontend/app.js の agent_progress 表示分岐は未使用のまま残っている。実端末での画像会話・プロジェクト再開の受入は未確認。
 
