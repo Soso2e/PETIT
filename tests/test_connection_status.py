@@ -45,7 +45,7 @@ class ConnectionStatusTests(unittest.TestCase):
     def test_open_does_not_contact_any_provider(self):
         with patch.object(connections, "_probe", side_effect=AssertionError("network")) as probe, patch("httpx.Client.send", side_effect=AssertionError("network")), patch("httpx.get", side_effect=AssertionError("network")):
             data = connections.snapshot()
-        self.assertEqual(len(data["services"]), 7)
+        self.assertEqual(len(data["services"]), 6)
         probe.assert_not_called()
         self.assertNotIn("connected", [s["connection_status"] for s in data["services"]])
 
@@ -91,7 +91,7 @@ class ConnectionStatusTests(unittest.TestCase):
         self.assertEqual(service["error_code"], "403")
         self.assertNotIn("super-secret", json.dumps(service))
         self.assertIn("共有", service["error"])
-        self.assertEqual(len(self.client.get("/api/connections").json()["services"]), 7)
+        self.assertEqual(len(self.client.get("/api/connections").json()["services"]), 6)
 
     def test_queue_failure_metadata_and_retry_limit(self):
         self.queue(attempts=5)
@@ -127,7 +127,7 @@ class ConnectionStatusTests(unittest.TestCase):
         original = connections._service
         with patch.object(connections, "_service", side_effect=lambda name: (_ for _ in ()).throw(RuntimeError("secret")) if name == "notion" else original(name)):
             data = self.client.get("/api/connections").json()
-        self.assertEqual(len(data["services"]), 7)
+        self.assertEqual(len(data["services"]), 6)
         self.assertNotIn("secret", json.dumps(data))
 
     def test_conflict_never_exposes_retry_schedule(self):
