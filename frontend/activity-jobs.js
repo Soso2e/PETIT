@@ -120,10 +120,9 @@
   // Refresh persisted progress only while the Development panel is visible.
   // Never claim that a running DB record proves the worker is alive.
   const poll = () => {
-    if (document.visibilityState === "visible" && !panel.hidden) void load();
+    if (document.visibilityState === "visible" && !panel.hidden) void load(true);
   };
   const polling = window.setInterval(poll, 30000);
-  window.addEventListener("pagehide", () => window.clearInterval(polling), { once: true });
   document.addEventListener("visibilitychange", poll);
   refresh.addEventListener("click", () => void load(true));
   window.addEventListener("petit:area-change", (event) => {
