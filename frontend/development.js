@@ -29,7 +29,7 @@
           results.push(name+': '+result.diagnostic+(result.agent_name?' / '+result.agent_name:'')+
             (result.diagnostic==='initialized'?' / ACP v1初期化のみ成功':''));
         }
-        $('acp-results').textContent=results.join('\\n');
+        $('acp-results').textContent=results.join('\n');
       }
     }catch(e){notice(e.message,true);}
     finally{control.disabled=false;}
