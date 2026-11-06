@@ -1,5 +1,7 @@
 # Project Source Refresh
 
+> Status: **アーカイブ**（v0.45.0で実装を撤去）。後継: [../runtime-flows.md](../runtime-flows.md)、[../architecture.md](../architecture.md)。旧図は [runtime-flows-legacy-routing.md](runtime-flows-legacy-routing.md)。
+
 PETIT refreshes only explicitly confirmed external project sources when a user starts or resumes a registered project. Ordinary chat does not trigger a project-source refresh.
 
 ## Selection boundary

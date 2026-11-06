@@ -1,6 +1,6 @@
 # PETIT Architecture — 現行の実装概要
 
-> Status: **現行（実装済みの概要）** / Last updated: **2026-11-06**（v0.44.0 開発版）
+> Status: **現行（実装済みの概要）** / Last updated: **2026-11-06**（v0.45.0 開発版）
 >
 > PETITがいまどう動いているかを1枚で把握するための入口。
 > 目指す姿は [Concept.md](../Concept.md)、会話処理・Tool実行の詳細フローの正本は [runtime-flows.md](runtime-flows.md) を見る。
@@ -81,6 +81,7 @@ flowchart TD
 - `brain_transport=cli_only` にすると、CLI（Codex / Antigravity CLI / Claude Code CLI）だけを使い、APIへは切り替えない。
 - 障害時は、Toolを実行する前に限って次の候補へ切り替える。Tool実行後に障害が起きたら、そのTurnは失敗として扱う。
 - Antigravity SDK は撤去済み（[brain/sdk-retirement.md](brain/sdk-retirement.md)）。
+- キーワードで先に処理する旧ルーター（agent / capability_router / brain_runtime / context_broker / dialogue_resolution / project_router など）は v0.45.0 で撤去した。画像付き会話は `vision_reply.py` のRead専用1 Callへ移した（[archive/runtime-flows-legacy-routing.md](archive/runtime-flows-legacy-routing.md)）。
 - 詳細: [runtime-flows.md](runtime-flows.md) の「v0.34.0: 初期設定・優先順位と単一Brain」、[brain/persistent-agent-workspace.md](brain/persistent-agent-workspace.md)
 
 ### 2.4 Tool・承認・実行記録

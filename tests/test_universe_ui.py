@@ -164,7 +164,7 @@ class UniverseUiTests(unittest.TestCase):
         tool = (BACKEND / "tools" / "task_hierarchy.py").read_text(encoding="utf-8")
         service = (BACKEND / "task_hierarchy.py").read_text(encoding="utf-8")
         tools_init = (BACKEND / "tools" / "__init__.py").read_text(encoding="utf-8")
-        capability = (BACKEND / "capability_router.py").read_text(encoding="utf-8")
+        capability = (BACKEND / "brain.py").read_text(encoding="utf-8")
         self.assertIn('data-action="parent"', html)
         self.assertIn('/parent', script)
         self.assertIn('move_to_life: true', script)

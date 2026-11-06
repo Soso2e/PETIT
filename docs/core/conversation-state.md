@@ -119,7 +119,7 @@ Task照応は「その/それ/これ/こいつ/さっきの/前の」の子作�
 
 ### 検証
 
-`tests.test_dialogue_state`、`tests.test_dialogue_resolution`、`tests.test_project_router_context_guard`でAcceptance Criteria 1〜9と安全回帰をLLMなしで検証します。`model_route`およびChat observabilityの`dialogue_state_used` / `dialogue_resolution_source`で、pending、成功Tool、選択、曖昧、stale等の解決元を確認できます。
+`tests.test_dialogue_state`でDialogue Stateの保存・期限・分離を検証します（決定論的な照応解決 `dialogue_resolution` はv0.45.0で撤去。現行はBrainがfocus IDを参考データとして受け取る）。`model_route`およびChat observabilityの`dialogue_state_used` / `dialogue_resolution_source`で、pending、成功Tool、選択、曖昧、stale等の解決元を確認できます。
 
 受入手順: 同じブラウザsessionで「ゲーム開発タスク追加」「その子にWEVORA追加」を送信し、返答と親タスクのCHILD TASKSを確認。サーバー再起動後に「その期限明日にして」を送信し、同じWEVORAのIDが更新されることを確認します。
 

@@ -1,5 +1,7 @@
 # Dialogue State #294 受入記録
 
+> v0.45.0 注記: 本書が扱う旧キーワードルーティング（agent / capability_router / brain_runtime / dialogue_resolution など）は撤去済み。現行は [../runtime-flows.md](../runtime-flows.md)。以下は当時の記録。
+
 2026-10-06、v0.24.0。外部サービスの成功とローカル会話の成功を区別する。
 
 ## Acceptance Criteria

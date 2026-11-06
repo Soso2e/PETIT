@@ -33,7 +33,6 @@ _STATUS_ALIASES: dict[str, str] = {
     "cancelled": "Chancel",
     "キャンセル": "Chancel",
 }
-_AGENT_ROUTES_INSTALLED = False
 
 
 def _normalize_status(status_value: str | None) -> str | None:
@@ -581,44 +580,3 @@ def retry_task_sync(task_id: int) -> dict[str, Any]:
 )
 def get_task_sync_status(task_id: int | None = None, limit: int = 20) -> dict[str, Any]:
     return task_sync_queue.status(task_id=task_id, limit=limit)
-
-
-def install_agent_routes() -> None:
-    """Install Phase 2 routing after backend.agent has finished importing."""
-    global _AGENT_ROUTES_INSTALLED
-    if _AGENT_ROUTES_INSTALLED:
-        return
-    from .. import agent  # Imported lazily to avoid the agent -> tools cycle.
-
-    existing = {name for name, _signals in agent._TOOL_SIGNALS}
-    additions = []
-    if "update_task" not in existing:
-        additions.append(
-            (
-                "update_task",
-                (
-                    "タスクを編集",
-                    "タスクを変更",
-                    "タスク名を変更",
-                    "期限を変更",
-                    "優先度を変更",
-                    "未完了に戻",
-                ),
-            )
-        )
-    if "retry_task_sync" not in existing:
-        additions.append(
-            (
-                "retry_task_sync",
-                ("タスク同期を再試行", "Notion同期を再試行", "同期をやり直"),
-            )
-        )
-    if "get_task_sync_status" not in existing:
-        additions.append(
-            (
-                "get_task_sync_status",
-                ("タスク同期状態", "タスクの同期状況", "同期エラー", "同期の失敗理由"),
-            )
-        )
-    agent._TOOL_SIGNALS = tuple(agent._TOOL_SIGNALS) + tuple(additions)
-    _AGENT_ROUTES_INSTALLED = True

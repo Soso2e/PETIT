@@ -66,19 +66,6 @@ class CurrentTimeContextTests(unittest.TestCase):
                 self.assertTrue(time_context.needs_prompt_context(query))
 
 
-class RuntimePromptWiringTests(unittest.TestCase):
-    def test_router_injects_context_user_side_and_keeps_agent_prefix_static(self) -> None:
-        agent = (BACKEND / "agent.py").read_text(encoding="utf-8")
-        router = (BACKEND / "capability_router.py").read_text(encoding="utf-8")
-        self.assertIn("_refresh_runtime_time_context", agent)
-        self.assertIn("_RUNTIME_AGENT_BASE_PROMPT", agent)
-        self.assertNotIn("time_context.with_current_context", agent)
-        self.assertIn("time_context.prompt_context_for", router)
-        self.assertIn("situation.build_active_work_context", router)
-        self.assertIn("workspace_context.build_context_block", router)
-        self.assertIn('f"{text}\\n\\n{situational_context}"', router)
-
-
 class ResponsiveUniverseLayoutTests(unittest.TestCase):
     @staticmethod
     def _responsive_css() -> str:

@@ -5,15 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import (
-    config,
-    db,
-    github_config,
-    github_project_links,
-    github_sync,
-    project_continuity,
-    project_source_refresh,
-)
+from backend import config, db, github_config, github_project_links, github_sync, project_continuity
 from backend.github_client import normalize_repository
 from backend.tools.builtins import register_builtin_tools
 from backend.tools.registry import registered_names, requires_confirmation
@@ -222,35 +214,6 @@ class GitHubEvidenceTests(unittest.TestCase):
         self.assertEqual(checkpoint["stage"], "implemented")
         self.assertEqual(checkpoint["unverified_items"], ["実画面", "本番確認"])
 
-    def test_resume_refresh_reads_only_confirmed_target_repository(self) -> None:
-        project_continuity.create_project("PETIT", project_id="petit")
-        project_continuity.create_project("Other", project_id="other")
-        project_continuity.link_project_source("petit", "github", "Soso2e/PETIT", confirmed=True)
-        project_continuity.link_project_source("petit", "github", "Soso2e/Unconfirmed")
-        removed = project_continuity.link_project_source("petit", "github", "Soso2e/Removed", confirmed=True)
-        project_continuity.remove_project_source_link(removed["id"])
-        project_continuity.link_project_source("other", "github", "Soso2e/Other", confirmed=True)
-        calls: list[tuple[str, str, bool]] = []
-
-        result = project_source_refresh.refresh_project_sources(
-            "petit",
-            force=True,
-            github_refresher=lambda project_id, repository, *, force: calls.append(
-                (project_id, repository, force)
-            )
-            or {
-                "ok": True,
-                "configured": True,
-                "skipped": False,
-                "stale": False,
-                "repository": repository,
-            },
-        )
-
-        self.assertTrue(result["ok"])
-        self.assertEqual(calls, [("petit", "Soso2e/PETIT", True)])
-        self.assertEqual(result["attempted"], ["github"])
-        self.assertEqual(result["confirmed_link_count"], 1)
 
     def test_cursor_ttl_and_failure_preserve_cache_and_redact_token(self) -> None:
         project_continuity.create_project("PETIT", project_id="petit")

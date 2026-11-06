@@ -105,8 +105,5 @@ If a confirmed note disappears or becomes unreadable:
 python -m unittest \
   tests.test_brain_candidate_discovery \
   tests.test_brain_project_mapping \
-  tests.test_brain_project_routing \
-  tests.test_project_source_refresh \
-  tests.test_project_resume
 python -m compileall backend tests
 ```

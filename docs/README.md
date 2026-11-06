@@ -34,7 +34,6 @@ Thread/Turn、Context Broker、会話状態、記憶、バックグラウンド�
 
 - [ai-first-agent-design.md](core/ai-first-agent-design.md) — AI-First Agent Architecture — 調査・比較PoC（#338）（DeepSeek中心の比較PoC。現行方針は ../Concept.md §4）
 - [assistant-architecture.md](core/assistant-architecture.md) — PETIT Assistant Architecture
-- [contextual_agent_runtime.md](core/contextual_agent_runtime.md) — 文脈駆動Agent Runtime
 - [conversation-action-reliability.md](core/conversation-action-reliability.md) — Conversation-to-Action Reliability — 初回修正（#335）
 - [conversation-state.md](core/conversation-state.md) — Conversation State
 - [CORE_HARDENING_VALIDATION.md](core/CORE_HARDENING_VALIDATION.md) — PETIT Core Hardening Validation
@@ -84,7 +83,6 @@ Coding Job、ローカル開発の観測、Project、GitHub
 - [github_evidence.md](dev/github_evidence.md) — GitHub Project Evidence
 - [local-development-insight.md](dev/local-development-insight.md) — ローカル開発環境の読取（Issue #341 / Phase 1）
 - [project-workspaces.md](dev/project-workspaces.md) — Projectとローカル開発フォルダ
-- [project_source_refresh.md](dev/project_source_refresh.md) — Project Source Refresh
 
 ### Desktop（`desktop/`）
 
@@ -141,6 +139,9 @@ iPhone / PWA、Discord、画像、Web Push、接続ステータス
 
 過去のバージョン別メモと旧Concept。現行の判断には使わない
 
+- [contextual_agent_runtime.md](archive/contextual_agent_runtime.md) — 文脈駆動Agent Runtime（v0.45.0で撤去）
+- [project_source_refresh.md](archive/project_source_refresh.md) — Project Source Refresh（v0.45.0で撤去）
+- [runtime-flows-legacy-routing.md](archive/runtime-flows-legacy-routing.md) — 旧キーワードルーティングの実装フロー（v0.45.0で撤去）
 - [concept-legacy.md](archive/concept-legacy.md) — Personal AI Assistant 開発方針
 - [desktop-v26-experience.md](archive/desktop-v26-experience.md) — Desktop v0.26.0 — 日常利用の修正と声かけ設計
 - [desktop-v27-experience.md](archive/desktop-v27-experience.md) — Desktop / Web v0.27.0

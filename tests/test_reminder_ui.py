@@ -43,7 +43,7 @@ class ReminderUiTests(unittest.TestCase):
         self.assertTrue((BACKEND / "reminders.py").is_file())
         tool = (BACKEND / "tools" / "reminders.py").read_text(encoding="utf-8")
         builtin_catalog = (BACKEND / "tools" / "builtins.py").read_text(encoding="utf-8")
-        capability = (BACKEND / "capability_router.py").read_text(encoding="utf-8")
+        capability = (BACKEND / "brain.py").read_text(encoding="utf-8")
         self.assertIn('name="create_reminder"', tool)
         self.assertIn('name="get_reminders"', tool)
         self.assertIn('name="manage_reminder"', tool)

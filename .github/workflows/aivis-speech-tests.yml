@@ -11,7 +11,6 @@ on:
       - "backend/chat.py"
       - "backend/request_context.py"
       - "backend/petit_prompt.py"
-      - "backend/brain_runtime.py"
       - "tests/test_voice_conversation_mode.py"
       - "tests/frontend/voice-input.test.cjs"
       - "frontend/index.html"
@@ -52,4 +51,4 @@ jobs:
       - name: Run voice input and playback boundaries
         run: node --test tests/frontend/voice-input.test.cjs
       - name: Run AivisSpeech tests
-        run: python -m unittest tests.test_aivis_speech tests.test_tts_api_contract tests.test_voice_conversation_mode tests.test_brain_runtime -v
+        run: python -m unittest tests.test_aivis_speech tests.test_tts_api_contract tests.test_voice_conversation_mode -v

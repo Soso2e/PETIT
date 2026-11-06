@@ -6,11 +6,7 @@ on:
       - feat/project-source-refresh
   pull_request:
     paths:
-      - "backend/project_source_refresh.py"
-      - "backend/project_resume.py"
       - "backend/notion_project_sync.py"
-      - "tests/test_project_source_refresh.py"
-      - "tests/test_project_resume.py"
       - ".github/workflows/project-source-refresh-tests.yml"
 
 jobs:
@@ -29,10 +25,8 @@ jobs:
           python -m pip install fastapi httpx pydantic chromadb timetree-exporter
       - name: Compile Python sources
         run: python -m compileall backend tests
-      - name: Run source refresh and resume tests
+      - name: Run Notion project sync regressions
         run: |
           python -m unittest \
-            tests.test_project_source_refresh \
-            tests.test_project_resume \
             tests.test_removed_integrations \
             tests.test_notion_adapter_v2

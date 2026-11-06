@@ -11,7 +11,6 @@ from importlib import import_module
 from . import registry
 
 _BUILTIN_MODULES = (
-    "backend.tools.agent_actions",
     "backend.tools.brain",
     "backend.tools.brain_projects",
     "backend.tools.briefing",

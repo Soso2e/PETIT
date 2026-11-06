@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from backend import capability_router, config, workspace_context as context
+from backend import config, workspace_context as context
 from backend.app import create_app
 
 
@@ -124,24 +124,6 @@ class WorkspaceContextTests(unittest.TestCase):
         self.assertNotIn("old-app", block)
         self.assertNotIn("old-workspace", block)
 
-    def test_api_and_brain_use_cached_observation_without_commands(self):
-        self.init_repo()
-        self.observer.refresh()
-        with (
-            patch.object(context, "_command") as command,
-            patch.object(capability_router.situation, "build_active_work_context", return_value=""),
-            patch.object(capability_router, "chat_completion", return_value={"content": "変更はないよ。"}) as llm,
-            patch("backend.setup_store.valid_session", return_value=True),
-        ):
-            client = TestClient(create_app())  # do not start live services
-            response = client.get("/api/workspace-context")
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["workspaces"][0]["changed_entries"], 0)
-            result = capability_router.choose("今のGit作業環境は？")
-        command.assert_not_called()
-        llm.assert_called_once()
-        self.assertEqual(result["type"], "reply")
-        self.assertIn("【PC作業環境】", llm.call_args.args[0][-1]["content"])
 
     def test_foreground_opt_in_and_unavailable_platform(self):
         with patch.object(context, "_command") as command:

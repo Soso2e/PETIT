@@ -117,7 +117,7 @@ rows where the internal project matches, `status=active`, and `confirmed_at` is 
 - The refresh result records attempted, failed, and skipped providers without an LLM.
 
 Detailed behavior is documented in
-[`docs/dev/project_source_refresh.md`](../dev/project_source_refresh.md) and
+[`docs/dev/project_source_refresh.md`](../archive/project_source_refresh.md) and
 [`docs/dev/github_evidence.md`](../dev/github_evidence.md).
 
 ### GitHub evidence boundary

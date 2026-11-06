@@ -19,7 +19,7 @@ Old `PETIT_USE_SONA_CORE`, `PETIT_SONA_CORE_*` and `LINKRAFT_*` environment sett
 
 ```bash
 python -m compileall backend tests
-python -m unittest -v tests.test_removed_integrations tests.test_project_source_refresh tests.test_project_resume tests.test_notion_adapter_v2 tests.test_calendar_sync tests.test_external_sync
+python -m unittest -v tests.test_removed_integrations tests.test_notion_adapter_v2 tests.test_calendar_sync tests.test_external_sync
 python -m pytest -q tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_module_registry.py tests/test_tool_registration.py tests/test_tool_risk_policy.py
 ```
 

@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from backend import attachments, brain_runtime, chat, config, db, frontend_api, lmstudio_client
+from backend import attachments, chat, config, db, frontend_api, lmstudio_client, vision_reply
 
 _temporary = tempfile.TemporaryDirectory(prefix="petit-vision-ui-")
 config.STORAGE_DIR = Path(_temporary.name)
@@ -32,7 +32,7 @@ def fixture_completion(messages, **kwargs):
 
 
 lmstudio_client.chat_completion = fixture_completion
-brain_runtime.chat_completion = fixture_completion
+vision_reply.chat_completion = fixture_completion
 lmstudio_client.endpoint = lambda route: {"provider": "lm_studio", "external": False, "base_url": "http://localhost:1234/v1", "profile": "local", "model": "fixture"}
 chat.conversation_state.update_after_turn = lambda *args, **kwargs: None
 

@@ -298,7 +298,7 @@ AivisSpeech、Notion Adapter v2、Notion会話検索、GitHub evidence、Web Pus
 
 ## Project Continuity Engine
 
-PETITは複数プロジェクトの開始・終了・切り替え・再開をSQLiteで継続管理します。通常雑談とは別の決定論的な経路で処理するため、LM Studioが停止していても保存済み状態から再開できます。
+PETITは複数プロジェクトの開始・終了・切り替え・再開をSQLiteで継続管理します。v0.45.0で旧来の決定論的な経路（キーワードで先に処理する方式）は撤去し、会話のBrainが `activate_internal_project` / `restore_context` / `get_project_status` / `save_project_completion` などのToolで扱います。以下の保存形式と確認の考え方は変わりません。
 
 ### 開始・再開
 
@@ -309,7 +309,11 @@ PETITに戻る
 さっきの続きやる
 ```
 
-確認済みの正式名・別名が一意なら、`active_project_state`を切り替えます。その直後、選択した内部プロジェクトに紐付く外部sourceのうち、次の条件をすべて満たすものだけを更新します。
+確認済みの正式名・別名が一意なら、`active_project_state`を切り替えます。
+
+> v0.45.0注記: 以下の「再開時の外部source自動更新」と固定順の再開文脈は旧ルーター（`project_resume` / `project_source_refresh`）の機能で、撤去済みです。現在は日次同期と `sync_notion_tasks` / `sync_github_evidence` などのToolで更新します。記録は [docs/archive/project_source_refresh.md](docs/archive/project_source_refresh.md)。
+
+旧実装では、選択した内部プロジェクトに紐付く外部sourceのうち、次の条件をすべて満たすものだけを更新していました。
 
 ```text
 project_id = 選択したプロジェクト
@@ -331,7 +335,7 @@ confirmed_at IS NOT NULL
 4. 旧`handoff_notes`の互換情報
 5. 確認済み外部source linkのfresh/stale状態
 
-別プロジェクトの記憶や未確認Relationは混ぜません。別名が衝突する場合は候補を出し、勝手に切り替えません。詳細は [`docs/dev/project_source_refresh.md`](docs/dev/project_source_refresh.md) を参照してください。
+別プロジェクトの記憶や未確認Relationは混ぜません。別名が衝突する場合は候補を出し、勝手に切り替えません。詳細は [`docs/archive/project_source_refresh.md`](docs/archive/project_source_refresh.md) を参照してください。
 
 ### 終了確認
 
@@ -381,29 +385,16 @@ SQLiteは外部正本を置き換えず、内部ID、別名、確認状態、che
 
 - 長期知識・設計: BRAIN / Obsidian
 
-## 会話処理の最小フロー
+## 会話処理の流れ
 
-通常の雑談は、短いsystem prompt・直近3往復以内・ユーザー発話だけを渡し、会話モデルを1回だけ呼びます。ツール、RAG、Embedding、外部同期、要約は実行しません。
+1回の会話（Turn）は、優先順位で選んだ1つのBrain（Antigravity CLI / Codex / Claude Code CLI / DeepSeek / LM Studio）が最後まで担当します。キーワードで先に処理する旧ルーター（v0.44.0まで残っていたもの）はv0.45.0で撤去しました。
 
-明確なプロジェクト開始・終了・登録、純粋な挨拶、現在時刻、明示的なタスク・予定・BRAIN要求は、AIルーターより前に決定論的に処理します。これにより、明確な要求で経路判定用LLMを余分に呼びません。
+- Brainは最初に小さなTool集合（時刻・タスク・予定・天気・ニュース・朝ブリーフィング）と、全Toolの名前一覧を受け取ります。他のToolは `discover_tools` で詳細を取得してから呼びます。
+- 書き込みは確認カードで承認を取り、承認は一度だけ消費します。結果は実行記録（receipt）と一緒に保存します。
+- 8 rounds / 12 calls で止まります。Toolを実行する前の障害に限り、次の候補のBrainへ切り替えます。
+- 画像付きの会話は、画像の観測結果をもとに回答だけを返し、操作はしません。
 
-明示的なツール語がない「傘を持つべき？」のような発話だけ、軽量Chatルーターが許可リスト内の候補ツールを提案します。提案は登録済みツールと照合し、未許可・未登録名を捨ててからAgentへ公開します。
-
-GitHubの一般的な雑談ではツールを公開しません。`owner/name`やGitHub URLの登録・紐付け、候補確認、明示的な同期依頼だけをGitHub evidenceツールへルーティングします。
-
-「Notionから〜を調べて」のような明示的なNotion参照は、ルーターLLMを通さず`search_notion`を実行します。検索結果がある場合だけAgentを1回呼んで整理し、未設定・0件・API失敗はPython側で区別して直接返します。通常会話ではNotion APIを呼びません。
-
-ツール呼び出し後は、標準の`assistant.tool_calls`と`role: tool`で結果を戻します。LM StudioのJinjaテンプレートがこの形式を拒否した場合だけ、同じターン内で従来のuser follow-up形式へ自動的に切り替えます。
-
-Agentは既定で最大3回のツール実行ラウンドを行え、その後に最終回答を生成できます。同じツールでも引数が異なれば再実行でき、完全一致する重複呼び出しは停止します。書き込みツールは従来どおり確認待ちへ変換され、即時実行されません。
-
-「今日何からやる？」のような計画相談では、未完了タスク・当日予定・BRAIN候補だけをPython側で限定取得し、LM Studio 1回で整理します。
-
-会話のEmbeddingとMarkdown出力は応答後のバックグラウンド処理です。Embeddingは同一テキストをプロセス内キャッシュで重複送信せず、Vaultは内容が変わったファイルだけ再Embeddingします。
-
-ChatとAgentはURL・APIキー・モデルを個別設定できます。Agent停止時は、安全に取得済みの読み取り結果だけChatモデルで整形できます。ツール選択や書き込みを勝手に省略しません。
-
-`/api/health` と各応答の詳細欄では、経路、モデル、ツール、同期鮮度、LLM/Embedding回数、Agentフォールバック、Project Continuityの参照件数、source refreshのattempted/failed/skippedを確認できます。`model_route`にはAIルーターの判断、提案ツール、実際に公開したツール、tool結果の伝達方式も含まれます。
+詳細なフローは [docs/runtime-flows.md](docs/runtime-flows.md)、旧ルーターの記録は [docs/archive/runtime-flows-legacy-routing.md](docs/archive/runtime-flows-legacy-routing.md) を参照してください。
 
 ## Web Push通知
 
@@ -448,15 +439,11 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
   ```bash
   python -m unittest \
     tests.test_project_continuity \
-    tests.test_project_router \
     tests.test_project_completion \
-    tests.test_project_resume \
     tests.test_project_registration \
-    tests.test_project_source_refresh \
     tests.test_notion_adapter_v2 \
     tests.test_github_evidence \
     tests.test_github_client_evidence \
-    tests.test_github_evidence_routing
   ```
 
 - Notion会話検索テスト: `python -m unittest tests.test_notion_search -v`

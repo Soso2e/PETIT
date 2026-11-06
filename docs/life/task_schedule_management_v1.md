@@ -181,7 +181,6 @@ Notion側の新しい内容を無言で上書きしない。
 python -m compileall backend tests
 python -m unittest \
   tests.test_notion_adapter_v2 \
-  tests.test_project_resume \
   tests.test_task_write_queue -v
 ```
 

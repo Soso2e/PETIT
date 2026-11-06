@@ -19,7 +19,7 @@ v0.33.0開発版では、同じThread/Turnを使う選択式の[公式Antigravit
 - BrainがToolを直接選択。公開集合はbrain.PUBLIC_TOOLSで固定し、内部execute_agent_write等は公開しない。
 - assistant tool_calls / role=tool / tool_call_id / reasoning_contentを維持。12 Tool calls・8 roundsで停止。
 - 決定論的な日本語ルーター、Capability判断LLM、別Agentへの再解釈は本番text経路から外す。
-- 旧agent.py等は既存契約の回帰・比較用に残るが、新しいchat/Workerは呼ばない。旧agent_legacy.runは削除。
+- 旧agent.py等の決定論ルーティングはv0.45.0で全て撤去した（画像はvision_reply.pyへ移設）。記録は[../archive/runtime-flows-legacy-routing.md](../archive/runtime-flows-legacy-routing.md)。
 - Visionは既存の画像観測→Read専用回答を同じTurn受付へ接続し、画像所有権・cloud同意・TTLを維持。
 
 ## 書込みと承認

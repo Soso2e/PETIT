@@ -8,7 +8,6 @@ on:
       - "backend/notion_client.py"
       - "backend/notion_project_sync.py"
       - "backend/notion_project_links.py"
-      - "backend/project_resume.py"
       - "backend/task_sync_queue.py"
       - "backend/worker.py"
       - "backend/tools/notion.py"
@@ -17,7 +16,6 @@ on:
       - "backend/tools/tasks_phase2.py"
       - "backend/tools/__init__.py"
       - "tests/test_notion_adapter_v2.py"
-      - "tests/test_project_resume.py"
       - "tests/test_task_write_queue.py"
       - "tests/test_task_phase2_wiring.py"
       - "docs/life/task_schedule_management_v1.md"
@@ -43,11 +41,10 @@ jobs:
           python -m pip install --quiet fastapi httpx pydantic chromadb timetree-exporter
       - name: Compile Python sources
         run: python -m compileall backend tests
-      - name: Run Notion adapter, project resume, and task queue tests
+      - name: Run Notion adapter and task queue tests
         run: >-
           python -m unittest
           tests.test_notion_adapter_v2
-          tests.test_project_resume
           tests.test_task_write_queue
           tests.test_task_phase2_wiring
           -v

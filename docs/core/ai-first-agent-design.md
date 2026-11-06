@@ -1,5 +1,7 @@
 > **Status（2026-11-06）**: 調査記録。「LLMが判断しPythonが保証する」という原則は引き継いでいるが、「DeepSeekを中心とする」前提は、判断と処理をCLIエージェントに任せる方針（[../../Concept.md](../../Concept.md) §4）に置き換わった。
 
+> v0.45.0 注記: 本書が扱う旧キーワードルーティング（agent / capability_router / brain_runtime / dialogue_resolution など）は撤去済み。現行は [../runtime-flows.md](../runtime-flows.md)。以下は当時の記録。
+
 # AI-First Agent Architecture — 調査・比較PoC（#338）
 
 ## 判断
