@@ -45,6 +45,25 @@ def configure(payload: Repositories):
     return config()
 
 
+class AcpProbe(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    provider: Literal["codex", "antigravity_cli"]
+
+
+@router.get("/acp/providers")
+def acp_providers():
+    # Read-only PATH inspection; never starts a CLI or authenticates.
+    from . import develop_acp
+    return {"providers": develop_acp.available()}
+
+
+@router.post("/acp/diagnose", dependencies=[Depends(setup_api._same_origin)])
+def acp_diagnose(payload: AcpProbe):
+    # Explicit admin action. Initialize only; no session, prompt, login, tools.
+    from . import develop_acp
+    return develop_acp.diagnose(payload.provider)
+
+
 @router.get("/activity")
 def activity(limit: int = 30):
     """Authenticated, read-only status list; never creates coding jobs."""

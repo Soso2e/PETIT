@@ -1,5 +1,26 @@
 # PETIT Runtime Flows
 
+## Develop ACP initialize診断（v0.45.1 / #357・#378）
+
+```mermaid
+flowchart LR
+    Admin[管理者 Develop画面] -->|明示POST CSRF検査| API["/api/coding/acp/diagnose"]
+    API --> Probe[develop_acp / ACP v1 initializeのみ]
+    Probe --> Codex[codex-acp]
+    Probe --> Agy[agy acp]
+    Probe --> Stop[子プロセス終了 / raw logs非公開]
+    UI[管理者 GET providers] --> Status[PATHの導入確認のみ]
+    Claude[Claude Code] --> Status
+    Status --> Admin
+    Probe -->|機能と認証手段IDのみ| Admin
+```
+
+この診断は既存Coding JobのWorker・承認・ファイル編集・会話Brainへ影響しない。
+ACP `session/new` / `session/prompt` / `authenticate` とClient FS/Terminal権限を使わない。
+Codex/Antigravity実機のACP初期化成功と本人認証・モデル推論・契約枠の確認は別の受入。
+Claude CodeのACP SDK認証経路は有効化しない。詳細は [Develop統合方針](dev/develop-multi-agent.md)。
+
+
 ## Claude Code CLI Executor（v0.44.0開発版）
 
 Concept §4 のExecutor順位（Antigravity CLI ＞ Codex ＞ Claude Code ＞ DeepSeek）の3番目。Antigravity CLIと同じ「構造化した1 round」方式で、Toolの実行・承認・receiptは既存native Loopが行う。

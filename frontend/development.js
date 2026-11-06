@@ -12,6 +12,28 @@
   $('proposal').addEventListener('submit',async event=>{event.preventDefault();$('propose').disabled=true;try{const repo=repositories.find(x=>x.path===$('repository').value);await api('/jobs','POST',{request_id:requestId,repository:$('repository').value,provider:$('provider').value,goal:$('goal').value,base_commit:repo?.head});requestId=crypto.randomUUID();await refresh();notice('対象と開始コミットを確認し、「開始」を選んでください。');$('jobs').querySelector('button')?.focus();}catch(e){notice(e.message,true);}finally{$('propose').disabled=false;}});
   $('save-roots').addEventListener('click',async()=>{try{await api('/config','PUT',{paths:$('repositories').value.split('\n').map(x=>x.trim()).filter(Boolean)});await config();notice('開発用リポジトリを保存しました。');}catch(e){notice(e.message,true);}});
   $('refresh').addEventListener('click',()=>refresh().catch(e=>notice(e.message,true)));
+  $('acp-check').addEventListener('click',async()=>{
+    const control=$('acp-check');control.disabled=true;
+    $('acp-results').textContent='ACP接続を確認しています…';
+    try{
+      const data=await api('/acp/providers');
+      const results=[];
+      for(const row of data.providers){
+        const name=row.provider==='antigravity_cli'?'Antigravity':row.provider==='claude_code'?'Claude Code':'Codex';
+        if(row.provider==='claude_code'){
+          results.push(name+': '+(row.installed?'公式CLI検出':'公式CLI未検出')+' / ACP未接続（契約条件の確認待ち）');
+        }else if(!row.installed){
+          results.push(name+': ACPコマンド未導入');
+        }else{
+          const result=await api('/acp/diagnose','POST',{provider:row.provider});
+          results.push(name+': '+result.diagnostic+(result.agent_name?' / '+result.agent_name:'')+
+            (result.diagnostic==='initialized'?' / ACP v1初期化のみ成功':''));
+        }
+        $('acp-results').textContent=results.join('\n');
+      }
+    }catch(e){notice(e.message,true);}
+    finally{control.disabled=false;}
+  });
   config().then(refresh).catch(e=>notice(e.message,true));
   setInterval(()=>{if(!document.hidden&&!$('content').hidden)refresh().catch(e=>notice(e.message,true));},3000);
 })();
