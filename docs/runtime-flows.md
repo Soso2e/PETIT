@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-    Admin[管理者 Develop画面] -->|明示POST CSRF検査| API[/api/coding/acp/diagnose]
+    Admin[管理者 Develop画面] -->|明示POST CSRF検査| API["/api/coding/acp/diagnose"]
     API --> Probe[develop_acp / ACP v1 initializeのみ]
     Probe --> Codex[codex-acp]
     Probe --> Agy[agy acp]
