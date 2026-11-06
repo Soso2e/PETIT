@@ -1257,3 +1257,17 @@ flowchart TD
 元発言検索は履歴の暗黙結合ではない。NULL旧sessionは出典不明のまま保持する。
 local_onlyの元発言・記憶はstandard会話の検索から除外。local_only検索はembeddingへも送信しない。
 詳細: [renaissance-memory.md](renaissance-memory.md)。
+
+## Development Activity 可視時更新（#372 / v0.43.0）
+
+```mermaid
+flowchart TD
+    Visible[Development Hub表示かつページ可視] --> Timer[30秒ごとの更新]
+    Timer --> API[認証済みGET /api/activity/jobs]
+    API --> SQLite[既存jobs SQLite正本]
+    SQLite --> UI[保存済み状態のみ表示 / Worker生存は未保証]
+    Hidden[他画面・非表示] --> Pause[ポーリングを行わない]
+    Coding[Codex Coding Jobs] --> Separate[既存別一覧 /api/coding/activity]
+```
+
+背景Readの状態表示は既存APIの投影を利用し、入力・結果本文を取得しない。手動更新も維持する。
