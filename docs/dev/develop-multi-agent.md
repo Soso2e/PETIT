@@ -9,7 +9,7 @@
 | --- | --- | --- | --- |
 | Codex | 既存Codex app-server / Coding Jobs | `codex-acp` | ACP接続は別経路。認証を実行しない |
 | Antigravity | 既存公式 `agy` CLI / Coding Jobs | `agy acp` | 公式ACP。CLIのログイン・利用枠は独立 |
-| Claude Code | PR #386（main統合済み）で公式CLI Executor追加中 | ACP起動なし、導入有無だけ | サブスク資格情報をAgent SDK等へ中継しない |
+| Claude Code | PR #386で公式CLI Executor実装済み（main統合済み） | ACP起動なし、導入有無だけ | サブスク資格情報をAgent SDK等へ中継しない |
 
 公式資料:
 - ACP v1: https://agentclientprotocol.com/protocol/v1/initialization
@@ -54,5 +54,5 @@ Current UIの1 Job = 1依頼、元checkout非変更、実テスト未実施、Pu
 
 - 合成エージェントの単体テストは実CLI認証・実モデル推論の証拠ではない。
 - Windows本人PCで Codex ACP と agy ACP の `initialized` を目視確認し、実利用枠は unknown とする。
-- 既存PR #386の変更と重複しないようClaude統合は別途。#385のdocs配置に従いdev/へ配置。
+- mainに入ったPR #386のClaude CLI Executorを維持し、ACPのみ別途。#385のdocs配置に従いdev/へ配置。
 - ACPのinitialize成功でもDevセッション再開・Permission表示・Git差分・Worktreeは未実装。
