@@ -122,7 +122,7 @@
   const poll = () => {
     if (document.visibilityState === "visible" && !panel.hidden) void load(true);
   };
-  const polling = window.setInterval(poll, 30000);
+  window.setInterval(poll, 30000);
   document.addEventListener("visibilitychange", poll);
   refresh.addEventListener("click", () => void load(true));
   window.addEventListener("petit:area-change", (event) => {
