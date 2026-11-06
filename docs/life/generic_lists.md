@@ -63,4 +63,4 @@ Agentには同じCapability内でタスクToolも渡されるため、会話文�
 
 ## 旧パーサー
 
-`list_conversation.py`は回帰比較のため当面残すが、通常の会話入口からは使用しない。正本は`docs/core/contextual_agent_runtime.md`に記載した文脈駆動Agent Runtimeとする。
+旧`list_conversation.py`はv0.45.0で撤去した。リストの会話操作は現行Brainが公開Tool（get_lists / add_list_item など）で行う。

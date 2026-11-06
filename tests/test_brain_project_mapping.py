@@ -5,15 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import (
-    brain_project_sync,
-    config,
-    db,
-    project_continuity,
-    project_resume,
-    project_source_refresh,
-    vault_indexer,
-)
+from backend import brain_project_sync, config, db, project_continuity, vault_indexer
 from backend.tools import register_builtin_tools
 from backend.tools.registry import registered_names, requires_confirmation
 
@@ -135,86 +127,8 @@ class BrainProjectMappingTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["event_type"], "brain_note_updated")
 
-    def test_source_refresh_reads_only_confirmed_target_note(self) -> None:
-        project_continuity.create_project("PETIT", project_id="petit")
-        project_continuity.create_project("Other", project_id="other")
-        project_continuity.link_project_source(
-            "petit", "brain", "vault:0:Projects/PETIT.md", confirmed=True
-        )
-        project_continuity.link_project_source(
-            "petit", "brain", "vault:0:Projects/Unconfirmed.md"
-        )
-        removed = project_continuity.link_project_source(
-            "petit", "brain", "vault:0:Projects/Removed.md", confirmed=True
-        )
-        project_continuity.remove_project_source_link(removed["id"])
-        project_continuity.link_project_source(
-            "other", "brain", "vault:0:Projects/Other.md", confirmed=True
-        )
-        calls: list[tuple[str, str, bool]] = []
 
-        result = project_source_refresh.refresh_project_sources(
-            "petit",
-            force=True,
-            brain_refresher=lambda project_id, external_id, *, force: calls.append(
-                (project_id, external_id, force)
-            )
-            or {
-                "ok": True,
-                "configured": True,
-                "skipped": False,
-                "stale": False,
-                "external_id": external_id,
-            },
-        )
 
-        self.assertTrue(result["ok"])
-        self.assertEqual(calls, [("petit", "vault:0:Projects/PETIT.md", True)])
-        self.assertEqual(result["attempted"], ["brain"])
-        self.assertEqual(result["confirmed_link_count"], 1)
-
-    def test_missing_note_keeps_cache_and_checkpoint_for_resume(self) -> None:
-        candidate = self.discover_candidate()
-        brain_project_sync.link_candidate(int(candidate["id"]), "petit")
-        project_continuity.save_project_checkpoint(
-            "soso",
-            "petit",
-            stage="implemented",
-            last_summary="BRAIN連携を実装",
-            next_action="実画面で確認",
-        )
-        (self.root / "Projects/PETIT.md").unlink()
-        vault_indexer._TEXT_CACHE.clear()
-
-        failed = brain_project_sync.refresh_note_link(
-            "petit", str(candidate["external_id"]), force=True
-        )
-        context = project_resume.build_resume_context("soso", "petit")
-        rendered = project_resume.render_resume_message(context)
-
-        self.assertFalse(failed["ok"])
-        self.assertTrue(failed["cached"])
-        self.assertTrue(failed["stale"])
-        self.assertEqual(context.checkpoint["last_summary"], "BRAIN連携を実装")
-        self.assertEqual(len(context.brain_notes), 1)
-        self.assertIn("関連BRAIN", rendered)
-        self.assertIn("brainは最新同期に失敗", rendered)
-        self.assertIn("実画面で確認", rendered)
-
-    def test_resume_excerpt_is_bounded(self) -> None:
-        project_continuity.create_project("PETIT", project_id="petit")
-        self.write_note("Projects/PETIT.md", "# PETIT\n\n" + ("長い本文" * 1000))
-        inspected = brain_project_sync.inspect_note(
-            "Projects/PETIT.md", project_id="petit"
-        )
-        brain_project_sync.link_candidate(int(inspected["candidate"]["id"]), "petit")
-
-        context = project_resume.build_resume_context("soso", "petit")
-        rendered = project_resume.render_resume_message(context)
-
-        self.assertLessEqual(len(context.brain_notes[0]["excerpt"]), 1200)
-        self.assertLess(len(rendered), 1000)
-        self.assertEqual(context.reference_counts()["brain_notes"], 1)
 
 
 if __name__ == "__main__":

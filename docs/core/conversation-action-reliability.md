@@ -1,5 +1,7 @@
 # Conversation-to-Action Reliability — 初回修正（#335）
 
+> v0.45.0 注記: 本書が扱う旧キーワードルーティング（agent / capability_router / brain_runtime / dialogue_resolution など）は撤去済み。現行は [../runtime-flows.md](../runtime-flows.md)。以下は当時の記録。
+
 調査基準は `feat/multimodal-vision` の `2f3fe8b`。修正ブランチは `origin/main` の `8fc1c5e` から分離し、Vision差分・既存storage・ローカルmainの未Push修正を変更しない。
 
 ## Phase 1：再現と原因

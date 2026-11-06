@@ -92,8 +92,5 @@ Repository mapping and ignoring require the existing approval preview. Sync and 
 python -m unittest \
   tests.test_github_evidence \
   tests.test_github_client_evidence \
-  tests.test_github_evidence_routing \
-  tests.test_project_source_refresh \
-  tests.test_project_resume
 python -m compileall backend tests
 ```

@@ -6,16 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import (
-    config,
-    db,
-    notion_client,
-    notion_project_links,
-    notion_project_sync,
-    project_continuity,
-    project_resume,
-    tools,
-)
+from backend import config, db, notion_client, notion_project_links, notion_project_sync, project_continuity, tools
 from backend.notion_client import NotionError
 from backend.tools import tasks as task_tools
 
@@ -274,18 +265,6 @@ class NotionAdapterV2Tests(unittest.TestCase):
         self.assertEqual(project_count, 1)
         self.assertEqual(task_ids, {"task-b"})
 
-    def test_resume_aggregates_notion_project_and_task_freshness(self) -> None:
-        project_continuity.create_project("PETIT", project_id="petit")
-        project_continuity.link_project_source("petit", "notion", "notion-project-petit", confirmed=True)
-        db.record_sync_success("notion:projects", 1)
-        db.record_sync_success("notion:tasks", 2)
-        db.record_sync_failure("notion:projects", "project API timeout")
-        context = project_resume.build_resume_context("soso", "petit")
-        rendered = project_resume.render_resume_message(context)
-        self.assertTrue(context.source_freshness["notion"]["stale"])
-        self.assertIn("notion:projects", context.source_freshness["notion"]["sources"])
-        self.assertIn("notion:tasks", context.source_freshness["notion"]["sources"])
-        self.assertIn("notionは最新同期に失敗", rendered)
 
     def test_legacy_flat_task_page_stays_parseable(self) -> None:
         page = self.task_page("legacy-task")

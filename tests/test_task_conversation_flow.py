@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import config, db, task_conversation, tools
+from backend import config, db, tools
 from backend.tools import task_reads
 
 
@@ -85,38 +85,7 @@ class TaskConversationFlowTests(unittest.TestCase):
         self.assertIn("priority=later", all_result["response_guidance"])
         self.assertIn("priority=all", all_result["response_guidance"])
 
-    def test_unregistered_activity_creates_high_priority_proposal_without_due_date(self) -> None:
-        with patch.object(
-            task_conversation.tools,
-            "dispatch",
-            return_value=json.dumps({"tasks": [], "total_count": 0}, ensure_ascii=False),
-        ) as dispatch:
-            result = task_conversation.try_handle_task_activity("卒研って言うタスクやってるんだ")
 
-        self.assertIsNotNone(result)
-        self.assertIn("追加する？", result["reply"])
-        self.assertEqual(result["pending_actions"][0]["name"], "create_task")
-        arguments = result["pending_actions"][0]["arguments"]
-        self.assertEqual(arguments, {"title": "卒研", "priority": "High"})
-        self.assertNotIn("due_date", arguments)
-        self.assertNotIn("category", arguments)
-        dispatch.assert_called_once_with(
-            "get_tasks",
-            {"status": "all", "priority": "all", "limit": 100},
-        )
-
-    def test_existing_activity_does_not_offer_duplicate_task(self) -> None:
-        payload = {"tasks": [{"title": "PETIT", "status": "Now"}], "total_count": 1}
-        with patch.object(
-            task_conversation.tools,
-            "dispatch",
-            return_value=json.dumps(payload, ensure_ascii=False),
-        ):
-            result = task_conversation.try_handle_task_activity("PETITっていうタスクやってるんだ")
-
-        self.assertIsNotNone(result)
-        self.assertIn("登録済み", result["reply"])
-        self.assertNotIn("pending_actions", result)
 
     def test_create_task_defaults_to_high_and_keeps_due_date_empty(self) -> None:
         with patch.object(config, "notion_configured", return_value=False):

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import agent, config, db, project_completion, project_continuity, tools
+from backend import config, db, project_completion, project_continuity, tools
 
 
 class ProjectCompletionTests(unittest.TestCase):
@@ -169,12 +169,6 @@ class ProjectCompletionTests(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    def test_agent_completion_path_does_not_call_lm_studio(self) -> None:
-        with patch("backend.agent.chat_completion", side_effect=AssertionError("LLM must not run")):
-            result = agent.run("終わった")
-
-        self.assertEqual(result["model_route"]["kind"], "project_completion_clarification")
-        self.assertIsNotNone(project_completion.get_completion_draft(config.PETIT_OWNER_ID))
 
 
 if __name__ == "__main__":

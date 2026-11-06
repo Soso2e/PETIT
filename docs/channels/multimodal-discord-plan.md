@@ -1,5 +1,7 @@
 # Multimodal Intelligence / Discord 計画
 
+> v0.45.0 注記: 本書が扱う旧キーワードルーティング（agent / capability_router / brain_runtime / dialogue_resolution など）は撤去済み。現行は [../runtime-flows.md](../runtime-flows.md)。以下は当時の記録。
+
 調査: 2026-10-17。基準main: `8fc1c5e`（origin/main）。ローカルmainの未Pushタスク再開修正 `dc865fe` とstorageの既存ファイルは保持し、実装ブランチはorigin/mainから分離する。
 
 ## 現在地

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import capability_router, config, db, tools, work_sessions
+from backend import config, db, tools, work_sessions
 
 
 class WorkSessionToolTests(unittest.TestCase):
@@ -66,14 +66,6 @@ class WorkSessionToolTests(unittest.TestCase):
         self.assertEqual(ended["session"]["status"], "ended")
         self.assertIsNone(work_sessions.active_session())
 
-    def test_work_tools_have_expected_risk_and_capability(self) -> None:
-        names = capability_router.tool_names_for(["work_sessions"])
-        self.assertIn("get_work_status", names)
-        self.assertIn("get_work_report", names)
-        self.assertIn("start_work_session", names)
-        self.assertIn("update_work_session", names)
-        self.assertEqual(tools.risk_for("start_work_session"), "low_risk_write")
-        self.assertEqual(tools.risk_for("update_work_session"), "low_risk_write")
 
     def test_start_same_paused_task_resumes_instead_of_reporting_already_active(self) -> None:
         task_id = self.add_task("HERE")
@@ -97,20 +89,6 @@ class WorkSessionToolTests(unittest.TestCase):
         self.assertFalse(result["started"])
         self.assertFalse(result["already_active"])
         self.assertNotIn("session", result)
-
-
-class WorkSessionRoutingTests(unittest.TestCase):
-    def test_work_time_question_cannot_bypass_tools(self) -> None:
-        with patch.object(
-            capability_router,
-            "chat_completion",
-            return_value={"content": "今日は60分作業したよ。", "tool_calls": []},
-        ):
-            route = capability_router.choose("今日どれに何分作業した？", history=[])
-
-        self.assertEqual(route["type"], "agent")
-        self.assertIn("work_sessions", route["capabilities"])
-        self.assertEqual(route["source"], "forced_tool_guard")
 
 
 if __name__ == "__main__":

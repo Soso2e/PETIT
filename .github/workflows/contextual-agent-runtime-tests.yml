@@ -4,9 +4,7 @@ on:
   pull_request:
     paths:
       - "backend/dialogue_state.py"
-      - "backend/dialogue_resolution.py"
       - "backend/conversation_state.py"
-      - "backend/brain_runtime.py"
       - "backend/brain.py"
       - "backend/setup_api.py"
       - "backend/setup_store.py"
@@ -43,24 +41,12 @@ on:
       - "tests/fixtures/vision/**"
       - "frontend/chat_attachments.js"
       - "backend/pending_actions.py"
-      - "backend/project_router.py"
-      - "backend/task_completion_intent.py"
       - "tests/test_dialogue_state.py"
-      - "tests/test_dialogue_resolution.py"
-      - "tests/test_project_router_context_guard.py"
       - "tests/test_conversation_state.py"
-      - "tests/test_brain_runtime.py"
-      - "tests/test_action_reliability.py"
-      - "tests/test_one_pass_router.py"
       - "backend/work_sessions.py"
       - "backend/tools/work_sessions.py"
       - "backend/notion_task_sync/store.py"
       - "backend/petit_prompt.py"
-      - "backend/agent.py"
-      - "backend/agent_runtime.py"
-      - "backend/agent_state.py"
-      - "backend/agent_progress.py"
-      - "backend/capability_router.py"
       - "backend/workspace_context.py"
       - "backend/local_development.py"
       - "backend/config.py"
@@ -75,26 +61,20 @@ on:
       - "backend/project_workspaces.py"
       - "backend/tools/project_workspaces.py"
       - "tests/test_project_workspaces.py"
-      - "backend/context_broker.py"
       - "backend/tools/schedule.py"
       - "backend/calendar_sync.py"
-      - "tests/test_context_broker.py"
       - "tests/test_calendar_keyword_search.py"
       - "tests/test_calendar_sync.py"
-      - "backend/tools/agent_actions.py"
       - "backend/tools/__init__.py"
       - "backend/tools/registry.py"
       - "backend/tools/task_hierarchy.py"
       - "frontend/app.js"
       - "frontend/action_confirm.js"
-      - "tests/test_contextual_agent_runtime.py"
       - "tests/test_tool_risk_policy.py"
       - "tests/test_task_parent_confirmation_guard.py"
-      - "docs/core/contextual_agent_runtime.md"
       - "docs/life/generic_lists.md"
       - "docs/runtime-flows.md"
       - "experiments/**"
-      - "tests/test_ai_first_poc.py"
       - ".github/workflows/contextual-agent-runtime-tests.yml"
 
 concurrency:
@@ -132,20 +112,11 @@ jobs:
       - name: Run contextual Agent tests
         run: |
           python -m unittest \
-            tests.test_action_reliability \
-            tests.test_ai_first_poc \
-            tests.test_one_pass_router \
             tests.test_work_session_tools \
             tests.test_work_sessions \
             tests.test_dialogue_state \
-            tests.test_dialogue_resolution \
-            tests.test_project_router_context_guard \
             tests.test_conversation_state \
-            tests.test_brain_runtime \
-            tests.test_context_broker \
-            tests.test_personal_context_broker \
             tests.test_task_hierarchy_idempotency \
-            tests.test_contextual_agent_runtime \
             tests.test_tool_risk_policy \
             tests.test_task_parent_confirmation_guard \
             -v

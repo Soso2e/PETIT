@@ -130,5 +130,5 @@ Notionプロジェクト名がPETIT内部プロジェクトと一致しても、
 
 ```bash
 python -m compileall backend tests
-python -m unittest tests.test_notion_adapter_v2 tests.test_project_resume
+python -m unittest tests.test_notion_adapter_v2
 ```

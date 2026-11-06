@@ -147,7 +147,6 @@ class DailyLifeIndexTests(unittest.TestCase):
             patch.object(worker.github_daily_review, "get_scheduler") as github_scheduler,
             patch.object(worker.daily_index, "ensure_schema"),
             patch.object(worker.daily_index, "get_scheduler") as daily_scheduler,
-            patch("backend.tools.tasks_phase2.install_agent_routes"),
         ):
             instance.start()
             instance.stop()

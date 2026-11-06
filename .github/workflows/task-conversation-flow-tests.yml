@@ -3,8 +3,6 @@ name: Task conversation flow tests
 on:
   pull_request:
     paths:
-      - "backend/agent.py"
-      - "backend/task_conversation.py"
       - "backend/tools/__init__.py"
       - "backend/tools/task_defaults.py"
       - "backend/tools/task_reads.py"

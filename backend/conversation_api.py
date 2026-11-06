@@ -47,10 +47,10 @@ def process(request_id: str) -> dict:
                     settings = setup_store.load()
                     if settings["brain_enabled"] and settings.get("brain_transport") == "cli_only":
                         raise lmstudio_client.LMStudioError("CLIのみの画像付き会話は未対応です。画像を外して送信してください。SDK/APIへ自動送信しません。")
-                    from . import attachments, brain_runtime, vision
+                    from . import attachments, vision, vision_reply
                     brain.check_provider(store.thread(row["thread_id"]))
                     observations = vision.analyze(attachment_ids, row["thread_id"])
-                    data = brain_runtime.run_with_images(payload["message"], observations,
+                    data = vision_reply.run_with_images(payload["message"], observations,
                                                          history=store.history(row["thread_id"]))
                     # Observations retain their existing 24h TTL, not a second
                     # permanent copy in the request ledger.

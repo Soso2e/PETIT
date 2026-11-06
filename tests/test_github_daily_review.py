@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import agent, config, db, github_config, github_daily_review, tools
+from backend import config, db, github_config, github_daily_review, tools
 from backend.tools.builtins import register_builtin_tools
 from backend.tools.registry import registered_names, requires_confirmation
 
@@ -223,10 +223,6 @@ class GitHubDailyReviewTests(unittest.TestCase):
         self.assertFalse(result["cursor_advanced"])
         self.assertIn("commit 1件", result["message"])
 
-    def test_explicit_github_review_routing_is_deterministic(self) -> None:
-        self.assertTrue(agent._github_review_requested("GitHub全体の前回差分をレビューして"))
-        self.assertTrue(agent._github_review_requested("GitHubの全リポジトリと新コミットを見て"))
-        self.assertFalse(agent._github_review_requested("GitHub候補をPETITに紐付けて"))
 
     def test_tool_is_registered_and_read_only(self) -> None:
         self.assertIn("review_github_activity", registered_names())

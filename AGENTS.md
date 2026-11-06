@@ -99,14 +99,13 @@ git branch --show-current
 
 次へ変更を加えた場合は、同じ変更内で対応するMermaid図も必ず更新する。
 
-- `/api/chat`と確認API
-- 決定論的な会話ルート
-- Capabilityグループと公開Tool
-- Agent Tool Loopと停止条件
-- Tool Registryとrisk
-- 確認付き書き込みとAgent state再開
-- ProgressイベントとUI配信
-- Project Continuity
+- `/api/chat`・Thread/Turn APIと確認API
+- Brain選択（優先順位・`cli_only`・Fallback）と各Brain
+- 公開Tool catalog・`discover_tools`・Tool Registryとrisk
+- Tool Loopの停止条件
+- 確認付き書き込み・承認の消費・effect receipt
+- 画像付き会話のRead専用経路
+- Coding Job・Durable Read Task
 
 実装とMermaid図が一致しない状態でコミット・main反映しない。Figma / FigJamはMermaid図を参照して更新し、内容の正確さはMermaidを優先する。
 

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 from pydantic import ValidationError
-from backend import chat, request_context, brain, brain_runtime, capability_router, config, db
+from backend import chat, request_context, brain, config, db
 import tempfile
 from pathlib import Path
 from backend.petit_prompt import voice_turn_instructions
@@ -38,23 +38,7 @@ class VoiceConversationModeTests(unittest.TestCase):
         self.assertEqual(seen, [('続きやろう', 'voice')])
         self.assertEqual(request_context.current_conversation_mode(), 'text')
 
-    def test_broker_and_deep_messages_preserve_user_and_history(self):
-        history = [{'role': 'user', 'content': '制作してる'}]
-        with request_context.bind(request_id=None, session_id=None, conversation_mode='voice'):
-            messages = brain_runtime._base_messages(history, '続きやろう', '')
-        self.assertIn('1〜3文', messages[0]['content'])
-        self.assertEqual(messages[1], history[0])
-        self.assertEqual(messages[-1]['content'], '続きやろう')
-        self.assertNotIn('1〜3文', brain_runtime._base_messages(history, '続きやろう', '')[0]['content'])
 
-    def test_one_pass_brain_receives_voice_instructions(self):
-        with request_context.bind(request_id=None, session_id=None, conversation_mode='voice'), \
-             patch.object(capability_router.situation, 'build_active_work_context', return_value=''), \
-             patch.object(capability_router.workspace_context, 'build_context_block', return_value=''), \
-             patch.object(capability_router, 'chat_completion', return_value={'content': 'こんにちは。'}) as completion:
-            result = capability_router.choose('こんにちは', [])
-        self.assertIn('1〜3文', completion.call_args.args[0][0]['content'])
-        self.assertEqual(result['reply'], 'こんにちは。')
 
 
 if __name__ == '__main__':

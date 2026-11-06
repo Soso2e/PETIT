@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend import agent, config, db, task_sync_queue, tools, worker
+from backend import config, db, task_sync_queue, tools, worker
 from backend.tools import registry, task_defaults, task_reads, tasks_phase2
 
 
@@ -39,15 +39,6 @@ class TaskPhase2WiringTests(unittest.TestCase):
         self.assertFalse(registry.requires_confirmation("retry_task_sync"))
         self.assertFalse(registry.requires_confirmation("set_task_parent"))
 
-    def test_agent_routes_are_installed_once(self) -> None:
-        tasks_phase2.install_agent_routes()
-        tasks_phase2.install_agent_routes()
-        names = [name for name, _signals in agent._TOOL_SIGNALS]
-        self.assertEqual(names.count("update_task"), 1)
-        self.assertEqual(names.count("retry_task_sync"), 1)
-        self.assertEqual(names.count("get_task_sync_status"), 1)
-        self.assertIn("update_task", agent._related_tool_names("タスクの期限を変更して"))
-        self.assertIn("retry_task_sync", agent._related_tool_names("タスク同期を再試行して"))
 
     def test_background_worker_processes_notion_task_queue(self) -> None:
         with patch.object(config, "notion_configured", return_value=True):

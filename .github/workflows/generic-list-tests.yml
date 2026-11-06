@@ -3,8 +3,6 @@ name: Generic list tests
 on:
   pull_request:
     paths:
-      - "backend/agent.py"
-      - "backend/list_conversation.py"
       - "backend/tools/__init__.py"
       - "backend/tools/lists.py"
       - "tests/test_generic_lists.py"

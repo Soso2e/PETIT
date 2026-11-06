@@ -1,5 +1,7 @@
 # 文脈駆動Agent Runtime
 
+> Status: **アーカイブ**（v0.45.0で実装を撤去）。後継: [../runtime-flows.md](../runtime-flows.md)、[../architecture.md](../architecture.md)。旧図は [runtime-flows-legacy-routing.md](runtime-flows-legacy-routing.md)。
+
 ## 目的
 
 PETITは、ユーザー発話を正規表現で個別Toolへ固定せず、直近の会話と元の依頼からLLMが目的・必要な機能領域・Tool・終了を判断する。

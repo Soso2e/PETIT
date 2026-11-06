@@ -4,7 +4,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-from backend import agent, config, notion_search
+from backend import config, notion_search
 from backend.notion_client import NotionError
 from backend import tools
 from backend.tools.builtins import register_builtin_tools
@@ -114,89 +114,8 @@ class NotionSearchRoutingTests(unittest.TestCase):
             ],
         }
 
-    def test_explicit_notion_read_uses_knowledge_capability_and_one_search(self) -> None:
-        tool_result = {
-            "ok": True,
-            "searched": True,
-            "status": "found",
-            "query": "卒研",
-            "count": 1,
-            "results": [
-                {
-                    "title": "卒研",
-                    "url": "https://www.notion.so/page-1",
-                    "last_edited_time": "2026-07-21T12:00:00.000Z",
-                    "properties": {"ステータス": "進行中"},
-                    "excerpt": "次は評価指標を決める。",
-                }
-            ],
-        }
-        model_results = [
-            self.tool_call(
-                {
-                    "query": "Notionから卒研に関する情報あったら、今どんな感じか教えて",
-                    "limit": 3,
-                    "max_chars": 1200,
-                }
-            ),
-            {
-                "role": "assistant",
-                "content": "卒研は進行中で、次は評価指標を決める段階です。",
-                "tool_calls": [],
-            },
-        ]
-        with (
-            patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
-            patch.object(agent.model_router, "choose", return_value=self.route()) as router,
-            patch.object(agent.tools, "dispatch", return_value=json.dumps(tool_result, ensure_ascii=False)) as dispatch,
-            patch.object(agent, "chat_completion", side_effect=model_results) as completion,
-        ):
-            result = agent.run("Notionから卒研に関する情報あったら、今どんな感じか教えて")
 
-        router.assert_called_once()
-        self.assertEqual(completion.call_count, 2)
-        self.assertEqual(completion.call_args_list[0].kwargs["route"], "agent")
-        called_args = dispatch.call_args.args[1]
-        self.assertEqual(called_args["limit"], 3)
-        self.assertEqual(called_args["max_chars"], 1200)
-        self.assertEqual(result["used_tools"][0]["name"], "search_notion")
-        self.assertEqual(result["model_route"]["capabilities"], ["knowledge"])
-        self.assertEqual(result["reply"], "卒研は進行中で、次は評価指標を決める段階です。")
 
-    def test_not_found_is_answered_from_tool_result_without_extra_search(self) -> None:
-        tool_result = {
-            "ok": True,
-            "searched": True,
-            "status": "not_found",
-            "query": "卒研",
-            "count": 0,
-            "results": [],
-            "error": None,
-        }
-        model_results = [
-            self.tool_call({"query": "Notionから卒研を探して", "limit": 3, "max_chars": 1200}),
-            {
-                "role": "assistant",
-                "content": "Notionの共有済みページには、卒研に該当する情報が見つからなかったよ。",
-                "tool_calls": [],
-            },
-        ]
-        with (
-            patch.object(agent.project_router, "try_handle_project_turn", return_value=None),
-            patch.object(agent.model_router, "choose", return_value=self.route()),
-            patch.object(agent.tools, "dispatch", return_value=json.dumps(tool_result, ensure_ascii=False)) as dispatch,
-            patch.object(agent, "chat_completion", side_effect=model_results) as completion,
-        ):
-            result = agent.run("Notionから卒研を探して")
-
-        self.assertEqual(dispatch.call_count, 1)
-        self.assertEqual(completion.call_count, 2)
-        self.assertIn("見つからなかった", result["reply"])
-        self.assertEqual(result["used_tools"][0]["name"], "search_notion")
-
-    def test_sync_and_casual_mentions_keep_legacy_introspection_safe(self) -> None:
-        self.assertEqual(agent._related_tool_names("Notionを同期して"), ["sync_notion_tasks"])
-        self.assertNotIn("search_notion", agent._related_tool_names("Notionは便利だね"))
 
 
 if __name__ == "__main__":
