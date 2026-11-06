@@ -132,7 +132,7 @@ def list_jobs():
 
 def create(request_id, repository, goal, provider, *, approved=False, task_id=None, project_id=None, base_commit=None):
     ensure_schema()
-    if provider not in {"codex", "antigravity_cli"}:raise ValueError("開発用CLIを選択してください。")
+    if provider not in {"codex", "antigravity_cli", "claude_code"}:raise ValueError("開発用CLIを選択してください。")
     if not goal.strip() or len(goal) > 8000:raise ValueError("開発目的を1〜8000文字で指定してください。")
     root = require_repository(repository)
     payload = json.dumps([str(root), goal, provider, task_id, project_id, base_commit], ensure_ascii=False)

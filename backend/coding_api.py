@@ -18,7 +18,7 @@ class Proposal(BaseModel):
     request_id: str = Field(min_length=1, max_length=200)
     repository: str = Field(min_length=1, max_length=1000)
     goal: str = Field(min_length=1, max_length=8000)
-    provider: Literal["codex", "antigravity_cli"]
+    provider: Literal["codex", "antigravity_cli", "claude_code"]
     base_commit: str | None = Field(default=None, pattern="^[0-9a-f]{40,64}$")
     task_id: int | None = None
     project_id: str | None = Field(default=None, max_length=200)
@@ -33,7 +33,7 @@ def call(function, *args, **kwargs):
 @router.get("/config")
 def config():
     jobs.ensure_schema()
-    return {"repositories": jobs.roots(), "providers": ["codex", "antigravity_cli"],
+    return {"repositories": jobs.roots(), "providers": ["codex", "antigravity_cli", "claude_code"],
             "policy": "source_HEAD_copy_only_no_shell_delete_push_or_merge"}
 
 

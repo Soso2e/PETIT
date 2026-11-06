@@ -6,7 +6,7 @@ on:
       - "backend/tools/task_reads.py"
       - "backend/tools/__init__.py"
       - "tests/test_task_cancel_status.py"
-      - "docs/task_status_handling.md"
+      - "docs/life/task_status_handling.md"
       - ".github/workflows/task-cancel-status-tests.yml"
 
 concurrency:

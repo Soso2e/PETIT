@@ -7,7 +7,7 @@ on:
       - "backend/daily_index.py"
       - "backend/worker.py"
       - "tests/test_daily_life_index.py"
-      - "docs/daily_life_index.md"
+      - "docs/life/daily_life_index.md"
       - ".env.example"
       - "requirements.txt"
       - ".github/workflows/daily-life-index-tests.yml"

@@ -91,7 +91,7 @@ Wakeまたは「音声会話」で連続会話を開始する。Chat完了とTTS
 - Desktopのバージョンとサーバーのバージョンは別に進められる。今回の最低サーバーは小型画面の追加を含むv0.20.0。アプリ更新はPythonやユーザーデータを置換しない。サーバー更新は従来のGit等の手順を維持。
   - **サーバー・Web画面側（Python / HTML / JS等）の変更**: Desktopアプリの再インストール・再配布は不要。サーバーコードを更新・再起動するだけでDesktopアプリ内の画面・機能にも即座に反映される。
   - **Desktop本体（`desktop/`配下のElectron処理・トレイ・ショートカット等）の変更**: 専用ブランチから `main` へPRを作成してマージし、`v*` タグを push することで GitHub Release が自動作成・配信され、Desktopアプリ側へ更新通知が行く。
-- 未公証macOSの自己更新は未実装。Windows更新も実Releaseを使った旧版からの実機更新は未確認。新しい体験と受入条件は [Desktop v0.26.0](desktop-v26-experience.md) を参照。
+- 未公証macOSの自己更新は未実装。Windows更新も実Releaseを使った旧版からの実機更新は未確認。新しい体験と受入条件は [Desktop v0.26.0](../archive/desktop-v26-experience.md) を参照。
 
 [Electron更新ガイド](https://www.electronjs.org/docs/latest/tutorial/updates)を参照。WindowsはGitHubの検証metadataを使うinstaller引継ぎで、公証を使わないmacOSは手動導入を維持する。
 
@@ -124,11 +124,11 @@ whisper-server -m models/ggml-base.bin --host 127.0.0.1 --port 8080
 ```
 
 Desktop設定のSTT URLは`http://127.0.0.1:8080/inference`。`file`、`language=ja`、`response_format=json`、`model`をmultipartで送り、`{"text":"..."}`を受け取るサーバーに対応する。LM StudioのチャットURLをSTTとして流用しない。
-音声応答は小型画面の「音声応答」をONにする。AivisSpeechは既存の[導入手順](aivis_speech.md)を使用する。
+音声応答は小型画面の「音声応答」をONにする。AivisSpeechは既存の[導入手順](../voice/aivis_speech.md)を使用する。
 
 ### openWakeWordの自動設定（#270 / #273）
 
-1. Python 3と「Hey プティ」の`hey_petit.onnx`を用意する。モデルを同梱しないinstallerもあるため、設定画面でONNXを選択する。[学習・実験モデル](openwakeword.md)を参照。
+1. Python 3と「Hey プティ」の`hey_petit.onnx`を用意する。モデルを同梱しないinstallerもあるため、設定画面でONNXを選択する。[学習・実験モデル](../voice/openwakeword.md)を参照。
 2. 「ウェイク環境を自動設定」を押す。保存前の画面上のONNX選択も使用する。
 3. 専用venvへ依存導入、backboneモデル取得、ONNXコピーを行い、マイクを開かないdiagnostic後にmanagedパスを保存する。diagnostic成功は実マイク検出成功を意味しない。
 4. STT URLを設定し、Wake待機をONにして保存。小型画面を閉じてトレイの待機ONを確認する。マイクでのreadyと実声検出は実機受入で確認する。

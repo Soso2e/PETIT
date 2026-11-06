@@ -7,6 +7,20 @@ import json
 from . import setup_store as settings, conversation_store as store, db, lmstudio_client
 
 _active: ContextVar[dict | None] = ContextVar("petit_brain_target", default=None)
+CLI_PROVIDERS = {"antigravity_cli", "codex", "claude_code"}
+# Concept §4 Executor order. Used for defaults and when a newly connected CLI is inserted.
+POLICY_ORDER = ["antigravity_cli", "codex", "claude_code", "deepseek"]
+
+
+def insert_by_policy(priority: list[str], provider: str) -> list[str]:
+    """Place a newly connected provider by policy without reordering the user's choices."""
+    if provider in priority:
+        return list(priority)
+    rank = POLICY_ORDER.index(provider)
+    for index, existing in enumerate(priority):
+        if existing in POLICY_ORDER and POLICY_ORDER.index(existing) > rank:
+            return priority[:index] + [provider] + priority[index:]
+    return list(priority) + [provider]
 
 
 def enabled() -> bool:
@@ -24,6 +38,11 @@ def target(provider: str, data: dict | None = None) -> dict:
         from .codex_brain import executable
         return {"provider": "codex", "profile": "codex", "label": "Codex（ChatGPT）", "external": True,
                 "model": data["codex_model"], "base_url": "", "configured": bool(executable()), "api_key": ""}
+    if provider == "claude_code":
+        from .claude_code_brain import executable
+        return {"provider": "claude_code", "profile": "claude_code", "label": "Claude Code CLI", "external": True,
+                "model": data.get("claude_code_model", ""), "base_url": "", "api_key": "", "timeout_seconds": 120,
+                "configured": bool(executable())}
     if provider == "antigravity":
         return {"provider": "antigravity_sdk", "profile": "antigravity", "label": "Antigravity SDK（廃止・再選択が必要）",
                 "configured": False, "model": data["antigravity_model"], "external": True, "base_url": "", "api_key": ""}
@@ -36,9 +55,11 @@ def target(provider: str, data: dict | None = None) -> dict:
 
 
 def permitted(provider: str, data: dict, privacy="standard") -> bool:
-    if data.get("brain_transport") == "cli_only" and provider not in {"codex", "antigravity_cli"}:
+    if data.get("brain_transport") == "cli_only" and provider not in CLI_PROVIDERS:
         return False
     if provider == "antigravity_cli" and not data.get("antigravity_cli_enabled"):
+        return False
+    if provider == "claude_code" and not data.get("claude_code_enabled"):
         return False
     if provider == "antigravity" or provider not in data["connected"]:
         return False
@@ -125,7 +146,7 @@ def public_status():
     for provider in data["priority"]:
         item = target(provider)
         options.append({"id": provider, "configured": item["configured"], "model": item["model"],
-                        "transport": "cli" if provider in {"codex", "antigravity_cli"} else "sdk" if provider == "antigravity" else "api",
+                        "transport": "cli" if provider in CLI_PROVIDERS else "sdk" if provider == "antigravity" else "api",
                         "connected": provider in data["connected"], "permitted": permitted(provider, data)})
     with db.get_connection() as c:
         exists = c.execute("SELECT 1 FROM sqlite_master WHERE name='turn_events'").fetchone()

@@ -42,8 +42,8 @@ on:
       - "tests/test_reminders.py"
       - "tests/test_reminder_ui.py"
       - "tests/test_current_time_and_desktop_ui.py"
-      - "docs/universe_focus_orbit.md"
-      - "docs/reminders.md"
+      - "docs/ui/universe_focus_orbit.md"
+      - "docs/life/reminders.md"
       - ".github/workflows/universe-ui-tests.yml"
 
 concurrency:

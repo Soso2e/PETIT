@@ -102,7 +102,7 @@ Web版では、次をすべて満たすときだけ定期チェックを実行�
 
 ルートService Workerは静的シェルのネットワーク優先キャッシュとWeb Push受信をまとめて扱う。`/api/`はキャッシュしない。旧`frontend/sw.js`は既存インストール互換のため残しているが、新しいPWA起動先と通知購読はルートスコープを使う。
 
-Web Pushの設定、通知カテゴリ、API、実iPhone確認は[`web_push_notifications.md`](web_push_notifications.md)を参照する。
+Web Pushの設定、通知カテゴリ、API、実iPhone確認は[`web_push_notifications.md`](../channels/web_push_notifications.md)を参照する。
 
 ## 制限
 

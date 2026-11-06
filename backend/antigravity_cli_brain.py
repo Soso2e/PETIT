@@ -55,9 +55,9 @@ def prepare(root: Path):
     (agents / (AGENT + ".md")).write_text(AGENT_SOURCE, encoding="utf-8")
 
 
-def parse_response(raw: str, catalog) -> dict:
+def parse_response(raw, catalog, *, label="Antigravity CLI", prefix="agy-") -> dict:
     try:
-        value = json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        value = raw if isinstance(raw, dict) else json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
         if not isinstance(value, dict) or set(value) != {"content", "tool_calls"}:
             raise ValueError()
         if not isinstance(value["content"], str) or not isinstance(value["tool_calls"], list):
@@ -69,6 +69,9 @@ def parse_response(raw: str, catalog) -> dict:
         else:
             allowed = catalog
         names = {x["function"]["name"] for x in allowed}
+        if hasattr(catalog, "full") and hasattr(catalog, "schemas"):
+            # discover_tools is advertised in the prompt; brain._run handles it without executing anything.
+            names |= {x["function"]["name"] for x in catalog.schemas()}
         calls = []
         if len(value["tool_calls"]) > 12:
             raise ValueError()
@@ -77,21 +80,22 @@ def parse_response(raw: str, catalog) -> dict:
                     or not isinstance(item["name"], str) or item["name"] not in names
                     or not isinstance(item["arguments"], dict)):
                 raise ValueError()
-            calls.append({"id": "agy-" + uuid4().hex, "type": "function", "function": {
+            calls.append({"id": prefix + uuid4().hex, "type": "function", "function": {
                 "name": item["name"], "arguments": store.encode(item["arguments"])}})
         return {"role": "assistant", "content": value["content"], "tool_calls": calls}
     except (ValueError, TypeError, KeyError, RecursionError):
-        raise CLIError("invalid_cli_response", "Antigravity CLIの構造化応答が不正です。Toolは実行していません。") from None
+        raise CLIError("invalid_cli_response", label + "の構造化応答が不正です。Toolは実行していません。") from None
 
 
-def invoke(command, root, prompt, check, *, timeout=90):
+def invoke(command, root, prompt, check, *, timeout=90, label="Antigravity CLI", raw_stdin=False, env=None):
     """No user text in argv; close the owned process tree on every exit."""
     from .provider_runtime import stop_worker
     from .cli_job import ProcessJob
     with tempfile.TemporaryFile() as source, tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error:
-        source.write((json.dumps({"event": "user", "message": {"content": prompt}}, ensure_ascii=False) + "\n").encode())
+        source.write(prompt.encode("utf-8") if raw_stdin else
+                     (json.dumps({"event": "user", "message": {"content": prompt}}, ensure_ascii=False) + "\n").encode())
         source.seek(0)
-        process = subprocess.Popen(command, cwd=root, env=environment(), stdin=source, stdout=output, stderr=error,
+        process = subprocess.Popen(command, cwd=root, env=environment() if env is None else env, stdin=source, stdout=output, stderr=error,
             **({"creationflags": subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP}
                if os.name == "nt" else {"start_new_session": True}))
         job = None
@@ -101,13 +105,13 @@ def invoke(command, root, prompt, check, *, timeout=90):
             while process.poll() is None:
                 check()
                 if time.monotonic() >= deadline:
-                    raise CLIError("timeout", "Antigravity CLIがタイムアウトしました。")
+                    raise CLIError("timeout", label + "がタイムアウトしました。")
                 if os.fstat(output.fileno()).st_size + os.fstat(error.fileno()).st_size > cli.MAX_BYTES:
-                    raise CLIError("output_limit", "Antigravity CLIの出力上限に達しました。")
+                    raise CLIError("output_limit", label + "の出力上限に達しました。")
                 time.sleep(.05)
             check()
             if os.fstat(output.fileno()).st_size + os.fstat(error.fileno()).st_size > cli.MAX_BYTES:
-                raise CLIError("output_limit", "Antigravity CLIの出力上限に達しました。")
+                raise CLIError("output_limit", label + "の出力上限に達しました。")
             output.seek(0); error.seek(0)
             return process.returncode, output.read(cli.MAX_BYTES).decode("utf-8"), error.read(cli.MAX_BYTES).decode("utf-8", "replace")
         finally:

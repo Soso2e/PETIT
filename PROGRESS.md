@@ -1,10 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.43.0 (PR中・未マージ)**
+**Current Version: v0.44.0 (PR中・未マージ)**
 
-**Last Updated: 2026-11-05 UTC**
+**Last Updated: 2026-11-06 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- Claude Code CLI Executor（v0.44.0、`feat/claude-code-executor`、docs/unify-directionを含む・未マージ）: Concept §4のExecutor 3番目として公式`claude`を会話Brain・Coding Jobに接続（明示接続のみ、組込みTool/MCP/設定読込なし、APIキー非継承、JSON Schemaで判断だけ受取）。既定の優先順位をAntigravity CLI→Codex→Claude Code→DeepSeekへ。CLI BrainがdiscoverをToolとして要求すると失敗していた不具合を修正。Linkraft撤去漏れで/api/connectionsがImportErrorになっていた不具合を修正。朝ブリーフィングを初回Tool集合へ追加。実CLI（開発コンテナ）で雑談・Read・承認付き予定保存を確認。Windows/macOS実端末・本人ログイン・契約上の扱いは未確認。詳細 docs/brain/claude-code-cli.md。既存の失敗テスト51件（旧ルーティング系、base同数）は未対応。削除候補（旧キーワードルーティング・ACP等）は判断待ち。
+
+- 文書統一 Step 1（`docs/unify-direction`、未マージ）: Concept.mdをCLI中心方針（Router=DeepSeek任意 / Executor=Antigravity CLI＞Codex＞Claude Code(予定)＞DeepSeek）の北極星として書き直し、旧全文は docs/archive/concept-legacy.md へ。docs/architecture.md（現行概要と目標との差）と docs/README.md（一覧・配置ルール）を新設し、docs を分野別フォルダへ移動。CLAUDE.mdはAGENTS.mdへの入口に縮小。次: Step 2 Issue再編（ラベル付与・epic統合・新規Issue）。このPCに gh が無いため導入・認証が必要。Router/Executor分離、Claude Code順位、アカウント範囲、Antigravity規約は未決定（Concept §10）。
 
 - #372 Activity live refresh (v0.43.0開発PR): Development Hub表示中かつタブ可視時のみ30秒間隔でSQLiteの保存済みJob状態を再取得。Codex等は別一覧と明記、永続Read調査を区別。新DB・Worker・Brain変更なし。実端末と実Providerの進捗反映は未検証。
 
@@ -342,3 +346,6 @@
 | 2026-10-29 | 10:55 | #362 | 2026-10-29-06: 接続テストの画一エラーを特定reason別の説明・Turn保存へ変更。 |
 | 2026-10-29 | 10:59 | #362 | 2026-10-29-07: Codex/Antigravity CLIの候補モデル一覧取得・選択・保存UIを追加。 |
 | 2026-11-03 | 06:39 | #372 | v0.40.0: Coding Jobの管理者read-only Activity状態一覧を既存Development Hubへ接続。非機密のID/status/provider/時刻のみ投影、Coding Job未初期化時の副作用なし。実機・再起動回復は未確認。 |
+| 2026-11-06 | 08:46 | #345 | 調査: ドキュメント約75本とオープンIssue 55件を棚卸し。Brain記述の不統一（LM Studio/DeepSeek/Antigravity）、Claude Code・アカウント型設定の記述なし、Issueラベル未整備を確認。変更・テストは未実施。 |
+| 2026-11-06 | 08:59 | #345 | docs: 文書統一 Step 1。Concept.mdをCLI中心の北極星へ刷新、architecture.md・docs/README.md新設、docsを分野別フォルダへ移動しリンク・workflowパス更新（リンク切れ0件、runtime-flows文書テスト6件OK）。機能変更なし。 |
+| 2026-11-06 | 14:56 | #345 | v0.44.0: Claude Code CLIをExecutor（会話Brain・Coding Job）として追加、既定順位を方針順へ、CLI BrainのdiscoverTools拒否と/api/connectionsのImportErrorを修正。新規テスト17件・実CLI smoke確認、既存失敗51件はbaseと同数。実端末・本人ログイン未確認。 |

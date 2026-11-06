@@ -1,44 +1,59 @@
-v0.36.0開発版（#368）は、Codex専用Workspace・成功したThreadの継続・必要なToolだけの詳細取得を追加します。SDKは廃止し、旧設定は明示再選択が必要です。実モデルでの会話速度改善は未確認です。[設計・測定・残課題](docs/persistent-agent-workspace.md)。
+# PETIT — Personal Executive for Tasks, Intelligence & Tools
+
+会話から意図を読み取り、生活・タスク・予定・やったことの記録・記憶・開発を横断して支える、**自分専用のAI秘書**。
+判断と実際の処理は CLI エージェント（Antigravity CLI ＞ Codex CLI ＞ Claude Code CLI（導入予定）、受け皿として DeepSeek）に任せ、
+PETIT Core（FastAPI + SQLite）が会話・記憶・権限・承認・実行記録の土台を担います。Web / PWA と Desktop（Electron）から使え、Discord Bot は今後追加します。
+
+| 知りたいこと | 文書 |
+| --- | --- |
+| 何を目指しているか | [Concept.md](Concept.md) |
+| いまの構成と、目標との差 | [docs/architecture.md](docs/architecture.md) |
+| 会話処理・Tool実行のフロー | [docs/runtime-flows.md](docs/runtime-flows.md) |
+| 文書の一覧 | [docs/README.md](docs/README.md) |
+| 現在地・未確認・変更履歴 | [PROGRESS.md](PROGRESS.md) |
+| 開発ルール | [AGENTS.md](AGENTS.md) |
+
+セットアップ手順は下の「[セットアップ](#セットアップ)」を参照してください。以下には、バージョンごとの変更メモ（新しい順）が続きます。
+
+---
+
+## バージョンごとの変更メモ
+
+v0.36.0開発版（#368）は、Codex専用Workspace・成功したThreadの継続・必要なToolだけの詳細取得を追加します。SDKは廃止し、旧設定は明示再選択が必要です。実モデルでの会話速度改善は未確認です。[設計・測定・残課題](docs/brain/persistent-agent-workspace.md)。
 
 ## PETIT UI v0.41.0 — Chat / Univ / Develop / Dashboard
 
-PETITはChatを初期画面にする4領域UIへ整理しました。UnivのThree.js惑星タスク表示とDevelopの既存CLI Coding Job機能は維持。Dashboardには、既存SQLite作業セッションから直近90日の活動カレンダー、直近7日/30日合計、活動日数を表示します。過去の日付を選ぶと当日のタスク・セッション・振り返りを確認できます。スマホでは下部4タブ、Electronのメイン画面も共通Web画面で同じ構成になります。DevelopのProject Thread直接連携、PCアプリ自動時間計測、実機配布確認は後続です。設計・受入条件: [Chat-first UI / Dashboard](docs/ui-chat-first-dashboard.md)。
+PETITはChatを初期画面にする4領域UIへ整理しました。UnivのThree.js惑星タスク表示とDevelopの既存CLI Coding Job機能は維持。Dashboardには、既存SQLite作業セッションから直近90日の活動カレンダー、直近7日/30日合計、活動日数を表示します。過去の日付を選ぶと当日のタスク・セッション・振り返りを確認できます。スマホでは下部4タブ、Electronのメイン画面も共通Web画面で同じ構成になります。DevelopのProject Thread直接連携、PCアプリ自動時間計測、実機配布確認は後続です。設計・受入条件: [Chat-first UI / Dashboard](docs/ui/ui-chat-first-dashboard.md)。
 
 
-> #368: Antigravity SDKは廃止。旧SDKの説明・検証値は履歴です。現在の移行方法は [SDK撤去](docs/sdk-retirement.md)。
+> #368: Antigravity SDKは廃止。旧SDKの説明・検証値は履歴です。現在の移行方法は [SDK撤去](docs/brain/sdk-retirement.md)。
 
-# PETIT — Personal AI Assistant (MVP)
 
-v0.39.0では、Antigravity CLIを明示接続するBrainとCodex CLI／Antigravity CLIに依頼する承認付きローカル開発タスクを統合しました。Development Hubから「CLIの開発タスク・進捗を見る」を開いて、許可したGitルート・目的・CLIを選び、承認後の状態・差分・静的チェックを確認できます。元checkoutは変更せず、専用コピーで作業します。任意Shell・実テストコード実行・削除・Push/PR/mergeは未対応です。[設計・制約](docs/coding-tasks.md)、[実CLIの合成受入](reports/antigravity-cli-brain-live.json)を参照。
+v0.39.0では、Antigravity CLIを明示接続するBrainとCodex CLI／Antigravity CLIに依頼する承認付きローカル開発タスクを統合しました。Development Hubから「CLIの開発タスク・進捗を見る」を開いて、許可したGitルート・目的・CLIを選び、承認後の状態・差分・静的チェックを確認できます。元checkoutは変更せず、専用コピーで作業します。任意Shell・実テストコード実行・削除・Push/PR/mergeは未対応です。[設計・制約](docs/dev/coding-tasks.md)、[実CLIの合成受入](reports/antigravity-cli-brain-live.json)を参照。
 
-v0.34.3ではSona Coreの実行分岐とLinkraft専用同期を撤去し、予定/承認は既存Renaissance Core・Registryへ統一しました。既存SQLiteデータと過去のLinkraftリンク/イベントは削除しません。移行・検証は[撤去ガイド](docs/integration-removal.md)を参照してください。
+v0.34.3ではSona Coreの実行分岐とLinkraft専用同期を撤去し、予定/承認は既存Renaissance Core・Registryへ統一しました。既存SQLiteデータと過去のLinkraftリンク/イベントは削除しません。移行・検証は[撤去ガイド](docs/ops/integration-removal.md)を参照してください。
 
 v0.34.2は開発規約の更新です。`AGENTS.md`にコード削除の事前調査・互換性保護・回帰検証と段階的整理の方針を明文化しました。実機能の削除・変更はありません。
 
 v0.34.1ではSettingsに公式Antigravity CLIの導入検出と未検証状態を追加しました。
 Googleログインの既存契約枠でPETITを動かす接続は、公式資料の矛盾とRead専用境界が
 未解決のため本番無効です。SDK+LM Studio/Gemini APIはこの目的の達成には含めません。
-[Windows/macOS導入・直接診断・Mock検証・残る受入](docs/antigravity-cli.md)を参照。
+[Windows/macOS導入・直接診断・Mock検証・残る受入](docs/brain/antigravity-cli.md)を参照。
 
-v0.33.0開発版は、公式Antigravity SDKを選択式のRead専用Brainとして接続します。既定の推論先はloopback LM Studioで、追加のクラウドAPI課金は不要です。導入・モデル選択・実測と未確認範囲は[SDK導入記録](docs/antigravity-brain-poc.md)を参照してください。Gemini API単独の追加とは区別します。
+v0.33.0開発版は、公式Antigravity SDKを選択式のRead専用Brainとして接続します。既定の推論先はloopback LM Studioで、追加のクラウドAPI課金は不要です。導入・モデル選択・実測と未確認範囲は[SDK導入記録](docs/brain/antigravity-brain-poc.md)を参照してください。Gemini API単独の追加とは区別します。
 
-v0.32.0開発版は[単一Brainと永続Thread/Turn](docs/renaissance-core.md)を導入します。会話は明示して切り替え、再送は同じrequest IDで結果を照会します。既存DBは初回schema追加前にSQLiteバックアップを作成します。実運用はCore 1プロセス（workers=1）です。実Provider/配布版/実端末の受入は別途です。
+v0.32.0開発版は[単一Brainと永続Thread/Turn](docs/core/renaissance-core.md)を導入します。会話は明示して切り替え、再送は同じrequest IDで結果を照会します。既存DBは初回schema追加前にSQLiteバックアップを作成します。実運用はCore 1プロセス（workers=1）です。実Provider/配布版/実端末の受入は別途です。
 
-設計とデータソースの役割は [ASSISTANT_ARCHITECTURE.md](ASSISTANT_ARCHITECTURE.md) を参照。
+設計とデータソースの役割は [docs/core/assistant-architecture.md](docs/core/assistant-architecture.md) を参照。
 主要な概念の使い分けは [docs/terminology.md](docs/terminology.md) を参照。
-DesktopをPCの主入口にする全体の目標・会話/実行の正本・起動/復旧・段階移行は [Desktop・共通Core基盤設計](docs/desktop-foundation-design.md) を参照。Brain/Context Brokerの方針は [docs/jarvis-agent.md](docs/jarvis-agent.md)。目標の新API/管理Coreは未実装です。
+DesktopをPCの主入口にする全体の目標・会話/実行の正本・起動/復旧・段階移行は [Desktop・共通Core基盤設計](docs/desktop/desktop-foundation-design.md) を参照。Brain/Context Brokerの方針は [docs/jarvis-agent.md](docs/core/jarvis-agent.md)。目標の新API/管理Coreは未実装です。
 
-会話から意図を読み取り、ツールを使って生活・タスク・予定・記憶を支える、
-自分専用のローカル AI アシスタント。詳しい思想は [`Concept.md`](./Concept.md) を参照。
 
-この MVP は **ブラウザ（localhost）で動くテキストチャット** で、
-LLM は **LM Studio**（OpenAI 互換のローカルサーバー）を利用します。
+v0.30.3の開発ブランチでは、会話からの作業セッション開始、対象IDの引き継ぎ、重複開始と失敗再試行を改善します。開始報告はTool結果と保存状態を照合します。実モデルE2Eは未確認です。[再現・修正範囲・受入条件](docs/core/conversation-action-reliability.md)を参照。
 
-v0.30.3の開発ブランチでは、会話からの作業セッション開始、対象IDの引き継ぎ、重複開始と失敗再試行を改善します。開始報告はTool結果と保存状態を照合します。実モデルE2Eは未確認です。[再現・修正範囲・受入条件](docs/conversation-action-reliability.md)を参照。
+DeepSeek中心の意図理解とTool Callingへの方針・3方式の比較・本番未接続の実験は [AI-First Agent Architecture](docs/core/ai-first-agent-design.md) を参照。既存の会話経路はまだ移行していません。
 
-DeepSeek中心の意図理解とTool Callingへの方針・3方式の比較・本番未接続の実験は [AI-First Agent Architecture](docs/ai-first-agent-design.md) を参照。既存の会話経路はまだ移行していません。
-
-v0.31.0の開発ブランチでは、Web/旧UI/Desktop小型会話に画像添付を追加します。PNG/JPEG/WebPを4枚・各8MiBまで、画像だけでも送信できます。観測と考察を分離し、既知のSteam指標はPythonで比率を検証します。実Providerの画像認識品質・配布Desktop/macOS/PWA実機は未確認です。[設計とフェーズ](docs/multimodal-discord-plan.md)、[受入セット](docs/multimodal-acceptance.md)を参照。
+v0.31.0の開発ブランチでは、Web/旧UI/Desktop小型会話に画像添付を追加します。PNG/JPEG/WebPを4枚・各8MiBまで、画像だけでも送信できます。観測と考察を分離し、既知のSteam指標はPythonで比率を検証します。実Providerの画像認識品質・配布Desktop/macOS/PWA実機は未確認です。[設計とフェーズ](docs/channels/multimodal-discord-plan.md)、[受入セット](docs/channels/multimodal-acceptance.md)を参照。
 
 画像はCoreに24時間保存します。クラウドへの画像・認識内容送信は既定OFFです。利用者が明示許可する場合だけ、サーバーの`.env`に `PETIT_ALLOW_CLOUD_IMAGES=true` を追加しBackendを再起動してください。Visionは既存の `PETIT_DEEPSEEK_API_KEY` / `PETIT_DEEPSEEK_FLASH_MODEL=deepseek-flash` を使用します。APIキーをClientやGitへ置かないでください。Chatの回答Providerは既存設定を使用します。
 
@@ -46,7 +61,7 @@ v0.31.0の開発ブランチでは、Web/旧UI/Desktop小型会話に画像添�
 
 HTTP契約は `POST /api/attachments` に画像実体（multipart不要）、`X-PETIT-Session` に既存会話ID（16〜200文字）を送り、返された`id`を `/api/chat` の `attachment_ids` で参照します。参照と削除も同じheaderで `GET / DELETE /api/attachments/{id}`。既存の文字だけの `/api/chat` は維持します。会話IDはローカルClientの境界でありユーザー認証の代わりではありません。無認証のCoreをインターネット公開しない構成を維持してください。
 
-v0.30.0ではUnivの遠景星空・ドラッグ操作とRemindersの通知センター配置を改善しました。 v0.30.1では予定名のキーワード検索とCAPCOM/カプコン別名に対応しました。 v0.30.2ではDesktopのOS通知音を任意で有効化でき、通知の表示診断を改善しました（OS上の受信・実音は未確認）。v0.29.0から、上部同期表示・Settingsから接続ステータスとNotion同期失敗の詳細を確認できます。保存済み状態を表示し、接続確認・再試行は明示操作で実行します。[接続ステータス](docs/connection-status.md)を参照。
+v0.30.0ではUnivの遠景星空・ドラッグ操作とRemindersの通知センター配置を改善しました。 v0.30.1では予定名のキーワード検索とCAPCOM/カプコン別名に対応しました。 v0.30.2ではDesktopのOS通知音を任意で有効化でき、通知の表示診断を改善しました（OS上の受信・実音は未確認）。v0.29.0から、上部同期表示・Settingsから接続ステータスとNotion同期失敗の詳細を確認できます。保存済み状態を表示し、接続確認・再試行は明示操作で実行します。[接続ステータス](docs/channels/connection-status.md)を参照。
 
 ## 構成
 
@@ -58,21 +73,21 @@ storage/   SQLite などの実行時データ（git 管理外）
 
 ## Windows / macOS Desktop（段階導入）
 
-v0.28.0（開発版）は、タスク選択から作業開始までの導線を整理し、統計の日付選択と振り返り保存、タブ切替後のDesktop復旧判定を改善します。[作業開始と振り返り](docs/desktop-v28-ux.md)を参照。
+v0.28.0（開発版）は、タスク選択から作業開始までの導線を整理し、統計の日付選択と振り返り保存、タブ切替後のDesktop復旧判定を改善します。[作業開始と振り返り](docs/archive/desktop-v28-ux.md)を参照。
 
-v0.27.0（開発ブランチ）は、小窓の惑星を削除し、作業中バーの上部固定・詳細開閉、Chatの会話欄だけのスクロールと常駐入力、Univの惑星本体の発光・ミドルドラッグ移動に対応します。検証範囲は [Desktop / Web v0.27.0](docs/desktop-v27-experience.md) を参照。
+v0.27.0（開発ブランチ）は、小窓の惑星を削除し、作業中バーの上部固定・詳細開閉、Chatの会話欄だけのスクロールと常駐入力、Univの惑星本体の発光・ミドルドラッグ移動に対応します。検証範囲は [Desktop / Web v0.27.0](docs/archive/desktop-v27-experience.md) を参照。
 
-「統計」タブで今日の合計作業時間・タスク別内訳・7日間の棒グラフ・作業記録を振り返れます。休憩と日をまたぐ作業は既存Coreで集計します。[作業統計](docs/work-statistics.md) を参照。
+「統計」タブで今日の合計作業時間・タスク別内訳・7日間の棒グラフ・作業記録を振り返れます。休憩と日をまたぐ作業は既存Coreで集計します。[作業統計](docs/life/work-statistics.md) を参照。
 
-v0.26.0（開発ブランチ）はWindowsの更新ダウンロード/検証、作業中の星、共通入力、Notion同期競合の手動比較・採用、Desktop通知と画面のすみの声かけに対応します。新しい通知/競合APIにはv0.26.0のサーバーも必要です。実装・未確認・次の音声体験は [Desktop v0.26.0](docs/desktop-v26-experience.md) を参照。
+v0.26.0（開発ブランチ）はWindowsの更新ダウンロード/検証、作業中の星、共通入力、Notion同期競合の手動比較・採用、Desktop通知と画面のすみの声かけに対応します。新しい通知/競合APIにはv0.26.0のサーバーも必要です。実装・未確認・次の音声体験は [Desktop v0.26.0](docs/archive/desktop-v26-experience.md) を参照。
 
-v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeをアプリ内で開けます。接続・画面停止の復旧画面、小型会話の下書き保持、待機中断、位置保持に対応。Backendは別途起動してください。使い分けと実機受入は [Desktop完成・受入台帳](docs/desktop-readiness.md) を参照。
+v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeをアプリ内で開けます。接続・画面停止の復旧画面、小型会話の下書き保持、待機中断、位置保持に対応。Backendは別途起動してください。使い分けと実機受入は [Desktop完成・受入台帳](docs/desktop/desktop-readiness.md) を参照。
 
 既存PETITへ接続するElectron常駐クライアントを追加しています。小型会話UI、トレイ、グローバルショートカット、更新通知、任意の日本語ウェイク検出に対応する初期実装です。
 `desktop`で`npm ci && npm start`を実行し、接続先を設定してください。音声認識にはWhisper互換サーバーを設定します。ウェイク検出はopenWakeWordを使用し、ONNXモデルを選んで「ウェイク環境を自動設定」を実行します。Wakeまたは「音声会話」から、返答再生後に次の発話を待つ連続会話を開始できます。
-設計比較、権限、ビルド、検証範囲は [docs/desktop.md](docs/desktop.md) を参照。iPhoneは既存PWAを継続します。
+設計比較、権限、ビルド、検証範囲は [docs/desktop.md](docs/desktop/desktop.md) を参照。iPhoneは既存PWAを継続します。
 
-AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
+AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/voice/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
 
 ## Coding Job Activity（v0.40.0）
 
@@ -86,13 +101,13 @@ Development Hubに、PETITの既存SQLite Job（background_research / agent_foll
 
 PETITのメイン画面から **Dev** を選ぶと、許可済みのローカルGitリポジトリのブランチ・HEAD・未コミット変更数・コンフリクト数・直近コミット・Concept/PROGRESS/READMEの存在を確認できます。PCの既存観測キャッシュを表示するだけで、Git fetch・コマンド実行・ファイル編集・AI Coding Job作成は行いません。macOS/iPhone実機の表示確認は今後実施します。
 
-利用には PETIT_WORKSPACE_CONTEXT_ENABLED=1、PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1 と PETIT_WORKSPACE_CONTEXT_DIRS（明示許可するGitルート、最大8件）の設定が必要です。観測の鮮度が切れた場合は過去の情報を現在値とみなさず、状態を表示します。PC上のローカル追跡refの比較であり、GitHubの最新状態を保証しません。正式な開発ジョブ・Codexの稼働セッション管理は後続の開発項目です。詳細は [Runtime Flows](docs/runtime-flows.md) と [ローカル開発環境の読取](docs/local-development-insight.md)。
+利用には PETIT_WORKSPACE_CONTEXT_ENABLED=1、PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1 と PETIT_WORKSPACE_CONTEXT_DIRS（明示許可するGitルート、最大8件）の設定が必要です。観測の鮮度が切れた場合は過去の情報を現在値とみなさず、状態を表示します。PC上のローカル追跡refの比較であり、GitHubの最新状態を保証しません。正式な開発ジョブ・Codexの稼働セッション管理は後続の開発項目です。詳細は [Runtime Flows](docs/runtime-flows.md) と [ローカル開発環境の読取](docs/dev/local-development-insight.md)。
 
 ## ローカル開発状況の参照（#341 / 開発ブランチ）
 
 既存PC観測をOpt-inで拡張し、登録済みローカルGitリポジトリのHEAD・ブランチ・ahead/behind・直近コミットと、直下の`Concept.md`・`PROGRESS.md`・`README.md`を読み取り専用で参照します。PETITのDesktop・iPhone PWAからの会話でも、同じCoreの観測キャッシュを利用できます。文書記載は実装・動作検証を証明しません。Git fetchは行いません。
 
-`PETIT_WORKSPACE_CONTEXT_ENABLED=1`、`PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1`、`PETIT_WORKSPACE_CONTEXT_DIRS`（最大8件の明示したGitルート）が必要。既定OFFで、自動フォルダ探索や任意パス読取はありません。設定、API、テスト、制限は[ローカル開発環境の読取](docs/local-development-insight.md)を参照。
+`PETIT_WORKSPACE_CONTEXT_ENABLED=1`、`PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1`、`PETIT_WORKSPACE_CONTEXT_DIRS`（最大8件の明示したGitルート）が必要。既定OFFで、自動フォルダ探索や任意パス読取はありません。設定、API、テスト、制限は[ローカル開発環境の読取](docs/dev/local-development-insight.md)を参照。
 
 ## 初期設定・接続管理（v0.34.0 開発版）
 
@@ -100,7 +115,7 @@ PETITのメイン画面から **Dev** を選ぶと、許可済みのローカル
 
 CLI中心で使う場合は「Brainの接続方式」を「CLIのみ」にして、CodexのChatGPT認証またはAntigravity CLIの明示接続を行い、優先順位の会話利用をONにして保存します。サーバー上の公式CLIへ会話・Tool選択を渡し、承認・実行・保存は既存Coreが管理します。SDK/APIへ自動切替しません。既存設定は従来どおり引き継ぎ、CLI画像対応は未実装です。実Codex推論の受入は未確認です。
 
-Calendarは読み取り専用で、選択した外部サービスからSQLiteへ02:00 JSTに差分同期します。未解決エラーは通知と会話へ反映します。Google双方向同期・Tool実行後のProvider間継続・本人の外部認証を伴う全サービス受入は未完了です。導入前提・既存クライアントの認証への影響・検証手順は[初期設定と接続](docs/setup-integrations.md)を参照してください。
+Calendarは読み取り専用で、選択した外部サービスからSQLiteへ02:00 JSTに差分同期します。未解決エラーは通知と会話へ反映します。Google双方向同期・Tool実行後のProvider間継続・本人の外部認証を伴う全サービス受入は未完了です。導入前提・既存クライアントの認証への影響・検証手順は[初期設定と接続](docs/ops/setup-integrations.md)を参照してください。
 
 ## セットアップ
 
@@ -125,9 +140,9 @@ Calendarは読み取り専用で、選択した外部サービスからSQLiteへ
 
 4. ブラウザで <http://127.0.0.1:8000> を開く。
 
-マイクからチャットへ送る場合は [音声入力の設定・Macの確認手順](docs/voice_mode.md) を参照してください。ブラウザ認識に加え、Whisper互換サーバーによる録音認識を選択できます。
+マイクからチャットへ送る場合は [音声入力の設定・Macの確認手順](docs/voice/voice_mode.md) を参照してください。ブラウザ認識に加え、Whisper互換サーバーによる録音認識を選択できます。
 
-5. 音声読み上げを使う場合は [`docs/aivis_speech.md`](docs/aivis_speech.md) の初期セットアップへ進む。
+5. 音声読み上げを使う場合は [`docs/voice/aivis_speech.md`](docs/voice/aivis_speech.md) の初期セットアップへ進む。
    - AivisSpeechを使う場合は、Windowsでのインストール → 音声モデル追加 → Engine起動 → `/docs` / `/speakers` → `.env` → 診断CLI → WAV再生の順で確認します。
    - AivisSpeechが未準備・停止中でもチャットは利用でき、対応ブラウザでは無料のブラウザ標準TTSへフォールバックできます。
    - 有料TTS APIは前提ではありません。
@@ -255,11 +270,11 @@ tailscale serve reset
 | `PETIT_WEB_PUSH_TTL_SECONDS` | `300` | Push Serviceが通知を保持する秒数 |
 
 AivisSpeech、Notion Adapter v2、Notion会話検索、GitHub evidence、Web Pushの詳細設定は、
-[`docs/aivis_speech.md`](docs/aivis_speech.md)、
-[`docs/notion_adapter_v2.md`](docs/notion_adapter_v2.md)、
-[`docs/notion_search.md`](docs/notion_search.md)、
-[`docs/github_evidence.md`](docs/github_evidence.md)、
-[`docs/web_push_notifications.md`](docs/web_push_notifications.md) を参照してください。
+[`docs/voice/aivis_speech.md`](docs/voice/aivis_speech.md)、
+[`docs/life/notion_adapter_v2.md`](docs/life/notion_adapter_v2.md)、
+[`docs/life/notion_search.md`](docs/life/notion_search.md)、
+[`docs/dev/github_evidence.md`](docs/dev/github_evidence.md)、
+[`docs/channels/web_push_notifications.md`](docs/channels/web_push_notifications.md) を参照してください。
 
 ## 現在使える主なツール
 
@@ -316,7 +331,7 @@ confirmed_at IS NOT NULL
 4. 旧`handoff_notes`の互換情報
 5. 確認済み外部source linkのfresh/stale状態
 
-別プロジェクトの記憶や未確認Relationは混ぜません。別名が衝突する場合は候補を出し、勝手に切り替えません。詳細は [`docs/project_source_refresh.md`](docs/project_source_refresh.md) を参照してください。
+別プロジェクトの記憶や未確認Relationは混ぜません。別名が衝突する場合は候補を出し、勝手に切り替えません。詳細は [`docs/dev/project_source_refresh.md`](docs/dev/project_source_refresh.md) を参照してください。
 
 ### 終了確認
 
@@ -398,7 +413,7 @@ Service Worker、Push API、VAPIDを使い、ブラウザを閉じている場�
 
 作業時間はNotion Task DBのプロパティではなく、Notionを含むTaskのPETIT内部IDへ紐づけたSQLiteセッションとして保存します。Universeの「作業開始」に加え、チャットから「このタスクを開始」「一時停止」「再開」「今日はここまで」を操作でき、「いま何分？」「今日どれに何分？」「最近7日の作業時間」のように現在・今日・直近1〜90日を集計できます。Task名が0件または複数件に一致する場合は勝手に作成・開始せず、候補を返します。
 
-VAPID未設定・依存未導入・通知無効時も既存チャットは動作します。設定、API、実iPhone PWA確認手順は[`docs/web_push_notifications.md`](docs/web_push_notifications.md)を参照してください。
+VAPID未設定・依存未導入・通知無効時も既存チャットは動作します。設定、API、実iPhone PWA確認手順は[`docs/channels/web_push_notifications.md`](docs/channels/web_push_notifications.md)を参照してください。
 
 ## Calendar
 
@@ -452,4 +467,4 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
 - AivisSpeechテスト: `python -m unittest tests.test_aivis_speech -v`
 - 全Python構文確認: `python -m compileall backend tests scripts`
 - 変更のたびに`PROGRESS.md`へ追記する。
-- ルール詳細は[`CLAUDE.md`](./CLAUDE.md)。
+- ルール詳細は[`CLAUDE.md`](CLAUDE.md)。

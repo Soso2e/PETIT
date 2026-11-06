@@ -4,7 +4,7 @@
 
 ## 製品の中心
 
-PETITは、DesktopとWeb/PWAから利用できる、ユーザーの目的・状況・記憶を継続して支える個人用エージェントとする。PCの主入口と会話/実行/起動の目標契約は [Desktop・共通Core基盤設計](desktop-foundation-design.md) に定義する。本書のBrain/Broker・情報源・許可境界は維持する。
+PETITは、DesktopとWeb/PWAから利用できる、ユーザーの目的・状況・記憶を継続して支える個人用エージェントとする。PCの主入口と会話/実行/起動の目標契約は [Desktop・共通Core基盤設計](../desktop/desktop-foundation-design.md) に定義する。本書のBrain/Broker・情報源・許可境界は維持する。
 ユーザーが毎回背景を説明し直さずに、相談、次の一手、作業の実行、結果確認まで進めることを目指す。
 PC操作や前面アプリの把握は任意の情報源であり、利用の前提にしない。
 
@@ -48,7 +48,7 @@ flowchart TD
     verify --> memory
 ```
 
-目標設計を示す図。実装済みフローは [runtime-flows.md](runtime-flows.md) を正とする。
+目標設計を示す図。実装済みフローは [runtime-flows.md](../runtime-flows.md) を正とする。
 既存のFastAPI / Module Registry / SQLite / Brain / Action Runtimeを発展させ、全面置換しない。
 
 ## 状況・記憶・判断のデータ契約
@@ -128,7 +128,7 @@ provider固有のI/O timeoutを置き換えるものではない。応答生成L
 2. **次**: #244のConversation Stateを取り込み、Project checkpointを#245のBrokerへ接続。
 3. **次**: #224をイベント駆動の提案として統合。永続的な重複抑止・保留・通知設定を整える。
 4. **その後**: #225 / #246で実行と結果検証をつなぐ。失敗から再開できる状態遷移を検証。
-5. **任意**: [PC観測](jarvis-workspace-agent.md)、音声、端末Agentを入口・情報源として追加。
+5. **任意**: [PC観測](../desktop/jarvis-workspace-agent.md)、音声、端末Agentを入口・情報源として追加。
 
 評価するのは、背景の再説明回数、誤った事実の断定、提案の採用/却下、不要通知、実行成功・検証率、
 LLM Call数・待ち時間。常駐ループや通知があるだけでJARVIS化完了とはしない。

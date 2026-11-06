@@ -3,7 +3,7 @@ import json
 import queue
 import time
 
-from . import antigravity_cli_brain, codex_brain, lmstudio_client
+from . import antigravity_cli_brain, claude_code_brain, codex_brain, lmstudio_client
 
 CATALOG = [{"type": "function", "function": {"name": name, "description": description, "parameters": schema}}
     for name, description, schema in [
@@ -29,11 +29,13 @@ Do not claim tests passed: only static checks are available. Never mark the user
 
 def run(provider, target, goal, invoke, check, progress):
     messages = [{"role": "system", "content": INSTRUCTIONS}, {"role": "user", "content": goal}]
-    if provider == "antigravity_cli":
+    if provider in {"antigravity_cli", "claude_code"}:
+        # Both CLIs run as structured reasoning steps; Core executes every Job tool.
+        completion = antigravity_cli_brain.completion if provider == "antigravity_cli" else claude_code_brain.completion
         for _ in range(32):
             check()
             progress("model_request")
-            response, metadata = antigravity_cli_brain.completion(target, messages, CATALOG, check)
+            response, metadata = completion(target, messages, CATALOG, check)
             progress("model_response")
             calls = response.get("tool_calls") or []
             if not calls:

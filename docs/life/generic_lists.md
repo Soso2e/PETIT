@@ -63,4 +63,4 @@ Agentには同じCapability内でタスクToolも渡されるため、会話文�
 
 ## 旧パーサー
 
-`list_conversation.py`は回帰比較のため当面残すが、通常の会話入口からは使用しない。正本は`docs/contextual_agent_runtime.md`に記載した文脈駆動Agent Runtimeとする。
+`list_conversation.py`は回帰比較のため当面残すが、通常の会話入口からは使用しない。正本は`docs/core/contextual_agent_runtime.md`に記載した文脈駆動Agent Runtimeとする。

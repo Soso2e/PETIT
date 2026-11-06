@@ -13,10 +13,10 @@ from urllib.parse import quote
 import httpx
 from fastapi import HTTPException
 
-from . import config, db, github_config, google_calendar_push, linkraft_config, task_sync_queue
+from . import config, db, github_config, google_calendar_push, task_sync_queue
 
 NAMES = {"lmstudio": "LM Studio", "notion": "Notion", "calendar": "Google Calendar",
-         "github": "GitHub", "linkraft": "Linkraft", "aivis": "AivisSpeech", "brain": "BRAIN"}
+         "github": "GitHub", "aivis": "AivisSpeech", "brain": "BRAIN"}
 _LOCKS = {key: threading.Lock() for key in NAMES}
 
 
@@ -27,7 +27,7 @@ def safe_text(value: Any) -> str | None:
     text = str(value)
     secrets = [str(v) for k, v in vars(config).items()
                if any(part in k for part in ("TOKEN", "KEY", "SECRET", "PASSWORD")) and isinstance(v, str) and v]
-    secrets += [github_config.TOKEN, linkraft_config.READ_TOKEN]
+    secrets += [github_config.TOKEN]
     secrets += [v for k, v in os.environ.items() if any(p in k.upper() for p in ("TOKEN", "KEY", "SECRET", "PASSWORD")) and v]
     for secret in sorted(set(secrets), key=len, reverse=True):
         if secret:
@@ -57,7 +57,6 @@ def _config_hash(service: str) -> str:
         "calendar": [config.CALENDAR_ICS_URLS, google_calendar_push.enabled(), google_calendar_push.calendar_id(),
                      str(token_path), token_path.stat().st_mtime_ns if token_path.is_file() else None],
         "github": [github_config.API_URL, github_config.TOKEN],
-        "linkraft": [linkraft_config.BASE_URL, linkraft_config.READ_TOKEN],
         "aivis": [config.TTS_PROVIDER, config.TTS_BASE_URL],
         "brain": [str(path) for path in config.OBSIDIAN_VAULT_DIRS],
     }
@@ -79,14 +78,13 @@ def _old(at: str | None, ttl: float = 300) -> bool:
 def _configured(service: str) -> bool:
     return {"lmstudio": lambda: bool(config.LM_BASE_URL), "notion": config.notion_configured,
             "calendar": lambda: bool(config.CALENDAR_ICS_URLS or (google_calendar_push.enabled() and google_calendar_push.token_file().is_file())), "github": github_config.configured,
-            "linkraft": linkraft_config.configured,
             "aivis": lambda: config.TTS_PROVIDER == "aivis" and bool(config.TTS_BASE_URL),
             "brain": lambda: bool(config.OBSIDIAN_VAULT_DIRS)}[service]()
 
 
 def _histories(service: str) -> list[dict[str, Any]]:
     prefixes = {"notion": ("notion:tasks",), "calendar": ("google_ics:", "google_calendar_push"),
-                "github": ("github:repo:",), "linkraft": ("linkraft:",)}
+                "github": ("github:repo:",)}
     states = [row for row in db.all_sync_states() if row["source"].startswith(prefixes.get(service, ("__none__",)))]
     if service == "notion":
         from .notion_task_sync import store
@@ -162,7 +160,7 @@ def _service(service: str) -> dict[str, Any]:
             syncing += 1
     sync = ("unconfigured" if not configured else "conflict" if counts.get("conflict") else "error" if error
             else "syncing" if syncing else "unverified" if not success
-            else "stale" if _old(success, ttl) else "healthy") if service in {"notion", "calendar", "github", "linkraft"} else None
+            else "stale" if _old(success, ttl) else "healthy") if service in {"notion", "calendar", "github"} else None
     return {"id": service, "name": NAMES[service], "configured": configured,
             "connection_status": connection, "sync_status": sync,
             "last_connection_success_at": diag.get("last_success_at"), "checked_at": diag.get("checked_at"),
@@ -213,10 +211,6 @@ def _probe(service: str) -> None:
         from . import github_client
         url = github_config.API_URL + "/user"
         headers = github_client._headers()
-    elif service == "linkraft":
-        from . import linkraft_client
-        url = linkraft_config.BASE_URL + "/api/integrations/petit/projects"
-        headers = linkraft_client._headers()
     elif service == "aivis":
         url = config.TTS_BASE_URL.rstrip("/") + "/speakers"
     elif service == "calendar":
@@ -244,7 +238,6 @@ def _probe(service: str) -> None:
         valid = (isinstance(data, list) and bool(data)) if service == "aivis" else (
             isinstance(data, dict) and (
                 isinstance(data.get("data"), list) if service == "lmstudio" else
-                isinstance(data.get("projects"), list) if service == "linkraft" else
                 bool(data.get("id")) if service == "notion" else bool(data.get("login"))))
         if not valid:
             raise ValueError("APIの応答形式が不正です。サービスの設定を確認してください。")

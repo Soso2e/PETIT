@@ -12,7 +12,7 @@ on:
       - "frontend/index.html"
       - "tests/test_task_conversation_flow.py"
       - "tests/test_task_cancel_status.py"
-      - "docs/task_conversation_flow.md"
+      - "docs/life/task_conversation_flow.md"
       - ".github/workflows/task-conversation-flow-tests.yml"
 
 concurrency:

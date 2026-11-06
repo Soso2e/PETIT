@@ -23,7 +23,7 @@ on:
       - ".github/workflows/aivis-speech-tests.yml"
       - ".env.example"
       - "README.md"
-      - "docs/aivis_speech.md"
+      - "docs/voice/aivis_speech.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

@@ -50,4 +50,4 @@ Windows x64 NSISを生成し、新しい通知画面・Main modulesの同梱検�
 
 参考: [Electron通知](https://www.electronjs.org/docs/latest/tutorial/notifications)、[Electron更新](https://www.electronjs.org/docs/latest/tutorial/updates)、[GitHub asset digest](https://docs.github.com/en/rest/releases/assets)。
 
-通知音の明示設定とMac切り分けは [Desktop通知診断](desktop-notification-diagnostics.md) を参照（v0.29.1）。
+通知音の明示設定とMac切り分けは [Desktop通知診断](../desktop/desktop-notification-diagnostics.md) を参照（v0.29.1）。

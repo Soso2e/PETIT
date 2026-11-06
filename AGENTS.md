@@ -1,25 +1,26 @@
 # AGENTS.md — PETIT 開発ルール
 
 AIコーディングエージェントと開発者向けの共通ルールです。  
-製品の目的・仕様は `Concept.md`、`README.md`、`docs/` を参照してください。
+製品の目的は `Concept.md`、現行の実装概要は `docs/architecture.md`、文書の一覧は `docs/README.md` を参照してください。
 
 ---
 
 ## PETIT概要
 
-PETITは、会話から意図を理解し、生活・制作・開発・タスク・予定・記憶を支援する個人用AIアシスタントです。
+PETITは、会話から意図を理解し、生活・タスク・予定・記録・記憶・開発を横断して支援する、自分専用のAI秘書です。判断と実際の処理はCLIエージェント（Antigravity CLI ＞ Codex CLI ＞ Claude Code CLI、受け皿としてDeepSeek）に任せ、PETIT Coreは会話・記憶・権限・承認・実行記録の土台を担う方針です（`Concept.md` §4）。
 
-- Backend: FastAPI + Python
-- LLM: LM StudioなどのOpenAI互換API
+- Backend: FastAPI + Python（Thread/Turn・Tool Registry・承認・SQLite）
+- Brain: Antigravity CLI / Codex CLI / Claude Code CLI / DeepSeek / LM Studio から優先順位で選択（現行は1 Turn を1つのBrainが担当）
 - 記憶: SQLite、Chroma、Obsidian Markdown
-- Frontend: HTML / CSS / Vanilla JavaScript
-- MVP: localhostで動くテキストチャット
+- Frontend: HTML / CSS / Vanilla JavaScript（Web / PWA）
+- Desktop: Electron（`desktop/`）
 
 ```text
-backend/   API・エージェント・ツール
-frontend/  ブラウザUI
+backend/   Core API・Brain・Tool・Domainサービス
+frontend/  Web / PWA UI
+desktop/   Electron Desktop
 scripts/   セットアップ・運用
-docs/      仕様・検証手順
+docs/      仕様・設計（配置は docs/README.md）
 storage/   実行時データ（Git管理外）
 ```
 
@@ -42,7 +43,7 @@ storage/   実行時データ（Git管理外）
 
 1. `AGENTS.md`
 2. `Concept.md`
-3. `README.md`
+3. `docs/architecture.md`
 4. `PROGRESS.md`
 5. Git状態
 6. 関連Issue・PR
@@ -72,7 +73,7 @@ git branch --show-current
 - Issueの目的と完了条件に沿う
 - 依存追加前に標準ライブラリで解決できないか確認する
 - 既存API・設定・データ形式を不用意に壊さない
-- LM Studioや外部サービス停止時も原因を明確に返す
+- Brain（CLI / API / LM Studio）や外部サービスの停止時も、サーバーを落とさず原因を明確に返す
 - ツール追加時は登録・引数検証・権限・確認フローまで確認する
 - 書き込みの承認・冪等性・監査境界を壊さない
 - 秘密情報を含めず、環境依存値は設定へ分離する
@@ -194,6 +195,8 @@ PRには変更概要、理由、影響範囲、テスト結果、未確認事項
 ## ドキュメント・コミット
 
 - 仕様、API、設定、データ形式、運用が変わったら関連文書も更新する
+- 文書の置き場所と書き方は `docs/README.md` の配置ルールに従う。バージョンごとの作業メモを新しく作らず、その機能の文書を更新する
+- 目標・方針が変わったら `Concept.md`、現行の構成が変わったら `docs/architecture.md` も更新する
 - コミットは `feat:` `fix:` `docs:` `refactor:` などを使い、日本語で簡潔に書く
 
 ---

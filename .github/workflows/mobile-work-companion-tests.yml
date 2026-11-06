@@ -12,7 +12,7 @@ on:
       - "frontend/sw.js"
       - "frontend/icon.svg"
       - "tests/test_mobile_work_companion.py"
-      - "docs/mobile_work_companion.md"
+      - "docs/life/mobile_work_companion.md"
       - ".github/workflows/mobile-work-companion-tests.yml"
 
 concurrency:

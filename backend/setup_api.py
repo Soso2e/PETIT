@@ -140,8 +140,10 @@ def logout(request: Request):
 def get_config():
     from . import codex_brain
     from .antigravity_cli import status
+    from . import claude_code_brain
+    data = settings.load()
     return {"settings": settings.public(), "brain": brain_priority.public_status(), "sync": service_sync.status(),
-            "antigravity_cli": status(settings.load()), "codex_cli": codex_brain.status()}
+            "antigravity_cli": status(data), "codex_cli": codex_brain.status(), "claude_code": claude_code_brain.status(data)}
 
 
 @router.get("/antigravity-acp", dependencies=[Depends(_admin)])
@@ -212,9 +214,16 @@ def antigravity_cli_status():
     return status(settings.load())
 
 
+@router.get("/claude-code", dependencies=[Depends(_admin)])
+def claude_code_status():
+    # File existence only. No login, prompt, process, credential inspection or network.
+    from . import claude_code_brain
+    return claude_code_brain.status(settings.load())
+
+
 class SettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    priority: list[Literal["codex", "antigravity", "deepseek", "antigravity_cli"]] | None = None
+    priority: list[Literal["codex", "antigravity", "deepseek", "antigravity_cli", "claude_code"]] | None = None
     paid_allowed: list[Literal["antigravity", "deepseek"]] | None = None
     brain_enabled: bool | None = None
     brain_transport: Literal["mixed", "cli_only"] | None = None
@@ -228,6 +237,7 @@ class SettingsUpdate(BaseModel):
     codex_web_search: Literal["disabled", "cached", "live"] | None = None
     codex_model: str | None = Field(default=None, max_length=200)
     antigravity_cli_model: str | None = Field(default=None, max_length=200)
+    claude_code_model: str | None = Field(default=None, max_length=200, pattern=r"^[A-Za-z0-9._:\[\]-]*$")
     sync_notifications: bool | None = None
 
 
@@ -361,6 +371,14 @@ def connect(service: str):
                          "connected": sorted(set(data["connected"]) | {service}),
                          "priority": [service] + [x for x in data["priority"] if x != service]})
         return {"connected": True, "tested": False, "authentication": "unknown", "officially_supported": False}
+    if service == "claude_code":
+        if not brain_priority.target(service)["configured"]:
+            raise HTTPException(400, "公式Claude Code CLIをサーバーへ導入し、公式CLIでログインしてください。")
+        data = settings.load()
+        # Unlike the explicit "move to top" Antigravity button, keep the Concept §4 order.
+        settings.update({"claude_code_enabled": True, "connected": sorted(set(data["connected"]) | {service}),
+                         "priority": brain_priority.insert_by_policy(data["priority"], service)})
+        return {"connected": True, "tested": False, "authentication": "unknown", "officially_supported": None}
     if service == "antigravity":
         from .provider_runtime import RETIRED_SDK_MESSAGE
         raise HTTPException(409, RETIRED_SDK_MESSAGE)
@@ -409,6 +427,7 @@ def disconnect(service: str):
                    "notion": {"notion_key": ""}, "timetree": {"timetree_email": "", "timetree_password": "", "timetree_calendar": ""}}
     settings.update({"connected": [x for x in settings.load()["connected"] if x != service],
                      **({"antigravity_cli_enabled": False} if service == "antigravity_cli" else {}),
+                     **({"claude_code_enabled": False} if service == "claude_code" else {}),
                      **({"calendar": "local"} if data["calendar"] == service else {})}, credentials.get(service))
     return {"disconnected": True, "remote_revocation_confirmed": remote_confirmed}
 
@@ -431,7 +450,7 @@ def test_connection(service: str):
             from .calendar_sync import parse_ics
             events = parse_ics(timetree.fetch_ics())
             return {"ok": True, "read_only": True, "count": len(events)}
-        if service in {"codex", "antigravity", "deepseek", "antigravity_cli"}:
+        if service in {"codex", "antigravity", "deepseek", "antigravity_cli", "claude_code"}:
             from . import brain, conversation_store as store, request_context
             data = settings.load()
             if not brain_priority.permitted(service, data):
