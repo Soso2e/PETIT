@@ -6,6 +6,9 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- v0.45.2 開発PR（Development Job UI回帰修正）: 既存Coding Jobsの詳細がstatus/イベント番号不変でも更新されるようsummary/error/checks/workspace/branchを描画差分判定へ追加。Claude Code CLIをAntigravity CLIと誤表示しないよう修正。SQLite・Brain・Worker・承認は変更なし。静的回帰契約テスト追加。Windows実画面・CIは未確認。
+
+
 - 旧キーワードルーティング撤去（v0.45.0、`refactor/remove-legacy-routing`、PR #386の上に積んだPR・未マージ）: 画像付き会話を `vision_reply.py`（Read専用1 Call、挙動同じ）へ移し、本番から到達不能になった21モジュール（agent / agent_legacy / agent_runtime / brain_runtime / capability_router / context_broker / model_router / dialogue_resolution / project_router / project_resume / project_source_refresh / task_completion(_intent) / task_work_intent / task_conversation / list_conversation / date_parser / recall / agent_state / agent_progress / tools.agent_actions）と比較PoC 2本を削除。DB tableは削除していない（agent_run_states等は残る）。プロジェクト再開時の外部source自動更新やNotion明示検索などの決定論的処理は#345以降すでに通常会話から使われておらず、今回コードを削除した（Brain+Toolで扱う）。旧図は docs/archive/runtime-flows-legacy-routing.md。frontend/app.js の agent_progress 表示分岐は未使用のまま残っている。実端末での画像会話・プロジェクト再開の受入は未確認。
 
 - Claude Code CLI Executor（v0.44.0、`feat/claude-code-executor`、docs/unify-directionを含む・未マージ）: Concept §4のExecutor 3番目として公式`claude`を会話Brain・Coding Jobに接続（明示接続のみ、組込みTool/MCP/設定読込なし、APIキー非継承、JSON Schemaで判断だけ受取）。既定の優先順位をAntigravity CLI→Codex→Claude Code→DeepSeekへ。CLI BrainがdiscoverをToolとして要求すると失敗していた不具合を修正。Linkraft撤去漏れで/api/connectionsがImportErrorになっていた不具合を修正。朝ブリーフィングを初回Tool集合へ追加。実CLI（開発コンテナ）で雑談・Read・承認付き予定保存を確認。Windows/macOS実端末・本人ログイン・契約上の扱いは未確認。詳細 docs/brain/claude-code-cli.md。既存の失敗テスト51件（旧ルーティング系、base同数）は未対応。削除候補（旧キーワードルーティング・ACP等）は判断待ち。
