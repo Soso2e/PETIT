@@ -44,7 +44,7 @@ class UniverseFixedViewportTests(unittest.TestCase):
         scene = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
 
         self.assertIn("new THREE.WebGLRenderer", scene)
-        self.assertIn("new OrbitControls(state.camera, state.inputSurface)", scene)
+        self.assertIn("state.controls = createCameraController(state.camera, state.inputSurface)", scene)
         self.assertIn("new THREE.SphereGeometry", scene)
         self.assertIn("createConnection", scene)
         self.assertIn("selectEntry", scene)

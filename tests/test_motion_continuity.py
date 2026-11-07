@@ -40,7 +40,7 @@ class MotionContinuityTests(unittest.TestCase):
         self.assertIn("applyCamera", self.univ)
         self.assertIn("pointermove", self.univ)
         self.assertIn("new THREE.PerspectiveCamera", self.webgl)
-        self.assertIn("new OrbitControls", self.webgl)
+        self.assertIn("createCameraController(state.camera, state.inputSurface)", self.webgl)
         self.assertIn("startCameraTween", self.webgl)
         self.assertIn("updateCameraTween", self.webgl)
 

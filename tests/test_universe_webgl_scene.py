@@ -12,7 +12,8 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn('const THREE_VERSION = "0.185.1"', source)
         self.assertIn("new THREE.WebGLRenderer", source)
         self.assertIn("new THREE.PerspectiveCamera", source)
-        self.assertIn("new OrbitControls", source)
+        self.assertIn("const createCameraController = (camera, element) =>", source)
+        self.assertNotIn("OrbitControls.js", source)
         self.assertIn("state.controls.target", source)
         self.assertIn("state.camera.position", source)
         self.assertNotIn("CSS2DRenderer", source)
@@ -53,26 +54,38 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn("document.body.appendChild(detail)", bridge)
         self.assertIn('detail.classList.add("univ-detail-portal")', bridge)
 
-    def test_webgl_input_is_owned_by_orbit_controls_and_taps_are_not_drags(self) -> None:
+    def test_webgl_input_is_owned_by_camera_controller_and_taps_are_not_drags(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
 
-        self.assertIn("state.controls.enableRotate = true", source)
-        self.assertIn("state.controls.enableZoom = true", source)
-        self.assertIn("state.controls.enableDamping = false", source)
-        self.assertIn("state.controls.touches.ONE = THREE.TOUCH.ROTATE", source)
-        self.assertIn("state.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN", source)
-        self.assertIn("new OrbitControls(state.camera, state.inputSurface)", source)
+        self.assertIn("state.controls = createCameraController(state.camera, state.inputSurface)", source)
         self.assertIn('state.renderer.domElement.classList.add("univ-webgl-canvas")', source)
         self.assertIn("state.inputSurface = state.renderer.domElement", source)
-        self.assertIn("const activePointers = new Set()", source)
-        self.assertIn("suppressSelectionUntilPointersClear", source)
-        self.assertIn("start.pointerId !== event.pointerId", source)
-        self.assertIn("if (start.moved || distance > threshold", source)
-        self.assertIn('input.addEventListener("pointercancel", cancelPointer)', source)
+        # Only pointers that belong to the gesture move the camera (no "ガガガ").
+        self.assertIn("const point = pointers.get(event.pointerId);\n      if (!point) return;", source)
+        # A finger landing on an overlay during a gesture joins it instead of clicking.
+        self.assertIn('document.addEventListener("pointerdown", onDocumentPointerDown, true)', source)
+        # After a pinch, the remaining finger is locked until all fingers lift.
+        self.assertIn('return multiTouched ? "locked" : "rotate";', source)
+        self.assertIn('mode = pointers.size >= 2 ? "pinch" : "locked";', source)
+        # Taps come from the controller: single pointer, within slop and time, never multi-touch.
+        self.assertIn("tapSlop: { touch: 10, pen: 8, mouse: 5 }", source)
+        self.assertIn("&& !multiTouched", source)
+        self.assertIn('state.controls.addEventListener("tap"', source)
         self.assertIn('input.addEventListener("wheel"', source)
         self.assertNotIn(".univ-webgl-input", css)
         self.assertIn("overscroll-behavior: contain", css)
+
+    def test_hidden_legacy_dom_never_intercepts_canvas_input(self) -> None:
+        css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
+        self.assertIn(".petit-univ-webgl-ready .univ-viewport #constellation-grid.univ-space * {\n  pointer-events: none !important;", css)
+
+    def test_tap_picking_ignores_empty_sky_near_labels(self) -> None:
+        source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+        self.assertIn("const LABEL_MIN_HIT_OPACITY = 0.5;", source)
+        self.assertIn("labelTextRange.selectNodeContents(textNode);", source)
+        self.assertIn("const TOUCH_MIN_TARGET_RADIUS = 16;", source)
+        self.assertIn("if (screenRadius >= TOUCH_MIN_TARGET_RADIUS) continue;", source)
 
     def test_automatic_overview_fit_never_undoes_user_camera_gestures(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
@@ -104,7 +117,7 @@ class UniverseWebglSceneTests(unittest.TestCase):
 
         self.assertIn("findLabelAt", source)
         self.assertIn("closestEntry = entry", source)
-        self.assertIn("selectEntry(labelEntry)", source)
+        self.assertIn("const labelEntry = findLabelAt(clientX, clientY, pointerType);", source)
         self.assertIn('element.classList.toggle("is-hovered", Boolean(labelEntry && entry === labelEntry))', source)
         self.assertIn("event.stopPropagation()", source)
         self.assertIn(".univ-webgl-label.is-hovered", css)
@@ -201,12 +214,13 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertIn("if (dist > 0.5) discard;", source)
         self.assertIn("THREE.AdditiveBlending", source)
 
-    def test_pointer_release_bubbles_to_orbit_controls_and_css_space_is_guarded(self) -> None:
-        """pointerupがOrbitControlsのドラッグ解除のためにdocumentへ伝播し、WebGL稼働時にCSSカメラが干渉しないことを検証する。"""
+    def test_pointer_release_reaches_camera_controller_and_css_space_is_guarded(self) -> None:
+        """pointerup/cancelがwindowのカメラ入力へ届き、WebGL稼働時にCSSカメラが干渉しないことを検証する。"""
         scene_source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         space_source = (FRONTEND / "univ-space.js").read_text(encoding="utf-8")
 
-        self.assertIn('input.addEventListener("pointerup", (event) => {\n      const start = state.pointerDown;', scene_source)
+        self.assertIn('window.addEventListener("pointerup", onPointerEnd);', scene_source)
+        self.assertIn('window.addEventListener("pointercancel", onPointerEnd);', scene_source)
         self.assertIn('if (document.body.classList.contains("petit-univ-webgl-ready")', space_source)
 
 

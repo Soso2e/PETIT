@@ -4,7 +4,6 @@
 
   const THREE_VERSION = "0.185.1";
   const THREE_URL = `https://esm.sh/three@${THREE_VERSION}`;
-  const ORBIT_CONTROLS_URL = `https://esm.sh/three@${THREE_VERSION}/examples/jsm/controls/OrbitControls.js`;
   const RENDER_JOB = "webgl-scene";
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -22,12 +21,8 @@
   window.PetitUnivWebGL = publicApi;
 
   let THREE;
-  let OrbitControls;
   try {
-    [THREE, { OrbitControls }] = await Promise.all([
-      import(THREE_URL),
-      import(ORBIT_CONTROLS_URL),
-    ]);
+    THREE = await import(THREE_URL);
   } catch (error) {
     console.error("PETIT Univ WebGL dependencies failed to load", error);
     const viewport = document.querySelector(".univ-viewport");
@@ -59,7 +54,6 @@
     visualTweens: new Map(),
     seenBodies: new Set(),
     selectedTaskId: null,
-    pointerDown: null,
     cameraTween: null,
     // True while OrbitControls owns a drag/pinch/wheel gesture.
     cameraInteracting: false,
@@ -163,26 +157,14 @@
     // The single Canvas is the background scene and owns camera input. DOM
     // labels/UI remain overlays with pointer-events disabled where appropriate.
     state.inputSurface = state.renderer.domElement;
-    state.controls = new OrbitControls(state.camera, state.inputSurface);
+    // One finger / left drag rotates, two fingers pinch-zoom and pan,
+    // right / middle / shift drag pans, wheel and trackpad pinch zoom to the cursor.
+    state.controls = createCameraController(state.camera, state.inputSurface);
     state.controls.target.set(0, 0, 0);
-    // Camera movement must stop with the drag. Residual damping felt like
-    // pointer-follow rotation even though OrbitControls only rotates on drag.
-    state.controls.enableDamping = false;
-    state.controls.dampingFactor = 0.065;
-    state.controls.enableRotate = true;
-    state.controls.enableZoom = true;
-    state.controls.enablePan = true;
-    state.controls.screenSpacePanning = true;
     state.controls.minDistance = 8;
     state.controls.maxDistance = 72;
     state.controls.maxPolarAngle = Math.PI * 0.92;
     state.controls.minPolarAngle = Math.PI * 0.08;
-    state.controls.zoomToCursor = true;
-    state.controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
-    state.controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
-    state.controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
-    state.controls.touches.ONE = THREE.TOUCH.ROTATE;
-    state.controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
     state.inputSurface.style.touchAction = "none";
     state.controls.update();
     state.controls.addEventListener("start", () => {
@@ -214,6 +196,406 @@
     state.resizeObserver.observe(state.viewport);
     resize();
     installPointerInteraction();
+  };
+
+  // Camera input controller for the Univ canvas (replaces OrbitControls).
+  // Gesture rules follow map / 3D-viewer practice (Google Maps, Sketchfab,
+  // model-viewer, camera-controls):
+  // - Only pointers that belong to the gesture move the camera. OrbitControls
+  //   read every touch on the document, so a second finger that landed on the
+  //   HUD made the rotation jump between both fingers ("ガガガ").
+  // - A finger that lands anywhere while a gesture is active joins it.
+  // - One finger / left mouse rotates; two fingers pinch-zoom and pan around
+  //   their midpoint. After a multi-finger gesture the remaining finger does
+  //   nothing until every finger is lifted, so the end of a pinch never turns
+  //   into a sudden rotation.
+  // - Every pointer-count change re-baselines, so the camera never jumps.
+  // - The camera follows the finger with light smoothing, and a quick flick
+  //   glides briefly. Stopping before release does not glide.
+  const CAMERA_INPUT = {
+    rotateSpeed: 0.92,
+    dragSmoothMs: 28,
+    settleSmoothMs: 70,
+    // Glide distance is speed × decay; at most ~55° for the fastest flick.
+    flingDecayMs: 140,
+    flingMaxIdleMs: 70,
+    flingMinSpeed: 0.0006,
+    flingMaxSpeed: 0.007,
+    tapSlop: { touch: 10, pen: 8, mouse: 5 },
+    tapMaxMs: 550,
+  };
+
+  const createCameraController = (camera, element) => {
+    const listeners = new Map();
+    const emit = (type, detail = {}) => {
+      (listeners.get(type) || []).forEach((listener) => listener({ type, ...detail }));
+    };
+    const target = new THREE.Vector3();
+    const goalTarget = new THREE.Vector3();
+    const spherical = new THREE.Spherical();
+    const goal = new THREE.Spherical();
+    const offset = new THREE.Vector3();
+    const panRight = new THREE.Vector3();
+    const panUp = new THREE.Vector3();
+    const ndc = new THREE.Vector2();
+    const rayCaster = new THREE.Raycaster();
+    const viewNormal = new THREE.Vector3();
+    const focusPlane = new THREE.Plane();
+    const focusPoint = new THREE.Vector3();
+    const pointers = new Map();
+    const velocity = { theta: 0, phi: 0 };
+    const samples = [];
+    let mode = "none";
+    let baseline = null;
+    let animating = false;
+    let lastTime = 0;
+    let multiTouched = false;
+    let tap = null;
+    let suppressClickUntil = 0;
+    let safariGestureScale = 1;
+
+    const controller = {
+      target,
+      enabled: true,
+      minDistance: 8,
+      maxDistance: 72,
+      minPolarAngle: 0.1,
+      maxPolarAngle: Math.PI - 0.1,
+      addEventListener(type, listener) {
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type).add(listener);
+      },
+      removeEventListener(type, listener) {
+        listeners.get(type)?.delete(listener);
+      },
+      get interacting() {
+        return pointers.size > 0;
+      },
+    };
+
+    const clampGoal = () => {
+      goal.phi = clamp(goal.phi, controller.minPolarAngle, controller.maxPolarAngle);
+      goal.radius = clamp(goal.radius, controller.minDistance, controller.maxDistance);
+    };
+
+    const syncFromCamera = () => {
+      offset.copy(camera.position).sub(target);
+      spherical.setFromVector3(offset);
+      goal.copy(spherical);
+      goalTarget.copy(target);
+    };
+
+    const applyToCamera = () => {
+      spherical.makeSafe();
+      offset.setFromSpherical(spherical);
+      camera.position.copy(target).add(offset);
+      camera.lookAt(target);
+    };
+
+    const wake = () => {
+      if (!animating) {
+        animating = true;
+        lastTime = 0;
+      }
+      emit("change");
+    };
+
+    const stop = () => {
+      velocity.theta = 0;
+      velocity.phi = 0;
+      samples.length = 0;
+      animating = false;
+      syncFromCamera();
+    };
+
+    // Samples use the input event's own timestamp, so a busy main thread
+    // (label layout, rebuilds) does not distort the release velocity.
+    const rotate = (dx, dy, time = performance.now()) => {
+      const height = element.clientHeight || 1;
+      const dTheta = (-2 * Math.PI * dx / height) * CAMERA_INPUT.rotateSpeed;
+      const dPhi = (-2 * Math.PI * dy / height) * CAMERA_INPUT.rotateSpeed;
+      goal.theta += dTheta;
+      goal.phi += dPhi;
+      clampGoal();
+      samples.push({ time, theta: dTheta, phi: dPhi });
+      while (samples.length && time - samples[0].time > 100) samples.shift();
+    };
+
+    const pan = (dx, dy) => {
+      const height = element.clientHeight || 1;
+      const worldPerPixel = (2 * goal.radius * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / height;
+      camera.updateMatrix();
+      panRight.setFromMatrixColumn(camera.matrix, 0);
+      panUp.setFromMatrixColumn(camera.matrix, 1);
+      goalTarget.addScaledVector(panRight, -dx * worldPerPixel).addScaledVector(panUp, dy * worldPerPixel);
+    };
+
+    // Zoom toward the point under the cursor / pinch midpoint, like OrbitControls.zoomToCursor.
+    const dolly = (scale, clientX = null, clientY = null) => {
+      if (!Number.isFinite(scale) || scale <= 0) return;
+      const previous = goal.radius;
+      goal.radius = clamp(previous * scale, controller.minDistance, controller.maxDistance);
+      const applied = goal.radius / previous;
+      if (clientX == null || Math.abs(applied - 1) < 1e-6) return;
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -(((clientY - rect.top) / rect.height) * 2 - 1));
+      rayCaster.setFromCamera(ndc, camera);
+      camera.getWorldDirection(viewNormal);
+      focusPlane.setFromNormalAndCoplanarPoint(viewNormal, goalTarget);
+      if (!rayCaster.ray.intersectPlane(focusPlane, focusPoint)) return;
+      goalTarget.add(focusPoint.sub(goalTarget).multiplyScalar(1 - applied));
+    };
+
+    const centroid = () => {
+      let x = 0;
+      let y = 0;
+      pointers.forEach((point) => { x += point.x; y += point.y; });
+      return { x: x / pointers.size, y: y / pointers.size };
+    };
+
+    const spread = () => {
+      if (pointers.size < 2) return 0;
+      const [a, b] = pointers.values();
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    };
+
+    const rebaseline = () => {
+      baseline = pointers.size ? { ...centroid(), spread: spread() } : null;
+    };
+
+    const modeFor = (event) => {
+      if (event.pointerType === "mouse") {
+        return event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.metaKey ? "rotate" : "pan";
+      }
+      if (pointers.size >= 2) return "pinch";
+      return multiTouched ? "locked" : "rotate";
+    };
+
+    const addPointer = (event) => {
+      if (pointers.has(event.pointerId)) return;
+      if (!pointers.size) {
+        stop();
+        multiTouched = false;
+        tap = {
+          pointerId: event.pointerId,
+          pointerType: event.pointerType || "mouse",
+          x: event.clientX,
+          y: event.clientY,
+          time: performance.now(),
+          moved: false,
+        };
+        emit("start");
+      }
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      try {
+        element.setPointerCapture(event.pointerId);
+      } catch (_error) {
+        // Pointer already released; document-level listeners still filter by id.
+      }
+      if (pointers.size >= 2) {
+        multiTouched = true;
+        tap = null;
+      }
+      mode = modeFor(event);
+      rebaseline();
+      wake();
+    };
+
+    const onPointerDown = (event) => {
+      if (!controller.enabled) return;
+      if (event.pointerType === "mouse" && ![0, 1, 2].includes(event.button)) return;
+      if (event.pointerType === "mouse" && pointers.size) return;
+      addPointer(event);
+    };
+
+    // A finger that lands on an overlay (HUD, nav, labels) while a gesture is
+    // already running joins the gesture instead of pressing that control.
+    const onDocumentPointerDown = (event) => {
+      if (!controller.enabled || !pointers.size || event.pointerType !== "touch") return;
+      if (event.target === element || pointers.has(event.pointerId)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      suppressClickUntil = performance.now() + 800;
+      addPointer(event);
+    };
+
+    const onDocumentClick = (event) => {
+      if (performance.now() > suppressClickUntil) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const onPointerMove = (event) => {
+      const point = pointers.get(event.pointerId);
+      if (!point) return;
+      point.x = event.clientX;
+      point.y = event.clientY;
+      if (tap && tap.pointerId === event.pointerId) {
+        const slop = CAMERA_INPUT.tapSlop[tap.pointerType] ?? CAMERA_INPUT.tapSlop.mouse;
+        if (Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > slop) tap.moved = true;
+      }
+      if (!baseline) rebaseline();
+      const center = centroid();
+      const dx = center.x - baseline.x;
+      const dy = center.y - baseline.y;
+      const currentSpread = spread();
+      if (mode === "rotate") rotate(dx, dy, event.timeStamp);
+      else if (mode === "pan") pan(dx, dy);
+      else if (mode === "pinch") {
+        if (baseline.spread > 0 && currentSpread > 0) dolly(baseline.spread / currentSpread, center.x, center.y);
+        pan(dx, dy);
+      }
+      baseline = { ...center, spread: currentSpread };
+      if (mode !== "locked") wake();
+    };
+
+    const startFling = (now) => {
+      const last = samples[samples.length - 1];
+      if (mode !== "rotate" || !last || now - last.time > CAMERA_INPUT.flingMaxIdleMs) return;
+      const span = Math.max(16, now - samples[0].time);
+      let theta = 0;
+      let phi = 0;
+      samples.forEach((sample) => { theta += sample.theta; phi += sample.phi; });
+      const max = CAMERA_INPUT.flingMaxSpeed;
+      velocity.theta = clamp(theta / span, -max, max);
+      velocity.phi = clamp(phi / span, -max, max);
+      if (Math.hypot(velocity.theta, velocity.phi) < CAMERA_INPUT.flingMinSpeed) {
+        velocity.theta = 0;
+        velocity.phi = 0;
+      }
+    };
+
+    const onPointerEnd = (event) => {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.delete(event.pointerId);
+      try {
+        if (element.hasPointerCapture?.(event.pointerId)) element.releasePointerCapture(event.pointerId);
+      } catch (_error) {
+        // Capture already released by the browser.
+      }
+      if (pointers.size) {
+        mode = pointers.size >= 2 ? "pinch" : "locked";
+        rebaseline();
+        return;
+      }
+      if (event.type === "pointerup") startFling(event.timeStamp);
+      const finishedTap = tap;
+      tap = null;
+      mode = "none";
+      baseline = null;
+      samples.length = 0;
+      emit("end");
+      wake();
+      if (
+        event.type === "pointerup"
+        && finishedTap
+        && finishedTap.pointerId === event.pointerId
+        && !finishedTap.moved
+        && !multiTouched
+        && performance.now() - finishedTap.time <= CAMERA_INPUT.tapMaxMs
+      ) {
+        emit("tap", { clientX: event.clientX, clientY: event.clientY, pointerType: finishedTap.pointerType });
+      }
+    };
+
+    const onWheel = (event) => {
+      if (!controller.enabled) return;
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : (event.deltaMode === 2 ? 100 : 1);
+      // Trackpad pinch arrives as ctrl+wheel with small deltas.
+      const strength = event.ctrlKey ? 0.01 : 0.0015;
+      if (!pointers.size) {
+        stop();
+        emit("start");
+      }
+      dolly(Math.exp(clamp(event.deltaY * unit, -240, 240) * strength), event.clientX, event.clientY);
+      if (!pointers.size) emit("end");
+      wake();
+    };
+
+    // Safari trackpad pinch (desktop) and iOS page-zoom gestures.
+    const onGestureStart = (event) => {
+      event.preventDefault();
+      safariGestureScale = 1;
+    };
+    const onGestureChange = (event) => {
+      event.preventDefault();
+      if (pointers.size || !controller.enabled || !event.scale) return;
+      stop();
+      emit("start");
+      dolly(safariGestureScale / event.scale, event.clientX, event.clientY);
+      safariGestureScale = event.scale;
+      emit("end");
+      wake();
+    };
+
+    element.addEventListener("pointerdown", onPointerDown);
+    element.addEventListener("wheel", onWheel, { passive: false });
+    element.addEventListener("contextmenu", (event) => event.preventDefault());
+    element.addEventListener("touchmove", (event) => event.preventDefault(), { passive: false });
+    element.addEventListener("gesturestart", onGestureStart);
+    element.addEventListener("gesturechange", onGestureChange);
+    element.addEventListener("gestureend", (event) => event.preventDefault());
+    document.addEventListener("pointerdown", onDocumentPointerDown, true);
+    document.addEventListener("click", onDocumentClick, true);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerEnd);
+    window.addEventListener("pointercancel", onPointerEnd);
+
+    controller.stop = stop;
+    controller.dollyBy = (scale) => {
+      if (pointers.size) return;
+      stop();
+      dolly(scale);
+      wake();
+    };
+    // Called every rendered frame. Returns true while the camera is still moving.
+    controller.update = (time = performance.now()) => {
+      if (!animating) {
+        syncFromCamera();
+        camera.lookAt(target);
+        return false;
+      }
+      const dt = lastTime ? clamp(time - lastTime, 0, 64) : 16;
+      lastTime = time;
+      if (!pointers.size && (velocity.theta || velocity.phi)) {
+        goal.theta += velocity.theta * dt;
+        goal.phi += velocity.phi * dt;
+        clampGoal();
+        const decay = Math.exp(-dt / CAMERA_INPUT.flingDecayMs);
+        velocity.theta *= decay;
+        velocity.phi *= decay;
+        if (Math.abs(velocity.theta) + Math.abs(velocity.phi) < 0.00002) {
+          velocity.theta = 0;
+          velocity.phi = 0;
+        }
+      }
+      const smoothMs = pointers.size ? CAMERA_INPUT.dragSmoothMs : CAMERA_INPUT.settleSmoothMs;
+      const k = reducedMotion.matches ? 1 : 1 - Math.exp(-dt / smoothMs);
+      spherical.theta += (goal.theta - spherical.theta) * k;
+      spherical.phi += (goal.phi - spherical.phi) * k;
+      spherical.radius += (goal.radius - spherical.radius) * k;
+      target.lerp(goalTarget, k);
+      const settled = !pointers.size
+        && !velocity.theta
+        && !velocity.phi
+        && Math.abs(goal.theta - spherical.theta) < 0.0002
+        && Math.abs(goal.phi - spherical.phi) < 0.0002
+        && Math.abs(goal.radius - spherical.radius) < 0.002
+        && target.distanceToSquared(goalTarget) < 0.000004;
+      if (settled) {
+        spherical.copy(goal);
+        target.copy(goalTarget);
+        animating = false;
+      }
+      applyToCamera();
+      emit("change");
+      return animating;
+    };
+
+    syncFromCamera();
+    return controller;
   };
 
   const seededRandom = (() => {
@@ -797,6 +1179,7 @@
   };
 
   const startCameraTween = (position, target, duration = 720) => {
+    state.controls.stop();
     state.cameraTween = {
       startedAt: performance.now(),
       duration: reducedMotion.matches ? 1 : duration,
@@ -892,11 +1275,7 @@
     if (!state.camera || !state.controls) return;
     state.cameraTween = null;
     state.userCameraMoved = true;
-    const offset = state.camera.position.clone().sub(state.controls.target);
-    const nextDistance = clamp(offset.length() * factor, state.controls.minDistance, state.controls.maxDistance);
-    offset.setLength(nextDistance);
-    state.camera.position.copy(state.controls.target).add(offset);
-    state.controls.update();
+    state.controls.dollyBy(factor);
     requestRender();
   };
 
@@ -909,86 +1288,109 @@
     return state.raycaster.intersectObjects(state.interactiveMeshes, false)[0]?.object || null;
   };
 
-  const findLabelAt = (clientX, clientY) => {
+  // Labels are hit-tested by their visible text only. The pill around the text
+  // is nearly transparent on the dark sky, so a tap there read as "empty space"
+  // yet selected the nearby planet. Faded (distant) labels are not targets.
+  const LABEL_MIN_HIT_OPACITY = 0.5;
+  const labelTextRange = document.createRange();
+  const labelHitRect = (element, padding) => {
+    const box = element.getBoundingClientRect();
+    let left = box.left;
+    let right = box.right;
+    let top = box.top;
+    let bottom = box.bottom;
+    const textNode = element.firstChild;
+    if (textNode?.nodeType === Node.TEXT_NODE) {
+      labelTextRange.selectNodeContents(textNode);
+      const textBox = labelTextRange.getBoundingClientRect();
+      if (textBox.width && textBox.height) {
+        left = Math.max(box.left, textBox.left);
+        right = Math.min(box.right, textBox.right);
+        top = Math.max(box.top, textBox.top);
+        bottom = Math.min(box.bottom, textBox.bottom);
+      }
+    }
+    return { left: left - padding, right: right + padding, top: top - padding, bottom: bottom + padding };
+  };
+
+  const findLabelAt = (clientX, clientY, pointerType = "mouse") => {
     let closestEntry = null;
     let closestDistSq = Infinity;
     const cameraPos = state.camera?.position;
+    const padding = pointerType === "touch" ? 6 : 2;
 
     for (const { element, entry, object } of state.labels.values()) {
       if (!element || element.hidden || element.style.display === "none") continue;
-      const rect = element.getBoundingClientRect();
-      if (
-        clientX >= rect.left &&
-        clientX <= rect.right &&
-        clientY >= rect.top &&
-        clientY <= rect.bottom
-      ) {
-        if (!object || !cameraPos) return entry;
-        const distSq = object.position.distanceToSquared(cameraPos);
-        if (distSq < closestDistSq) {
-          closestDistSq = distSq;
-          closestEntry = entry;
-        }
+      const opacity = Number.parseFloat(element.style.opacity || "1");
+      if (!element.classList.contains("is-selected") && opacity < LABEL_MIN_HIT_OPACITY) continue;
+      const rect = labelHitRect(element, padding);
+      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) continue;
+      if (!object || !cameraPos) return entry;
+      const distSq = object.position.distanceToSquared(cameraPos);
+      if (distSq < closestDistSq) {
+        closestDistSq = distSq;
+        closestEntry = entry;
       }
     }
     return closestEntry;
   };
 
+  // Small satellites get a minimum touch radius around their projected center,
+  // but only up to that radius: nothing farther away is ever picked.
+  const TOUCH_MIN_TARGET_RADIUS = 16;
+  const projectedCenter = new THREE.Vector3();
+  const projectedEdge = new THREE.Vector3();
+  const findSmallBodyNear = (clientX, clientY) => {
+    if (!state.renderer || !state.camera) return null;
+    const rect = state.renderer.domElement.getBoundingClientRect();
+    let best = null;
+    let bestDistance = Infinity;
+    for (const mesh of state.interactiveMeshes) {
+      if (!mesh.visible || !mesh.userData?.entry) continue;
+      mesh.getWorldPosition(projectedCenter);
+      const radius = (mesh.geometry?.parameters?.radius || 1) * mesh.scale.x;
+      projectedEdge.copy(projectedCenter).addScaledVector(state.camera.up, radius);
+      projectedCenter.project(state.camera);
+      projectedEdge.project(state.camera);
+      if (projectedCenter.z < -1 || projectedCenter.z > 1) continue;
+      const x = rect.left + ((projectedCenter.x + 1) / 2) * rect.width;
+      const y = rect.top + ((1 - projectedCenter.y) / 2) * rect.height;
+      const screenRadius = Math.hypot((projectedEdge.x - projectedCenter.x) * rect.width / 2, (projectedEdge.y - projectedCenter.y) * rect.height / 2);
+      if (screenRadius >= TOUCH_MIN_TARGET_RADIUS) continue;
+      const distance = Math.hypot(clientX - x, clientY - y);
+      if (distance <= TOUCH_MIN_TARGET_RADIUS && distance < bestDistance) {
+        best = mesh;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  };
+
+  const pickEntryAt = (clientX, clientY, pointerType = "mouse") => {
+    const labelEntry = findLabelAt(clientX, clientY, pointerType);
+    if (labelEntry) return labelEntry;
+    const object = raycastAt(clientX, clientY)
+      || (pointerType === "touch" ? findSmallBodyNear(clientX, clientY) : null);
+    return object?.userData?.entry || null;
+  };
+
   const installPointerInteraction = () => {
     const input = state.inputSurface;
-    const activePointers = new Set();
-    let suppressSelectionUntilPointersClear = false;
 
     input.addEventListener("pointerdown", (event) => {
       // Keep pointer events owned by WebGL canvas instead of bubbling to CSS fallback.
       event.stopPropagation();
-      // Camera gestures must never also select a planet or open its detail.
-      if (event.pointerType === "mouse" && event.button !== 0) return;
-      activePointers.add(event.pointerId);
-      if (!event.isPrimary || activePointers.size > 1) {
-        state.pointerDown = null;
-        suppressSelectionUntilPointersClear = true;
-        return;
-      }
-      state.pointerDown = {
-        pointerId: event.pointerId,
-        pointerType: event.pointerType,
-        x: event.clientX,
-        y: event.clientY,
-        time: performance.now(),
-        moved: false,
-      };
     });
-    input.addEventListener("pointerup", (event) => {
-      const start = state.pointerDown;
-      state.pointerDown = null;
-      activePointers.delete(event.pointerId);
-      if (activePointers.size === 0 && suppressSelectionUntilPointersClear) {
-        suppressSelectionUntilPointersClear = false;
-        return;
-      }
-      if (!start || start.pointerId !== event.pointerId || suppressSelectionUntilPointersClear) return;
-      const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
-      const threshold = start.pointerType === "touch" ? 10 : 5;
-      if (start.moved || distance > threshold || performance.now() - start.time > 550) return;
-
-      const labelEntry = findLabelAt(event.clientX, event.clientY);
-      if (labelEntry) {
-        selectEntry(labelEntry);
-        return;
-      }
-      const object = raycastAt(event.clientX, event.clientY);
-      if (object?.userData?.entry) selectEntry(object.userData.entry);
+    // Tap = one pointer, released within the slop and time limit, with no
+    // second finger at any point. The camera controller decides; anything
+    // else is a camera gesture and never selects a planet.
+    state.controls.addEventListener("tap", ({ clientX, clientY, pointerType }) => {
+      const entry = pickEntryAt(clientX, clientY, pointerType);
+      if (entry) selectEntry(entry);
     });
     input.addEventListener("pointermove", (event) => {
-      if (state.pointerDown?.pointerId === event.pointerId) {
-        const distance = Math.hypot(event.clientX - state.pointerDown.x, event.clientY - state.pointerDown.y);
-        const threshold = state.pointerDown.pointerType === "touch" ? 10 : 5;
-        if (distance > threshold) state.pointerDown.moved = true;
-        return;
-      }
-      if (activePointers.size) return;
-      const labelEntry = findLabelAt(event.clientX, event.clientY);
+      if (event.pointerType !== "mouse" || state.controls.interacting) return;
+      const labelEntry = findLabelAt(event.clientX, event.clientY, "mouse");
       const object = labelEntry ? null : raycastAt(event.clientX, event.clientY);
       input.style.cursor = (labelEntry || object) ? "pointer" : "grab";
       for (const { element, entry } of state.labels.values()) {
@@ -996,15 +1398,8 @@
         element.classList.toggle("is-hovered", Boolean(labelEntry && entry === labelEntry));
       }
     }, { passive: true });
-    const cancelPointer = (event) => {
-      activePointers.delete(event.pointerId);
-      if (state.pointerDown?.pointerId === event.pointerId) state.pointerDown = null;
-      if (activePointers.size === 0) suppressSelectionUntilPointersClear = false;
-    };
-    input.addEventListener("pointercancel", cancelPointer);
-    input.addEventListener("lostpointercapture", cancelPointer);
     input.addEventListener("wheel", (event) => {
-      // Keep the wheel owned by OrbitControls instead of the hidden CSS camera.
+      // Keep the wheel owned by the camera controller instead of the hidden CSS camera.
       event.stopPropagation();
     }, { passive: true });
     input.addEventListener("auxclick", (event) => { if (event.button === 1) event.preventDefault(); });
@@ -1125,8 +1520,8 @@
     if (!state.ready || !isPanelActive() || document.hidden) return;
     const cameraMoving = updateCameraTween(time);
     const bodiesMoving = updateVisualTweens(time);
-    const tweening = cameraMoving || bodiesMoving;
-    state.controls.update();
+    const controlsMoving = state.controls.update(time);
+    const tweening = cameraMoving || bodiesMoving || controlsMoving;
     const liteMode = document.documentElement.dataset.petitPerformance === "lite";
     if (!liteMode && !reducedMotion.matches) {
       const delta = state.lastRenderTime ? Math.min(32, time - state.lastRenderTime) : 0;
