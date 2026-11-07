@@ -1,12 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.45.1 (PR中・未マージ)**
+**Current Version: v0.46.0 (PR中・未マージ)**
 
 **Last Updated: 2026-11-07 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #391 Univ 3Dカメラ操作（v0.45.1、PR中）: リサイズ（スマホのアドレスバー出入り・レール開閉）やタスク構成変更のたびに `resetCamera()` が走り、ドラッグ回転・ピンチ拡縮した視点が全体表示へ巻き戻っていた。ユーザーがカメラを動かした後と操作中は自動フィットしない（明示リセットで解除）。操作中は自動Tweenを止める。Playwright（Chromium・モバイルエミュレーション）で確認、iPhone/Android実機は未確認。
+- #393 Univ 3Dカメラ入力（v0.46.0、PR中）: OrbitControlsを自前の `createCameraController` に置き換え、ジェスチャーに属する指だけでカメラを動かす（2本目の指がHUDに乗っても振動しない）、ピンチ後に残った指は全指が離れるまで無効、軽い追従スムージングと短い慣性、タップ判定をカメラ入力側へ統合。WebGL表示中に見えない旧DOMボタン（`univ-space.css` の `pointer-events: auto`）がスマホで3Dビューの約15%を覆い、ドラッグ不発・何もない所のタップで近くのタスクが選択される原因だったため子孫も無効化。ラベルは見えている文字だけを当たりにした。#391（v0.45.1）のリサイズ時の巻き戻し修正はマージ済み。Playwright（Chromium・タッチエミュレーション）で確認、iPhone/Android実機は未確認。
 
 - 旧キーワードルーティング撤去（v0.45.0、`refactor/remove-legacy-routing`、PR #386の上に積んだPR・未マージ）: 画像付き会話を `vision_reply.py`（Read専用1 Call、挙動同じ）へ移し、本番から到達不能になった21モジュール（agent / agent_legacy / agent_runtime / brain_runtime / capability_router / context_broker / model_router / dialogue_resolution / project_router / project_resume / project_source_refresh / task_completion(_intent) / task_work_intent / task_conversation / list_conversation / date_parser / recall / agent_state / agent_progress / tools.agent_actions）と比較PoC 2本を削除。DB tableは削除していない（agent_run_states等は残る）。プロジェクト再開時の外部source自動更新やNotion明示検索などの決定論的処理は#345以降すでに通常会話から使われておらず、今回コードを削除した（Brain+Toolで扱う）。旧図は docs/archive/runtime-flows-legacy-routing.md。frontend/app.js の agent_progress 表示分岐は未使用のまま残っている。実端末での画像会話・プロジェクト再開の受入は未確認。
 
@@ -355,3 +355,4 @@
 | 2026-11-06 | 14:56 | #345 | v0.44.0: Claude Code CLIをExecutor（会話Brain・Coding Job）として追加、既定順位を方針順へ、CLI BrainのdiscoverTools拒否と/api/connectionsのImportErrorを修正。新規テスト17件・実CLI smoke確認、既存失敗51件はbaseと同数。実端末・本人ログイン未確認。 |
 | 2026-11-06 | 15:12 | #345 | v0.45.0: 旧キーワードルーティング21モジュールとexecute_agent_write・比較PoCを撤去、画像会話をvision_reply.pyへ移設、旧runtime-flows図をarchiveへ。既存失敗テスト51件→21件（残りは全てbaseから既存）。実端末未確認。 |
 | 2026-11-07 | 04:05 | #391 | v0.45.1: Univ 3Dでリサイズ・レイアウト変更時の自動全体表示がユーザーの回転/拡縮を巻き戻していた不具合を修正（操作中・操作後は自動フィットしない、明示リセットで解除）。Playwright再現・回帰テスト追加。実機未確認。 |
+| 2026-11-07 | 04:57 | #393 | v0.46.0: Univ 3Dのカメラ入力をOrbitControlsから自前コントローラへ置換（追跡外の指を無視・ピンチ後ロック・慣性・タップ統合）、見えない旧DOMボタンがCanvas入力を奪っていた不具合とラベルの広すぎる当たり判定を修正。実機未確認。 |
