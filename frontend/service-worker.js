@@ -3,7 +3,7 @@
 importScripts("/static/petit-version.js");
 
 const CACHE_NAME = `petit-shell-v${self.PETIT_ASSET_VERSION}-webgl1-voice2-motion1`;
-const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-polish1-rail1-context2-stats2-ux2-connections1-setup1-chatfirst1-dashboard90-activitylive1-claudecode1-legacyrouting0`;
+const ACTIVE_CACHE_NAME = `${CACHE_NAME}-corner-shell-polish1-rail1-context2-stats2-ux2-connections1-setup1-chatfirst1-dashboard90-activitylive1-claudecode1-legacyrouting0-mobilechrome1`;
 const THREE_CDN_ORIGIN = "https://esm.sh";
 const THREE_CDN_PREFIX = "/three@0.185.1";
 
@@ -45,6 +45,7 @@ const SHELL = [
   "/static/universe-3d-foundation.css",
   "/static/universe-webgl-scene.css",
   "/static/petit-corner-shell.css",
+  "/static/petit-mobile-chrome.css",
   "/static/universe-app.js",
   "/static/universe-next.js",
   "/static/life-map.js",
@@ -85,6 +86,7 @@ const SHELL = [
   "/static/mobile_audio_unlock.js",
   "/static/recorded_speech.js",
   "/static/voice.js",
+  "/static/chat-tidy.js",
   "/static/companion.js",
   "/static/shell.js",
   "/static/manifest.webmanifest",

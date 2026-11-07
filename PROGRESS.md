@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.45.1 (PR中・未マージ)**
+**Current Version: v0.46.0 (`claude/awesome-galileo-r7agm8`・未マージ)**
 
 **Last Updated: 2026-11-07 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- スマホUI統一（v0.46.0、`claude/awesome-galileo-r7agm8`・未マージ）: 959px以下でChat / Univ / Develop / Dashboardが同じヘッダー（左=画面名・同期・版、右=作業タイマー・通知・設定）と画面端に接する下部タブを共有する。Chatだけ通知/設定が「作業なし」バーの下へ移る専用ルール（petit-ui-polish.css）を撤去し、全幅だった作業バーはヘッダーのタイマーボタンへ畳んだ。Chatは入力欄が下部タブに隠れていた不具合を修正し、会話切替・最新の依頼・音声入力方式を「会話」メニューへ、画像添付を入力欄の＋へ移した（chat-tidy.jsは既存要素の付け替えのみで、session.js / voice.js / chat_attachments.jsの処理とDesktop小型会話は不変）。新しい見た目は petit-mobile-chrome.css に集約。Playwright（iPhone 13 / SE・1440px、API模擬）で確認。iPhone実機・PWA・Electron狭幅は未確認。
 
 - #391 Univ 3Dカメラ操作（v0.45.1、PR中）: リサイズ（スマホのアドレスバー出入り・レール開閉）やタスク構成変更のたびに `resetCamera()` が走り、ドラッグ回転・ピンチ拡縮した視点が全体表示へ巻き戻っていた。ユーザーがカメラを動かした後と操作中は自動フィットしない（明示リセットで解除）。操作中は自動Tweenを止める。Playwright（Chromium・モバイルエミュレーション）で確認、iPhone/Android実機は未確認。
 
@@ -355,3 +357,4 @@
 | 2026-11-06 | 14:56 | #345 | v0.44.0: Claude Code CLIをExecutor（会話Brain・Coding Job）として追加、既定順位を方針順へ、CLI BrainのdiscoverTools拒否と/api/connectionsのImportErrorを修正。新規テスト17件・実CLI smoke確認、既存失敗51件はbaseと同数。実端末・本人ログイン未確認。 |
 | 2026-11-06 | 15:12 | #345 | v0.45.0: 旧キーワードルーティング21モジュールとexecute_agent_write・比較PoCを撤去、画像会話をvision_reply.pyへ移設、旧runtime-flows図をarchiveへ。既存失敗テスト51件→21件（残りは全てbaseから既存）。実端末未確認。 |
 | 2026-11-07 | 04:05 | #391 | v0.45.1: Univ 3Dでリサイズ・レイアウト変更時の自動全体表示がユーザーの回転/拡縮を巻き戻していた不具合を修正（操作中・操作後は自動フィットしない、明示リセットで解除）。Playwright再現・回帰テスト追加。実機未確認。 |
+| 2026-11-07 | 04:59 | - | v0.46.0: スマホで4タブのヘッダー・通知/設定位置を統一（Chat専用の配置を撤去）、作業バーをヘッダーのタイマーへ畳み、Chatの入力欄が下部タブに隠れる不具合を修正、会話切替・音声設定を「会話」メニューへ集約。回帰テスト追加。実機未確認。 |
