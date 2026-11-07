@@ -355,3 +355,4 @@
 | 2026-11-06 | 14:56 | #345 | v0.44.0: Claude Code CLIをExecutor（会話Brain・Coding Job）として追加、既定順位を方針順へ、CLI BrainのdiscoverTools拒否と/api/connectionsのImportErrorを修正。新規テスト17件・実CLI smoke確認、既存失敗51件はbaseと同数。実端末・本人ログイン未確認。 |
 | 2026-11-06 | 15:12 | #345 | v0.45.0: 旧キーワードルーティング21モジュールとexecute_agent_write・比較PoCを撤去、画像会話をvision_reply.pyへ移設、旧runtime-flows図をarchiveへ。既存失敗テスト51件→21件（残りは全てbaseから既存）。実端末未確認。 |
 | 2026-11-07 | 04:05 | #391 | v0.45.1: Univ 3Dでリサイズ・レイアウト変更時の自動全体表示がユーザーの回転/拡縮を巻き戻していた不具合を修正（操作中・操作後は自動フィットしない、明示リセットで解除）。Playwright再現・回帰テスト追加。実機未確認。 |
+| 2026-11-07 | 08:50 | - | 再設計の提案文書を追加（未承認・未実装）: docs/brain/agent-home.md（PETIT Home・MCP・自由度L0〜L3・セッション継続）、docs/channels/discord-bot.md（Owner/Guildの2モード、Guildは DeepSeek only・サーバー別DB・Notion・リマインド・人物認知）。Concept §2・§4の改訂は承認待ち。 |
