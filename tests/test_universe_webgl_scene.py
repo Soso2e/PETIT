@@ -74,6 +74,20 @@ class UniverseWebglSceneTests(unittest.TestCase):
         self.assertNotIn(".univ-webgl-input", css)
         self.assertIn("overscroll-behavior: contain", css)
 
+    def test_automatic_overview_fit_never_undoes_user_camera_gestures(self) -> None:
+        source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
+
+        # Gestures mark the camera as user-owned and stop competing tweens.
+        self.assertIn("state.cameraInteracting = true;", source)
+        self.assertIn("state.userCameraMoved = true;", source)
+        self.assertIn("if (state.cameraInteracting) {", source)
+        # Resize (mobile address bar, rail) and layout changes only refit automatically.
+        self.assertIn("if (state.cameraInteracting || state.userCameraMoved) return false;", source)
+        self.assertIn("!state.selectedTaskId) fitOverviewAutomatically();", source)
+        self.assertNotIn("!state.selectedTaskId) resetCamera();", source)
+        # Explicit reset hands the camera back to the automatic overview.
+        self.assertIn("const resetCamera = () => {\n    state.userCameraMoved = false;", source)
+
     def test_labels_remain_dom_text_instead_of_canvas_textures(self) -> None:
         source = (FRONTEND / "universe-webgl-scene.js").read_text(encoding="utf-8")
         css = (FRONTEND / "universe-webgl-scene.css").read_text(encoding="utf-8")
