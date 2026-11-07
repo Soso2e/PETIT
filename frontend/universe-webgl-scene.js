@@ -61,6 +61,11 @@
     selectedTaskId: null,
     pointerDown: null,
     cameraTween: null,
+    // True while OrbitControls owns a drag/pinch/wheel gesture.
+    cameraInteracting: false,
+    // True once the user has moved the camera themselves. Automatic overview
+    // fitting (resize, layout changes) must not undo that until an explicit reset.
+    userCameraMoved: false,
     renderFrame: null,
     labelsNeedUpdate: true,
     lastRenderTime: 0,
@@ -182,10 +187,15 @@
     state.controls.update();
     state.controls.addEventListener("start", () => {
       state.cameraTween = null;
+      state.cameraInteracting = true;
+      state.userCameraMoved = true;
       requestRender();
     });
     state.controls.addEventListener("change", () => requestRender());
-    state.controls.addEventListener("end", () => requestRender());
+    state.controls.addEventListener("end", () => {
+      state.cameraInteracting = false;
+      requestRender();
+    });
 
     state.scene.add(new THREE.HemisphereLight(0x9db5ff, 0x07091a, 1.15));
     const coreLight = new THREE.PointLight(0x9fb6ff, 120, 72, 1.7);
@@ -426,7 +436,10 @@
     state.renderer.setSize(width, height, false);
     state.camera.aspect = width / height;
     state.camera.updateProjectionMatrix();
-    if (isPanelActive() && state.overviewRadius && !state.selectedTaskId) resetCamera();
+    // Mobile browser chrome (address bar) and the area rail resize the viewport
+    // during ordinary use. Refit only while the camera is still the automatic
+    // overview; otherwise a resize mid-gesture snapped the view back.
+    if (isPanelActive() && state.overviewRadius && !state.selectedTaskId) fitOverviewAutomatically();
     requestRender();
   };
 
@@ -711,7 +724,7 @@
     }
     clearStatus();
     document.body.classList.add("petit-univ-webgl-ready");
-    if (fitOverview && !state.selectedTaskId) resetCamera();
+    if (fitOverview && !state.selectedTaskId) fitOverviewAutomatically();
     window.dispatchEvent(new CustomEvent("petit:univ-webgl-rendered", {
       detail: { systems: models.length, tasks: state.entries.size },
     }));
@@ -811,6 +824,7 @@
   };
 
   const resetCamera = () => {
+    state.userCameraMoved = false;
     state.selectedTaskId = null;
     updateSelection();
     document.body.classList.remove("petit-univ-manage-open");
@@ -827,6 +841,14 @@
     state.scene.fog.density = Math.min(.0115, .6 / distance);
     startCameraTween(direction.multiplyScalar(distance), new THREE.Vector3(0, 0, 0), 760);
     window.PetitUnivSpace?.reset?.();
+  };
+
+  // Automatic (non-user) overview fit. Skipped while the user is operating the
+  // camera or has moved it, so their rotation/zoom is never discarded.
+  const fitOverviewAutomatically = () => {
+    if (state.cameraInteracting || state.userCameraMoved) return false;
+    resetCamera();
+    return true;
   };
 
   const openDetail = () => {
@@ -869,6 +891,7 @@
   const zoomBy = (factor) => {
     if (!state.camera || !state.controls) return;
     state.cameraTween = null;
+    state.userCameraMoved = true;
     const offset = state.camera.position.clone().sub(state.controls.target);
     const nextDistance = clamp(offset.length() * factor, state.controls.minDistance, state.controls.maxDistance);
     offset.setLength(nextDistance);
@@ -995,6 +1018,11 @@
   const updateCameraTween = (time) => {
     const tween = state.cameraTween;
     if (!tween) return false;
+    // Never let a tween fight an active drag/pinch.
+    if (state.cameraInteracting) {
+      state.cameraTween = null;
+      return false;
+    }
     const progress = reducedMotion.matches ? 1 : clamp((time - tween.startedAt) / tween.duration, 0, 1);
     const eased = progress < 0.5
       ? 4 * progress * progress * progress
