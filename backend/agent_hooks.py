@@ -6,7 +6,7 @@ already confines file tools to PETIT Home and refuses settings/git writes, and
 Core Tools (MCP) carry their own risk and approval.
 
   L0 PETIT Home       file tools free, except persona files (diff approval) and .git/.claude
-  L1 worktrees        not opened yet (H4)
+  L1 worktrees        PETIT Home/worktrees/<repo>-<id>: edit freely; test/commit/push via Core Tools
   L2 going outside    push / PR / network / publishing -> deny; use approved Core Tools
   L3 irreversible     sudo, deleting outside Home, secrets, main push -> always deny
 """
@@ -27,16 +27,17 @@ SECRET_NAMES = re.compile(r"(^|/)(\.env[^/]*|.*\.pem|.*\.key|id_[a-z0-9]+|\.netr
 
 PERSONA_REASON = ("人格ファイルは直接書き換えられません。update_persona_file（mcp__petit__update_persona_file）で"
                   "変更後の全文を渡すと、Core が差分を見せて承認を取ります。")
-OUTSIDE_REASON = "PETIT Home の外は使えません（L1 の作業用 worktree は未開放）。"
-L2_REASON = ("外部への送信・公開・リモート操作はこの場では実行できません（L2）。PETIT の承認つき Tool を使うか、"
-             "ユーザーに必要な操作を伝えてください。")
+OUTSIDE_REASON = ("PETIT Home の外は使えません。リポジトリを触るときは open_worktree で Home の worktrees/ に"
+                  "作業用 worktree を作ってください。")
+L2_REASON = ("外部への送信・公開・リモート操作はこの場では実行できません（L2）。push は push_worktree、PR は "
+             "create_worktree_pull_request（承認つき）など PETIT の Tool を使うか、ユーザーに必要な操作を伝えてください。")
 L3_REASON = "取り返しのつかない操作・秘密情報へのアクセスは常に禁止されています（L3）。"
 
 # Commands whose purpose is to reach outside the machine or publish (L2).
 L2_COMMANDS = {"curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "telnet", "ftp", "gh", "twine",
                "aws", "gcloud", "az", "kubectl", "docker", "podman"}
 L2_SUBCOMMANDS = {("git", "push"), ("git", "remote"), ("git", "fetch"), ("git", "pull"), ("git", "clone"),
-                  ("git", "config"), ("git", "submodule"), ("npm", "publish"), ("npm", "login"), ("pnpm", "publish"),
+                  ("git", "config"), ("git", "submodule"), ("git", "worktree"), ("npm", "publish"), ("npm", "login"), ("pnpm", "publish"),
                   ("yarn", "publish"), ("cargo", "publish"), ("pip", "download"), ("pip", "install"),
                   ("npm", "install"), ("npm", "i"), ("pnpm", "add"), ("yarn", "add"), ("uv", "pip")}
 # Commands that are irreversible or escalate (L3).
@@ -70,7 +71,8 @@ def _file_decision(tool: str, tool_input: dict, home: Path) -> str | None:
     if not _inside(path, home):
         return OUTSIDE_REASON
     relative = path.resolve().relative_to(home.resolve())
-    if relative.parts and relative.parts[0] in PROTECTED_DIRS:
+    # .git at any depth (Home itself and every worktree); .claude at the top.
+    if ".git" in relative.parts or (relative.parts and relative.parts[0] in PROTECTED_DIRS):
         return L3_REASON if tool in WRITE_TOOLS else None
     if SECRET_NAMES.search(relative.as_posix()):
         return L3_REASON

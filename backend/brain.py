@@ -23,6 +23,8 @@ PUBLIC_TOOLS = {
     "get_reminders", "create_reminder", "manage_reminder", "search_brain_notes",
     "search_notion", "gmail_search", "gmail_get_message", "get_weather", "search_news",
     "get_persona", "update_persona_file",
+    "open_worktree", "list_worktrees", "get_worktree_status", "run_worktree_check", "commit_worktree",
+    "push_worktree", "create_worktree_pull_request", "close_worktree",
 }
 LOCAL_WRITES = {
     "delegate_coding_task", "cancel_coding_task", "delegate_background_research",

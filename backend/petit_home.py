@@ -44,8 +44,9 @@ _TEMPLATES = {
         "- AGENTS.md / SOUL.md / USER.md: 人格と原則の正本。変更は差分承認。\n"
         "- memory/ skills/ scratch/: プティが自由に使う（L0）。\n"
         "- inbox/ outbox/: 受け取るファイル / 渡すファイル（Git 管理外）。\n"
+        "- worktrees/: 登録リポジトリの作業用 worktree（petit/ ブランチ。Home の Git 管理外）。\n"
     ),
-    ".gitignore": "inbox/\noutbox/\n",
+    ".gitignore": "inbox/\noutbox/\nworktrees/\n",
 }
 
 
@@ -88,6 +89,11 @@ def ensure() -> Path:
         if not path.exists():
             path.write_text(content, encoding="utf-8")
             created = True
+    ignore = home / ".gitignore"
+    if ignore.is_file() and "worktrees/" not in ignore.read_text(encoding="utf-8").splitlines():
+        # Worktrees are their own git checkouts; Home's history must not swallow them.
+        ignore.write_text(ignore.read_text(encoding="utf-8").rstrip("\n") + "\nworktrees/\n", encoding="utf-8")
+        created = True
     if not (home / ".git").exists():
         _git(home, "init", "-q")
         created = True

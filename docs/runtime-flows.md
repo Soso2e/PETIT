@@ -63,6 +63,22 @@ flowchart TD
     Risk -->|no| Exec[brain.execute<br/>書き込みは effect receipt]
 ```
 
+## Worktree での開発（v0.46.0開発版・#401）
+
+```mermaid
+flowchart TD
+    Agent[エージェント] --> Open[open_worktree L1<br/>coding_roots の repo だけ]
+    Open --> WT[Home/worktrees/repo-id<br/>petit/slug-id ブランチ]
+    WT --> Edit[ファイル Tool で編集<br/>Hook: worktree 内 .git 書込は拒否]
+    Edit --> Check[run_worktree_check L1<br/>許可コマンドのみ・シェルなし・秘密なし]
+    Check --> Commit[commit_worktree L1]
+    Commit --> Push{push_worktree L1<br/>作成時の petit/ ブランチ・HEAD 一致?}
+    Push -->|main・既定・他ブランチ・不一致| Refuse[拒否 L3]
+    Push -->|yes| Remote[origin へ push・receipt]
+    Remote --> PR[create_worktree_pull_request<br/>confirm_write・Core 計算 preview]
+    PR -->|承認| GH[PC の gh で PR 作成]
+```
+
 ## Claude Code エージェントモード（v0.46.0開発版・#400）
 
 `claude_code_agent_mode` が ON のときだけ、Claude Code の Turn はこの経路になる（OFF なら下の「Claude Code CLI Executor」）。

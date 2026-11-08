@@ -40,6 +40,7 @@ _BUILTIN_MODULES = (
     "backend.tools.task_reads",
     "backend.tools.task_defaults",
     "backend.tools.work_sessions",
+    "backend.tools.worktrees",
     "backend.web_tools",
 )
 

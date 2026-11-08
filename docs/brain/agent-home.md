@@ -71,9 +71,9 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 | 段階 | 範囲 | 例 | 確認 |
 | --- | --- | --- | --- |
 | **L0 自由** | PETIT Home の中 | メモを書く、skills を作る、scratch でスクリプトを試す、Web調査 | なし（git で全履歴を残す） |
-| **L1 作業** | 登録した repo の **作業用 worktree / ブランチ** | コードを書く、テスト・lint・build を実行、ブランチへ commit | なし（開始時に Job として記録） |
-| **L2 外に出る** | GitHub・外部サービス・送信 | push、PR 作成、Issue コメント、メール・Discord 送信、Notion 書き込み | **承認**（今の確認カード） |
-| **L3 不可逆** | 本人の資産そのもの | main への直接 push、ファイル削除（Home・worktree 外）、課金、秘密値の読取 | **拒否**（ルールで常に止める） |
+| **L1 作業** | 登録した repo の **作業用 worktree / ブランチ**（PETIT Home の `worktrees/`） | コードを書く、テスト・lint・build を実行、ブランチへ commit、**自分の `petit/` ブランチへ push** | なし（実行記録は残す） |
+| **L2 外に出る** | GitHub・外部サービス・送信 | PR 作成、Issue コメント、メール・Discord 送信、Notion 書き込み | **承認**（今の確認カード） |
+| **L3 不可逆** | 本人の資産そのもの | main（既定ブランチ）への push、force push、他のブランチへの push、ファイル削除（Home・worktree 外）、課金、秘密値の読取 | **拒否**（ルールで常に止める） |
 
 - 境界は CLI 自身の権限設定（Claude Code の `permissions.allow / deny`、Codex の sandbox 設定）と **Hook** で実装する。Hook（PreToolUse）が L2 の操作を検出したら Core に承認を問い合わせ、L3 は即拒否する。
 - 秘密値は今と同じく子プロセスへ渡さない。GitHub への push などは Core 側の Tool（承認つき）経由にし、CLI に token を持たせない。
@@ -103,7 +103,7 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 | **H1 Home と人格の一元化** | Home を作り、`AGENTS.md` / `SOUL.md` / `USER.md` を全 Brain の人格の正本にする。Home を git 管理 | どの Brain・入口でも同じ人格ファイルから応答する。ファイル変更が差分で見える  **実装済み（v0.46.0・#396）** |
 | **H2 PETIT MCP サーバー** | Tool Registry を MCP（stdio）で公開。risk・承認・receipt は既存のまま | Claude Code から MCP 経由で Read Tool と承認つき Write が動き、receipt が残る **実装済み（v0.46.0・#398）。実 Turn への組込みは H3** |
 | **H3 Claude Code エージェントモード** | cwd=Home、組込みTool有効、権限ルール + Hook、`--resume` によるセッション継続 | Home 内で自由に作業し、L2 は承認、L3 は拒否されることをテストで確認 **実装済み（v0.46.0・#400）。実 CLI で通し確認済み** |
-| **H4 Coding Job v2** | 登録 repo の git worktree で作業、テスト実行、ブランチ commit。push / PR は承認つき Core Tool | 実 repo で「Issue → ブランチ → テスト → PR（承認）」が通る |
+| **H4 Coding Job v2** | 登録 repo の git worktree で作業、テスト実行、ブランチ commit。push / PR は承認つき Core Tool | 実 repo で「Issue → ブランチ → テスト → PR（承認）」が通る **実装済み（v0.46.0・#401）。実 CLI で通し確認済み（PR の実作成は未確認）** |
 | **H5 Codex / Antigravity CLI の追従** | 同じ Home・MCP・段階ルールを各 CLI の設定へ写す | 3 CLI で同じシナリオが通る。差分は文書に記録 |
 
 最初に Claude Code で作る理由: 権限ルール・Hook・MCP・`--resume` がそろっていて、L0〜L3 の境界を最も素直に実装できるため。Concept の Executor 順位（Antigravity CLI 最優先）は会話 Brain の順位として残し、エージェントモードの対応順とは分けて扱う。
@@ -156,6 +156,25 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 | update_persona_file → 差分つき承認待ち → 承認 → 同じセッションで再開 → SOUL.md 反映・commit | 確認済み |
 | Bash（サンドボックス内） | 未確認（コンテナにサンドボックス依存がないため Bash は渡していない） |
 | Windows / macOS、本人アカウント | 未確認 |
+
+## 4.4 H4 の実装（v0.46.0・#401）
+
+- `backend/worktrees.py` と Tool（`backend/tools/worktrees.py`）:
+
+  | Tool | 段階 | 中身 |
+  | --- | --- | --- |
+  | `open_worktree` | L1 | 登録 repo（設定の `coding_roots`）から、origin の既定ブランチを元に `Home/worktrees/<repo>-<id>` と `petit/<slug>-<id>` ブランチを作る。`git fetch` は試すだけ |
+  | `list_worktrees` / `get_worktree_status` | 読取 | 開いている worktree、未 commit の変更・commit・差分の統計 |
+  | `run_worktree_check` | L1 | テスト・ビルド・静的検査だけ（`python -m pytest`、`npm test` / `npm run <script>`、`npx eslint` など、`go test`、`cargo test`、`make` など）。シェルなし・PETIT の秘密値なし・600秒・出力の末尾 20,000 文字。何度でも実行し直せる |
+  | `commit_worktree` | L1 | `git add -A` と commit（作者 PETIT） |
+  | `push_worktree` | L1 | 作成時の `petit/` ブランチだけを `HEAD:refs/heads/<branch>` で push。commit を引数で指定し HEAD と一致したときだけ。既定ブランチ・main など・他のブランチ・force は不可 |
+  | `create_worktree_pull_request` | L2（承認） | push 済みのときだけ、PC の `gh` ログインで PR を作る。確認カードには Core が計算した「ブランチ → 既定ブランチ・commit 一覧・差分の統計・本文」 |
+  | `close_worktree` | L1 | worktree のフォルダを片付ける（ブランチは残す） |
+
+- git は Core が実行し、repo の git hook は無効（`core.hooksPath=/dev/null`）。push と PR は PC の本人の git / gh の認証を使い、CLI には渡さない。
+- `worktrees/` は Home の中にあるので、エージェントモードのファイル Tool でそのまま編集できる。Home の git 管理からは外す（`.gitignore`）。Hook は worktree 内の `.git` への書き込みと、Bash からの `git worktree` を拒否する。
+- 注意: `run_worktree_check` は repo のテストコードを PC 上で実行する（OS サンドボックスなし・ネットワーク制限なし）。登録した自分の repo だけが対象。
+- 実 CLI での確認（haiku・ローカルの合成 repo と bare origin）: 「登録 repo 確認 → worktree 作成 → 関数とテストを追加 → pytest 2 passed → commit → `petit/` へ push → PR は差分つきで承認待ち」が通り、origin の main は変わらないことを確認。GitHub への PR の実作成は未確認。
 
 ## 5. 決定事項と残りの問い
 
