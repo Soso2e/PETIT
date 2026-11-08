@@ -106,7 +106,7 @@ Concept §6 の「Discord Bot：自分専用に常駐」をここで実装する
 
 | 段 | 内容 | 完了条件 |
 | --- | --- | --- |
-| **D1 Owner MVP** | Bot プロセス、owner 判定、DM とメンション、Core Thread 対応、defer・分割 | DM で予定・タスクに答える。owner 以外・指定外サーバーには何も個人情報を返さない（テスト） |
+| **D1 Owner MVP** | Bot プロセス、owner 判定、DM とメンション、Core Thread 対応、defer・分割 | DM で予定・タスクに答える。owner 以外・指定外サーバーには何も個人情報を返さない（テスト） **実装済み（v0.46.0・#397）。実 Discord 未確認** |
 | **D2 Owner の承認と通知** | 承認ボタン、リマインダー・Job 完了の DM 配送 | 承認が owner だけ・一度だけ。通知 OFF のカテゴリは送らない |
 | **D3 Guild の土台** | `/petit setup`、サーバー専用 DB、DeepSeek only の会話、予算 | 未設定サーバーで DeepSeek 0 回。Guild から owner Tool へ届かない（テスト） |
 | **D4 Guild のタスク・予定・リマインド** | catalog、確認ボタン、リマインド配送 | 実サーバーで登録 → 期日にメンションが届く |
@@ -117,6 +117,22 @@ Concept §6 の「Discord Bot：自分専用に常駐」をここで実装する
 D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 
 ---
+
+## 5.1 D1 の実装と起動手順（v0.46.0・#397）
+
+- Core: `backend/discord_api.py`。`POST /api/channels/discord/events`（Bearer のサービストークン必須）。owner 判定は Core が行う: 発話者が `PETIT_DISCORD_OWNER_ID` で、DM か `PETIT_DISCORD_OWNER_GUILD_IDS` のサーバーのときだけ Owner モード。それ以外は固定の案内を返し、Brain を呼ばない。
+- Thread は `discord:<channel_id>`、request ID は `discord:<message_id>`。Gateway の再送でも保存済みの結果を返す。
+- 承認が必要な操作は「PETIT の画面で承認してください」と返す（Discord のボタンは D2）。
+- Bot: `backend/channels/discord/`（`python -m backend.channels.discord`）。Message Content Intent は使わず、DM とメンションだけを受ける。返答は 2000 文字ごとに段落・行で分割。Bot からのメンション通知は無効（`AllowedMentions.none()`）。
+- 指定サーバーのチャンネルで個人情報を要約だけにする処理は未実装（§7 の未決定事項）。
+
+起動手順:
+
+1. Discord Developer Portal で Application と Bot を作り、Bot token を控える。Privileged Gateway Intents はすべて OFF のままでよい。OAuth2 URL Generator で `bot` スコープと権限「Send Messages / Read Message History」を選び、自分のサーバーに招待する。
+2. Discord の開発者モードで、自分の user ID と指定するサーバーの ID をコピーする。
+3. Core を起動する環境に設定する: `PETIT_DISCORD_OWNER_ID`、`PETIT_DISCORD_OWNER_GUILD_IDS`（カンマ区切り・空なら DM のみ）、`PETIT_DISCORD_SERVICE_TOKEN`（`python -c "import secrets;print(secrets.token_urlsafe(32))"` で作った値）。
+4. Bot を起動する: `pip install -r requirements-discord.txt` のあと、`DISCORD_BOT_TOKEN`・`PETIT_DISCORD_SERVICE_TOKEN`（Core と同じ値）・`PETIT_CORE_URL`（既定 `http://127.0.0.1:8000`）を設定して `python -m backend.channels.discord`。
+5. Bot に DM するか、指定サーバーで `@Bot名 今日なにある？` と送る。
 
 ## 6. どこで動かすか — 自宅PC＋Cloudflare（検討）
 

@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.45.1 (PR中・未マージ)**
+**Current Version: v0.46.0 (`claude/ai-redesign-discord-bot-h0xlft`・未マージ)**
 
-**Last Updated: 2026-11-07 UTC**
+**Last Updated: 2026-11-08 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- 再設計 H1 + D1（v0.46.0、`claude/ai-redesign-discord-bot-h0xlft`・未マージ）: 人格の正本を PETIT Home（`~/PETIT-Home` / `PETIT_HOME`）へ移し全Brainで共有、人格変更は Core 計算の差分を確認カードで承認（#396）。Discord Bot Owner モード MVP を別プロセスで追加、owner 判定は Core（#397）。未確認: 実 Discord 接続、Desktop の確認カードでの差分表示、Home の場所の設定UI。次: H2（PETIT MCP サーバー）・D2（承認ボタン・通知）。
 
 - #391 Univ 3Dカメラ操作（v0.45.1、PR中）: リサイズ（スマホのアドレスバー出入り・レール開閉）やタスク構成変更のたびに `resetCamera()` が走り、ドラッグ回転・ピンチ拡縮した視点が全体表示へ巻き戻っていた。ユーザーがカメラを動かした後と操作中は自動フィットしない（明示リセットで解除）。操作中は自動Tweenを止める。Playwright（Chromium・モバイルエミュレーション）で確認、iPhone/Android実機は未確認。
 
@@ -357,3 +359,4 @@
 | 2026-11-07 | 04:05 | #391 | v0.45.1: Univ 3Dでリサイズ・レイアウト変更時の自動全体表示がユーザーの回転/拡縮を巻き戻していた不具合を修正（操作中・操作後は自動フィットしない、明示リセットで解除）。Playwright再現・回帰テスト追加。実機未確認。 |
 | 2026-11-07 | 08:50 | - | 再設計の提案文書を追加（未承認・未実装）: docs/brain/agent-home.md（PETIT Home・MCP・自由度L0〜L3・セッション継続）、docs/channels/discord-bot.md（Owner/Guildの2モード、Guildは DeepSeek only・サーバー別DB・Notion・リマインド・人物認知）。Concept §2・§4の改訂は承認待ち。 |
 | 2026-11-08 | 01:38 | - | 再設計方針を承認しConcept.mdへ反映: §4 CLIの自由度をL0〜L3へ（Home内自由・ブランチでのテスト/commit確認なし・push/PR/外部送信は承認・不可逆は拒否）、人格ファイルは差分承認、§2にDeepSeek onlyで分離したDiscord Guildモードを追記、§8 Botは自宅PC＋Cloudflare無料枠ならGuild配送のみ。未実装。 |
+| 2026-11-08 | 01:49 | #396 #397 | v0.46.0: PETIT Home を人格の単一ソースに（AGENTS/SOUL/USER.md・git管理・差分承認の update_persona_file・承認カードに Core 計算 preview）、Discord Owner モード MVP（別プロセス Bot、Core が owner 判定、非 owner は Brain 0 回、message ID で冪等）。新規テスト21件、既存失敗17件は base と同数。実 Discord 未確認。 |

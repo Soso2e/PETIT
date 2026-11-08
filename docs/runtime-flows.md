@@ -17,6 +17,26 @@ flowchart TD
     Card -->|取消/期限切れ| Keep[ファイルは変更しない]
 ```
 
+## Discord Owner モード（v0.46.0開発版・#397）
+
+Bot は別プロセスで、Gateway へ外向き接続するだけ。owner 判定は Core が行い、owner 以外には Brain を呼ばない。詳細は [channels/discord-bot.md](channels/discord-bot.md)。
+
+```mermaid
+flowchart TD
+    Msg[Discord メッセージ] --> Extract{relay.extract<br/>Botの発言? / サーバーでメンションなし?}
+    Extract -->|該当| Silent[何もしない]
+    Extract -->|DM・メンション| Post[POST /api/channels/discord/events<br/>Bearer サービストークン]
+    Post --> Auth{トークン一致?}
+    Auth -->|未設定| E503[503]
+    Auth -->|不一致| E401[401]
+    Auth --> Mode{発話者 = OWNER_ID かつ<br/>DM か OWNER_GUILD_IDS?}
+    Mode -->|no| Guide[固定の案内のみ<br/>Brain 呼び出し 0 回]
+    Mode -->|yes| Submit[conversation_api.submit<br/>thread=discord:channel / request=discord:message<br/>source=discord・is_admin]
+    Submit --> Turn[既存の単一Brain Turn<br/>8 rounds / 12 calls・承認・receipt]
+    Turn -->|waiting_approval| Note[PETIT画面で承認するよう案内]
+    Turn --> Split[relay.split 2000文字で分割して返信]
+```
+
 ## Claude Code CLI Executor（v0.44.0開発版）
 
 Concept §4 のExecutor順位（Antigravity CLI ＞ Codex ＞ Claude Code ＞ DeepSeek）の3番目。Antigravity CLIと同じ「構造化した1 round」方式で、Toolの実行・承認・receiptは既存native Loopが行う。
