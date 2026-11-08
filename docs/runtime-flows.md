@@ -1,5 +1,22 @@
 # PETIT Runtime Flows
 
+## PETIT Home: 人格の単一ソースと差分承認（v0.46.0開発版）
+
+全Brain（native Tool Loop / Claude Code CLI / Antigravity CLI / Codex）は、同じ PETIT Home の人格ファイルから system 指示を作る。人格ファイルの変更は Core が計算した差分を確認カードに出し、承認後に一度だけ書き込んで git commit する。詳細は [brain/agent-home.md](brain/agent-home.md)。
+
+```mermaid
+flowchart TD
+    Turn[Turn開始] --> Persona[petit_home.persona<br/>AGENTS.md + SOUL.md + USER.md<br/>空テンプレートとコメントは除外]
+    Persona -->|Home不可| Fallback[petit_prompt.CORE_SYSTEM_PROMPT]
+    Persona --> Native[brain._run の system / vision_reply]
+    Persona --> Workspace[agent_workspace AGENTS.md<br/>Coreが生成したものだけ再生成・手編集は停止]
+    Native --> Call{update_persona_file?}
+    Call -->|confirm_write| Propose[store.propose<br/>引数を保存]
+    Propose --> Card[approvals: tools.preview_for<br/>表示時に現在ファイルとの差分を Core が計算]
+    Card -->|承認| Apply[petit_home.apply<br/>一時ファイル→置換・git commit・receipt]
+    Card -->|取消/期限切れ| Keep[ファイルは変更しない]
+```
+
 ## Claude Code CLI Executor（v0.44.0開発版）
 
 Concept §4 のExecutor順位（Antigravity CLI ＞ Codex ＞ Claude Code ＞ DeepSeek）の3番目。Antigravity CLIと同じ「構造化した1 round」方式で、Toolの実行・承認・receiptは既存native Loopが行う。

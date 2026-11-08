@@ -30,8 +30,9 @@ class VoiceTaskInteractionTests(unittest.TestCase):
         prompt = _literal_assignment(module, "CORE_SYSTEM_PROMPT")
         self.assertIn("PETIT", prompt)
         self.assertIn("読み上げやすいプレーンテキスト", prompt)
-        # The single Brain uses the same shared prompt (legacy aliases were removed with the router).
-        self.assertIn("CORE_SYSTEM_PROMPT", (ROOT / "backend" / "brain.py").read_text(encoding="utf-8"))
+        # The shared prompt seeds PETIT Home, and every Brain reads the persona from there.
+        self.assertIn("CORE_SYSTEM_PROMPT", (ROOT / "backend" / "petit_home.py").read_text(encoding="utf-8"))
+        self.assertIn("petit_home.persona()", (ROOT / "backend" / "brain.py").read_text(encoding="utf-8"))
 
     def test_voice_script_scopes_speech_and_handles_confirmation(self) -> None:
         source = (ROOT / "frontend" / "voice.js").read_text(encoding="utf-8")

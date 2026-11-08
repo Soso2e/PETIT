@@ -105,7 +105,7 @@ function addMessage(role, text, { tools, error, actions, modelRoute, silent = fa
       controls.appendChild(preview);
     }
     const exact = document.createElement('pre'); exact.className = 'action-preview';
-    exact.textContent = JSON.stringify(action.arguments || {}, null, 2);
+    exact.textContent = action.preview || JSON.stringify(action.arguments || {}, null, 2);
     exact.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto';
     controls.appendChild(exact);
     const approve = document.createElement("button");

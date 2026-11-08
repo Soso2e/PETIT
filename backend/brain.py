@@ -6,8 +6,8 @@ import hashlib
 import time
 from typing import Any
 
-from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, request_context, time_context, tools
-from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
+from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, petit_home, request_context, time_context, tools
+from .petit_prompt import voice_turn_instructions
 
 # A reviewed public catalog, never the registry's internal approval executors.
 # Optional integrations simply disappear when their Tools are not registered.
@@ -22,6 +22,7 @@ PUBLIC_TOOLS = {
     "delegate_background_research", "get_background_research_status",
     "get_reminders", "create_reminder", "manage_reminder", "search_brain_notes",
     "search_notion", "gmail_search", "gmail_get_message", "get_weather", "search_news",
+    "get_persona", "update_persona_file",
 }
 LOCAL_WRITES = {
     "delegate_coding_task", "cancel_coding_task", "delegate_background_research",
@@ -204,7 +205,8 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
     if messages is None:
         payload = json.loads(row["input_json"])
         focus = dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:]
-        messages = [{"role": "system", "content": CORE_SYSTEM_PROMPT + voice_turn_instructions() + INSTRUCTIONS +
+        persona = petit_home.persona()
+        messages = [{"role": "system", "content": persona + voice_turn_instructions() + INSTRUCTIONS +
                     "\n必要ならdiscover_toolsで詳細schemaを取得する。場所は確認済みの情報だけを使い、不明なら質問する。タイムゾーンから推定しない。\nCapability一覧: " + catalog.index()},
                     {"role": "user", "content": "Coreの現在時刻（参考メタデータ）: " +
                      time_context.current_datetime().isoformat(timespec="seconds")}]
@@ -219,7 +221,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
     from . import service_sync
     with db.get_connection() as c:
         store.event(c, row["thread_id"], request_id, "brain_context_metrics", {
-            "prompt_chars":len(CORE_SYSTEM_PROMPT + voice_turn_instructions() + INSTRUCTIONS),
+            "prompt_chars":len(petit_home.persona() + voice_turn_instructions() + INSTRUCTIONS),
             "history_chars":sum(len(str(x.get("content") or "")) for x in store.history(row["thread_id"])),
             "state_chars":len(store.encode(dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:])),
             "index_chars":len(catalog.index()), "alerts_chars":len(service_sync.warning()), "tokens":None})

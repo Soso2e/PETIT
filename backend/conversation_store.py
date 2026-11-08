@@ -256,7 +256,15 @@ def approvals(request_id: str) -> list[dict]:
         rows = connection.execute(
             "SELECT * FROM turn_approvals WHERE request_id=? AND status='pending' AND expires_at>?",
             (request_id, time.time())).fetchall()
-    return [{"approval_id": r["id"], "name": r["tool"], "arguments": json.loads(r["arguments_json"])} for r in rows]
+    from . import tools
+    result = []
+    for r in rows:
+        item = {"approval_id": r["id"], "name": r["tool"], "arguments": json.loads(r["arguments_json"])}
+        preview = tools.preview_for(r["tool"], item["arguments"])
+        if preview is not None:
+            item["preview"] = preview
+        result.append(item)
+    return result
 
 
 def approval(approval_id: str) -> dict | None:

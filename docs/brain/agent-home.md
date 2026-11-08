@@ -100,7 +100,7 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 
 | 段 | 内容 | 完了条件 |
 | --- | --- | --- |
-| **H1 Home と人格の一元化** | Home を作り、`AGENTS.md` / `SOUL.md` / `USER.md` を全 Brain の人格の正本にする。Home を git 管理 | どの Brain・入口でも同じ人格ファイルから応答する。ファイル変更が差分で見える |
+| **H1 Home と人格の一元化** | Home を作り、`AGENTS.md` / `SOUL.md` / `USER.md` を全 Brain の人格の正本にする。Home を git 管理 | どの Brain・入口でも同じ人格ファイルから応答する。ファイル変更が差分で見える  **実装済み（v0.46.0・#396）** |
 | **H2 PETIT MCP サーバー** | Tool Registry を MCP（stdio）で公開。risk・承認・receipt は既存のまま | Claude Code から MCP 経由で Read Tool と承認つき Write が動き、receipt が残る |
 | **H3 Claude Code エージェントモード** | cwd=Home、組込みTool有効、権限ルール + Hook、`--resume` によるセッション継続 | Home 内で自由に作業し、L2 は承認、L3 は拒否されることをテストで確認 |
 | **H4 Coding Job v2** | 登録 repo の git worktree で作業、テスト実行、ブランチ commit。push / PR は承認つき Core Tool | 実 repo で「Issue → ブランチ → テスト → PR（承認）」が通る |
@@ -109,6 +109,15 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 最初に Claude Code で作る理由: 権限ルール・Hook・MCP・`--resume` がそろっていて、L0〜L3 の境界を最も素直に実装できるため。Concept の Executor 順位（Antigravity CLI 最優先）は会話 Brain の順位として残し、エージェントモードの対応順とは分けて扱う。
 
 ---
+
+## 4.1 H1 の実装（v0.46.0・#396）
+
+- `backend/petit_home.py`: Home の場所は環境変数 `PETIT_HOME`、未設定なら `~/PETIT-Home`。足りないファイルだけ作り、既存は上書きしない。git があれば初期化して commit する。
+- `petit_home.persona()`: `AGENTS.md` + `SOUL.md` + `USER.md` を連結（1ファイル 8,000 文字まで）。HTML コメントだけの空テンプレートは入れない。Home を読めないときは `petit_prompt.CORE_SYSTEM_PROMPT` に戻す。
+- 使う場所: `brain._run`（native / Claude Code / Antigravity CLI の system）、`vision_reply`、Codex の agent-workspace `AGENTS.md`。
+- Tool: `get_persona`（safe_read）、`update_persona_file`（confirm_write。変更後の全文を渡す）。確認カードには Tool Registry の `preview` で Core が計算した unified diff を出す（モデルが書いた差分は使わない）。承認後に一時ファイル経由で置換し、git commit する。
+- agent-workspace: Core が生成した内容（ハッシュを `agent-workspace.generated` に記録）と旧形式の生成内容だけ再生成し、手編集は従来どおり停止する。
+- 未実装: Home の場所を設定画面で変える UI、Desktop のプレビュー表示、CLI の組込みTool有効化（H3）。
 
 ## 5. 決定事項と残りの問い
 
