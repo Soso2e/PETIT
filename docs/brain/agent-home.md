@@ -1,11 +1,11 @@
 # PETIT Home — CLIを「判断器」から「自立した作業者」へ
 
-> Status: **目標（提案・未承認・未実装）** / Last updated: **2026-11-07**
+> Status: **目標（方針承認済み 2026-11-08・未実装）** / Last updated: **2026-11-08**
 >
 > 関連: Concept.md §4・§8・§10、[claude-code-cli.md](claude-code-cli.md)、[persistent-agent-workspace.md](persistent-agent-workspace.md)、[../dev/coding-tasks.md](../dev/coding-tasks.md)
 >
-> 本書は再設計の提案。採用が決まったら Concept.md §4「Coreが守ること」と runtime-flows.md を同じ変更で直す。
-> それまでは現行の正本は [claude-code-cli.md](claude-code-cli.md) と [../runtime-flows.md](../runtime-flows.md)。
+> 方針（L0〜L3・人格ファイルの差分承認）は Concept.md §4 に反映済み。実装を変えたら runtime-flows.md を同じ変更で直す。
+> 実装されるまで、現行の動作の正本は [claude-code-cli.md](claude-code-cli.md) と [../runtime-flows.md](../runtime-flows.md)。
 
 ---
 
@@ -51,7 +51,9 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 - **人格は「システムプロンプトに埋め込む文字列」ではなく、Home 内のファイル**にする。CLI は自分で読み、必要なら（承認つきで）書き換えられる。
 - DeepSeek / LM Studio（API Brain）も、同じ `AGENTS.md` + `SOUL.md` + `USER.md` を system prompt として読み込む。**入口やBrainが変わっても秘書はひとり**（Concept §3-4）を、ファイルの共有で守る。
 - 現行の `backend/petit_prompt.py` の `CORE_SYSTEM_PROMPT` は、初回だけ `AGENTS.md` の雛形として書き出す。以後の正本は Home のファイル。
-- 現行 `agent_workspace.py` の「変更されていたら停止」は、「変更は git の差分としてユーザーに見せる」に変える。プティが自分の指示を育てるのを止めない代わりに、履歴と巻き戻しを保証する。
+- 現行 `agent_workspace.py` の「変更されていたら停止」は、「変更は git の差分としてユーザーに見せる」に変える。
+- **人格ファイル（`AGENTS.md` / `SOUL.md` / `USER.md`）の変更は差分承認（決定）**: プティは変更案を作業ブランチ（または `proposals/`）に書き、Core が差分を確認カードで見せ、本人が承認したときだけ反映する。却下した案も履歴に残す。`memory/` `skills/` `scratch/` は L0（確認なし）。
+- 人格ファイルを直接書き換える操作は Hook で止め、上の提案の流れへ回す。
 
 ### 2.2 PETIT Tool は MCP で渡す
 
@@ -75,7 +77,7 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 
 - 境界は CLI 自身の権限設定（Claude Code の `permissions.allow / deny`、Codex の sandbox 設定）と **Hook** で実装する。Hook（PreToolUse）が L2 の操作を検出したら Core に承認を問い合わせ、L3 は即拒否する。
 - 秘密値は今と同じく子プロセスへ渡さない。GitHub への push などは Core 側の Tool（承認つき）経由にし、CLI に token を持たせない。
-- これは Concept §4「CLIに任意のShellや無制限のファイル操作を直接は開放しない」の**書き換え**になる。採用時は「Home と登録 worktree の中だけ開放し、外への影響は承認・不可逆は拒否」と改める。
+- この4段階は Concept §4 に反映済み（2026-11-08）。旧方針「CLIに任意のShellや無制限のファイル操作を直接は開放しない」を置き換えた。
 
 ### 2.4 セッションを持つ
 
@@ -108,12 +110,14 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 
 ---
 
-## 5. 決めてほしいこと
+## 5. 決定事項と残りの問い
 
-1. **自由度の線引き**: 表 2.3 の L0〜L3 でよいか（特に「登録 repo のブランチ上でのテスト実行・commit は確認なし」）。
-2. **Home の場所**: PETIT 本体の `storage/` 配下にするか、ユーザーが直接開ける場所（例 `~/PETIT-Home`、Obsidian Vault 内）にするか。
-3. **プティが自分の人格ファイルを書き換えてよいか**: 自由 / 提案だけ（差分を見せて承認） / 禁止。
-4. **Concept §4 の書き換え**を承認するか（2.3 の最後の段落）。
+| 項目 | 状態 |
+| --- | --- |
+| 自由度の線引き L0〜L3 | **決定**（2026-11-08） |
+| Concept §4 の書き換え | **決定・反映済み** |
+| 人格ファイルの変更 | **決定**: 差分を見せて本人が承認 |
+| Home の場所 | 未決定。提案: 既定は `~/PETIT-Home`（ユーザーが直接開ける場所）、設定で変更可。Obsidian Vault 内に置くかは H1 実装時に確認する |
 
 ## 6. 未確認
 

@@ -356,3 +356,4 @@
 | 2026-11-06 | 15:12 | #345 | v0.45.0: 旧キーワードルーティング21モジュールとexecute_agent_write・比較PoCを撤去、画像会話をvision_reply.pyへ移設、旧runtime-flows図をarchiveへ。既存失敗テスト51件→21件（残りは全てbaseから既存）。実端末未確認。 |
 | 2026-11-07 | 04:05 | #391 | v0.45.1: Univ 3Dでリサイズ・レイアウト変更時の自動全体表示がユーザーの回転/拡縮を巻き戻していた不具合を修正（操作中・操作後は自動フィットしない、明示リセットで解除）。Playwright再現・回帰テスト追加。実機未確認。 |
 | 2026-11-07 | 08:50 | - | 再設計の提案文書を追加（未承認・未実装）: docs/brain/agent-home.md（PETIT Home・MCP・自由度L0〜L3・セッション継続）、docs/channels/discord-bot.md（Owner/Guildの2モード、Guildは DeepSeek only・サーバー別DB・Notion・リマインド・人物認知）。Concept §2・§4の改訂は承認待ち。 |
+| 2026-11-08 | 01:38 | - | 再設計方針を承認しConcept.mdへ反映: §4 CLIの自由度をL0〜L3へ（Home内自由・ブランチでのテスト/commit確認なし・push/PR/外部送信は承認・不可逆は拒否）、人格ファイルは差分承認、§2にDeepSeek onlyで分離したDiscord Guildモードを追記、§8 Botは自宅PC＋Cloudflare無料枠ならGuild配送のみ。未実装。 |

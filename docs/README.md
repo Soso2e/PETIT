@@ -49,7 +49,7 @@ Thread/Turn、Context Broker、会話状態、記憶、バックグラウンド�
 Brainの選択、CLI（Antigravity / Codex / Claude Code）接続、モデル切り替え
 
 - [antigravity-brain-poc.md](brain/antigravity-brain-poc.md) — 公式Antigravity SDK Brain — Refs #349（SDKは撤去済み。履歴として保持）
-- [agent-home.md](brain/agent-home.md) — PETIT Home：CLIを自立した作業者へ（提案・未承認）
+- [agent-home.md](brain/agent-home.md) — PETIT Home：CLIを自立した作業者へ（方針承認済み・未実装）
 - [antigravity-cli.md](brain/antigravity-cli.md) — Antigravity CLIと既存契約枠（#355 / #349）
 - [claude-code-cli.md](brain/claude-code-cli.md) — Claude Code CLI Executor（v0.44.0）
 - [model_route_switcher.md](brain/model_route_switcher.md) — Chat / Agent モデル切り替え
@@ -124,7 +124,7 @@ iPhone / PWA、Discord、画像、Web Push、接続ステータス
 
 - [app-notification-unification.md](channels/app-notification-unification.md) — Webアプリ構造と通知・会話継続の統一
 - [connection-status.md](channels/connection-status.md) — 接続ステータス（#327）
-- [discord-bot.md](channels/discord-bot.md) — Discord Bot：本人専用モードとGuildプロジェクトモード（提案・未承認）
+- [discord-bot.md](channels/discord-bot.md) — Discord Bot：本人専用モードとGuildプロジェクトモード（方針承認済み・未実装）
 - [iphone_phase0_tailscale.md](channels/iphone_phase0_tailscale.md) — iPhone Phase 0: Tailscale Serve
 - [multimodal-acceptance.md](channels/multimodal-acceptance.md) — Multimodal / Discord 受入セット
 - [multimodal-discord-plan.md](channels/multimodal-discord-plan.md) — Multimodal Intelligence / Discord 計画

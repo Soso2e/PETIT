@@ -1,10 +1,10 @@
 # PETIT Discord Bot — 本人専用モードと「サーバー向けプロジェクトモード」
 
-> Status: **目標（提案・未承認・未実装）** / Last updated: **2026-11-07**
+> Status: **目標（方針承認済み 2026-11-08・未実装）** / Last updated: **2026-11-08**
 >
 > 関連: Concept.md §2・§6・§9・§10、[multimodal-discord-plan.md](multimodal-discord-plan.md)（旧計画。PR3/PR4 の Discord 部分を本書が引き継ぐ）、[../brain/agent-home.md](../brain/agent-home.md)
 >
-> 本書は提案。Guild モード（§3）は Concept §2「自分専用。他人向けの汎用Botは目指さない」と衝突するため、採用時に Concept §2・§9 を改める。
+> Guild モード（§3）は Concept §2 に「副産物」として追記済み（2026-11-08）。owner データとの完全分離が条件。
 
 ---
 
@@ -110,6 +110,7 @@ Concept §6 の「Discord Bot：自分専用に常駐」をここで実装する
 | **D2 Owner の承認と通知** | 承認ボタン、リマインダー・Job 完了の DM 配送 | 承認が owner だけ・一度だけ。通知 OFF のカテゴリは送らない |
 | **D3 Guild の土台** | `/petit setup`、サーバー専用 DB、DeepSeek only の会話、予算 | 未設定サーバーで DeepSeek 0 回。Guild から owner Tool へ届かない（テスト） |
 | **D4 Guild のタスク・予定・リマインド** | catalog、確認ボタン、リマインド配送 | 実サーバーで登録 → 期日にメンションが届く |
+| **D4.5 Cloudflare 配送（任意）** | 無料枠を確認できたら、Guild のリマインドを Worker の Cron で配送 | PC 停止中でも期日に届く。送信済みが PC の台帳へ戻る。無料枠内 |
 | **D5 Notion 連携・人の認知** | modal での token 登録、Notion 正本の同期、メンバープロフィール、forget-me | Notion 側の変更が反映。forget-me 後に何も答えない |
 | **D6 開発の司令塔を Discord から** | agent-home の Job を Discord スレッドで操作 | 「進めて → 進捗 → PR 承認」が Discord だけで完結 |
 
@@ -117,15 +118,47 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 
 ---
 
-## 6. 決めてほしいこと
+## 6. どこで動かすか — 自宅PC＋Cloudflare（検討）
 
-1. **Bot をどこで動かすか**: 自宅PC（PC が寝ると Bot も止まる。Guild のリマインドが遅れる） / 常時稼働の小さいサーバー（Guild モードだけをそこへ置く案もある）。
-2. **Concept §2 の改訂**: 「本体は自分専用。副産物として、owner データから完全に分離した Guild モードを持つ」と書き換えてよいか。
-3. **Guild の書き込み確認**: 誰でも押せる / 管理者だけ / サーバーごとに設定。
-4. **owner 指定サーバー**: 最初に登録するサーバーと、そこで個人情報をどこまで出すか（§2 の既定案でよいか）。
+**決定（2026-11-08）: 基本は自宅PC。** Cloudflare は無料枠に収まる場合だけ、PC 停止中に止まると困る部分に使う。
 
-## 7. 未確認
+### 6.1 役割分担の案
+
+| 担当 | 自宅PC | Cloudflare（任意） |
+| --- | --- | --- |
+| Discord Gateway（メンション・会話） | ○ 常駐プロセス | ×（Worker は長時間の WebSocket 接続を保てないため置かない） |
+| Owner モード全部 | ○ | ×（owner のデータは置かない：Concept §8） |
+| Guild の会話・タスク・Notion | ○ | × |
+| Guild のリマインド配送 | ○（PC 稼働中） | ○ Cron Trigger が期日の通知を Discord REST API で送る |
+| PC 停止中の案内 | — | 任意: 「いまは本体がお休み中です」を返す程度 |
+
+- PC は Guild のリマインド予定を、外向きの HTTPS で Worker の小さな保存先（D1 など）へ写すだけ。Worker から自宅PCへ入る経路は作らない。
+- Worker に置くのは「サーバーID・チャンネルID・メンション先・本文・期日」だけ。送信済みは PC 側が取りに行って台帳に反映する（送信済み / 未送信 / 不明 を区別：Concept §8）。
+- Bot token を Worker の Secret に置くことになる。漏えい時の影響が Bot 全体に及ぶため、Worker の権限は送信だけに絞る。
+- Slash コマンドを HTTP（Interactions Endpoint）で受けるように設定すると、Gateway 側には届かなくなる。PC 停止中の案内のためだけに切り替えない（実装時に公式仕様で再確認）。
+
+### 6.2 無料枠の確認（未確認・実装前に公式で確かめる）
+
+- Workers 無料枠の 1 日あたりリクエスト数、Cron Trigger の本数、D1 の保存量と読み書き回数の上限。
+- 想定負荷: リマインド配送は 1 分ごとの Cron でも 1 日 1,440 回程度なので、少数のサーバーなら無料枠に収まる見込み。超えそうなら Cron 間隔を 5 分にする。
+- 枠を超える・有料化が必要になるなら Cloudflare は使わず、「PC 停止中はリマインドが遅れる」と Guild 側に明示する。
+
+### 6.3 段階
+
+D1〜D5 は自宅PCだけで作る。Cloudflare 配送は D4 の後に **D4.5** として、無料枠の確認が取れてから追加する。
+
+## 7. 残りの問い
+
+| 項目 | 状態 |
+| --- | --- |
+| Bot の置き場所 | **決定**: 自宅PC。Cloudflare は無料枠なら Guild 配送だけ（§6） |
+| Concept §2 の改訂 | **決定・反映済み** |
+| Guild の書き込み確認を誰が押せるか | 未決定。提案: 既定は管理者だけ、サーバーごとに「誰でも」に変更可 |
+| owner 指定サーバーと個人情報の出し方 | 未決定。提案: DM では返す、指定サーバーのチャンネルでは要約のみ（§2） |
+
+## 8. 未確認
 
 - Discord の DM での Message Content Intent の扱いと、slash コマンドだけで足りるか（旧計画の調査メモを実装時に公式で再確認する）。
 - DeepSeek の現行料金とサーバーあたりの想定コスト。
 - Notion internal integration をサーバー側が用意する手間（案内文の検証）。
+- Cloudflare 無料枠の現行の上限と、Worker から Discord REST API へ送るときのレート制限（§6.2）。
