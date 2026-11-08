@@ -102,7 +102,7 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 | --- | --- | --- |
 | **H1 Home と人格の一元化** | Home を作り、`AGENTS.md` / `SOUL.md` / `USER.md` を全 Brain の人格の正本にする。Home を git 管理 | どの Brain・入口でも同じ人格ファイルから応答する。ファイル変更が差分で見える  **実装済み（v0.46.0・#396）** |
 | **H2 PETIT MCP サーバー** | Tool Registry を MCP（stdio）で公開。risk・承認・receipt は既存のまま | Claude Code から MCP 経由で Read Tool と承認つき Write が動き、receipt が残る **実装済み（v0.46.0・#398）。実 Turn への組込みは H3** |
-| **H3 Claude Code エージェントモード** | cwd=Home、組込みTool有効、権限ルール + Hook、`--resume` によるセッション継続 | Home 内で自由に作業し、L2 は承認、L3 は拒否されることをテストで確認 |
+| **H3 Claude Code エージェントモード** | cwd=Home、組込みTool有効、権限ルール + Hook、`--resume` によるセッション継続 | Home 内で自由に作業し、L2 は承認、L3 は拒否されることをテストで確認 **実装済み（v0.46.0・#400）。実 CLI で通し確認済み** |
 | **H4 Coding Job v2** | 登録 repo の git worktree で作業、テスト実行、ブランチ commit。push / PR は承認つき Core Tool | 実 repo で「Issue → ブランチ → テスト → PR（承認）」が通る |
 | **H5 Codex / Antigravity CLI の追従** | 同じ Home・MCP・段階ルールを各 CLI の設定へ写す | 3 CLI で同じシナリオが通る。差分は文書に記録 |
 
@@ -129,6 +129,33 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 - Core 全体の管理者 cookie と同一 Origin のチェックは、Bearer で守る `/api/agent-bridge/` と `/api/channels/discord/` には適用しない（`setup_api.TOKEN_AUTH_PREFIXES`）。
 - 確認済み: 実 Claude Code CLI（2.1.x）の `claude mcp list` で接続と Tool 一覧の取得（使い捨ての設定フォルダで実施）。
 - 未実装: 実際の Turn で CLI を MCP つきで起動すること、MCP から出た承認の承認後の再開（どちらも H3）。
+
+## 4.3 H3 の実装（v0.46.0・#400）
+
+設定画面の Claude Code カードで「エージェントモードを使う」を ON にしたときだけ動く（既定 OFF。OFF なら従来の JSON 判断方式）。
+
+- `backend/claude_agent.py`: 1 Turn につき公式 `claude` を1回起動する。
+  - `-p --output-format json --restricted --strict-mcp-config --mcp-config <一時ファイル> --settings <一時ファイル> --permission-mode acceptEdits --tools Read,Write,Edit,Glob,Grep --allowedTools mcp__petit --disable-slash-commands --append-system-prompt <人格+規則>`、cwd = PETIT Home。
+  - `--restricted` でユーザー・プロジェクトの設定を読まず、ファイル Tool を Home に閉じ込め、設定・git ファイルへの書き込みを拒否する。
+  - MCP 設定（Turn 限定トークン入り）と settings は 0600 の一時ファイルで渡し、Turn 後にトークンを失効させる。API キーや PETIT の秘密値は子プロセスへ渡さない。
+  - Thread ごとの CLI セッションを `provider_sessions`（`claude_agent`）に保存し、次の Turn は `--resume`。人格・モデル・Bash 可否・Hook 版が変わったら新しいセッション。
+  - MCP から承認待ちが出たら Turn は `waiting_approval`。承認すると、同じセッションに承認結果を渡して `--resume` で続ける。
+  - Turn の終わりに Home の変更を git commit（`PETIT: <request_id>`）。push はしない。
+- `backend/agent_hooks.py`（PreToolUse Hook）: L0〜L3 の線。Home 外・`..`・`~`・秘密ファイル名・`.git`/`.claude` への書き込みは拒否。人格ファイルの直接編集は拒否して `update_persona_file` へ誘導。Bash では外部通信・公開・インストール（L2）、sudo・Home 外の削除など（L3）を拒否。WebFetch・WebSearch・サブエージェント・他の MCP も拒否。
+- Bash: 「Bash も許可する」を ON にし、かつ Claude Code の OS サンドボックスが実際に使えるとき（Linux: `bwrap` と `socat`、macOS: `sandbox-exec`）だけ渡す。Windows では渡さない。
+  - 実機で判明: 依存が無いと CLI は警告だけ出してサンドボックス無しで Bash を実行する。そのため Core 側で依存を確認して、無ければ Bash を渡さない（`bash_withheld` を記録）。
+- 承認後の再開: Core は Turn が最初に止まったとき `input_json` を消すので、再開中の MCP は「承認済みの操作がある Turn」を管理者の Turn として扱う（承認は管理者か Discord の owner しかできない）。
+
+実 CLI での通し確認（Linux 開発コンテナ・haiku・合成データ）:
+
+| 確認 | 結果 |
+| --- | --- |
+| Home の `memory/` への書き込み（L0）と Turn 後の git commit | 確認済み |
+| SOUL.md の直接 Edit を Hook が拒否し、エージェントが回避せず報告 | 確認済み（denials 1） |
+| MCP 経由の PETIT Tool（get_current_time） | 確認済み |
+| update_persona_file → 差分つき承認待ち → 承認 → 同じセッションで再開 → SOUL.md 反映・commit | 確認済み |
+| Bash（サンドボックス内） | 未確認（コンテナにサンドボックス依存がないため Bash は渡していない） |
+| Windows / macOS、本人アカウント | 未確認 |
 
 ## 5. 決定事項と残りの問い
 

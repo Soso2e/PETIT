@@ -96,6 +96,18 @@ def ensure() -> Path:
     return home
 
 
+def commit(home: Path, message: str) -> bool:
+    """Commit whatever changed in Home (L0 history). No-op without git or changes."""
+    if not shutil.which("git") or not (home / ".git").exists():
+        return False
+    try:
+        changed = subprocess.run(["git", "status", "--porcelain"], cwd=home, capture_output=True, text=True,
+                                 timeout=20).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return bool(changed) and _commit(home, message)
+
+
 def _commit(home: Path, message: str) -> bool:
     return _git(home, "add", "-A") and _git(home, "commit", "-q", "--allow-empty-message", "-m", message)
 

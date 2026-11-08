@@ -245,6 +245,8 @@ class SettingsUpdate(BaseModel):
     codex_model: str | None = Field(default=None, max_length=200)
     antigravity_cli_model: str | None = Field(default=None, max_length=200)
     claude_code_model: str | None = Field(default=None, max_length=200, pattern=r"^[A-Za-z0-9._:\[\]-]*$")
+    claude_code_agent_mode: bool | None = None
+    claude_code_agent_bash: bool | None = None
     sync_notifications: bool | None = None
 
 

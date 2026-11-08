@@ -190,6 +190,11 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
     if target.get("provider") == "codex":
         from . import codex_brain
         return codex_brain.run(request_id, target, messages=messages, used_tools=used_tools)
+    if target.get("provider") == "claude_code":
+        from . import claude_agent, setup_store
+        if claude_agent.enabled(setup_store.load()):
+            # Agent mode: the CLI works in PETIT Home and calls PETIT Tools over MCP.
+            return claude_agent.run(request_id, target, messages=messages, used_tools=used_tools)
     from .brain_catalog import Catalog, DISCOVER
     from .provider_runtime import validate_arguments
     catalog = Catalog()

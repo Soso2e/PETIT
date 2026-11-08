@@ -22,6 +22,7 @@ DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["antigravit
             "brain_transport": "mixed",
             "antigravity_cli_enabled": False, "antigravity_cli_model": "",
             "claude_code_enabled": False, "claude_code_model": "",
+            "claude_code_agent_mode": False, "claude_code_agent_bash": False,
             "coding_roots": [],
             "paid_allowed": [], "connected": [], "calendar": "local", "google_calendar_id": "primary",
             "notion_tasks_db": "", "notion_projects_db": "", "notion_pages": [],

@@ -137,3 +137,18 @@ def test_full_app_lets_token_endpoints_through_admin_middleware_only_with_token(
     # Everything else still needs the admin cookie.
     assert client.get("/api/threads").status_code == 401
     assert client.get("/api/agent-bridgeX").status_code == 401
+
+
+def test_resumed_turn_after_approval_keeps_tools(api):
+    # Real-CLI finding: input_json is consumed when the Turn first stops; resume must still work.
+    request_id = running_turn("r-resume")
+    with db.get_connection() as connection:
+        connection.execute("UPDATE turns SET input_json=NULL WHERE request_id=?", (request_id,))
+    token = agent_bridge.issue(request_id)
+    headers = {"Authorization": "Bearer " + token}
+    assert api.post("/api/agent-bridge/tools/list", headers=headers).status_code == 403  # nothing approved yet
+    call = {"id": "c1", "function": {"name": "update_persona_file"}}
+    approval_id = store.propose(request_id, call, {"file": "SOUL.md", "content": "x", "reason": "r"})
+    with db.get_connection() as connection:
+        connection.execute("UPDATE turn_approvals SET status='approved' WHERE id=?", (approval_id,))
+    assert api.post("/api/agent-bridge/tools/list", headers=headers).status_code == 200

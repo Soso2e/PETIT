@@ -77,6 +77,7 @@ flowchart TD
   - **Codex CLI**: app-server の Agent Loop。PETIT の Tool は dynamic Tool として渡す。Codex の shell / apps / plugins / subagent は無効にしている。
   - **Antigravity CLI**: 公式 `agy` を本人のCLI認証で起動する。設定画面で明示的に接続したときだけ使える。規約上の許諾は未確定（[brain/antigravity-cli.md](brain/antigravity-cli.md)）。
   - **Claude Code CLI**: 公式 `claude` をヘッドレスで起動し、組込みTool・MCP・設定読込を無効にしてJSONで判断だけを受け取る。明示接続時のみ（[brain/claude-code-cli.md](brain/claude-code-cli.md)）。
+    - **エージェントモード（v0.46.0、設定で ON のときだけ）**: PETIT Home を作業場所に、組込みファイル Tool と PETIT Tool（MCP）を使い、PreToolUse Hook で L0〜L3 の線を引く。人格ファイルは差分承認。詳細は [brain/agent-home.md](brain/agent-home.md) §4.3。
 - 既定の優先順位は Concept §4 と同じ Antigravity CLI → Codex → Claude Code → DeepSeek。未接続の候補は飛ばす。保存済みの順位は書き換えず、新しく接続したCLIは方針順の位置へ挿入する（Antigravity CLIの「先頭へ」ボタンは従来どおり）。
 - `brain_transport=cli_only` にすると、CLI（Codex / Antigravity CLI / Claude Code CLI）だけを使い、APIへは切り替えない。
 - 障害時は、Toolを実行する前に限って次の候補へ切り替える。Tool実行後に障害が起きたら、そのTurnは失敗として扱う。

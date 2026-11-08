@@ -68,9 +68,18 @@ def _grant(authorization: str | None, *, counting: bool) -> dict:
 
 def _turn_context(request_id: str):
     row = store.load_turn(request_id)
-    payload = json.loads(row["input_json"])
     if row["status"] not in {"queued", "running"}:
         raise HTTPException(409, "このTurnは実行中ではありません。")
+    if row["input_json"] is None:
+        # The ledger consumes input_json when a Turn first stops. A Turn only resumes after an
+        # admin (or the Discord owner) approved something, so that approval stands in for it.
+        from . import db
+        with db.get_connection() as connection:
+            approved = connection.execute("SELECT 1 FROM turn_approvals WHERE request_id=? AND status='approved' LIMIT 1",
+                                          (request_id,)).fetchone()
+        payload = {"is_admin": bool(approved)}
+    else:
+        payload = json.loads(row["input_json"])
     if not payload.get("is_admin"):
         # Non-admin turns are plain conversation: no Tools (same as the native loop).
         raise HTTPException(403, "このTurnではToolを使えません。")
@@ -105,7 +114,13 @@ def call_tool(payload: ToolCall, authorization: str | None = Header(default=None
     from .provider_runtime import validate_arguments
     grant = _grant(authorization, counting=True)
     request_id = grant["request_id"]
-    _row, context = _turn_context(request_id)
+    row, context = _turn_context(request_id)
+    if row["cancel_requested"]:
+        return {"isError": True, "result": {"error": "cancelled", "stop": True}}
+    if store.approvals(request_id):
+        # One approval at a time: the agent must stop and let the user decide first.
+        return {"isError": False, "result": {"status": "awaiting_user_approval", "stop": True,
+                                              "message": "承認待ちの操作がある。ここで回答を終えること。"}}
     with context:
         catalog = _catalog()
         if payload.name not in catalog:
@@ -119,10 +134,15 @@ def call_tool(payload: ToolCall, authorization: str | None = Header(default=None
                 "function": {"name": payload.name, "arguments": store.encode(arguments)}}
         if tools.requires_confirmation(payload.name):
             approval_id = store.propose(request_id, call, arguments)
-            return {"isError": False, "result": {
-                "status": "awaiting_user_approval", "approval_id": approval_id,
-                "message": "ユーザーの承認待ち。承認されるまで実行していない。実行済みと言わないこと。"}}
-        raw = brain.execute(request_id, call, arguments)
+            raw = store.encode({"status": "awaiting_user_approval", "approval_id": approval_id, "stop": True,
+                                "message": "ユーザーの承認待ち。承認されるまで実行していない。実行済みと言わないこと。"})
+        else:
+            raw = brain.execute(request_id, call, arguments)
+        # Same ledger shape as external_brain: approval fills the tool result, then the Turn resumes.
+        messages = json.loads(store.load_turn(request_id)["messages_json"] or "[]")
+        messages.extend([{"role": "assistant", "content": "", "tool_calls": [call]},
+                         {"role": "tool", "tool_call_id": call["id"], "content": brain.compact(raw, payload.name)}])
+        store.save_messages(request_id, messages)
     try:
         value = json.loads(raw)
     except (TypeError, ValueError):

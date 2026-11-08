@@ -63,6 +63,30 @@ flowchart TD
     Risk -->|no| Exec[brain.execute<br/>書き込みは effect receipt]
 ```
 
+## Claude Code エージェントモード（v0.46.0開発版・#400）
+
+`claude_code_agent_mode` が ON のときだけ、Claude Code の Turn はこの経路になる（OFF なら下の「Claude Code CLI Executor」）。
+
+```mermaid
+flowchart TD
+    Run[brain._run provider=claude_code] --> Mode{agent_mode ON?}
+    Mode -->|no| Json[従来の JSON 判断 step]
+    Mode -->|yes| Prep[PETIT Home を用意・Turn 限定トークン発行<br/>MCP 設定と Hook 設定を 0600 一時ファイルへ]
+    Prep --> Session{同じ Thread の有効なセッション?<br/>承認後なら承認待ちにしたセッション}
+    Session --> CLI[claude -p --restricted cwd=Home<br/>Read/Write/Edit/Glob/Grep + mcp__petit<br/>Bash は opt-in かつ OS サンドボックス可のときだけ]
+    CLI --> Hook{PreToolUse: agent_hooks.decide}
+    Hook -->|Home外・秘密・.git/.claude書込・L2・L3| Deny[拒否して理由を返す]
+    Hook -->|人格ファイル直接編集| Persona[拒否 → update_persona_file へ誘導]
+    Hook -->|L0| Tool[ファイル操作]
+    Hook -->|mcp__petit__*| Bridge[PETIT MCP bridge<br/>catalog・検証・risk・承認・receipt]
+    Bridge -->|confirm_write| Wait[承認待ち・以後の Tool は stop]
+    CLI --> Done[終了: トークン失効・Home を git commit]
+    Done --> Finish{承認待ちあり?}
+    Finish -->|yes| WA[waiting_approval・セッションIDを記録]
+    Finish -->|no| OK[completed・provider_sessions に保存]
+    WA --> Approve[承認 → conversation_api.decide → 同じセッションで --resume]
+```
+
 ## Claude Code CLI Executor（v0.44.0開発版）
 
 Concept §4 のExecutor順位（Antigravity CLI ＞ Codex ＞ Claude Code ＞ DeepSeek）の3番目。Antigravity CLIと同じ「構造化した1 round」方式で、Toolの実行・承認・receiptは既存native Loopが行う。

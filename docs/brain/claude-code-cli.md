@@ -19,6 +19,10 @@ Concept §4 のExecutor順位（Antigravity CLI ＞ Codex ＞ **Claude Code** �
 - Tool実行前の失敗は、既存のFallback規則で次の候補へ切り替わる。
 - Coding Job（`provider=claude_code`）も同じ `completion` を使い、Job限定catalog（list / read / SHA照合write / 静的check）だけで作業する。実テスト・Push・PRは引き続き未対応。
 
+## エージェントモード（v0.46.0・#400）
+
+設定で ON にすると、上の JSON 判断方式の代わりに、PETIT Home の中で組込みファイル Tool と PETIT Tool（MCP）を使うエージェントとして動く。詳細と L0〜L3 の線は [agent-home.md](agent-home.md) §4.3。
+
 ## 設定
 
 - Settings の「Claude Code CLI」カードで **明示的に接続**したときだけ使う（`claude_code_enabled` と `connected`）。環境変数からは有効化しない。
