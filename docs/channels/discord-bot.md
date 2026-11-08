@@ -107,7 +107,7 @@ Concept §6 の「Discord Bot：自分専用に常駐」をここで実装する
 | 段 | 内容 | 完了条件 |
 | --- | --- | --- |
 | **D1 Owner MVP** | Bot プロセス、owner 判定、DM とメンション、Core Thread 対応、defer・分割 | DM で予定・タスクに答える。owner 以外・指定外サーバーには何も個人情報を返さない（テスト） **実装済み（v0.46.0・#397）。実 Discord 未確認** |
-| **D2 Owner の承認と通知** | 承認ボタン、リマインダー・Job 完了の DM 配送 | 承認が owner だけ・一度だけ。通知 OFF のカテゴリは送らない |
+| **D2 Owner の承認と通知** | 承認ボタン、リマインダー・Job 完了の DM 配送 | 承認が owner だけ・一度だけ。通知 OFF のカテゴリは送らない **実装済み（v0.46.0・#399）。実 Discord 未確認** |
 | **D3 Guild の土台** | `/petit setup`、サーバー専用 DB、DeepSeek only の会話、予算 | 未設定サーバーで DeepSeek 0 回。Guild から owner Tool へ届かない（テスト） |
 | **D4 Guild のタスク・予定・リマインド** | catalog、確認ボタン、リマインド配送 | 実サーバーで登録 → 期日にメンションが届く |
 | **D4.5 Cloudflare 配送（任意）** | 無料枠を確認できたら、Guild のリマインドを Worker の Cron で配送 | PC 停止中でも期日に届く。送信済みが PC の台帳へ戻る。無料枠内 |
@@ -131,8 +131,16 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 1. Discord Developer Portal で Application と Bot を作り、Bot token を控える。Privileged Gateway Intents はすべて OFF のままでよい。OAuth2 URL Generator で `bot` スコープと権限「Send Messages / Read Message History」を選び、自分のサーバーに招待する。
 2. Discord の開発者モードで、自分の user ID と指定するサーバーの ID をコピーする。
 3. Core を起動する環境に設定する: `PETIT_DISCORD_OWNER_ID`、`PETIT_DISCORD_OWNER_GUILD_IDS`（カンマ区切り・空なら DM のみ）、`PETIT_DISCORD_SERVICE_TOKEN`（`python -c "import secrets;print(secrets.token_urlsafe(32))"` で作った値）。
-4. Bot を起動する: `pip install -r requirements-discord.txt` のあと、`DISCORD_BOT_TOKEN`・`PETIT_DISCORD_SERVICE_TOKEN`（Core と同じ値）・`PETIT_CORE_URL`（既定 `http://127.0.0.1:8000`）を設定して `python -m backend.channels.discord`。
-5. Bot に DM するか、指定サーバーで `@Bot名 今日なにある？` と送る。
+4. 通知も DM で受けるなら、Core 側に `PETIT_DISCORD_NOTIFICATIONS=on` を設定し、Web の通知設定で受けたいカテゴリを ON にする。
+5. Bot を起動する: `pip install -r requirements-discord.txt` のあと、`DISCORD_BOT_TOKEN`・`PETIT_DISCORD_SERVICE_TOKEN`（Core と同じ値）・`PETIT_CORE_URL`（既定 `http://127.0.0.1:8000`）を設定して `python -m backend.channels.discord`。
+6. Bot に DM するか、指定サーバーで `@Bot名 今日なにある？` と送る。
+
+## 5.2 D2 の実装（v0.46.0・#399）
+
+- 承認: 承認待ちの返答に、Core が計算した preview（最大1,500文字）と「承認する / やめる」ボタンを付ける。押されたら Bot が `POST /api/channels/discord/approvals` へ送り、Core が「owner か」「DM か指定サーバーか」「Discord 由来の承認か」を確かめてから既存の `conversation_api.decide` で一度だけ消費する。Web / Desktop の承認は Discord から決められない。
+- 通知: Core に `PETIT_DISCORD_NOTIFICATIONS=on` を設定したときだけ。Bot が30秒ごと（`PETIT_DISCORD_POLL_SECONDS`）に `GET /api/channels/discord/notifications` で、通知設定で ON のカテゴリの直近1時間の通知を取りに行き、owner に DM する。
+  - 取得した時点で配信記録に `claimed` を書く。送れたら `sent`、失敗は `failed` を報告する。報告前に止まったものは `claimed`（不明）のまま残し、自動では再送しない（Concept §8）。
+  - 通知のカテゴリと ON / OFF は既存の通知設定（Web Push と共通）を使う。
 
 ## 6. どこで動かすか — 自宅PC＋Cloudflare（検討）
 

@@ -54,3 +54,29 @@ def split(text: str, limit: int = LIMIT) -> list[str]:
     if text:
         chunks.append(text)
     return chunks
+
+
+BUTTON_PREFIX = "petit:"
+
+
+def button_id(approval_id: str, approved: bool) -> str:
+    return f"{BUTTON_PREFIX}{'approve' if approved else 'reject'}:{approval_id}"
+
+
+def parse_button(custom_id: str | None) -> tuple[str, bool] | None:
+    """Return (approval_id, approved) for PETIT buttons, else None."""
+    if not custom_id or not custom_id.startswith(BUTTON_PREFIX):
+        return None
+    parts = custom_id.split(":")
+    if len(parts) != 3 or parts[1] not in {"approve", "reject"} or not parts[2].isalnum():
+        return None
+    return parts[2], parts[1] == "approve"
+
+
+def approval_text(item: dict) -> str:
+    preview = str(item.get("preview") or "").replace("```", "'''")
+    return f"**確認: {item.get('name', '')}**\n```\n{preview}\n```"[:LIMIT]
+
+
+def notification_text(item: dict) -> str:
+    return f"**{item.get('title', '')}**\n{item.get('body', '')}"[:LIMIT]

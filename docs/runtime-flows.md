@@ -33,8 +33,34 @@ flowchart TD
     Mode -->|no| Guide[固定の案内のみ<br/>Brain 呼び出し 0 回]
     Mode -->|yes| Submit[conversation_api.submit<br/>thread=discord:channel / request=discord:message<br/>source=discord・is_admin]
     Submit --> Turn[既存の単一Brain Turn<br/>8 rounds / 12 calls・承認・receipt]
-    Turn -->|waiting_approval| Note[PETIT画面で承認するよう案内]
+    Turn -->|waiting_approval| Buttons[Core計算 preview + 承認/やめるボタン]
     Turn --> Split[relay.split 2000文字で分割して返信]
+    Buttons --> Press[POST /api/channels/discord/approvals]
+    Press --> Check{owner かつ DM/指定サーバー<br/>かつ request_id が discord: ?}
+    Check -->|no| Deny[403 / 404・消費しない]
+    Check -->|yes| Decide[conversation_api.decide<br/>一度だけ承認消費・receipt]
+    Poll[Bot 30秒ごと] --> Claim[GET /api/channels/discord/notifications<br/>NOTIFICATIONS=on・設定ONのカテゴリ・直近1時間]
+    Claim --> Mark[配信記録 claimed を先に書く]
+    Mark --> DM[owner へ DM]
+    DM --> Report[sent / failed を報告<br/>未報告は claimed=不明のまま再送しない]
+```
+
+## PETIT MCP bridge（v0.46.0開発版・#398）
+
+CLI に PETIT Tool を MCP（stdio）で渡す土台。呼び出し口が MCP になっても、catalog・検証・risk・承認・receipt は native Loop と同じ。実 Turn への組込みは H3（未実装）。
+
+```mermaid
+flowchart TD
+    Core[Core: agent_bridge.issue request_id<br/>使い捨てトークン 30分] --> CLI[CLI が petit_mcp を stdio で起動<br/>PETIT_BRIDGE_TOKEN]
+    CLI --> List[tools/list → POST /api/agent-bridge/tools/list]
+    CLI --> Call[tools/call → POST /api/agent-bridge/tools/call]
+    Call --> Grant{トークン有効・40回以内・<br/>Turn が queued/running・管理者?}
+    Grant -->|no| Reject[401 / 403 / 409 / 429]
+    Grant -->|yes| Public{brain.schemas に公開?<br/>JSON Schema 検証}
+    Public -->|no| ToolErr[isError: tool_not_public_or_unavailable]
+    Public --> Risk{requires_confirmation?}
+    Risk -->|yes| Propose[store.propose<br/>承認待ちを返す・実行しない]
+    Risk -->|no| Exec[brain.execute<br/>書き込みは effect receipt]
 ```
 
 ## Claude Code CLI Executor（v0.44.0開発版）

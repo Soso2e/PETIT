@@ -101,7 +101,7 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 | 段 | 内容 | 完了条件 |
 | --- | --- | --- |
 | **H1 Home と人格の一元化** | Home を作り、`AGENTS.md` / `SOUL.md` / `USER.md` を全 Brain の人格の正本にする。Home を git 管理 | どの Brain・入口でも同じ人格ファイルから応答する。ファイル変更が差分で見える  **実装済み（v0.46.0・#396）** |
-| **H2 PETIT MCP サーバー** | Tool Registry を MCP（stdio）で公開。risk・承認・receipt は既存のまま | Claude Code から MCP 経由で Read Tool と承認つき Write が動き、receipt が残る |
+| **H2 PETIT MCP サーバー** | Tool Registry を MCP（stdio）で公開。risk・承認・receipt は既存のまま | Claude Code から MCP 経由で Read Tool と承認つき Write が動き、receipt が残る **実装済み（v0.46.0・#398）。実 Turn への組込みは H3** |
 | **H3 Claude Code エージェントモード** | cwd=Home、組込みTool有効、権限ルール + Hook、`--resume` によるセッション継続 | Home 内で自由に作業し、L2 は承認、L3 は拒否されることをテストで確認 |
 | **H4 Coding Job v2** | 登録 repo の git worktree で作業、テスト実行、ブランチ commit。push / PR は承認つき Core Tool | 実 repo で「Issue → ブランチ → テスト → PR（承認）」が通る |
 | **H5 Codex / Antigravity CLI の追従** | 同じ Home・MCP・段階ルールを各 CLI の設定へ写す | 3 CLI で同じシナリオが通る。差分は文書に記録 |
@@ -118,6 +118,17 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 - Tool: `get_persona`（safe_read）、`update_persona_file`（confirm_write。変更後の全文を渡す）。確認カードには Tool Registry の `preview` で Core が計算した unified diff を出す（モデルが書いた差分は使わない）。承認後に一時ファイル経由で置換し、git commit する。
 - agent-workspace: Core が生成した内容（ハッシュを `agent-workspace.generated` に記録）と旧形式の生成内容だけ再生成し、手編集は従来どおり停止する。
 - 未実装: Home の場所を設定画面で変える UI、Desktop のプレビュー表示、CLI の組込みTool有効化（H3）。
+
+## 4.2 H2 の実装（v0.46.0・#398）
+
+- `backend/agent_bridge.py`: Core が Turn ごとに使い捨てのトークンを発行する（`issue(request_id)`、30分、メモリ上のみ・ハッシュで保持）。`POST /api/agent-bridge/tools/list` と `/tools/call` は Bearer トークン必須。
+  - 公開 catalog は native Loop と同じ `brain.schemas()`。引数は同じ JSON Schema 検証。
+  - `confirm_write` は実行せず `store.propose` で承認待ちを返す（確認カードには Core 計算の preview）。それ以外は `brain.execute` で実行し、書き込みは effect receipt を残す。
+  - 実行中（queued / running）の Turn だけ、管理者の Turn だけ。1 Turn あたり 40 回まで。
+- `backend/petit_mcp.py`（`python -m backend.petit_mcp`）: 依存なしの stdio JSON-RPC。`initialize` / `tools/list` / `tools/call` / `ping`。Tool の失敗は `isError` の結果として返す。
+- Core 全体の管理者 cookie と同一 Origin のチェックは、Bearer で守る `/api/agent-bridge/` と `/api/channels/discord/` には適用しない（`setup_api.TOKEN_AUTH_PREFIXES`）。
+- 確認済み: 実 Claude Code CLI（2.1.x）の `claude mcp list` で接続と Tool 一覧の取得（使い捨ての設定フォルダで実施）。
+- 未実装: 実際の Turn で CLI を MCP つきで起動すること、MCP から出た承認の承認後の再開（どちらも H3）。
 
 ## 5. 決定事項と残りの問い
 

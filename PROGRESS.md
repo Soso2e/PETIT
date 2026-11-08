@@ -6,7 +6,7 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- 再設計 H1 + D1（v0.46.0、`claude/ai-redesign-discord-bot-h0xlft`・未マージ）: 人格の正本を PETIT Home（`~/PETIT-Home` / `PETIT_HOME`）へ移し全Brainで共有、人格変更は Core 計算の差分を確認カードで承認（#396）。Discord Bot Owner モード MVP を別プロセスで追加、owner 判定は Core（#397）。未確認: 実 Discord 接続、Desktop の確認カードでの差分表示、Home の場所の設定UI。次: H2（PETIT MCP サーバー）・D2（承認ボタン・通知）。
+- 再設計 H1 + D1（v0.46.0、`claude/ai-redesign-discord-bot-h0xlft`・未マージ）: 人格の正本を PETIT Home（`~/PETIT-Home` / `PETIT_HOME`）へ移し全Brainで共有、人格変更は Core 計算の差分を確認カードで承認（#396）。Discord Bot Owner モード MVP を別プロセスで追加、owner 判定は Core（#397）。未確認: 実 Discord 接続、Desktop の確認カードでの差分表示、Home の場所の設定UI。H2: PETIT Tool の MCP bridge（#398、実 Claude Code CLI の接続確認済み）、D2: Discord の承認ボタンと通知 DM（#399）も同じブランチに追加。次: H3（Claude Code エージェントモード: cwd=Home・組込みTool・MCP・承認後の再開）。
 
 - #391 Univ 3Dカメラ操作（v0.45.1、PR中）: リサイズ（スマホのアドレスバー出入り・レール開閉）やタスク構成変更のたびに `resetCamera()` が走り、ドラッグ回転・ピンチ拡縮した視点が全体表示へ巻き戻っていた。ユーザーがカメラを動かした後と操作中は自動フィットしない（明示リセットで解除）。操作中は自動Tweenを止める。Playwright（Chromium・モバイルエミュレーション）で確認、iPhone/Android実機は未確認。
 
@@ -360,3 +360,4 @@
 | 2026-11-07 | 08:50 | - | 再設計の提案文書を追加（未承認・未実装）: docs/brain/agent-home.md（PETIT Home・MCP・自由度L0〜L3・セッション継続）、docs/channels/discord-bot.md（Owner/Guildの2モード、Guildは DeepSeek only・サーバー別DB・Notion・リマインド・人物認知）。Concept §2・§4の改訂は承認待ち。 |
 | 2026-11-08 | 01:38 | - | 再設計方針を承認しConcept.mdへ反映: §4 CLIの自由度をL0〜L3へ（Home内自由・ブランチでのテスト/commit確認なし・push/PR/外部送信は承認・不可逆は拒否）、人格ファイルは差分承認、§2にDeepSeek onlyで分離したDiscord Guildモードを追記、§8 Botは自宅PC＋Cloudflare無料枠ならGuild配送のみ。未実装。 |
 | 2026-11-08 | 01:49 | #396 #397 | v0.46.0: PETIT Home を人格の単一ソースに（AGENTS/SOUL/USER.md・git管理・差分承認の update_persona_file・承認カードに Core 計算 preview）、Discord Owner モード MVP（別プロセス Bot、Core が owner 判定、非 owner は Brain 0 回、message ID で冪等）。新規テスト21件、既存失敗17件は base と同数。実 Discord 未確認。 |
+| 2026-11-08 | 02:05 | #398 #399 | v0.46.0（同ブランチ追加）: PETIT MCP bridge（Turn限定トークン、catalog・検証・risk・承認・receipt は native と同じ、stdio JSON-RPC。実 Claude Code CLI の `mcp list` で接続確認）。Discord 承認ボタン（owner・Discord 由来のみ）と通知 DM（opt-in、claimed→sent/failed、不明は再送しない）。管理者 cookie ミドルウェアが Bearer 窓口を弾いていた不具合を修正。 |

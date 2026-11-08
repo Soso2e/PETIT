@@ -35,6 +35,9 @@ def _same_origin(request: Request):
         raise HTTPException(403, "操作元を確認できません。設定画面から操作してください。")
 
 
+TOKEN_AUTH_PREFIXES = ("/api/agent-bridge/", "/api/channels/discord/")
+
+
 def install(app):
     from fastapi.exceptions import RequestValidationError
     from fastapi.exception_handlers import request_validation_exception_handler
@@ -57,9 +60,13 @@ def install(app):
             chat_public = path == "/api/chat"
             setup_public = path in {"/api/setup/session", "/api/setup/login", "/api/setup/bootstrap", "/api/health", "/api/setup/google/callback"}
             is_public_api = setup_public or (chat_public and initialized and settings.load().get("completed"))
-            if path.startswith("/api/") and not is_public_api:
+            # Machine endpoints authenticate every request with their own Bearer token
+            # (agent_bridge / discord_api). Browsers never send those automatically,
+            # so neither the admin cookie nor the same-origin check applies.
+            token_auth = path.startswith(TOKEN_AUTH_PREFIXES)
+            if path.startswith("/api/") and not is_public_api and not token_auth:
                 _admin(request)
-            if path.startswith("/api/") and request.method not in {"GET", "HEAD", "OPTIONS"} and (initialized or path.startswith("/api/setup/")):
+            if path.startswith("/api/") and not token_auth and request.method not in {"GET", "HEAD", "OPTIONS"} and (initialized or path.startswith("/api/setup/")):
                 _same_origin(request)
             response = await call_next(request)
         except HTTPException as exc:

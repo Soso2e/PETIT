@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from . import (
+    agent_bridge,
     attachments,
     setup_api,
     coding_api,
@@ -38,6 +39,7 @@ def build_modules() -> tuple[ModuleDefinition, ...]:
         ModuleDefinition(id="coding-jobs", routers=(coding_api.router,)),
         ModuleDefinition(id="durable-reads", routers=(durable_reads.router,)),
         ModuleDefinition(id="conversations", routers=(conversation_api.router,)),
+        ModuleDefinition(id="agent-bridge", routers=(agent_bridge.router,), dependencies=("builtin-tools", "conversations")),
         ModuleDefinition(id="discord", routers=(discord_api.router,), dependencies=("conversations",)),
         ModuleDefinition(id="model-routing", routers=(model_routing_api.router,)),
         ModuleDefinition(id="attachments", routers=(attachments.router,)),

@@ -61,7 +61,7 @@ flowchart TD
 | Desktop | `desktop/`（Electron）。既存のCoreへ接続するクライアントで、Core は同梱しない。ウェイクワードは openWakeWord（`wake/`） | [desktop/desktop.md](desktop/desktop.md)、[voice/openwakeword.md](voice/openwakeword.md) |
 | 音声 | Desktop の音声会話、Web 録音、AivisSpeech 読み上げ | [voice/voice_mode.md](voice/voice_mode.md)、[voice/aivis_speech.md](voice/aivis_speech.md) |
 | iOS | `ios/PETITMobile` は試作段階 | [../ios/PETITMobile/PHASE_STATUS.md](../ios/PETITMobile/PHASE_STATUS.md) |
-| Discord | **Owner モード MVP（v0.46.0）**。別プロセスの Bot（`backend/channels/discord/`）が DM・指定サーバーのメンションを `/api/channels/discord/events` へ中継し、owner 判定は Core が行う。owner 以外は固定の案内だけで Brain を呼ばない。承認ボタン・通知・Guild モードは未実装 | [channels/discord-bot.md](channels/discord-bot.md) |
+| Discord | **Owner モード MVP（v0.46.0）**。別プロセスの Bot（`backend/channels/discord/`）が DM・指定サーバーのメンションを `/api/channels/discord/events` へ中継し、owner 判定は Core が行う。owner 以外は固定の案内だけで Brain を呼ばない。承認ボタン（owner のみ・Discord 由来の承認のみ）と通知の DM 配送（opt-in）あり。Guild モードは未実装 | [channels/discord-bot.md](channels/discord-bot.md) |
 
 ### 2.2 会話の台帳（Thread / Turn）
 
@@ -151,7 +151,7 @@ PETIT/
 | Executor の優先順位 Antigravity ＞ Codex ＞ Claude Code ＞ DeepSeek | 既定値を方針順に設定済み（v0.44.0）。保存済みの順位は変えない | 実端末で各CLIの接続テスト |
 | Claude Code CLI 対応 | 会話Brain・Coding Jobに実装（v0.44.0）。契約上の扱いは未確認 | 実ログイン環境での受入、得意分野による振り分け（§10） |
 | アカウント型の設定共通化 | ホスト別の設定と管理者1名 | アカウントのモデルと保存先を設計する |
-| Discord 常駐Bot | Owner モードの会話 MVP（v0.46.0） | 承認ボタン・通知（D2）、Guild モード（D3〜） |
+| Discord 常駐Bot | Owner モード（会話・承認ボタン・通知、v0.46.0） | Guild モード（D3〜）、実 Discord での受入 |
 | ファイルの検索と添付 | 未実装 | Everything / ローカル / Drive の読み取り境界と送信の確認を設計する |
 | 開発の司令塔 | Coding Job は静的checkまで | 実テスト実行・Push・PR を、承認つきで段階的に開放する |
 | Desktop を主入口に | Electron クライアント。Core の自動起動・同梱はない | [desktop/desktop-foundation-design.md](desktop/desktop-foundation-design.md) の段階導入 |

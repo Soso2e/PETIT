@@ -43,7 +43,8 @@ def post(client, body, token=TOKEN):
 
 def test_owner_dm_goes_to_core_thread_as_admin(client):
     data = post(client, event()).json()
-    assert data == {"mode": "owner", "status": "completed", "reply": "返答: 明日の予定は？", "request_id": "discord:555"}
+    assert data == {"mode": "owner", "status": "completed", "reply": "返答: 明日の予定は？", "request_id": "discord:555",
+                    "approvals": []}
     thread_id, request_id, message, kwargs = client.calls[0]
     assert (thread_id, request_id) == ("discord:777", "discord:555")
     assert kwargs == {"source": "discord", "is_admin": True}
@@ -134,6 +135,130 @@ def test_core_client_sends_token_and_degrades_when_core_is_down():
         finally:
             await core.close()
 
-    assert asyncio.run(run(httpx.MockTransport(handler))) == "やあ" and seen["auth"] == "Bearer " + TOKEN
+    assert asyncio.run(run(httpx.MockTransport(handler)))["reply"] == "やあ" and seen["auth"] == "Bearer " + TOKEN
     down = httpx.MockTransport(lambda request: (_ for _ in ()).throw(httpx.ConnectError("down")))
-    assert asyncio.run(run(down)) == bot.UNAVAILABLE
+    assert asyncio.run(run(down))["reply"] == bot.UNAVAILABLE
+
+
+# --- D2: approval buttons and notifications -------------------------------------------
+
+def test_button_ids_round_trip_and_reject_foreign_ids():
+    assert relay.parse_button(relay.button_id("abc123", True)) == ("abc123", True)
+    assert relay.parse_button(relay.button_id("abc123", False)) == ("abc123", False)
+    for bad in (None, "other:approve:x", "petit:delete:x", "petit:approve:../x", "petit:approve"):
+        assert relay.parse_button(bad) is None
+    assert "```x```" not in relay.approval_text({"name": "n", "preview": "```x```"})
+
+
+def _approval_turn(monkeypatch, request_id="discord:555"):
+    from backend import conversation_store as store
+    monkeypatch.setenv("PETIT_DISCORD_SERVICE_TOKEN", TOKEN)
+    monkeypatch.setenv("PETIT_DISCORD_OWNER_ID", OWNER)
+    monkeypatch.setenv("PETIT_DISCORD_OWNER_GUILD_IDS", GUILD)
+    store.create_thread("discord:777", source="discord")
+    store.accept("discord:777", request_id, {"message": "m", "is_admin": True})
+    call = {"id": "c1", "function": {"name": "update_persona_file"}}
+    approval_id = store.propose(request_id, call, {"file": "SOUL.md", "content": "# SOUL\n静かに。", "reason": "r"})
+    store.finish(request_id, {"reply": "変えますか？"}, status="waiting_approval")
+    app = FastAPI()
+    app.include_router(discord_api.router)
+    return TestClient(app), approval_id
+
+
+def decision(approval_id, **overrides):
+    body = {"interaction_id": "9", "approval_id": approval_id, "guild_id": None, "author_id": OWNER, "approved": True}
+    body.update(overrides)
+    return body
+
+
+def test_waiting_turn_returns_core_preview_for_buttons(monkeypatch):
+    test, approval_id = _approval_turn(monkeypatch)
+    data = test.get("/api/channels/discord/events/555", headers={"Authorization": "Bearer " + TOKEN}).json()
+    assert data["status"] == "waiting_approval"
+    assert data["approvals"][0]["approval_id"] == approval_id and "+静かに。" in data["approvals"][0]["preview"]
+
+
+@pytest.mark.parametrize("overrides", [{"author_id": "9999"}, {"guild_id": "4004"}])
+def test_only_owner_in_owner_context_can_press(monkeypatch, overrides):
+    test, approval_id = _approval_turn(monkeypatch)
+    calls = []
+    monkeypatch.setattr(conversation_api, "decide", lambda *a: calls.append(a))
+    response = test.post("/api/channels/discord/approvals", json=decision(approval_id, **overrides),
+                         headers={"Authorization": "Bearer " + TOKEN})
+    assert response.status_code == 403 and calls == []
+
+
+def test_owner_press_decides_discord_approval(monkeypatch):
+    test, approval_id = _approval_turn(monkeypatch)
+    calls = []
+    monkeypatch.setattr(conversation_api, "decide",
+                        lambda aid, approved: calls.append((aid, approved)) or {"status": "completed", "reply": "変えました"})
+    data = test.post("/api/channels/discord/approvals", json=decision(approval_id, approved=False),
+                     headers={"Authorization": "Bearer " + TOKEN}).json()
+    assert calls == [(approval_id, False)] and data["reply"] == "変えました"
+
+
+def test_web_approvals_cannot_be_decided_from_discord(monkeypatch):
+    test, approval_id = _approval_turn(monkeypatch, request_id="web-request")
+    response = test.post("/api/channels/discord/approvals", json=decision(approval_id),
+                         headers={"Authorization": "Bearer " + TOKEN})
+    assert response.status_code == 404
+
+
+def _notify_setup(monkeypatch, enabled=True, categories=("schedule_reminder",)):
+    from backend import notifications
+    monkeypatch.setenv("PETIT_DISCORD_SERVICE_TOKEN", TOKEN)
+    monkeypatch.setenv("PETIT_DISCORD_OWNER_ID", OWNER)
+    if enabled:
+        monkeypatch.setenv("PETIT_DISCORD_NOTIFICATIONS", "on")
+    notifications.init_db()
+    notifications.update_preferences({c: True for c in categories})
+    app = FastAPI()
+    app.include_router(discord_api.router)
+    return TestClient(app), notifications
+
+
+def test_notifications_are_claimed_once_and_respect_preferences(monkeypatch):
+    test, notifications = _notify_setup(monkeypatch)
+    on, _ = notifications._create_event("schedule_reminder", "10分後に会議", "定例", "/")
+    notifications._create_event("high_task", "OFF のカテゴリ", "送らない", "/")
+    headers = {"Authorization": "Bearer " + TOKEN}
+    first = test.get("/api/channels/discord/notifications", headers=headers).json()
+    assert first["owner_id"] == OWNER and [n["event_id"] for n in first["notifications"]] == [on]
+    assert test.get("/api/channels/discord/notifications", headers=headers).json()["notifications"] == []
+    assert test.post(f"/api/channels/discord/notifications/{on}", json={"status": "sent"}, headers=headers).status_code == 200
+    assert test.post(f"/api/channels/discord/notifications/{on}", json={"status": "sent"}, headers=headers).status_code == 404
+
+
+def test_notifications_off_without_opt_in(monkeypatch):
+    test, notifications = _notify_setup(monkeypatch, enabled=False)
+    notifications._create_event("schedule_reminder", "t", "b", "/")
+    data = test.get("/api/channels/discord/notifications", headers={"Authorization": "Bearer " + TOKEN}).json()
+    assert data == {"owner_id": None, "notifications": []}
+
+
+def test_deliver_notifications_reports_each_outcome():
+    reports = []
+
+    class Core:
+        async def claim_notifications(self):
+            return {"owner_id": OWNER, "notifications": [{"event_id": 1, "title": "a", "body": "b"},
+                                                          {"event_id": 2, "title": "c", "body": "d"}]}
+
+        async def report(self, event_id, status, error=None):
+            reports.append((event_id, status))
+
+    class User:
+        count = 0
+
+        async def send(self, text):
+            User.count += 1
+            if User.count == 2:
+                raise RuntimeError("dm closed")
+
+    async def fetch_user(uid):
+        assert uid == int(OWNER)
+        return User()
+
+    assert asyncio.run(bot.deliver_notifications(Core(), fetch_user)) == 1
+    assert reports == [(1, "sent"), (2, "failed")]
