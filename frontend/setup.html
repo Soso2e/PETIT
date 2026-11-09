@@ -2,122 +2,510 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="referrer" content="no-referrer"><title>PETIT 初期設定と接続</title>
+  <meta name="referrer" content="no-referrer"><title>PETIT 設定とサービス接続</title>
   <link rel="stylesheet" href="/static/setup.css"><script src="/static/setup.js" defer></script>
 </head>
 <body>
 <main>
-  <header><a href="/static/universe.html" id="back">PETITに戻る</a> / <a href="/static/development.html">開発タスク</a><p class="eyebrow">PETIT / SETUP</p><h1>初期設定と接続</h1><p>使いたいサービスだけ接続してください。設定はこのサーバーに保存します。</p></header>
+  <header class="setup-header">
+    <div class="setup-topbar">
+      <div class="setup-topbar-links">
+        <a href="/static/universe.html" id="back" class="back-btn">← PETITに戻る</a>
+        <a href="/static/development.html" class="sub-link">開発タスク</a>
+      </div>
+      <span id="setup-mode-badge" class="status-badge">設定管理</span>
+    </div>
+    <p class="eyebrow">PETIT / SETTINGS &amp; INTEGRATIONS</p>
+    <h1 id="page-title">AI・外部サービス接続設定</h1>
+    <p class="header-lead" id="page-lead">会話で使うAIの優先順位と、Notion・TimeTree・Googleなどの連携を一か所で管理します。</p>
+  </header>
+
   <p id="notice" role="status" aria-live="polite"></p>
+
   <section id="auth" class="card" hidden>
-    <h2 id="auth-title">管理者ログイン</h2><p id="auth-help"></p>
-    <form id="auth-form"><label>管理者パスワード<input id="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+    <div class="card-head">
+      <div class="card-head__title">
+        <h2 id="auth-title">管理者ログイン</h2>
+        <small id="auth-help"></small>
+      </div>
+    </div>
+    <form id="auth-form">
+      <label>管理者パスワード<input id="password" type="password" autocomplete="current-password" required maxlength="256"></label>
       <label id="bootstrap-field" hidden>初期設定トークン（Cloudで設定した場合）<input id="bootstrap-token" type="password" autocomplete="off"></label>
-      <button type="submit" id="auth-submit">ログイン</button></form>
+      <div class="actions"><button type="submit" id="auth-submit">ログイン</button></div>
+    </form>
   </section>
+
   <div id="admin" hidden>
-    <nav aria-label="セットアップ手順"><button data-step="0">1 AI</button><button data-step="1">2 サービス</button><button data-step="2">3 同期と通知</button><button data-step="3">4 完了</button></nav>
+    <section id="setup-overview-bar" class="overview-bar" aria-label="現在の設定サマリー">
+      <button type="button" class="overview-chip" data-jump-step="0">
+        <span class="overview-chip__label">🤖 会話AI (Brain)</span>
+        <span class="overview-chip__value" id="ov-ai">確認中…</span>
+      </button>
+      <button type="button" class="overview-chip" data-jump-step="1" data-jump-target="sec-calendar-services">
+        <span class="overview-chip__label">📅 予定の同期元</span>
+        <span class="overview-chip__value" id="ov-calendar">確認中…</span>
+      </button>
+      <button type="button" class="overview-chip" data-jump-step="1" data-jump-target="card-notion">
+        <span class="overview-chip__label">🔗 Notion / 外部連携</span>
+        <span class="overview-chip__value" id="ov-services">確認中…</span>
+      </button>
+      <button type="button" class="overview-chip" data-jump-step="2">
+        <span class="overview-chip__label">🔄 同期・アラート</span>
+        <span class="overview-chip__value" id="ov-sync">確認中…</span>
+      </button>
+    </section>
+
+    <nav aria-label="セットアップ手順">
+      <button data-step="0">1 AI設定・優先順位</button>
+      <button data-step="1">2 Notion・TimeTree・Google</button>
+      <button data-step="2">3 同期と通知</button>
+      <button data-step="3">4 確認・完了</button>
+    </nav>
+
     <div id="step-0" class="step">
-      <section class="card"><h2>AI Brainの優先順位</h2><p>ドラッグ、または上下ボタンで並び替えます。次の依頼から上位を再試行します。</p>
-        <ol id="priority" aria-label="AIの優先順位"></ol><p id="active-brain"></p>
-        <label>Brainの接続方式<select id="brain-transport"><option value="cli_only">CLIのみ（SDK/APIへ自動切替しない）</option><option value="mixed" selected>上の優先順位でCLI・SDK・APIを使う</option></select></label>
-        <p class="muted">CLIのみではCodexと、明示接続したAntigravity CLIを候補にします。端末 → Tailscale → PETITサーバー → サーバー上のCLIと接続します。</p>
-        <label class="check"><input type="checkbox" id="brain-enabled">この優先順位を会話で使う</label>
-        <button id="save-brain">AI設定を保存</button><p class="muted">Tool実行後の障害では、自動切替で処理を再実行せず、保存済み結果を保持します。</p>
-      </section>
-      <section class="card"><h2>DeepSeekを最初の担当にする（試験）</h2>
-        <p>普段の会話・予定・タスク・作業記録はDeepSeekがすぐ返し、複数ステップの作業はCLIに任せます。上の優先順位は変更しません。OFFにすると元に戻ります。</p>
-        <label class="check"><input type="checkbox" id="front-brain">DeepSeekを最初の担当にする</label>
-        <label>任せる先の順位<select id="delegate-priority"><option value="claude_code,codex">Claude Code → Codex</option><option value="codex,claude_code">Codex → Claude Code</option><option value="claude_code">Claude Codeだけ</option><option value="codex">Codexだけ</option></select></label>
-        <label>Claude Codeのモデル（任せる作業用）<select id="delegate-claude-model"><option value="sonnet">Sonnet</option><option value="haiku">Haiku（消費が少ない）</option></select></label>
-        <p id="delegate-status" role="status"></p>
-        <p class="muted">任せる作業の開始に確認は出ません。開始と状態はチャット画面に表示し、外部への送信や書き込みは従来どおり確認します。この作業ではエージェントモードの設定に関わらず、PETIT Homeと登録リポジトリのworktreeの中で作業します。DeepSeekへの文脈送信の許可が必要です。メール本文はDeepSeekへ送らず、CLIに任せます。</p>
-        <button id="save-front-brain">この設定を保存</button>
-      </section>
-      <section class="card"><h2>Codex CLI / ChatGPT</h2><p>サーバーの公式Codex CLIを使います。PETIT専用の認証を公式の資格情報ストアへ保存します。チャット・Tool選択はCodex、Toolの検証・承認・実行結果の保存はPETITが担当します。</p>
-        <p id="codex-cli-status" role="status"></p><button id="codex-diagnose" class="quiet">CLI導入・認証状態を確認（推論なし）</button>
-        <p class="muted">Codexの認証状態は導入検出と別に確認します。実際のモデル応答は「接続テスト」で確認してください。CLIへの直接のファイル編集・Shell操作は許可せず、PETITの公開Toolを使用します。CLIのみの画像付き会話は未対応です。</p>
-        <label>モデル（空欄でCodexの既定）<input id="codex-model" maxlength="200"></label>
-        <button data-models="codex">モデル一覧を取得</button><label>一覧から選択<select id="codex-model-options"><option value="">CLIの既定モデル</option></select></label><button data-save-model="codex">このモデル設定を保存</button>
-        <label><input type="checkbox" id="codex-agent-mode"> Codex エージェントモード（PETIT Home で作業。ファイル操作・開発は PETIT の Tool 経由、Codex の shell と書き込みは無効のまま）</label>
-        <label>CodexのWeb検索（外部検索を許可）<select id="codex-web-search"><option value="disabled">無効</option><option value="cached">許可：キャッシュ検索</option><option value="live">許可：ライブ検索</option></select></label><p class="muted">検索すると検索語が外部へ送信されます。私的情報を含む会話では無効にしてください。許可はOSのネットワーク権限とは別です。</p>
-        <div class="actions"><button data-connect="codex">ChatGPTで認証</button><button id="codex-confirm">認証完了を確認</button><button data-test="codex">接続テスト</button><button data-disconnect="codex" class="quiet">切断</button></div>
-        <p id="codex-code" role="status"></p><a id="codex-link" target="_blank" rel="noopener noreferrer" hidden>公式認証ページを開く</a>
-      </section>
-      <section class="card" aria-labelledby="agy-title"><h2 id="agy-title">Antigravity CLI / Googleログイン・既存契約枠</h2>
-        <p>公式agyを直接起動し、判断・Tool要求をJSONで受け取ります。Toolの実行・承認・保存はPETIT Coreが行い、CLIの直接ファイル編集・Shellは公開しません。</p>
-        <p class="muted">個人契約CLIの第三者アプリ内利用は公式FAQで非サポートです。この接続はGoogleの許諾取得を意味しません。契約枠の残量・追加Credits設定は公式CLIで確認してください。</p>
-        <p id="antigravity-cli-status" role="status" aria-live="polite">状態を確認中…</p>
-        <label>CLIモデル（空欄で公式CLIの既定）<input id="antigravity-cli-model" maxlength="200"></label>
-        <button data-models="antigravity_cli">モデル一覧を取得</button><label>一覧から選択<select id="antigravity-cli-model-options"><option value="">CLIの既定モデル</option></select></label><button data-save-model="antigravity_cli">このモデル設定を保存</button>
-        <div class="actions"><button id="antigravity-cli-diagnose">インストール状態を再確認</button><button data-connect="antigravity_cli">CLIへ接続・優先順位の先頭へ</button><button data-test="antigravity_cli">接続テスト</button><button data-disconnect="antigravity_cli" class="quiet">PETITから切断</button></div>
-        <p><a href="https://www.antigravity.google/docs/getting-started/" target="_blank" rel="noopener noreferrer">公式CLIの導入・ログイン手順</a></p>
-        <p class="muted">ログインはサーバーPCの公式CLIで行います。ここにはGoogle認証情報を入力しません。バージョンはサーバーで agy --version を確認してください。CLIが未導入・未認証の状態をSDKや別Providerの成功として扱いません。</p>
-      </section>
-      <section class="card" aria-labelledby="claude-code-title"><h2 id="claude-code-title">Claude Code CLI / Anthropicログイン・既存契約枠</h2>
-        <p>公式claudeをヘッドレスで起動し、判断・Tool要求をJSONで受け取ります。CLIの組込みTool・MCP・設定読込・セッション保存は無効にし、Toolの実行・承認・保存はPETIT Coreが行います。</p>
-        <p class="muted">自作アプリから呼び出す使い方の契約上の扱いは未確認です。この接続はAnthropicの許諾取得を意味しません。APIキーは渡さず、サーバーPCの公式CLIのログインだけを使います。</p>
-        <p id="claude-code-status" role="status" aria-live="polite">状態を確認中…</p>
-        <label>CLIモデル（空欄で公式CLIの既定）<input id="claude-code-model" maxlength="200"></label>
-        <button data-models="claude_code">モデル候補を表示</button><label>一覧から選択<select id="claude-code-model-options"><option value="">CLIの既定モデル</option></select></label><button data-save-model="claude_code">このモデル設定を保存</button>
-        <div class="actions"><button id="claude-code-diagnose">インストール状態を再確認</button><button data-connect="claude_code">CLIへ接続（Codexの次に配置）</button><button data-test="claude_code">接続テスト</button><button data-disconnect="claude_code" class="quiet">PETITから切断</button></div>
-        <p class="muted">ログインはサーバーPCで <code>claude</code> を起動して行います。接続テストは実際に1回推論します。</p>
-        <h3>エージェントモード（試験的）</h3>
-        <p>ONにすると、Claude Code は PETIT Home（既定 <code>~/PETIT-Home</code>）の中でファイルを自由に読み書きし、PETIT の Tool を MCP で直接使います。外部への送信・push は止め、人格ファイルの変更とタスク等の書き込みは確認カードで承認します。</p>
-        <label><input type="checkbox" id="claude-agent-mode"> エージェントモードを使う</label>
-        <label><input type="checkbox" id="claude-agent-bash"> Home 内で Bash も許可する（Claude Code の OS サンドボックス内のみ・Windows では無効）</label>
-        <div class="actions"><button id="claude-agent-save">エージェント設定を保存</button></div>
-      </section>
-      <section class="card"><h2>Antigravity SDKは廃止しました</h2><p>旧設定・認証情報・会話履歴は保持しています。AI設定を確認して保存すると、利用するAIを明示的に再選択できます。</p><p id="sdk-migration" role="status"></p></section>
-      <section class="card"><h2>Google Antigravity / 公式ACP</h2>
-        <p>Google公式ACP Registryのバイナリを標準ACPで起動します。本人専用の対話型開発のみが対象です。認証情報は公式Agentが管理し、PETITはOAuth tokenを読みません。</p>
-        <label>ACP Agentのインストール先<input id="acp-install-root" maxlength="1000" autocomplete="off"></label>
-        <div class="actions"><button id="acp-install">Registryから導入・SHA-256検証</button><button id="acp-handshake">ACP initializeを確認</button><button id="acp-auth">公式Google OAuth（oauth-personal）</button></div>
-        <dl><dt>導入状態 / Agent version</dt><dd id="acp-install-state">unknown</dd><dt>Google OAuth状態</dt><dd id="acp-auth-state">unknown</dd>
-          <dt>モデル / Token使用量 / 契約枠 / 追加Credits</dt><dd id="acp-usage-state">unknown / unknown / unknown / unknown</dd>
-          <dt>Filesystem / Terminal権限</dt><dd id="acp-permission-state">拒否中。OS隔離が未検証のため実フォルダへのアクセス・Brain接続は無効。</dd>
-          <dt>Handshake応答時間</dt><dd id="acp-latency">unknown</dd><dt>最後のエラー</dt><dd id="acp-error">なし</dd></dl>
-        <p class="muted">ACP Agentは独自にToolを実行します。PETIT UIのPermission確認だけでは書込をOS側で止められないため、サンドボックス検証が終わるまで通常会話・許可フォルダ・無人実行・Provider priorityには接続しません。ACP接続失敗から他Providerへ自動fallbackもしません。</p>
-      </section>
-      <section class="card"><h2>DeepSeek</h2><label>APIキー<input id="deepseek-key" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
-        <label>モデル<input id="deepseek-model" value="deepseek-flash" maxlength="200"></label>
-        <label class="check"><input id="paid-deepseek" type="checkbox">DeepSeekへの文脈送信とAPI料金を事前許可する（自動切替を含む）</label>
-        <div class="actions"><button data-connect="deepseek">保存して接続</button><button data-test="deepseek">接続テスト</button><button data-disconnect="deepseek" class="quiet">切断・キー削除</button></div>
-      </section>
+      <div class="section-divider">
+        <h2>会話で使うAIの決め方（全体設定）</h2>
+        <p>上から順番に使えるAIを選びます。普段の窓口をDeepSeekにする構成も選べます。</p>
+      </div>
+
+      <div class="setup-grid-2">
+        <section class="card" id="card-brain-priority">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2>① AI Brainの優先順位</h2>
+              <small>ドラッグまたは「↑ 上へ」「↓ 下へ」で即座に並び替え・保存します</small>
+            </div>
+            <span id="brain-mode-badge" class="status-badge">確認中</span>
+          </div>
+          <p id="active-brain" class="status-line"></p>
+          <ol id="priority" aria-label="AIの優先順位"></ol>
+          <label class="check"><input type="checkbox" id="brain-enabled"><span><strong>この優先順位を会話で使う</strong><br><small>ONにすると、上のリストで「利用可能」な最上位のAIが会話を担当します</small></span></label>
+          <label>Brainの接続方式
+            <select id="brain-transport">
+              <option value="mixed" selected>上の優先順位でCLI・APIを使う（推奨）</option>
+              <option value="cli_only">CLIのみ（APIへ自動切替しない）</option>
+            </select>
+          </label>
+          <div class="actions">
+            <button id="save-brain">AI設定を保存</button>
+          </div>
+          <details class="card-details">
+            <summary>💡 接続方式と障害時の自動切替について</summary>
+            <p class="muted">CLIのみではCodex・Antigravity CLI・Claude Code CLIを候補にします。Tool実行前の障害時は次の順位へ自動で切り替わりますが、Tool実行後の障害では二重実行を防ぐため自動切替せず保存済み結果を保持します。</p>
+          </details>
+        </section>
+
+        <section class="card" id="card-front-brain">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2>② DeepSeekを最初の担当にする（窓口モード）</h2>
+              <small>雑談・予定・タスク操作はDeepSeekが即答し、複雑な作業だけCLIへ委譲します</small>
+            </div>
+            <span id="front-brain-badge" class="status-badge">OFF</span>
+          </div>
+          <label class="check"><input type="checkbox" id="front-brain"><span><strong>DeepSeekを最初の担当（窓口）にする</strong><br><small>左の優先順位リストを書き換えずに、普段の窓口だけをDeepSeekにします</small></span></label>
+          <p id="delegate-status" class="status-line" role="status"></p>
+          <div class="field-grid-2">
+            <label>複雑な作業を任せるCLIの順位
+              <select id="delegate-priority">
+                <option value="claude_code,codex">Claude Code → Codex</option>
+                <option value="codex,claude_code">Codex → Claude Code</option>
+                <option value="claude_code">Claude Codeだけ</option>
+                <option value="codex">Codexだけ</option>
+              </select>
+            </label>
+            <label>Claude Codeのモデル（委譲作業用）
+              <select id="delegate-claude-model">
+                <option value="sonnet">Sonnet（標準）</option>
+                <option value="haiku">Haiku（消費が少ない）</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button id="save-front-brain">この設定を保存</button>
+          </div>
+          <details class="card-details">
+            <summary>💡 窓口モードの条件と動作仕様</summary>
+            <p class="muted">使うには「① この優先順位を会話で使う」をONにし、下のDeepSeekカードで接続と料金許可を行ってください。メール本文の読み取りやファイル・開発作業はDeepSeekへ送らずCLIに任せます。</p>
+          </details>
+        </section>
+      </div>
+
+      <div class="section-divider">
+        <h2>各AIプロバイダーの接続・モデル設定</h2>
+        <p>使いたいAIだけ接続してください。モデル変更後は「接続テスト」で実際の応答を確認できます。</p>
+      </div>
+
+      <div class="setup-grid-2">
+        <section class="card" id="card-antigravity-cli" aria-labelledby="agy-title">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2 id="agy-title">Antigravity CLI</h2>
+              <small>Googleログイン・既存契約枠（最優先CLI候補）</small>
+            </div>
+            <span id="badge-antigravity_cli" class="status-badge">確認中</span>
+          </div>
+          <p id="antigravity-cli-status" class="status-line" role="status" aria-live="polite">状態を確認中…</p>
+          <div class="actions">
+            <button data-connect="antigravity_cli">CLIへ接続・優先順位の先頭へ</button>
+            <button data-test="antigravity_cli">接続テスト</button>
+            <button id="antigravity-cli-diagnose" class="quiet">インストール状態を再確認</button>
+            <button data-disconnect="antigravity_cli" class="quiet">PETITから切断</button>
+          </div>
+          <div class="sub-box">
+            <p class="sub-box__title"><span>使用モデル設定</span><button type="button" data-models="antigravity_cli" class="quiet">モデル一覧を取得</button></p>
+            <div class="field-grid-2">
+              <label>一覧から選択<select id="antigravity-cli-model-options"><option value="">CLIの既定モデル</option></select></label>
+              <label>CLIモデル（空欄で既定）<input id="antigravity-cli-model" maxlength="200" placeholder="空欄でCLIの既定"></label>
+            </div>
+            <div class="actions"><button data-save-model="antigravity_cli" class="quiet">このモデル設定を保存</button></div>
+          </div>
+          <details class="card-details">
+            <summary>💡 ログイン手順と注意事項</summary>
+            <p class="muted">ログインはサーバーPCの公式CLI（<code>agy</code>）で行います。個人契約CLIの第三者アプリ内利用は公式FAQで非サポートであり、この接続はGoogleの許諾取得を意味しません。<a href="https://www.antigravity.google/docs/getting-started/" target="_blank" rel="noopener noreferrer">公式CLIの導入手順</a></p>
+          </details>
+        </section>
+
+        <section class="card" id="card-codex">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2>Codex CLI / ChatGPT</h2>
+              <small>OpenAI公式Codex app-server（ChatGPT認証）</small>
+            </div>
+            <span id="badge-codex" class="status-badge">確認中</span>
+          </div>
+          <p id="codex-cli-status" class="status-line" role="status"></p>
+          <div class="actions">
+            <button data-connect="codex">ChatGPTで認証</button>
+            <button id="codex-confirm">認証完了を確認</button>
+            <button data-test="codex">接続テスト</button>
+            <button id="codex-diagnose" class="quiet">CLI導入・認証状態を確認（推論なし）</button>
+            <button data-disconnect="codex" class="quiet">切断</button>
+          </div>
+          <p id="codex-code" role="status"></p>
+          <a id="codex-link" target="_blank" rel="noopener noreferrer" hidden>公式認証ページを開く</a>
+          <div class="sub-box">
+            <p class="sub-box__title"><span>使用モデル設定</span><button type="button" data-models="codex" class="quiet">モデル一覧を取得</button></p>
+            <div class="field-grid-2">
+              <label>一覧から選択<select id="codex-model-options"><option value="">CLIの既定モデル</option></select></label>
+              <label>モデル（空欄で既定）<input id="codex-model" maxlength="200" placeholder="空欄でCodexの既定"></label>
+            </div>
+            <div class="actions"><button data-save-model="codex" class="quiet">このモデル設定を保存</button></div>
+          </div>
+          <div class="sub-box">
+            <p class="sub-box__title"><span>🏠 エージェントモード・検索設定</span></p>
+            <label class="check"><input type="checkbox" id="codex-agent-mode"><span>Codex エージェントモード（PETIT Home で作業・PETIT Tool 経由でファイル操作）</span></label>
+            <label>CodexのWeb検索（外部検索を許可）
+              <select id="codex-web-search">
+                <option value="disabled">無効（私的情報の送信を防ぐ）</option>
+                <option value="cached">許可：キャッシュ検索</option>
+                <option value="live">許可：ライブ検索</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="card" id="card-claude-code" aria-labelledby="claude-code-title">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2 id="claude-code-title">Claude Code CLI</h2>
+              <small>Anthropicログイン・既存契約枠</small>
+            </div>
+            <span id="badge-claude_code" class="status-badge">確認中</span>
+          </div>
+          <p id="claude-code-status" class="status-line" role="status" aria-live="polite">状態を確認中…</p>
+          <div class="actions">
+            <button data-connect="claude_code">CLIへ接続（Codexの次に配置）</button>
+            <button data-test="claude_code">接続テスト</button>
+            <button id="claude-code-diagnose" class="quiet">インストール状態を再確認</button>
+            <button data-disconnect="claude_code" class="quiet">PETITから切断</button>
+          </div>
+          <div class="sub-box">
+            <p class="sub-box__title"><span>使用モデル設定</span><button type="button" data-models="claude_code" class="quiet">モデル候補を表示</button></p>
+            <div class="field-grid-2">
+              <label>一覧から選択<select id="claude-code-model-options"><option value="">CLIの既定モデル</option></select></label>
+              <label>CLIモデル（空欄で既定）<input id="claude-code-model" maxlength="200" placeholder="空欄でCLIの既定"></label>
+            </div>
+            <div class="actions"><button data-save-model="claude_code" class="quiet">このモデル設定を保存</button></div>
+          </div>
+          <div class="sub-box">
+            <p class="sub-box__title"><span>🏠 エージェントモード（PETIT Home）</span></p>
+            <label class="check"><input type="checkbox" id="claude-agent-mode"><span>エージェントモードを使う（PETIT Home 内で自由に読み書き・MCP Tool 利用）</span></label>
+            <label class="check"><input type="checkbox" id="claude-agent-bash"><span>Home 内で Bash も許可する（OSサンドボックス内のみ・Windowsでは無効）</span></label>
+            <div class="actions"><button id="claude-agent-save" class="quiet">エージェント設定を保存</button></div>
+          </div>
+          <details class="card-details">
+            <summary>💡 ログイン手順と注意事項</summary>
+            <p class="muted">サーバーPCで <code>claude</code> を起動してログインしてください。APIキーは渡さず公式CLIのログインだけを使います。</p>
+          </details>
+        </section>
+
+        <section class="card" id="card-deepseek">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2>DeepSeek (API)</h2>
+              <small>CLIが使えないときの受け皿・窓口モード担当</small>
+            </div>
+            <span id="badge-deepseek" class="status-badge">確認中</span>
+          </div>
+          <label>
+            <span class="label-row"><span>APIキー</span><span id="cred-deepseek_key" class="status-badge">確認中</span></span>
+            <input id="deepseek-key" type="password" autocomplete="off" placeholder="変更する場合だけ入力">
+          </label>
+          <label>モデル<input id="deepseek-model" value="deepseek-flash" maxlength="200"></label>
+          <label class="check"><input id="paid-deepseek" type="checkbox"><span><strong>DeepSeekへの文脈送信とAPI料金を事前許可する</strong><br><small>自動切替や窓口モードでDeepSeekを使うために必要です</small></span></label>
+          <div class="actions">
+            <button data-connect="deepseek">保存して接続</button>
+            <button data-test="deepseek">接続テスト</button>
+            <button data-disconnect="deepseek" class="quiet">切断・キー削除</button>
+          </div>
+        </section>
+      </div>
+
+      <details id="advanced-ai-section" class="advanced-section">
+        <summary>⚙️ 詳細・実験機能・移行案内（Google公式ACP / 旧SDK廃止案内）</summary>
+        <section class="card">
+          <h2>Antigravity SDKは廃止しました</h2>
+          <p class="muted">旧設定・認証情報・会話履歴は保持しています。上のAI設定を保存すると、利用するAIを明示的に再選択できます。</p>
+          <p id="sdk-migration" role="status"></p>
+        </section>
+        <section class="card">
+          <h2>Google Antigravity / 公式ACP（実験的・通常会話未接続）</h2>
+          <p class="muted">Google公式ACP Registryのバイナリを標準ACPで検証します。OSサンドボックス検証が終わるまで通常会話や優先順位には接続しません。</p>
+          <label>ACP Agentのインストール先<input id="acp-install-root" maxlength="1000" autocomplete="off"></label>
+          <div class="actions">
+            <button id="acp-install">Registryから導入・SHA-256検証</button>
+            <button id="acp-handshake">ACP initializeを確認</button>
+            <button id="acp-auth">公式Google OAuth（oauth-personal）</button>
+          </div>
+          <dl>
+            <dt>導入状態 / Agent version</dt><dd id="acp-install-state">unknown</dd>
+            <dt>Google OAuth状態</dt><dd id="acp-auth-state">unknown</dd>
+            <dt>モデル / Token使用量 / 契約枠 / 追加Credits</dt><dd id="acp-usage-state">unknown / unknown / unknown / unknown</dd>
+            <dt>Filesystem / Terminal権限</dt><dd id="acp-permission-state">拒否中。OS隔離が未検証のため実フォルダへのアクセス・Brain接続は無効。</dd>
+            <dt>Handshake応答時間</dt><dd id="acp-latency">unknown</dd>
+            <dt>最後のエラー</dt><dd id="acp-error">なし</dd>
+          </dl>
+        </section>
+      </details>
     </div>
+
     <div id="step-1" class="step" hidden>
-      <section class="card"><h2>Notion</h2><p>インテグレーションに共有したページとDBを選択します。既存のタスク同期と検索を使います。</p>
-        <label>インテグレーションキー<input id="notion-key" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
-        <div class="actions"><button data-connect="notion">保存して接続</button><button data-test="notion">接続テスト</button><button data-disconnect="notion" class="quiet">切断・キー削除</button></div>
-        <label>ページ・DB検索<input id="notion-query" maxlength="200"></label><button id="notion-search">検索</button><button id="notion-more" hidden>次の50件</button>
-        <label>タスクDB<select id="notion-tasks"></select></label><label>プロジェクトDB<select id="notion-projects"></select></label>
-        <fieldset><legend>検索で参照するページ（未選択なら共有済みページ全体）</legend><div id="notion-pages"></div></fieldset><button id="notion-select">選択を保存</button>
+      <div class="section-divider">
+        <h2>タスク・知識の連携（Notion）</h2>
+        <p>①APIキー保存 → ②共有ページ・DB一覧を取得してタスクDBを選択 → ③選択を保存 の3ステップで連携します。</p>
+      </div>
+
+      <section class="card" id="card-notion">
+        <div class="card-head">
+          <div class="card-head__title">
+            <h2>Notion</h2>
+            <small>タスク双方向同期・プロジェクト管理・会話からのNotion検索</small>
+          </div>
+          <span id="badge-notion" class="status-badge">確認中</span>
+        </div>
+
+        <div class="setup-grid-2">
+          <div class="sub-box">
+            <p class="sub-box__title"><span>Step 1. インテグレーションキーの接続</span><span id="cred-notion_key" class="status-badge">確認中</span></p>
+            <label>インテグレーションキー<input id="notion-key" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
+            <div class="actions">
+              <button data-connect="notion">保存して接続</button>
+              <button data-test="notion">接続テスト</button>
+              <button data-disconnect="notion" class="quiet">切断・キー削除</button>
+            </div>
+          </div>
+
+          <div class="sub-box">
+            <p class="sub-box__title"><span>Step 2. 同期するデータベース・ページの選択</span><span id="notion-db-badge" class="status-badge">確認中</span></p>
+            <label>ページ・DB検索（空欄のまま検索で共有済みを全件取得）<input id="notion-query" maxlength="200" placeholder="空欄のまま「検索」で一覧を読み込みます"></label>
+            <div class="actions">
+              <button id="notion-search" class="quiet">📥 共有ページ・DBを検索して読み込む</button>
+              <button id="notion-more" class="quiet" hidden>次の50件</button>
+            </div>
+            <div class="field-grid-2">
+              <label>タスクDB<select id="notion-tasks"></select></label>
+              <label>プロジェクトDB<select id="notion-projects"></select></label>
+            </div>
+            <fieldset>
+              <legend>検索で参照するページ（未選択なら共有済みページ全体）</legend>
+              <div id="notion-pages"></div>
+            </fieldset>
+            <div class="actions">
+              <button id="notion-select">選択を保存</button>
+              <button type="button" data-sync="notion" class="quiet">🔄 今すぐNotionを再同期</button>
+            </div>
+          </div>
+        </div>
       </section>
-      <section class="card"><h2>Google / Calendar・Gmail</h2><p>Google Cloudで作成したOAuthクライアントを登録します。CalendarとGmailは別々に読み取り権限を認可できます。</p>
-        <label>OAuth Client ID<input id="google-client-id" autocomplete="off" placeholder="変更する場合だけ入力"></label>
-        <label>OAuth Client Secret<input id="google-client-secret" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
-        <label>登録済みRedirect URI<input id="google-redirect" type="url"></label><button id="google-save">OAuth設定を保存</button>
-        <h3>Googleカレンダー</h3><div class="actions"><button data-oauth="google_calendar">Googleで接続</button><button data-test="google_calendar">接続テスト</button><button data-disconnect="google_calendar" class="quiet">切断</button></div>
-        <button id="google-calendars">利用可能なカレンダーを取得</button><label>取り込むカレンダー<select id="google-calendar"><option value="primary">メインカレンダー</option></select></label><button id="calendar-select">カレンダー選択を保存</button>
-        <h3>Gmail</h3><p>会話でメールを検索・一覧表示・本文取得できます。送信・変更・削除は行いません。</p><div class="actions"><button data-oauth="gmail">Googleで接続</button><button data-test="gmail">接続テスト</button><button data-disconnect="gmail" class="quiet">切断</button></div>
-      </section>
-      <section class="card"><h2>TimeTree</h2><p>既存の読み取り専用エクスポーターを使います。TimeTreeへ書き込みません。</p>
-        <label>メール<input id="timetree-email" type="email" autocomplete="off"></label><label>パスワード<input id="timetree-password" type="password" autocomplete="off"></label><label>カレンダーコード<input id="timetree-calendar" autocomplete="off"></label>
-        <div class="actions"><button data-connect="timetree">保存して接続</button><button data-test="timetree">接続テスト</button><button data-disconnect="timetree" class="quiet">切断・認証削除</button></div>
-      </section>
+
+      <div class="section-divider" id="sec-calendar-services">
+        <h2>予定（カレンダー）・メールの連携（TimeTree / Google）</h2>
+        <p>予定は「TimeTree」「Googleカレンダー」「PETITローカル」から1つを同期元に選べます。接続後、カード内のボタンでそのまま同期元に設定できます。</p>
+      </div>
+
+      <div class="setup-grid-2">
+        <section class="card" id="card-timetree">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2>TimeTree</h2>
+              <small>予定の読み取り取り込み（TimeTree側への書き込みは行いません）</small>
+            </div>
+            <span id="badge-timetree" class="status-badge">確認中</span>
+          </div>
+
+          <div class="sub-box">
+            <p class="sub-box__title"><span>Step 1. TimeTree認証情報の登録</span></p>
+            <label>
+              <span class="label-row"><span>メール</span><span id="cred-timetree_email" class="status-badge">確認中</span></span>
+              <input id="timetree-email" type="email" autocomplete="off" placeholder="TimeTreeのログインメールアドレス">
+            </label>
+            <label>
+              <span class="label-row"><span>パスワード</span><span id="cred-timetree_password" class="status-badge">確認中</span></span>
+              <input id="timetree-password" type="password" autocomplete="off" placeholder="変更する場合だけ入力">
+            </label>
+            <label>
+              <span class="label-row"><span>カレンダーコード</span><span id="cred-timetree_calendar" class="status-badge">確認中</span></span>
+              <input id="timetree-calendar" autocomplete="off" placeholder="Web版TimeTreeのURL末尾のコード">
+            </label>
+            <div class="actions">
+              <button data-connect="timetree">保存して接続</button>
+              <button data-test="timetree">接続テスト</button>
+              <button data-disconnect="timetree" class="quiet">切断・認証削除</button>
+            </div>
+          </div>
+
+          <div class="sub-box">
+            <p class="sub-box__title"><span>Step 2. 予定の同期元として使う</span></p>
+            <p id="timetree-sync-hint" class="muted">接続後に下のボタンを押すと、予定の同期元をTimeTreeに切り替えて今すぐ予定を取り込みます。</p>
+            <div class="actions">
+              <button type="button" id="timetree-activate-sync">📅 TimeTreeを予定の同期元にして今すぐ同期</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" id="card-google">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2>Google / Calendar・Gmail</h2>
+              <small>Googleカレンダーの予定読み取り・Gmailの検索と本文読み取り</small>
+            </div>
+            <span id="badge-google" class="status-badge">確認中</span>
+          </div>
+
+          <div class="sub-box">
+            <p class="sub-box__title"><span>Step 1. Google OAuth クライアント設定</span><span id="cred-google_oauth" class="status-badge">確認中</span></p>
+            <div class="field-grid-2">
+              <label>OAuth Client ID<input id="google-client-id" autocomplete="off" placeholder="変更する場合だけ入力"></label>
+              <label>OAuth Client Secret<input id="google-client-secret" type="password" autocomplete="off" placeholder="変更する場合だけ入力"></label>
+            </div>
+            <label>登録済みRedirect URI<input id="google-redirect" type="url"></label>
+            <div class="actions"><button id="google-save">OAuth設定を保存</button></div>
+          </div>
+
+          <div class="sub-box">
+            <p class="sub-box__title"><span>Step 2. Googleカレンダー（予定読み取り）</span><span id="badge-google_calendar" class="status-badge">確認中</span></p>
+            <div class="actions">
+              <button data-oauth="google_calendar">Googleで接続</button>
+              <button data-test="google_calendar">接続テスト</button>
+              <button data-disconnect="google_calendar" class="quiet">切断</button>
+            </div>
+            <div class="inline-controls">
+              <button id="google-calendars" class="quiet">利用可能なカレンダーを取得</button>
+            </div>
+            <label>取り込むカレンダー<select id="google-calendar"><option value="primary">メインカレンダー</option></select></label>
+            <div class="actions">
+              <button id="calendar-select" class="quiet">カレンダー選択を保存</button>
+              <button type="button" id="google-activate-sync">📅 Googleカレンダーを同期元にして今すぐ同期</button>
+            </div>
+          </div>
+
+          <div class="sub-box">
+            <p class="sub-box__title"><span>Step 3. Gmail（メール検索・本文取得 / 読み取り専用）</span><span id="badge-gmail" class="status-badge">確認中</span></p>
+            <p class="muted">会話でメールの検索・本文取得ができます。送信・変更・削除は行いません。</p>
+            <div class="actions">
+              <button data-oauth="gmail">Googleで接続</button>
+              <button data-test="gmail">接続テスト</button>
+              <button data-disconnect="gmail" class="quiet">切断</button>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
+
     <div id="step-2" class="step" hidden>
-      <section class="card"><h2>ローカル中心のカレンダー同期</h2><label>アクティブな外部カレンダー<select id="calendar-source"><option value="local">PETITローカルのみ</option><option value="google_calendar">Googleカレンダー</option><option value="timetree">TimeTree</option></select></label>
-        <p>同期方向：外部 → PETIT SQLite（読み取り専用）。ローカル予定は外部へ書き戻しません。Google双方向同期は未実装です。</p><p>毎日02:00（Asia/Tokyo）。停止中の予定時刻は次の起動後に追いつきます。</p>
-        <button id="save-calendar">同期設定を保存</button><button id="sync-calendar">今すぐ同期・再試行</button><button data-sync="notion">Notionを再同期</button>
-      </section>
-      <section class="card" id="alerts"><h2>同期状態と運用アラート</h2><div id="sync-status"></div><div id="alert-list"></div>
-        <label class="check"><input id="sync-notifications" type="checkbox" checked>同期失敗の高優先度通知を有効にする</label><button id="save-notifications">通知設定を保存</button>
-        <a href="/static/universe.html?view=notifications" target="_top">Web Push・端末通知の設定</a><p class="muted">通知が届かなくてもエラーは保存します。正常同期まで会話でも短く警告します。</p>
+      <div class="setup-grid-2">
+        <section class="card">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2>ローカル中心のカレンダー同期</h2>
+              <small>毎日02:00（JST）に自動同期。いつでも手動で即時同期できます</small>
+            </div>
+            <span id="badge-active-calendar" class="status-badge">確認中</span>
+          </div>
+          <label>アクティブな外部カレンダー（会話で参照する予定の取り込み元）
+            <select id="calendar-source">
+              <option value="local">PETITローカルのみ（外部カレンダーを使わない）</option>
+              <option value="google_calendar">Googleカレンダー</option>
+              <option value="timetree">TimeTree</option>
+            </select>
+          </label>
+          <p class="muted">同期方向：外部 → PETIT SQLite（読み取り専用）。ローカルで追加した予定も合わせて表示されます。</p>
+          <div class="actions">
+            <button id="save-calendar">同期設定を保存</button>
+            <button id="sync-calendar">📅 カレンダーを今すぐ同期・再試行</button>
+            <button data-sync="notion" class="quiet">📝 Notionを再同期</button>
+          </div>
+        </section>
+
+        <section class="card" id="alerts">
+          <div class="card-head">
+            <div class="card-head__title">
+              <h2>同期状態と運用アラート</h2>
+              <small>各サービスの最終同期日時と、未解決のエラーを確認・再試行します</small>
+            </div>
+          </div>
+          <h3>各サービスの同期履歴</h3>
+          <div id="sync-status"></div>
+          <h3 style="margin-top:16px">未解決の同期アラート</h3>
+          <div id="alert-list"></div>
+          <label class="check"><input id="sync-notifications" type="checkbox" checked><span>同期失敗の高優先度通知を有効にする</span></label>
+          <div class="actions">
+            <button id="save-notifications">通知設定を保存</button>
+            <a href="/static/universe.html?view=notifications" target="_top" class="sub-link">Web Push・端末通知の設定を開く</a>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="step-3" class="step" hidden>
+      <section class="card">
+        <div class="card-head">
+          <div class="card-head__title">
+            <h2>現在の設定一覧・完了</h2>
+            <small>未接続のサービスは後からいつでも追加・変更できます</small>
+          </div>
+        </div>
+        <div id="summary" class="summary-grid"></div>
+        <p class="muted">外部サービスが停止していても、設定とローカルの会話・タスク・予定データは安全に保持されます。</p>
+        <div class="actions">
+          <button id="complete">設定を完了してPETITを開く</button>
+        </div>
       </section>
     </div>
-    <div id="step-3" class="step" hidden><section class="card"><h2>設定を確認</h2><div id="summary"></div><p>未接続のサービスは後から接続できます。外部サービスが停止しても設定・ローカルデータは保持します。</p><button id="complete">設定を完了してPETITを開く</button></section></div>
-    <footer><button id="previous" class="quiet">前へ</button><button id="next">次へ・未設定はスキップ</button><button id="refresh" class="quiet">状態を更新</button><button id="logout" class="quiet">ログアウト</button></footer>
+
+    <footer>
+      <div class="footer-left">
+        <button id="previous" class="quiet">← 前へ</button>
+        <button id="next">次へ・未設定はスキップ →</button>
+      </div>
+      <div class="footer-right">
+        <button id="refresh" class="quiet">↻ 状態を更新</button>
+        <button id="logout" class="quiet">ログアウト</button>
+      </div>
+    </footer>
   </div>
 </main>
-</body></html>
+</body>
+</html>

@@ -253,6 +253,26 @@ class UniverseUiTests(unittest.TestCase):
         self.assertIn("@media (max-width: 640px)", webgl_css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", webgl_css)
 
+    def test_settings_and_setup_ui_redesign_structure(self) -> None:
+        universe_html = (FRONTEND / "universe.html").read_text(encoding="utf-8")
+        setup_html = (FRONTEND / "setup.html").read_text(encoding="utf-8")
+        setup_js = (FRONTEND / "setup.js").read_text(encoding="utf-8")
+        setup_gate_js = (FRONTEND / "setup-gate.js").read_text(encoding="utf-8")
+        conn_js = (FRONTEND / "connection-status.js").read_text(encoding="utf-8")
+
+        self.assertIn('href="/static/setup.html#services"', universe_html)
+        self.assertIn('id="setup-overview-bar"', setup_html)
+        self.assertIn('id="timetree-activate-sync"', setup_html)
+        self.assertIn('id="google-activate-sync"', setup_html)
+        self.assertIn('id="cred-notion_key"', setup_html)
+        self.assertIn('id="cred-timetree_password"', setup_html)
+        self.assertIn('id="advanced-ai-section"', setup_html)
+        self.assertIn("applyHashNavigation", setup_js)
+        self.assertIn("updateBadgesAndOverview", setup_js)
+        self.assertIn("/static/setup.html#timetree", setup_gate_js)
+        self.assertIn("/static/setup.html#notion", setup_gate_js)
+        self.assertIn("connection-setup-link", conn_js)
+
 
 class _Rows:
     def __init__(self, rows: list[dict[str, object]]) -> None:

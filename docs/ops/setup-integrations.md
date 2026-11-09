@@ -1,8 +1,8 @@
 > #368: Antigravity SDKは廃止。以下のSDK記述は過去の実装・検証記録です。[現在の移行方法](../brain/sdk-retirement.md)を参照。
 
-# 初期セットアップ・接続管理（v0.34.0 / #353）
+# 初期セットアップ・接続管理（v0.34.0 / #353、UI再設計 v0.51.0 / #414）
 
-同じFastAPI / SQLite / Module RegistryでLocalとCloudを動かす。サービス接続は`/static/setup.html`に集約し、初回起動・未ログイン時にWeb入口から案内する。従来Settingsのテーマ・音声・通知は残し、接続設定へのリンクを置く。
+同じFastAPI / SQLite / Module RegistryでLocalとCloudを動かす。サービス接続は`/static/setup.html`に集約し、初回起動・未ログイン時にWeb入口から案内する。通常画面のSettingsタブ最上部には現在のAI Brain順位・カレンダー同期元・Notion/Gmail状態のサマリーハブと各セクションへの直通リンク（`#ai` / `#services` / `#notion` / `#timetree` / `#google` / `#sync`）を配置し、画面テーマ・音声・通知の設定と明確に役割を分ける。
 
 ## サーバーの準備とUI操作
 
@@ -10,7 +10,7 @@
 2. `python -m backend.main`で起動し、localhostの画面で12文字以上の管理者パスワードを作成する。CloudはHTTPSと`PETIT_BOOTSTRAP_TOKEN`をホスト側で設定し、初回画面にその値を入力する。外部公開前にホスト設定を済ませる。初期設定後は全`/api`（health/session/login/OAuth callbackを除く）を同じ管理者sessionで保護する。
 3. AIを接続し、モデル・優先順位・有料APIへの文脈送信/料金許可を保存する。キーを入力するだけでは有料推論を許可しない。接続テストは合成の専用Threadで実際に推論する。最後に「この優先順位を会話で使う」を有効にする。従来Provider選択へ戻すにはこの設定をOFFにする。
 4. Notionはキーを保存し、共有済みページ/DBを検索して接続対象を保存する。Googleは自分のOAuthクライアントID/secretと登録済みcallback URIを設定し、Calendar/Gmailを別々に認可する。callback URIは`https://ホスト/api/setup/google/callback`（localhostはHTTP可）。Google側でCalendar/Gmail APIを有効にし、OAuthテスト利用者等の設定も済ませる。PETITからGoogle Cloudプロジェクトや有料契約は作成しない。
-5. TimeTreeは既存exporterに必要なメール・パスワード・カレンダーコードを登録する。接続テスト後、アクティブな外部Calendarを1つ選び、手動同期で取り込みを確認する。未使用のサービスはスキップできる。
+5. TimeTreeは既存exporterに必要なメール・パスワード・カレンダーコードを登録する（保存後は`🔑 保存済み`を表示）。Step 2の「TimeTreeをカレンダー同期元にして今すぐ同期」ボタン（またはGoogle Calendarカード内の同等ボタン）で、タブを移動せずにアクティブな外部Calendarの切替と初回手動同期を1クリックで完了できる。未使用のサービスはスキップできる。
 6. 初期設定を完了し、会話で予定・メール・Notionを検索する。サービス別の接続テスト成功と、実際の会話でのTool利用は分けて確認する。
 
 ## 保存・認証
