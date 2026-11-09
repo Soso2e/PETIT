@@ -51,7 +51,7 @@ function freshnessLabel(status, label) {
   return `${label}: ${status.stale ? "古いキャッシュ" : "最新"}`;
 }
 
-function addMessage(role, text, { tools, error, actions, modelRoute, silent = false } = {}) {
+function addMessage(role, text, { tools, error, actions, modelRoute, developmentJobId, silent = false } = {}) {
   const wrap = document.createElement("div");
   wrap.className = `msg msg--${role}`;
   if (silent) wrap.dataset.voiceSilent = "1";
@@ -60,6 +60,7 @@ function addMessage(role, text, { tools, error, actions, modelRoute, silent = fa
   bubble.className = "bubble" + (error ? " bubble--error" : "");
   bubble.textContent = text;
   wrap.appendChild(bubble);
+  if (developmentJobId) window.PetitDevelopment?.attachProposal(bubble, developmentJobId);
 
   if (tools && tools.length) {
     const t = document.createElement("div");
@@ -212,7 +213,7 @@ async function decideAction(approvalId, approved, controls) {
       addMessage("assistant", "⚠️ " + data.error, { error: true });
       return;
     }
-    addMessage("assistant", data.reply || "", { tools: data.used_tools, actions: data.pending_actions });
+    addMessage("assistant", data.reply || "", { tools: data.used_tools, actions: data.pending_actions, developmentJobId: data.development_job_id });
     history.push({ role: "assistant", content: data.reply });
   } catch (e) {
     addMessage("assistant", "⚠️ 確認操作に失敗しました: " + e.message, { error: true });
@@ -433,7 +434,8 @@ async function sendMessage(text) {
       voiceResult = data;
       history.push({ role: "user", content: text });
       if (data.reply || data.pending_actions?.length) {
-        addMessage("assistant", data.reply, { tools: data.used_tools, actions: data.pending_actions, modelRoute: data.model_route });
+        addMessage("assistant", data.reply, { tools: data.used_tools, actions: data.pending_actions, modelRoute: data.model_route,
+          developmentJobId: data.development_job_id });
         history.push({ role: "assistant", content: data.reply });
         if (data.used_tools?.some((item) => item.name === "delegate_to_agent")) void window.PetitDelegations?.refresh();
       }
@@ -530,6 +532,7 @@ async function restoreHistory() {
           silent: true,
           tools,
           modelRoute: row.model_route,
+          developmentJobId: row.development_job_id,
         });
         history.push({ role: "assistant", content: row.assistant_text });
       }

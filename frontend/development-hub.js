@@ -1,4 +1,4 @@
-// Development Hub: read-only view of the existing opt-in WorkspaceObserver cache.
+// Development Hub: read-only view of registered folders in the WorkspaceObserver cache.
 // Never fetch Git remotes, inspect arbitrary paths, or execute a coding agent.
 (() => {
   "use strict";
@@ -10,13 +10,13 @@
     if (snapshot.status !== "observed" || snapshot.stale) {
       return { state: "stale", projects: [], collectedAt: snapshot.collected_at || null };
     }
-    const projects = (Array.isArray(snapshot.workspaces) ? snapshot.workspaces : []).slice(0, 8)
+    const projects = (Array.isArray(snapshot.workspaces) ? snapshot.workspaces : []).slice(0, 16)
       .map((item) => {
         const detail = item && item.development && typeof item.development === "object" ? item.development : {};
         return {
           id: String(item?.workspace_id || ""),
           name: String(item?.name || "無名のリポジトリ").slice(0, 120),
-          status: item?.status === "ok" ? "ok" : "unavailable",
+          status: ["ok", "folder"].includes(item?.status) ? item.status : "unavailable",
           branch: String(item?.branch || "不明").slice(0, 120),
           changes: Number.isInteger(item?.changed_entries) ? Math.max(0, item.changed_entries) : null,
           conflicts: Number.isInteger(item?.conflicts) ? Math.max(0, item.conflicts) : null,
@@ -69,10 +69,11 @@
     const card = node("article", null, "development-project");
     const header = node("div", null, "development-project__header");
     const heading = node("h2", data.name);
-    const badge = node("span", data.status === "ok" ? "ローカル観測" : "取得不可", "development-badge");
+    const badge = node("span", data.status === "ok" ? "ローカル観測" : data.status === "folder" ? "登録フォルダ" : "取得不可", "development-badge");
     badge.dataset.status = data.status;
     header.append(heading, badge);
     card.append(header);
+    if (data.status === "folder") return card;
 
     const stats = node("dl", null, "development-project__stats");
     const field = (label, value) => {
@@ -129,9 +130,8 @@
       if (requestNumber !== current) return;
       lastLoaded = Date.now();
       if (result.state === "disabled") {
-        state.textContent = "PC観測はOFF";
-        message("ローカル開発観測が無効です",
-          "環境変数 PETIT_WORKSPACE_CONTEXT_ENABLED=1 と PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1 を設定し、PETIT_WORKSPACE_CONTEXT_DIRS に許可するGitルートを登録してください。");
+        state.textContent = "観測結果はありません";
+        message("登録済みフォルダを確認してください", "フォルダはDevelopタブから登録できます。");
       } else if (result.state === "stale") {
         state.textContent = "観測待ち・古い情報：" + time(result.collectedAt);
         message("最新の開発状況を確認できません",
@@ -139,7 +139,7 @@
       } else {
         state.textContent = "最終観測：" + time(result.collectedAt) + " · " + result.projects.length + "プロジェクト";
         if (!result.projects.length) {
-          message("登録済みのリポジトリがありません", "許可されたGitルートを設定すると、ここに一覧が表示されます。");
+          message("登録済みフォルダがありません", "「フォルダを管理」から追加できます。");
         } else {
           list.replaceChildren(...result.projects.map(renderProject));
         }
@@ -158,5 +158,8 @@
     if (event.detail?.area === "development") void load();
   });
   window.PetitDevelopmentHub.reload = () => load(true);
+  window.setInterval(() => {
+    if (!panel.hidden && !document.hidden) void load();
+  }, 30000);
   if (!panel.hidden) void load();
 })();

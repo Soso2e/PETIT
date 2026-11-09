@@ -1238,7 +1238,7 @@
     history: () => [...state.history],
   };
 
-  const appendMessage = (role, message, actions = []) => {
+  const appendMessage = (role, message, actions = [], developmentJobId = null) => {
     const item = document.createElement("div");
     item.className = `message message--${role}`;
     const copy = document.createElement("div");
@@ -1270,6 +1270,7 @@
     }
 
     messagesEl.appendChild(item);
+    if (developmentJobId) window.PetitDevelopment?.attachProposal(item, developmentJobId);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return item;
   };
@@ -1292,7 +1293,7 @@
         await animateTaskExit(completedTask);
       }
       if (data.error) throw new Error(data.error);
-      appendMessage("assistant", data.reply || "", data.pending_actions || []);
+      appendMessage("assistant", data.reply || "", data.pending_actions || [], data.development_job_id);
       await loadUniverse();
     } catch (error) {
       appendMessage("assistant", `確認操作に失敗しました: ${error.message}`);
@@ -1344,7 +1345,7 @@
       if (data.error) throw new Error(data.error);
       window.PetitChatAttachments?.complete(attachmentIds);
       pending.remove();
-      appendMessage("assistant", data.reply || "", data.pending_actions || []);
+      appendMessage("assistant", data.reply || "", data.pending_actions || [], data.development_job_id);
       state.history.push({ role: "user", content: message }, { role: "assistant", content: data.reply || "" });
       if (data.used_tools?.some((item) => item.name === "delegate_to_agent")) void window.PetitDelegations?.refresh();
       await loadUniverse();
@@ -1517,7 +1518,7 @@
           state.history.push({ role: "user", content: row.user_text });
         }
         if (row.assistant_text) {
-          appendMessage("assistant", row.assistant_text);
+          appendMessage("assistant", row.assistant_text, [], row.development_job_id);
           state.history.push({ role: "assistant", content: row.assistant_text });
         }
       }

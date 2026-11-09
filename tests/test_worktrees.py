@@ -124,9 +124,15 @@ def test_pull_request_needs_push_and_records_url(repo, tmp_path, monkeypatch):
     assert "add n" in preview and "→ main" in preview and "push 済み" in preview
     fake = tmp_path / "bin"
     fake.mkdir()
-    (fake / "gh").write_text("#!/bin/sh\necho https://github.com/example/myapp/pull/7\n")
-    (fake / "gh").chmod(0o755)
     monkeypatch.setattr(worktrees.shutil, "which", lambda name, path=None: str(fake / "gh") if name == "gh" else None)
+    run = worktrees.subprocess.run
+
+    def run_with_gh(argv, **kwargs):
+        if argv[0] == str(fake / "gh"):
+            return subprocess.CompletedProcess(argv, 0, b"https://github.com/example/myapp/pull/7\n", b"")
+        return run(argv, **kwargs)
+
+    monkeypatch.setattr(worktrees.subprocess, "run", run_with_gh)
     created = worktrees.create_pull_request(wid, "T", "B")
     assert created["url"].endswith("/pull/7") and created["pr_url"].endswith("/pull/7")
 
@@ -151,7 +157,7 @@ def test_hook_treats_worktree_as_l1_but_protects_git(repo):
     assert hooks.decide("Read", {"file_path": str(work / "app.py")}, home) == hooks.OUTSIDE_REASON
 
 
-def test_tools_over_mcp_bridge_push_without_approval_pr_with_approval(repo):
+def test_mcp_catalog_routes_new_development_through_proposal(repo):
     work, _ = repo
     store.create_thread("t-wt")
     store.accept("t-wt", "r-wt", {"message": "m", "is_admin": True})
@@ -164,15 +170,9 @@ def test_tools_over_mcp_bridge_push_without_approval_pr_with_approval(repo):
     def call(name, arguments):
         return client.post("/api/agent-bridge/tools/call", json={"name": name, "arguments": arguments}, headers=headers).json()
 
-    opened = call("open_worktree", {"repository": str(work), "task": "mcp"})["result"]
-    (petit_home.root() / opened["path"] / "m.txt").write_text("m")
-    committed = call("commit_worktree", {"worktree_id": opened["worktree_id"], "message": "add m"})["result"]
-    pushed = call("push_worktree", {"worktree_id": opened["worktree_id"], "commit": committed["commit"]})
-    assert pushed["isError"] is False and pushed["result"]["pushed"] is True
-    pr = call("create_worktree_pull_request", {"worktree_id": opened["worktree_id"], "title": "T", "body": "B"})
-    assert pr["result"]["status"] == "awaiting_user_approval"
-    (pending,) = store.approvals("r-wt")
-    assert "add m" in pending["preview"]
-    with db.get_connection() as connection:
-        receipts = [r["tool"] for r in connection.execute("SELECT tool FROM effect_receipts WHERE request_id='r-wt' ORDER BY rowid")]
-    assert receipts == ["open_worktree", "commit_worktree", "push_worktree"]
+    listed = client.post("/api/agent-bridge/tools/list", headers=headers).json()
+    assert "propose_development_job" in {entry["name"] for entry in listed["tools"]}
+    assert call("open_worktree", {"repository": str(work), "task": "mcp"})["isError"]
+    assert call("push_worktree", {})["isError"]
+    assert call("create_worktree_pull_request", {})["isError"]
+    assert not store.approvals("r-wt")

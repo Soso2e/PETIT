@@ -28,7 +28,39 @@ flowchart TD
     Ledger --> Final["/api/chat 応答で確定本文・used_tools・pending_actions・model_route を描画"]
 ```
 
-## Front Brain と CLI 委譲（v0.50.0開発版・#411）
+## 開発ジョブ（v0.52.0・#418）
+
+Chat の提案と Develop の直接依頼は同じ SQLite 台帳と Worker を使う。既存の一般作業の CLI 委譲は次節を参照。
+
+```mermaid
+flowchart TD
+    Roots[UIの coding_roots と環境設定を結合] --> Select[対象・プロンプト・モデル・Effort]
+    Chat[Chat が開発意図を判断] --> Select
+    Develop[Develop の送信フォーム] --> Select
+    Select --> Quota[CLI認証と利用枠のキャッシュからモデルを確定]
+    Quota --> Entry{入口}
+    Entry -->|Chat| Proposed[proposed を保存し返信と Develop に開始カード]
+    Proposed -->|承認| Queued[queued]
+    Proposed -->|取消| Cancelled[cancelled]
+    Entry -->|Develop| Queued
+    Queued -->|条件付き取得| Run[running]
+    Run --> Mode{対象モード}
+    Mode -->|Git| Git[開始コミットの clone と専用ブランチ]
+    Git --> GitTool[Core Tool で編集・静的検査・テスト・ビルド・commit]
+    GitTool --> Check{検査結果}
+    Check -->|成功| Review[ready_for_review]
+    Check -->|失敗| FailedChecks[checks_failed]
+    Mode -->|PC| PC[範囲内の検索・読み取りと scratch へのコピー]
+    PC -->|元ファイルやフォルダへの直接操作| Pending[waiting_approval と操作カード]
+    Pending -->|承認を一度消費| Effect[対象と内容を再検証し Core が実行]
+    Pending -->|拒否・期限切れ| Review
+    Effect -->|操作の結果を記録| Review
+    PC -->|承認対象なし| Review
+    Review -->|利用者のレビュー| Completed[completed]
+    Run -->|再起動| Interrupted[interrupted]
+```
+
+## Front Brain と一般作業の CLI 委譲（#411）
 
 `front_brain_deepseek` が ON のときだけ動く（既定 OFF）。委譲は作業用 Thread の通常の Turn なので、承認・receipt・取消・events は既存のものを使う。実行状態の正本は `turns.status`。詳細は [brain/front-brain-delegation.md](brain/front-brain-delegation.md)。
 
@@ -37,11 +69,12 @@ flowchart TD
     Turn[既存 Thread / Turn 受付] --> Order{front_brain_deepseek ON<br/>かつ mixed?}
     Order -->|no| Saved[保存済みの順位]
     Order -->|yes| Front[このTurnだけ DeepSeek を先頭に<br/>保存済みの順位は変えない]
-    Front --> Native[native Loop / 初回から定型Tool + delegate_to_agent<br/>gmail_get_message・worktree・Coding Job・Home書込は非公開<br/>HOME_HINT の代わりに FRONT_HINT]
+    Front --> Native[native Loop / 初回から定型Toolと一般作業の delegate_to_agent<br/>開発は propose_development_job]
     Front -->|DeepSeek 不可・Tool実行前| Fallback[既存の順位で次のBrain]
     Native -->|テキスト| Reply[回答・確認質問]
     Native -->|PETIT Tool| Gate[既存の検証・risk・承認・receipt]
     Gate --> Native
+    Native -->|propose_development_job| DevJob[開発ジョブの proposed へ]
     Native -->|delegate_to_agent| Create[同じ transaction で receipt・作業用Thread・queued Turn・delegations]
     Create --> Notice[返答末尾に Core が「…に任せました」を追記]
     Create -.->|2秒ごと| Worker[委譲 Worker / 同時1件 / 会話用Workerを使わない]
@@ -168,7 +201,9 @@ flowchart TD
     Codex -->|no| CW[従来の agent-workspace]
 ```
 
-## Worktree での開発（v0.46.0開発版・#401）
+## Worktree の旧経路（v0.46.0開発版・#401）
+
+過去のフロー。v0.52.0 の会話カタログでは新規 Worktree 操作を公開せず、上記の開発ジョブを使う。
 
 ```mermaid
 flowchart TD
@@ -302,6 +337,8 @@ flowchart TD
 ```
 
 CLIは専用Agentの直接Toolをfinishだけに絞る。Core ToolはJSON要求から既存native Loopで実行し、CLIが独自にShellやファイルを実行する経路を作らない。CLIに会話をargvで渡さず、APIキー・Core秘密値を子へ継承しない。各roundの外部conversation ID/usageは同じSQLite Eventsへ記録する。quotaはunknown。
+
+次の図は旧 Coding Job の入口を示す。新しい依頼は「開発ジョブ（v0.52.0・#418）」を参照。
 
 ```mermaid
 flowchart TD
@@ -543,21 +580,21 @@ Thread/Turn/Eventsの現行経路は上図を参照する。[Desktop・共通Cor
 
 [AI-First設計と比較PoC](core/ai-first-agent-design.md)（#338）の実験を経て、通常text経路を上図へ移行した。旧キーワードルーティングの図はv0.45.0の撤去に合わせて [archive/runtime-flows-legacy-routing.md](archive/runtime-flows-legacy-routing.md) へ移した。
 
-## ローカル開発観測（#341 / Opt-in、開発ブランチ）
+## ローカル開発観測（#341 / #418）
 
 ```mermaid
 flowchart TD
-    settings[明示設定: workspaceのGitルート最大8件] --> opt{PC観測 & 開発資料許可がON?}
-    opt -->|NO| disabled[参照不可 / 既存会話継続]
-    opt -->|YES| observer[既存WorkspaceObserverの定期refresh]
+    settings[UIの登録フォルダと環境設定を結合] --> observer[WorkspaceObserverの定期refresh]
     observer --> root{指定ディレクトリがGitルート?}
-    root -->|NO| unavailable[unavailable / not_repository_root]
+    root -->|NO| folder[登録フォルダの状態のみ]
     root -->|YES| git[git status / local HEAD・branches・log・tracking差分]
-    root --> docs[Concept / PROGRESS / README の固定3ファイルを上限付きで読む]
+    root -->|YES| docs[Concept / PROGRESS / README の固定3ファイルを上限付きで読む]
+    folder --> cache
     git --> cache[スナップショットメモリ cache: collected_at / stale]
     docs --> cache
     cache --> api[GET api/workspace-context]
     cache --> tool[Agent get_local_development_status safe_read]
+    cache -->|会話コンテキスト注入を有効化した場合| Context[会話へ限定情報を渡す]
     tool --> response[文書上の目標・作業状態・未検証を区別して答える]
 ```
 

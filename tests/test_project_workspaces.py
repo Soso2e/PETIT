@@ -97,12 +97,12 @@ class ProjectWorkspaceTests(unittest.TestCase):
         self.assertIn(task["id"], [item["id"] for item in result["tasks"]])
         self.assertTrue(get_local_development_status(project_id=task["project_id"])["ok"])
 
-    def test_removed_allowlist_missing_root_and_disabled_flags_fail_closed(self):
+    def test_removed_allowlist_fails_closed_but_chat_opt_in_does_not_gate_observation(self):
         folders.link(self.project["id"], str(self.first))
         with patch.object(config, "WORKSPACE_CONTEXT_DIRS", [self.second]):
             self.assertFalse(get_local_development_status(project_id=self.project["id"])["ok"])
         with patch.object(config, "WORKSPACE_CONTEXT_ENABLED", False):
-            self.assertEqual(get_local_development_status(project_id=self.project["id"])["status"], "disabled")
+            self.assertEqual(get_local_development_status(project_id=self.project["id"])["status"], "observed")
 
     def test_stale_cache_does_not_become_current_just_because_a_file_was_modified(self):
         folders.link(self.project["id"], str(self.first))

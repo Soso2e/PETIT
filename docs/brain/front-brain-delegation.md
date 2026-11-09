@@ -8,14 +8,16 @@
 >
 > 実装フローの正本は [runtime-flows.md](../runtime-flows.md)。本書は設計の理由と範囲を書く。
 
-## 0. 実装の状況（v0.50.0）
+## 0. 実装の状況（v0.52.0）
+
+開発・リポジトリ調査・PC ファイル作業は `propose_development_job` で開始確認を取り、Develop と同じジョブに保存する。以下の `delegate_to_agent` は一般作業の経路を説明する。[開発ジョブの仕様](../dev/coding-tasks.md)
 
 | 段 | 状態 |
 | --- | --- |
 | P0 計測 | **未実施**。§7 の評価と現行文脈での実測はまだ |
 | P1 Front Brain | 実装済み。設定のトグル（既定 OFF）で有効。トグル OFF の動作は変えていない |
 | P2 委譲 | 実装済み |
-| P3 の一部 | 親 Thread での承認は実装済み。**`continue_delegation`、Discord での承認、`delegate_coding_task` の整理は未実装** |
+| P3 の一部 | 親 Thread での承認は実装済み。`continue_delegation` と Discord での承認は未実装。開発は #418 で Coding Job に移した |
 | P4 既定の変更 | 未実施（`POLICY_ORDER` は変えていない） |
 
 確認済み: 単体・回帰テスト、合成 Provider での実ブラウザ操作（設定画面、依頼 → 即応答 → 状態表示 → 報告）。
@@ -118,7 +120,8 @@ flowchart TD
 | --- | --- |
 | 既存 | `get_current_time` `get_tasks` `get_schedule` `get_weather` `search_news` |
 | 追加（生活） | `get_work_status` `start_work_session` `update_work_session` `record_past_work` `create_task` `complete_task` `create_reminder` `search_memory` |
-| 追加（委譲） | `delegate_to_agent` `get_delegation_status` |
+| 追加（一般作業の委譲） | `delegate_to_agent` `get_delegation_status` |
+| 追加（開発の提案） | `list_coding_repositories` `propose_development_job` |
 
 - `add_schedule` は確認付きのため今回は Discovery のままとし、利用頻度を見て判断する。
 - `get_tasks` → `start_work_session` のように2コール以上かかる依頼は残る。DeepSeek の速度なら許容する。
@@ -250,17 +253,14 @@ CLIの報告（未検証）: ……
 | できる | できない（本設計では広げない） |
 | --- | --- |
 | PETIT Home の読み書き | Home と worktree の外のファイル探索（柱「ファイルを探して届ける」は未着手） |
-| 登録 repo の worktree での開発・`run_worktree_check` | Web 調査（`claude_agent` は WebFetch / WebSearch を拒否） |
+| メール本文の確認 | Web 調査（`claude_agent` は WebFetch / WebSearch を拒否） |
 | PETIT Tool を組み合わせた複数ステップ作業 | Windows での Bash（`sandbox_ready` が False） |
 
-PC 上のファイルを探す依頼は委譲しても達成できない。Tool の説明に範囲を明記し、範囲外はその場で「まだできない」と答えさせる。
+リポジトリの調査・開発と PC 上のファイル探索は開発ジョブの対象。
 
 ### 5.10 `delegate_coding_task` との関係
 
-当面は併存する。
-
-- P2 の `delegate_to_agent` はコード変更を対象にしない。
-- P3 で worktree 開発を開放するときに、どちらかへ統合するか決める。Tool が2つ並ぶと、Front Brain が迷うため。
+`propose_development_job` が開発の公開入口になる。旧 `delegate_coding_task` と旧 Worktree の変更 Tool は会話カタログから外し、既存ジョブとリポジトリの記録を保持する。
 
 ---
 

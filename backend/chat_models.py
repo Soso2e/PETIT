@@ -17,6 +17,7 @@ class ChatResponse(BaseModel):
     used_tools: list[dict[str, Any]] = Field(default_factory=list)
     error: str | None = None
     model_route: dict[str, Any] | None = None
+    development_job_id: str | None = None
     request_id: str | None = None
     thread_id: str | None = None
     status: str | None = None

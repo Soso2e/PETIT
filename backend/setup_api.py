@@ -225,9 +225,23 @@ def antigravity_cli_status():
 
 @router.get("/claude-code", dependencies=[Depends(_admin)])
 def claude_code_status():
-    # File existence only. No login, prompt, process, credential inspection or network.
     from . import claude_code_brain
-    return claude_code_brain.status(settings.load())
+    return {**claude_code_brain.status(settings.load()), **{
+        key: value for key, value in claude_code_brain.auth_status().items()
+        if key in {"authentication", "login_running", "restricted_supported"}
+    }}
+
+
+@router.post("/claude-code/auth/{action}", dependencies=[Depends(_admin), Depends(_same_origin)])
+def claude_code_auth(action: Literal["login", "logout"]):
+    import subprocess
+    from . import claude_code_brain, development_models
+    try:
+        result = claude_code_brain.auth_login() if action == "login" else claude_code_brain.auth_logout()
+    except (OSError, ValueError, subprocess.SubprocessError):
+        raise HTTPException(400, "Claude Code CLIの認証操作を開始できません。サーバーPCのCLIを確認してください。") from None
+    development_models.invalidate()
+    return result
 
 
 class SettingsUpdate(BaseModel):
@@ -441,9 +455,11 @@ def disconnect(service: str):
     try:
         if service in google_services.SCOPES:
             google_services.disconnect(service)
-        elif service == "codex":
+        elif service == "codex" and os.getenv("PETIT_CODEX_HOME"):
             from . import codex_brain
             codex_brain.logout()
+        elif service == "codex":
+            remote_confirmed = False  # Standard CLI credentials are shared with the user's local CLI.
     except Exception:
         remote_confirmed = False
     credentials = {"deepseek": {"deepseek_key": ""}, "antigravity": {"antigravity_key": ""},

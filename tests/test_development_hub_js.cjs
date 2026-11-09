@@ -76,7 +76,7 @@ test("missing development data remains visibly unverified, including explicit nu
 });
 
 test("snapshot and document catalog are bounded", () => {
-  const workspaces = Array.from({ length: 15 }, (_, i) => ({
+  const workspaces = Array.from({ length: 20 }, (_, i) => ({
     name: "repo-" + i,
     status: "ok",
     development: {
@@ -85,7 +85,7 @@ test("snapshot and document catalog are bounded", () => {
     },
   }));
   const result = project({ enabled: true, status: "observed", stale: false, workspaces });
-  assert.equal(result.projects.length, 8);
+  assert.equal(result.projects.length, 16);
   assert.equal(result.projects[0].documents.length, 2);
   assert.equal(result.projects[0].commits.length, 5);
 });

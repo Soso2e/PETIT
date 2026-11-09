@@ -18,6 +18,7 @@
       "/static/universe.css",
       "/static/chat_attachments.css",
       "/static/delegations.css",
+      "/static/development.css",
       "/static/universe-actions.css",
       "/static/universe-next.css",
       "/static/notifications.css",
@@ -218,14 +219,36 @@
           <div>
             <span class="eyebrow">DEVELOPMENT HUB</span>
             <h1>Develop / 開発プロジェクト</h1>
-            <p><a href="/static/development.html">CLIへの開発依頼・確認・差分レビューを開く</a></p>
-            <p>登録済みローカルGitの状況を一か所で確認。開発実行・PR操作はまだ行いません。</p>
+            <p>開発の依頼、開始確認、進捗、差分レビュー</p>
           </div>
-          <button id="development-refresh" type="button">観測結果を更新</button>
+          <button id="development-refresh" type="button">状態を更新</button>
         </div>
+        <form id="development-request" class="development-request">
+          <div class="development-options">
+            <label>対象フォルダ<select name="repository"><option value="">指定なし（PC内の全ファイルを見る）</option></select></label>
+            <label>モデル<select name="model_key"><option value="auto">自動（残量優先）</option></select></label>
+            <label>Effort<select name="effort"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label>
+          </div>
+          <label><input type="checkbox" name="lightweight"> 軽量な読み取り調査</label>
+          <label>開発プロンプト<textarea name="goal" rows="3" required maxlength="8000" placeholder="目的・期待する結果・制約"></textarea></label>
+          <p>Gitは開始コミットの専用ブランチで作業します。PCファイルの直接操作は別途確認します。CLIに依頼内容と作業に必要なファイル内容が渡ります。</p>
+          <button type="submit">開発を依頼する</button>
+        </form>
+        <details class="development-request">
+          <summary>フォルダを管理</summary>
+          <form id="development-roots">
+            <label>サーバーPC上の絶対パス<input name="path" required maxlength="1000" placeholder="C:\Projects\example"></label>
+            <button type="submit">フォルダを追加</button>
+          </form>
+          <ul id="development-root-list"></ul>
+        </details>
+        <p id="development-job-notice" role="status" aria-live="polite"></p>
+        <p id="development-usage" aria-live="polite"></p>
+        <section aria-label="開発ジョブ"><h2>開発ジョブ</h2><div id="development-jobs"></div></section>
+        <h2>ローカル観測</h2>
         <p id="development-state" class="development-state" role="status" aria-live="polite">表示の準備中</p>
         <div id="development-projects" class="development-projects"></div>
-        <p class="development-note">参照元：PC上の許可済みWorkspaceObserverのキャッシュ。Git fetchは行いません。文書は未検証の記述、ahead/behindは最後に保存した追跡refとの差分です。Codex等の稼働セッションやジョブ実行は後続PRで接続します。</p>
+        <p class="development-note">観測は登録フォルダのローカル状態です。ahead/behind は最後に保存した追跡 ref との差分です。</p>
       </section>
 
       <section class="view" data-view-panel="reminders" hidden>
@@ -489,6 +512,7 @@
       "/static/chat_input.js",
       "/static/chat_attachments.js",
       "/static/delegations.js",
+      "/static/development.js",
       "/static/notifications.js",
       "/static/universe-app.js",
       "/static/universe-next.js",

@@ -392,11 +392,13 @@ def present_conversation(row: dict) -> dict:
     if str(row.get("user_text") or "").startswith("[PETIT_INTERNAL_EVENT]"):
         row = {**row, "user_text": "", "kind": "internal_event"}
     raw_result = row.pop("result_json", None)
-    if raw_result and not row.get("model_route"):
+    if raw_result:
         try:
             data = json.loads(raw_result)
-            if isinstance(data, dict) and "model_route" in data:
-                row["model_route"] = data["model_route"]
+            if isinstance(data, dict):
+                for key in ("model_route", "development_job_id"):
+                    if key in data and key not in row:
+                        row[key] = data[key]
         except Exception:
             pass
     return row

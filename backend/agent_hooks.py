@@ -27,8 +27,7 @@ SECRET_NAMES = re.compile(r"(^|/)(\.env[^/]*|.*\.pem|.*\.key|id_[a-z0-9]+|\.netr
 
 PERSONA_REASON = ("人格ファイルは直接書き換えられません。update_persona_file で"
                   "変更後の全文を渡すと、Core が差分を見せて承認を取ります。")
-OUTSIDE_REASON = ("PETIT Home の外は使えません。リポジトリを触るときは open_worktree で Home の worktrees/ に"
-                  "作業用 worktree を作ってください。")
+OUTSIDE_REASON = "PETIT Home の外は使えません。リポジトリ・PCファイルの作業は Develop の開発ジョブを使ってください。"
 L2_REASON = ("外部への送信・公開・リモート操作はこの場では実行できません（L2）。push は push_worktree、PR は "
              "create_worktree_pull_request（承認つき）など PETIT の Tool を使うか、ユーザーに必要な操作を伝えてください。")
 L3_REASON = "取り返しのつかない操作・秘密情報へのアクセスは常に禁止されています（L3）。"
