@@ -50,7 +50,7 @@ class UnivSpaceTests(unittest.TestCase):
         self.assertIn('data-univ-action="focus"', fallback)
         self.assertIn('data-univ-action="manage"', fallback)
         self.assertIn("new THREE.PerspectiveCamera", webgl)
-        self.assertIn("new OrbitControls", webgl)
+        self.assertIn("createCameraController(state.camera, state.inputSurface)", webgl)
         self.assertIn("new THREE.Raycaster", webgl)
         self.assertIn("startCameraTween", webgl)
         self.assertIn("focusEntry", webgl)

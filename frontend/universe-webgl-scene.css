@@ -124,6 +124,15 @@
   user-select: none;
 }
 
+/* univ-space.css sets pointer-events: auto on the legacy planet/satellite
+   buttons, which overrides the inherited none above. Those invisible buttons
+   covered ~15% of the 3D view: drags starting on them never reached the
+   camera, second fingers on them were lost, and taps on "empty" sky selected
+   whichever task's hidden button sat there. Disable every descendant too. */
+.petit-univ-webgl-ready .univ-viewport #constellation-grid.univ-space * {
+  pointer-events: none !important;
+}
+
 /* WebGL owns the scene backdrop after it is ready. Leaving the CSS stars or
    gradient visible here makes a second universe show through the canvas. */
 .petit-univ-webgl-ready .univ-viewport {
