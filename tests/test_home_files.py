@@ -75,8 +75,8 @@ def test_codex_agent_mode_works_in_home(fake):
     api.submit("codex-home", "r-home", "こんにちは", is_admin=True)
     start = next(params for method, params in fake.calls if method == "thread/start")
     assert start["cwd"] == str(petit_home.root().resolve()) or start["cwd"] == str(petit_home.root())
-    assert "write_home_file" in start["developerInstructions"] and "open_worktree" in start["developerInstructions"]
-    assert start["sandbox"] == "read-only" and start["approvalPolicy"] == "never"
+    assert "write_home_file" in start["developerInstructions"] and "propose_development_job" in start["developerInstructions"]
+    assert start["permissions"] == codex_brain.PERMISSIONS and start["approvalPolicy"] == "never"
 
 
 def test_codex_agent_mode_off_keeps_managed_workspace(fake):

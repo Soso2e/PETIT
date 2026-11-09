@@ -61,13 +61,14 @@ class WorkspaceContextTests(unittest.TestCase):
         child = self.root / "child"
         child.mkdir()
         result = context.observe_workspace(child)
-        self.assertEqual(result["error"], "not_repository_root")
-        self.assertNotIn("files", result)
+        self.assertEqual(result["status"], "folder")
+        self.assertEqual(result["files"], [])
+        self.assertNotIn("development", result)
 
     def test_conflicts_renames_private_paths_and_unicode(self):
         output = ("## main\0UU 競合.py\0R  新規.py\0旧名.py\0"
                   "?? .env.production\0?? secrets/\0 M key.pem\0 M ordinary.py\0").encode()
-        with patch.object(context, "_command", side_effect=[str(self.root).encode(), output]):
+        with patch.object(context, "_command", side_effect=[str(self.root).encode(), output] + [b""] * 12):
             result = context.observe_workspace(self.root)
         self.assertEqual(result["conflicts"], 1)
         self.assertEqual(result["changed_entries"], 6)
@@ -76,7 +77,7 @@ class WorkspaceContextTests(unittest.TestCase):
 
     def test_file_list_is_bounded(self):
         output = b"## main\0" + b"".join(f" M file-{i}.py\0".encode() for i in range(20))
-        with patch.object(context, "_command", side_effect=[str(self.root).encode(), output]):
+        with patch.object(context, "_command", side_effect=[str(self.root).encode(), output] + [b""] * 12):
             result = context.observe_workspace(self.root)
         self.assertEqual(result["changed_entries"], 20)
         self.assertEqual(len(result["files"]), 8)
@@ -99,18 +100,22 @@ class WorkspaceContextTests(unittest.TestCase):
             ]),
         ):
             self.observer.refresh()
-        snapshot = self.observer.snapshot()
+            snapshot = self.observer.snapshot()
         self.assertEqual(snapshot["workspaces"][0]["changed_entries"], 2)
         self.assertEqual(snapshot["workspaces"][1]["status"], "unavailable")
 
-    def test_disabled_does_not_observe_or_inject_or_return_old_data(self):
-        with patch.object(config, "WORKSPACE_CONTEXT_ENABLED", False), patch.object(context, "_command") as command:
-            self.observer.start()
+    def test_registered_roots_are_observed_without_chat_opt_in(self):
+        from backend import setup_store
+        self.init_repo()
+        with (patch.object(config, "WORKSPACE_CONTEXT_ENABLED", False),
+              patch.object(config, "WORKSPACE_LOCAL_DEVELOPMENT_ENABLED", False),
+              patch.object(config, "WORKSPACE_CONTEXT_DIRS", []),
+              patch.object(setup_store, "load", return_value={"coding_roots": [str(self.root)]})):
             self.observer.refresh()
             self.assertEqual(context.build_context_block(), "")
-            self.assertEqual(context.get_workspace_context(), {"enabled": False, "status": "disabled"})
-        command.assert_not_called()
-        self.assertIsNone(self.observer._thread)
+            snapshot = context.get_workspace_context()
+            self.assertTrue(snapshot["enabled"])
+            self.assertIn("development", snapshot["workspaces"][0])
 
     def test_stale_observations_are_not_injected_as_current_facts(self):
         self.observer._snapshot = {

@@ -1,4 +1,4 @@
-"""Official Codex app-server stdio integration; dedicated PETIT auth home."""
+"""Official Codex app-server stdio integration and CLI-managed authentication."""
 from __future__ import annotations
 
 import json
@@ -9,12 +9,31 @@ import queue
 import shutil
 import subprocess
 import threading
+import tempfile
 import time
 
 from . import setup_store as settings, conversation_store as store, lmstudio_client, db
 
 _auth = None
+_auth_workspace = None
 _auth_lock = threading.RLock()
+PERMISSIONS = "petit_core_read"
+
+
+def _configured_home():
+    override = os.getenv("PETIT_CODEX_HOME", "").strip()
+    return Path(override).expanduser().resolve() if override else None
+
+
+def instruction_sources(result):
+    """Permit the user's normal Codex instructions alongside our managed workspace."""
+    sources = result.get("instructionSources")
+    if not isinstance(sources, list):
+        raise lmstudio_client.LMStudioError("Codexの指示ファイルの読込先を確認できません。")
+    home = _configured_home() or Path.home() / ".codex"
+    user_docs = {home / name for name in ("AGENTS.md", "AGENTS.override.md")}
+    allowed = {path.resolve() for path in user_docs if not path.is_symlink()}
+    return {Path(path).resolve() for path in sources} - allowed
 
 
 def executable() -> str | None:
@@ -56,8 +75,6 @@ class RPC:
         binary = executable()
         if not binary:
             raise lmstudio_client.LMStudioError("Codex CLIが未導入です。公式CLIをサーバーへ導入してください。")
-        home = settings.root() / "codex"
-        home.mkdir(parents=True, mode=0o700, exist_ok=True)
         from .agent_workspace import prepare
         self.workspace = Path(workspace) if workspace is not None else prepare()
         if web_search not in {"disabled", "cached", "live"}:
@@ -65,10 +82,15 @@ class RPC:
         self.events, self.counter, self.pending = queue.Queue(), 0, []
         env = {k: v for k, v in os.environ.items() if k.upper() in {
             "PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOME", "LOCALAPPDATA", "APPDATA", "PROGRAMFILES"}}
-        env.update(CODEX_HOME=str(home), PYTHONUTF8="1")
+        env["PYTHONUTF8"] = "1"
+        if home := _configured_home():
+            env["CODEX_HOME"] = str(home)
         flags = ["features.shell_tool=false", "features.multi_agent=false", "features.apps=false", "features.plugins=false",
-                 "features.memories=false", 'project_root_markers=["AGENTS.md"]', 'web_search=' + json.dumps(web_search), 'cli_auth_credentials_store="keyring"',
-                 'approval_policy="never"', 'sandbox_mode="read-only"']
+                 "features.memories=false", "features.hooks=false", "mcp_servers={}",
+                 'project_root_markers=["AGENTS.md"]', 'web_search=' + json.dumps(web_search),
+                 'approval_policy="never"', 'sandbox_mode="read-only"',
+                 f'permissions.{PERMISSIONS}.filesystem={{ {json.dumps(self.workspace.resolve().as_posix(), ensure_ascii=False)} = "read" }}',
+                 f"permissions.{PERMISSIONS}.network.enabled=false"]
         argv = [binary, "app-server", "--listen", "stdio://"]
         for flag in flags:
             argv.extend(["-c", flag])
@@ -140,10 +162,15 @@ class RPC:
 
 
 def auth_client():
-    global _auth
+    global _auth, _auth_workspace
     with _auth_lock:
         if _auth is None or _auth.process.poll() is not None:
-            _auth = RPC()
+            if _auth is not None:
+                _auth.close()
+            if _auth_workspace is not None:
+                _auth_workspace.cleanup()
+            _auth_workspace = tempfile.TemporaryDirectory(prefix="petit-codex-auth-")
+            _auth = RPC(workspace=_auth_workspace.name)
         return _auth
 
 
@@ -176,25 +203,25 @@ def diagnose():
     result = status()
     if not result["installed"]:
         return {**result, "error": "Codex CLIが見つかりません。サーバーのPATH・標準配置先またはPETIT_CODEX_EXECUTABLEを確認してください。"}
-    client = None
     try:
-        client = RPC()
-        acct = client.request("account/read", {"refreshToken": False}).get("account") or {}
-        return {**result, "authenticated": acct.get("type") == "chatgpt", "auth_mode": acct.get("type"),
-                "plan": acct.get("planType"), "protocol_ready": True}
+        with tempfile.TemporaryDirectory(prefix="petit-codex-diagnose-") as workspace:
+            client = RPC(workspace=workspace)
+            try:
+                acct = client.request("account/read", {"refreshToken": False}).get("account") or {}
+                return {**result, "authenticated": acct.get("type") == "chatgpt", "auth_mode": acct.get("type"),
+                        "plan": acct.get("planType"), "protocol_ready": True}
+            finally:
+                client.close()
     except PermissionError:
-        return {**result, "error": "PETIT専用Codex設定フォルダにアクセスできません。Core実行ユーザーとフォルダ権限を確認してください。"}
+        return {**result, "error": "Codex設定フォルダにアクセスできません。Core実行ユーザーとフォルダ権限を確認してください。"}
     except (OSError, lmstudio_client.LMStudioError):
         return {**result, "error": "Codex CLIとの接続に失敗しました。公式CLIの導入・互換性を確認してください。"}
-    finally:
-        if client is not None:
-            client.close()
 
 HOME_RULES = """
 PETIT Home（作業ディレクトリ）で動くエージェントとして振る舞う。ファイル操作はすべて petit_read_tool 経由の Core Tool で行う。
 - Home の読み書き（L0）: list_home_files / read_home_file / search_home_files / write_home_file / edit_home_file。memory/ や skills/ に覚えたこと・手順を残してよい。
 - 人格ファイル（AGENTS.md / SOUL.md / USER.md）は update_persona_file に変更後の全文を渡す（差分承認）。
-- 開発（L1）: list_coding_repositories → open_worktree → worktrees/ のファイルを read/edit/write_home_file で編集 → run_worktree_check → commit_worktree → push_worktree（petit/ ブランチだけ）。PR は create_worktree_pull_request（承認つき）。
+- 開発: list_coding_repositories で対象を確認し、propose_development_job で利用者の開始確認を取る。
 - テスト結果は実際の出力どおりに伝える。拒否された操作を別の方法で回避しない。
 """
 
@@ -240,7 +267,7 @@ def run(request_id, target, *, messages=None, used_tools=None):
         dynamic_tools = [{"name": "petit_read_tool", "description": "PETITのToolをCore経由で実行",
                       "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "arguments_json": {"type": "string"}},
                                       "required": ["name", "arguments_json"], "additionalProperties": False}}] if request_context.current_is_admin() else []
-        parameters = {"cwd": str(workspace), "approvalPolicy": "never", "sandbox": "read-only",
+        parameters = {"cwd": str(workspace), "approvalPolicy": "never", "permissions": PERMISSIONS,
                       "developerInstructions": instructions}
         if not saved:
             parameters.update(ephemeral=False, dynamicTools=dynamic_tools)
@@ -263,15 +290,14 @@ def run(request_id, target, *, messages=None, used_tools=None):
         if saved and thread != saved["session_id"]:
             raise lmstudio_client.LMStudioError("Codex Threadの対応が一致しません。")
         agent_workspace.assert_owner(row["thread_id"], "codex", thread)
-        sources = result.get("instructionSources")
-        if not isinstance(sources, list) or {Path(x).resolve() for x in sources} != {(workspace / "AGENTS.md").resolve()}:
+        sources = instruction_sources(result)
+        if sources != {(workspace / "AGENTS.md").resolve()}:
             raise lmstudio_client.LMStudioError("WorkspaceのAGENTS.md読込を確認できません。")
         with db.get_connection() as c:
             store.event(c, row["thread_id"], request_id, "external_session", {"provider":"codex", "resumed":bool(saved),
                 "session_id":thread, "instruction_sources_verified":sources is not None})
         client.request("turn/start", {"threadId": thread, "input": [{"type": "text", "text": prompt}],
-                        "sandboxPolicy": {"type": "readOnly", "access": {"type": "restricted", "includePlatformDefaults": False,
-                                                                                    "readableRoots": [str(workspace)]}}})
+                                      "permissions": PERMISSIONS})
         deadline = started + 180
         while time.monotonic() < deadline:
             if store.load_turn(request_id)["cancel_requested"]:
@@ -339,8 +365,11 @@ def run(request_id, target, *, messages=None, used_tools=None):
 
 
 def shutdown():
-    global _auth
+    global _auth, _auth_workspace
     with _auth_lock:
         if _auth:
             _auth.close()
             _auth = None
+        if _auth_workspace:
+            _auth_workspace.cleanup()
+            _auth_workspace = None

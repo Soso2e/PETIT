@@ -11,7 +11,7 @@
     <div class="setup-topbar">
       <div class="setup-topbar-links">
         <a href="/static/universe.html" id="back" class="back-btn">← PETITに戻る</a>
-        <a href="/static/development.html" class="sub-link">開発タスク</a>
+        <a href="/static/universe.html?view=development" class="sub-link">開発タスク</a>
       </div>
       <span id="setup-mode-badge" class="status-badge">設定管理</span>
     </div>
@@ -181,7 +181,7 @@
             <button id="codex-confirm">認証完了を確認</button>
             <button data-test="codex">接続テスト</button>
             <button id="codex-diagnose" class="quiet">CLI導入・認証状態を確認（推論なし）</button>
-            <button data-disconnect="codex" class="quiet">切断</button>
+            <button data-disconnect="codex" class="quiet">PETITから切断</button>
           </div>
           <p id="codex-code" role="status"></p>
           <a id="codex-link" target="_blank" rel="noopener noreferrer" hidden>公式認証ページを開く</a>
@@ -218,7 +218,9 @@
           <div class="actions">
             <button data-connect="claude_code">CLIへ接続（Codexの次に配置）</button>
             <button data-test="claude_code">接続テスト</button>
-            <button id="claude-code-diagnose" class="quiet">インストール状態を再確認</button>
+            <button id="claude-code-login">Claude Code CLIにログイン</button>
+            <button id="claude-code-diagnose" class="quiet">ログイン状態を確認</button>
+            <button id="claude-code-logout" class="quiet">CLIからログアウト</button>
             <button data-disconnect="claude_code" class="quiet">PETITから切断</button>
           </div>
           <div class="sub-box">
@@ -237,7 +239,7 @@
           </div>
           <details class="card-details">
             <summary>💡 ログイン手順と注意事項</summary>
-            <p class="muted">サーバーPCで <code>claude</code> を起動してログインしてください。APIキーは渡さず公式CLIのログインだけを使います。</p>
+            <p class="muted">ログインすると、サーバーPC上で公式CLIの認証ブラウザが開きます。古いCLIはサーバーPCで <code>claude update</code> を実行して更新できます。</p>
           </details>
         </section>
 

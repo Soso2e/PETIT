@@ -14,6 +14,8 @@ import os
 import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -149,7 +151,9 @@ def validate_check_command(argv: list[str]) -> list[str]:
     if not argv or not all(isinstance(x, str) and x and "\0" not in x for x in argv) or len(argv) > 40:
         raise WorktreeError("command は空でない文字列の配列で渡してください。")
     head = argv[0]
-    name = Path(head).name
+    if head != "./gradlew" and ("/" in head or "\\" in head or ":" in head):
+        raise WorktreeError("実行ファイルはパスではなく名前で指定してください。")
+    name = head.lower().removesuffix(".exe") if os.name == "nt" else head
     if name in {"python", "python3", "py"}:
         if len(argv) >= 3 and argv[1] == "-m" and argv[2] in PYTHON_MODULES:
             return argv
@@ -166,33 +170,77 @@ def validate_check_command(argv: list[str]) -> list[str]:
         if len(argv) >= 2 and argv[1] in GO_CARGO_SUBCOMMANDS:
             return argv
         raise WorktreeError("go / cargo は test / vet / build / check などだけ実行できます。")
-    if head in DIRECT_RUNNERS or name in DIRECT_RUNNERS:
-        if "/" in head and head != "./gradlew":
-            raise WorktreeError("実行ファイルはパスではなく名前で指定してください。")
+    if name in DIRECT_RUNNERS:
         return argv
     raise WorktreeError("テスト・ビルド・静的検査のコマンドだけ実行できます（pytest / npm test / go test など）。")
+
+
+def validate_job_check_command(argv):
+    argv = validate_check_command(argv)
+    runner = argv[0].lower().removesuffix(".exe")
+    arguments = argv[1:]
+    allowed_scripts = {"test", "build", "lint", "check", "typecheck", "format", "verify"}
+    if runner in SCRIPT_RUNNERS and arguments[0] != "test":
+        if arguments[0] != "run" or arguments[1].split(":", 1)[0] not in allowed_scripts:
+            raise WorktreeError("リポジトリのテスト・ビルド・検査スクリプトを指定してください。")
+    if runner == "npx" or (runner in {"node", "deno"} and (not arguments or arguments[0] not in {"--test", "--check", "test", "check"})):
+        raise WorktreeError("パッケージの取得・任意スクリプトの実行はできません。")
+    if runner == "make" and (not arguments or any(arg not in allowed_scripts for arg in arguments)):
+        raise WorktreeError("make のテスト・ビルド・検査ターゲットを指定してください。")
+    for arg in arguments:
+        candidate = Path(arg.partition("=")[2] if arg.startswith("-") and "=" in arg else arg)
+        if candidate.anchor or ".." in candidate.parts:
+            raise WorktreeError("検査のパスは作業ブランチ内の相対パスで指定してください。")
+    return argv
 
 
 def run_check(worktree_id: str, command: list[str]) -> dict:
     """L1: run a test/build/lint command in the worktree. No shell; no Core secrets."""
     item = _row(worktree_id)
+    return {"worktree_id": worktree_id, **run_check_in(item["path"], command)}
+
+
+def run_check_in(workspace, command, *, check=lambda: None):
+    from .cli_job import ProcessJob
     argv = validate_check_command(command)
     if argv[0] == "./gradlew":
-        wrapper = Path(item["path"]) / "gradlew"
+        wrapper = Path(workspace) / "gradlew"
         executable = str(wrapper) if wrapper.is_file() and not wrapper.is_symlink() else None
     else:
         executable = shutil.which(argv[0], path=_env().get("PATH"))
+    if argv[0].lower() in {"python", "python.exe"}:
+        executable = sys.executable
     if not executable:
         raise WorktreeError(f"{argv[0]} が見つかりません。")
     started = time.monotonic()
-    try:
-        proc = subprocess.run([executable, *argv[1:]], cwd=item["path"], env=_env(), capture_output=True,
-                              timeout=TEST_TIMEOUT, **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
-        code, out, err, timed_out = proc.returncode, proc.stdout, proc.stderr, False
-    except subprocess.TimeoutExpired as exc:
-        code, out, err, timed_out = None, exc.stdout or b"", exc.stderr or b"", True
-    text = (out + b"\n" + err).decode("utf-8", "replace")
-    return {"worktree_id": worktree_id, "command": argv, "exit_code": code, "passed": code == 0, "timed_out": timed_out,
+    # Windows batch shims do not have safe argv semantics.
+    command_line = [executable, *argv[1:]]
+    if os.name == "nt" and Path(executable).suffix.lower() in {".bat", ".cmd"}:
+        node = shutil.which("node.exe")
+        script = Path(executable).parent / "node_modules" / "npm" / "bin" / (argv[0] + "-cli.js")
+        if argv[0] not in {"npm", "npx"} or not node or not script.is_file():
+            raise WorktreeError("Windowsではネイティブのテストランナーを指定してください。")
+        command_line = [node, str(script), *argv[1:]]
+    with tempfile.TemporaryFile() as output:
+        proc = subprocess.Popen(command_line, cwd=workspace, env={**_env(), "PYTHONDONTWRITEBYTECODE": "1"},
+                                stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT,
+                                **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}))
+        job = None
+        try:
+            job = ProcessJob(proc)
+            while proc.poll() is None and time.monotonic() - started < TEST_TIMEOUT:
+                check()
+                time.sleep(.1)
+            code = proc.poll()
+        finally:
+            if job:
+                job.close()
+            elif proc.poll() is None:
+                proc.kill()
+            proc.wait()
+        output.seek(max(0, output.seek(0, os.SEEK_END) - OUTPUT_LIMIT))
+        text = output.read(OUTPUT_LIMIT).decode("utf-8", "replace")
+    return {"command": argv, "exit_code": code, "passed": code == 0, "timed_out": code is None,
             "seconds": round(time.monotonic() - started, 2),
             # Tail keeps the summary line most runners print last.
             "output": text[-OUTPUT_LIMIT:]}
@@ -200,15 +248,18 @@ def run_check(worktree_id: str, command: list[str]) -> dict:
 
 def commit(worktree_id: str, message: str) -> dict:
     item = _row(worktree_id)
-    path = Path(item["path"])
+    return {**commit_in(Path(item["path"]), message), **_public(item)}
+
+
+def commit_in(path, message, *, run_git=_git):
     message = message.strip()
     if not message:
         raise WorktreeError("commit メッセージを入れてください。")
-    if not _git(path, "status", "--porcelain").strip():
+    if not run_git(path, "status", "--porcelain").strip():
         return {"committed": False, "reason": "変更がありません。"}
-    _git(path, "add", "-A")
-    _git(path, "-c", "user.name=PETIT", "-c", "user.email=petit@localhost", "commit", "-q", "-m", message[:2000])
-    return {"committed": True, "commit": _git(path, "rev-parse", "HEAD").strip(), **_public(item)}
+    run_git(path, "add", "-A")
+    run_git(path, "-c", "user.name=PETIT", "-c", "user.email=petit@localhost", "commit", "-q", "-m", message[:2000])
+    return {"committed": True, "commit": run_git(path, "rev-parse", "HEAD").strip()}
 
 
 def _check_push_target(item: dict) -> str:

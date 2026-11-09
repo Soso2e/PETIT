@@ -11,11 +11,14 @@ def test_codex_coding_bridge_and_cleanup(monkeypatch):
     FakeRPC.scripts=[[tool("list_files",tool="petit_coding_tool"),delta("変更内容と未確認事項"),complete()]]
     monkeypatch.setattr(codex_brain,"RPC",FakeRPC)
     invoke=Mock(return_value={"files":["answer.py"]})
-    result=coding_agents.run("codex",{"model":""},"合成開発",invoke,lambda:None,lambda kind:None)
+    result=coding_agents.run("codex",{"model":"gpt-6.1-sol", "effort":"high"},"合成開発",invoke,lambda:None,lambda kind:None)
     assert result == "変更内容と未確認事項" and FakeRPC.clients[0].closed
     invoke.assert_called_once_with("list_files",{})
     params=next(p for method,p in FakeRPC.clients[0].requests if method=="thread/start")
     assert params["dynamicTools"][0]["name"] == "petit_coding_tool"
+    assert params["model"] == "gpt-6.1-sol"
+    turn = next(p for method, p in FakeRPC.clients[0].requests if method == "turn/start")
+    assert turn["effort"] == "high"
 
 
 def test_codex_coding_cancel_closes_client(monkeypatch):

@@ -95,7 +95,8 @@ def test_first_call_has_routine_writes_and_hand_off_but_no_mail_body(ready, mode
     setup_store.update({"connected": ["deepseek", "claude_code", "gmail"]}, {"google_tokens": {"scopes": []}})
     replies.append({"role": "assistant", "content": "はい"})
     submit()
-    assert {"start_work_session", "create_task", "record_past_work", "delegate_to_agent"} <= set(calls[0]["tools"])
+    assert {"start_work_session", "create_task", "record_past_work", "delegate_to_agent",
+            "propose_development_job", "list_coding_repositories"} <= set(calls[0]["tools"])
     assert "add_schedule" not in calls[0]["tools"]
     assert "gmail_get_message:" not in calls[0]["system"] and "gmail_search:" in calls[0]["system"]
     assert "delegate_to_agentでCLIに任せる" in calls[0]["system"]
@@ -112,7 +113,8 @@ def test_toggle_off_has_no_hand_off_tool(ready, model):
     submit()
     assert "delegate_to_agent" not in calls[0]["tools"] and "delegate_to_agent" not in calls[0]["system"]
     assert "start_work_session" not in calls[0]["tools"]
-    assert "open_worktree:" in calls[0]["system"] and "*_home_file Tool" in calls[0]["system"]
+    assert "propose_development_job:" in calls[0]["system"] and "*_home_file Tool" in calls[0]["system"]
+    assert "open_worktree:" not in calls[0]["system"]
 
 
 def client():

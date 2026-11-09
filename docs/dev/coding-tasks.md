@@ -1,34 +1,35 @@
-# CLIによるローカル開発タスク（#225 / #362）
+# CLIによるローカル開発ジョブ（#418）
 
-## 責務と既存機能の再利用
+管理者は Develop タブの「フォルダを管理」からサーバーPCの絶対パスを登録する。設定の `coding_roots` と既存の `PETIT_WORKSPACE_CONTEXT_DIRS` を合わせて表示する。環境変数の有効化フラグは Develop の利用条件に含まれない。観測を会話コンテキストへ注入する設定と、Develop の観測は別扱いとする。
 
-会話のBrainと開発Jobの実行Providerを別々に選択する。BrainがCodexでも、承認した開発JobをAntigravity CLIへ渡せる。既存のThread/Turn/Approval/Effect Receipt、tasks_cache、SQLiteを正本として使い、別DBは作らない。既存機能の削除・置換は不要。
+## 依頼と実行
 
-- `coding_jobs.py`: 同じSQLiteのJob/イベント、明示許可したrepository、専用コピー、取消/復旧、作業ファイルの検証。
-- `coding_agents.py`: Codex app-server dynamic ToolまたはAntigravity CLI構造化出力。両方とも直接のShell/ファイルToolを公開せず、Jobに限定したCoreのToolを呼ぶ。
-- `coding_api.py` / `tools/coding.py`: Webと会話の入口。会話開始は既存の確認付きTool、Web開始は対象・開始コミット・目的・CLIを表示した明示承認。
-- `frontend/development.html`: 状態・進捗・変更ファイル・diff・静的チェック・未確認事項を同じJob IDで表示。
+- Chat は `list_coding_repositories` で対象を確認し、`propose_development_job` に整えたプロンプト、対象、モデルと Effort を渡す。同じジョブの `proposed` カードが返信内と Develop に表示される。開始操作で `queued` に進む。
+- Develop のフォームは管理者の送信で `queued` を作る。以降はどちらも同じ Coding Job Worker が処理する。
+- request ID と入力のハッシュで再送を判定し、状態の更新条件で承認と Worker の取得を一度に限る。実行中の Core 再起動は `interrupted` とし、作業コピーを保持する。
+- 旧ジョブの記録と API は残す。旧開発ページの URL は Develop タブへ移動する。通常の会話カタログでは、旧 `delegate_coding_task` と worktree 変更 Tool に代わって開発提案を公開する。
 
-## 最初の実装単位
+## モデルと利用枠
 
-1. 管理者がGitルートを最大8件登録。既存の観測用Read許可を開発Write許可に流用しない。
-2. 依頼を`proposed`として保存し、通常Task IDと関連付ける。曖昧なrepository名を推測で選ばない。
-3. 承認後に`queued`へ進める。sourceのHEADを再検査し、固定したcommitからローカルcloneを作る。未コミット変更を含めず、元checkoutは変更しない。cloneのremoteは除去する。
-4. CLIへ目的・制約・Tool catalogを送り、Coreが`list_files`、`read_file`、`write_file`、`run_static_checks`を検証して実行する。`.git`、`_private`、実環境設定、リンク、外部パスは拒否する。
-5. 静的チェックと差分を保存し、`ready_for_review`または`checks_failed`へ進める。モデルの成功発言だけで`completed`にしない。利用者の明示したレビュー完了のみで完了にする。
+| 選択 | 実行 CLI | モデルと Effort |
+| --- | --- | --- |
+| Claude Opus 5.5 | Claude Code | `opus` と `--effort` |
+| Codex Sol 6.1 | Codex app-server | `gpt-6.1-sol` と `turn/start.effort` |
+| Antigravity Argon | Antigravity CLI | `gemini-4-argon-<effort>` |
+| Gemini 3.8 Flash | Antigravity CLI | `gemini-3.8-flash-<effort>` |
 
-最初の単位では任意Shell・依存インストール・任意テストコード実行・ファイル削除・Push・PR作成・mergeを公開しない。Python構文、JavaScript構文、git diff --checkを静的に確認する。実際のテスト・実ホスト動作・CIは`not_run`として区別し、後続でrepositoryごとに承認した実行方式を追加する。
+Effort は low / medium / high、既定は medium。自動選択は軽量調査で利用可能な Flash を優先し、通常の開発では認証を確認できた候補を週次、次いで5時間枠の残量順に比較する。0% の枠を持つ候補は除外し、不明な枠は既知の残量より後に置く。
 
-## 永続状態と移行
+`GET /api/coding/usage` は公式 CLI で得た結果を60秒キャッシュする。Antigravity の `/usage` は Gemini 共通の5時間枠と、Argon 専用または Gemini 共通の週次枠を使う。Codex は `account/rateLimits/read` を使う。Claude は認証確認に加え、PETIT のジョブ履歴から5時間40リクエスト・7日200リクエストを目安に推定する。Anthropic の実契約枠や他のアプリからの消費は含まない。利用制限エラーから5時間は5時間枠を0%と扱う。
 
-`coding_jobs` / `coding_job_events`を既存DBへ追加する前にSQLite backup APIでbackupしquick_checkする。既存のTask・会話・履歴は削除しない。既存3Provider順位は維持し、Antigravity CLIは明示接続時に追加する。
+Codex は OS 標準の CLI 認証を参照する。明示的に分離する場合は `PETIT_CODEX_HOME` を使う。Claude Code の設定ではサーバーPCの公式ブラウザ認証を開始でき、状態確認とログアウトを行える。Claude Code のエージェントモードで `--restricted` が見つからない場合は `claude update` を案内する。
 
-再送はrequest IDと入力hashを照合し、同一Jobを返す。承認とclaimは条件付きUPDATEで一度だけ消費する。再起動時の`running`は`interrupted`にし、自動再実行しない。取消後も差分と専用コピーを残す。設定・接続の取消、deadline、出力上限を実行中にも検査し、所有CLIプロセスを終了する。
+## 実行範囲と承認
 
-`local_only`のThreadから外部CLIへの開発委譲は承認後も拒否し、そのThreadの文脈を送らない。
+- Git ルートでは、開始コミットのローカル clone に専用作業ブランチを作り、元 checkout の未コミット差分を含めず、clone の remote を除去する。Core はファイル編集、静的チェック、許可リストのテスト・ビルドランナー、ローカル commit を提供する。差分レビューは開始コミットを基準にし、commit 済みの変更を含む。テスト・ビルドのランナーはホストでリポジトリ内のコードを実行するため、登録・選択するリポジトリは信頼できるものに限る。
+- Git 以外の登録フォルダではそのフォルダを、指定なしでは Windows の論理ドライブ全体を対象にする。Everything の Windows IPC または `es.exe` で問い合わせ、利用できない場合は件数・時間を制限してファイル名を走査する。機密性の高い名前や認証領域、PETIT ストレージ、リンク経由のパスは Core で除外する。
+- PC の検索・テキスト読み取りと、ジョブ専用の `storage/coding-scratch/` へのコピー・作業は開始確認の範囲に含む。読み取った本文は選択した CLI に渡り得る。
+- 元ファイルへの書き込み・移動・削除、元フォルダでのコマンド実行は L2 の操作カードを作る。承認対象は登録済みのパス、引数と書き込み元のハッシュに固定する。元ファイルが変わった場合は適用しない。操作の承認は30分有効で、取消や不明結果からの自動再実行は行わない。コマンドは承認した argv をホストで実行する。
+- CLI にはジョブごとの Core カタログを渡す。Git の push、PR、merge はこのカタログの対象外。静的検査、コマンド検証、実アプリの受入、利用者のレビュー完了は別々に表示する。
 
-## CLI利用の境界
-
-Antigravityは本人の明示依頼による実装であり、Googleの個人契約における第三者アプリ内利用の許諾を取得したことにはならない。OAuth token抽出、非公開API、MCP proxy、アカウント回転は行わない。公式CLIが管理する認証を使い、CoreのAPIキー等を子プロセスへ渡さない。取得できない契約枠・実モデル名・quotaはunknownのまま表示する。
-
-CLI本体に公開する直接Toolは制限し、JobができることはCoreのcatalogに限定する。CLIのプロンプトへの注意書きや事後のイベント検出だけを権限制御の根拠にはしない。実CLI・合成DB・Mock・ブラウザ・実端末の証拠を分ける。
+公式 CLI の認証を使用し、PETIT の API キーや認証トークンを抽出しない。個人契約を外部アプリから使う条件については各提供元の利用条件を参照する。[Claude Code の利用条件](https://code.claude.com/docs/en/legal-and-compliance)・[Antigravity CLI の接続条件](../brain/antigravity-cli.md)

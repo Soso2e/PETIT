@@ -52,13 +52,18 @@ def observe_workspace(path: Path) -> dict[str, Any]:
     """Observe exactly the configured repository root, without contents or remotes."""
     result: dict[str, Any] = {"name": _text(path.name), "status": "unavailable"}
     try:
-        root = path.expanduser().resolve(strict=True)
+        from .project_workspaces import _safe_root
+        root = _safe_root(path)
         from .local_development import workspace_identity
         result["workspace_id"] = workspace_identity(root)
         git = ["git", "-c", "core.fsmonitor=false", "-C", str(root)]
-        actual = _command(git + ["rev-parse", "--show-toplevel"]).decode().strip()
+        try:
+            actual = _command(git + ["rev-parse", "--show-toplevel"]).decode().strip()
+        except subprocess.CalledProcessError:
+            result.update(status="folder", files=[])
+            return result
         if Path(actual).resolve() != root:
-            result["error"] = "not_repository_root"
+            result.update(status="folder", files=[])
             return result
         data = _command(git + ["status", "--porcelain=v1", "-z", "--branch",
                                "--untracked-files=normal"])
@@ -83,9 +88,8 @@ def observe_workspace(path: Path) -> dict[str, Any]:
         result.update(status="ok", branch=branch, changed_entries=changed,
                       conflicts=conflicts, files=files, hidden_entries=hidden,
                       files_truncated=changed > len(files) + hidden)
-        if config.WORKSPACE_LOCAL_DEVELOPMENT_ENABLED:
-            from .local_development import collect_local_development
-            result["development"] = collect_local_development(root, _command)
+        from .local_development import collect_local_development
+        result["development"] = collect_local_development(root, _command)
     except subprocess.TimeoutExpired:
         result["error"] = "timeout"
     except (OSError, ValueError, subprocess.CalledProcessError):
@@ -141,28 +145,32 @@ def _windows_foreground() -> str:
 class WorkspaceObserver:
     def __init__(self) -> None:
         self._stop = threading.Event()
+        self._wake = threading.Event()
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._snapshot: dict[str, Any] | None = None
 
     def refresh(self) -> None:
-        if not config.WORKSPACE_CONTEXT_ENABLED:
-            return
+        from .development_roots import configured
         # Timestamp the beginning: slow/failed collection never makes old facts newer.
         collected_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        workspaces = [observe_workspace(path) for path in config.WORKSPACE_CONTEXT_DIRS[:8]]
-        snapshot = {"collected_at": collected_at, "workspaces": workspaces,
-                    "foreground": observe_foreground()}
+        folders = configured()
+        workspaces = [observe_workspace(Path(path)) for path, _ in folders]
+        snapshot = {"collected_at": collected_at, "workspaces": workspaces, "_roots": folders,
+                    "foreground": observe_foreground() if config.WORKSPACE_CONTEXT_ENABLED else {"status": "disabled"}}
         with self._lock:
             if not self._stop.is_set():
                 self._snapshot = snapshot
 
     def snapshot(self) -> dict[str, Any]:
-        if not config.WORKSPACE_CONTEXT_ENABLED:
+        from .development_roots import configured
+        folders = configured()
+        if not folders and not config.WORKSPACE_CONTEXT_ENABLED:
             return {"enabled": False, "status": "disabled"}
         with self._lock:
             result = copy.deepcopy(self._snapshot)
-        if result is None:
+        if result is None or result.pop("_roots", []) != folders:
+            self._wake.set()
             return {"enabled": True, "status": "pending", "stale": True}
         age = (datetime.now(timezone.utc) - datetime.fromisoformat(result["collected_at"])).total_seconds()
         stale = age < 0 or age > config.WORKSPACE_CONTEXT_MAX_AGE_SECONDS
@@ -170,7 +178,7 @@ class WorkspaceObserver:
                 "age_seconds": max(0, int(age)), "stale": stale}
 
     def start(self) -> None:
-        if not config.WORKSPACE_CONTEXT_ENABLED or (self._thread and self._thread.is_alive()):
+        if self._thread and self._thread.is_alive():
             return
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="petit-workspace-observer", daemon=True)
@@ -178,6 +186,7 @@ class WorkspaceObserver:
 
     def stop(self) -> None:
         self._stop.set()
+        self._wake.set()
         if self._thread:
             self._thread.join(timeout=1)
         with self._lock:
@@ -185,13 +194,13 @@ class WorkspaceObserver:
 
     def _run(self) -> None:
         while not self._stop.is_set():
+            self._wake.clear()
             try:
                 self.refresh()
             except Exception:  # one faulty observation must not stop the observer
                 # Retained observations age out; no exception payload is logged.
                 pass
-            if self._stop.wait(config.WORKSPACE_CONTEXT_INTERVAL_SECONDS):
-                break
+            self._wake.wait(config.WORKSPACE_CONTEXT_INTERVAL_SECONDS)
 
 
 _observer = WorkspaceObserver()
@@ -203,6 +212,9 @@ def get_workspace_context() -> dict[str, Any]:
 
 
 def build_context_block() -> str:
+    # Registering a development folder does not opt into sending observations in chat.
+    if not config.WORKSPACE_CONTEXT_ENABLED:
+        return ""
     snapshot = get_workspace_context()
     if not snapshot["enabled"]:
         return ""

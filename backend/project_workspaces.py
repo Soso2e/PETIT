@@ -5,7 +5,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from . import config, db, local_development, project_continuity, project_source_links, workspace_context
+from . import db, development_roots, local_development, project_continuity, project_source_links, workspace_context
 
 PROVIDER = "local_workspace"
 
@@ -24,12 +24,10 @@ def _safe_root(path: Path) -> Path:
 
 
 def allowed_roots() -> list[Path]:
-    if not config.WORKSPACE_CONTEXT_ENABLED or not config.WORKSPACE_LOCAL_DEVELOPMENT_ENABLED:
-        return []
     result = []
-    for configured in config.WORKSPACE_CONTEXT_DIRS:
+    for configured, _ in development_roots.configured():
         try:
-            root = _safe_root(configured)
+            root = _safe_root(Path(configured))
             if root not in result:
                 result.append(root)
         except (OSError, ValueError):

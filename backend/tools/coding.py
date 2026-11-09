@@ -1,12 +1,34 @@
 """Conversation tools for separately approved, durable local coding tasks."""
 from .registry import tool
-from .. import coding_jobs as jobs, request_context
+from .. import coding_jobs as jobs, development_models, request_context
 
 
-@tool(name="list_coding_repositories", description="開発用に利用者が明示許可したローカルGitルートを取得する。推測や全ドライブ探索はしない。",
+@tool(name="list_coding_repositories", description="開発用に利用者が登録したフォルダとGitルートを取得する。対象パスを推測しない。",
       parameters={"type": "object", "properties": {}, "additionalProperties": False}, risk="safe_read")
 def list_coding_repositories():
     return {"repositories": jobs.roots(), "providers": ["codex", "antigravity_cli", "claude_code"]}
+
+
+@tool(name="propose_development_job",
+      description="開発・コード修正・リポジトリ調査・PCファイル作業の依頼を具体的な開発プロンプトに整え、利用者の開始確認待ちとして保存する。実行は始まらない。先に list_coding_repositories で対象を確認する。全PCが意図された場合は repository を空文字にする。軽量な読み取り調査だけ lightweight を true にする。",
+      parameters={"type": "object", "properties": {
+          "repository": {"type": "string", "maxLength": 1000},
+          "goal": {"type": "string", "minLength": 1, "maxLength": 8000},
+          "model_key": {"type": "string", "enum": ["auto", *development_models.MODELS]},
+          "effort": {"type": "string", "enum": list(development_models.EFFORTS)},
+          "lightweight": {"type": "boolean"}},
+          "required": ["repository", "goal"], "additionalProperties": False},
+      risk="low_risk_write")
+def propose_development_job(repository: str, goal: str, model_key="auto", effort="medium", lightweight=False):
+    from .. import delegations
+    request_id, thread_id = request_context.current_ids()
+    if not request_context.current_is_admin() or request_context.local_only() or delegations.is_work_thread(thread_id):
+        raise ValueError("管理者の通常会話で開発ジョブを提案できます。")
+    if not request_id or not thread_id:
+        raise ValueError("request_id_required")
+    job = jobs.create_development("chat:" + request_id, repository, goal, model_key, effort, lightweight,
+                                  thread_id=thread_id, turn_id=request_id)
+    return {"job_id": job["id"], "status": job["status"], "selection": job["selection"]}
 
 
 @tool(name="delegate_coding_task", description="明示された開発依頼をCodex CLIかAntigravity CLIの別タスクへ渡す。確認画面で対象repository・目的・providerを確認する。元フォルダは変更せず開始時HEADのコピーで実装し、進捗は開発タスク画面で確認する。Push/PR/merge/任意Shellはしない。",

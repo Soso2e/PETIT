@@ -11,7 +11,9 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
+import threading
 import time
 
 from . import antigravity_cli as agy, antigravity_cli_brain as shared, conversation_store as store, db
@@ -23,6 +25,8 @@ POLICY_MESSAGE = "Claude Code CLIは初期設定で明示的に接続してく�
 POLICY_NOTICE = ("Claude Code CLIを自作アプリから呼び出す使い方の契約上の扱いは未確認です（Concept §10）。"
                  "接続は利用者の選択であり、Anthropicの許諾取得を意味しません。")
 GUIDE = "https://docs.anthropic.com/en/docs/claude-code/setup"
+_auth_lock = threading.Lock()
+_login_process = None
 # Aliases accepted by the official CLI. A catalog, never proof of entitlement.
 MODEL_ALIASES = [{"id": "sonnet", "label": "Sonnet（CLIの別名）"}, {"id": "opus", "label": "Opus（CLIの別名）"},
                  {"id": "haiku", "label": "Haiku（CLIの別名）"}]
@@ -73,6 +77,71 @@ def status(data: dict | None = None) -> dict:
             "quota_remaining": "unknown", "tested": False, "guide": GUIDE}
 
 
+def _auth_command(*args):
+    binary = executable()
+    if not binary:
+        raise ValueError("Claude Code CLIが見つかりません。")
+    return [binary, *args]
+
+
+def _probe(*args):
+    return subprocess.run(_auth_command(*args), cwd=tempfile.gettempdir(), env=environment(), stdin=subprocess.DEVNULL,
+                          capture_output=True, encoding="utf-8", errors="replace", timeout=10,
+                          creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+
+
+def auth_status():
+    result = status()
+    result["login_running"] = bool(_login_process and _login_process.poll() is None)
+    if not result["installed"]:
+        return result
+    try:
+        response = json.loads(_probe("auth", "status").stdout)
+        if isinstance(response, dict) and type(response.get("loggedIn")) is bool:
+            result["authentication"] = "logged_in" if response["loggedIn"] else "logged_out"
+            result["subscription"] = response.get("authMethod") == "claude.ai" or (
+                response["loggedIn"] and response.get("apiProvider") == "firstParty"
+                and response.get("authMethod") not in {"apiKey", "none"})
+    except (ValueError, OSError, subprocess.SubprocessError):
+        pass
+    try:
+        result["restricted_supported"] = "--restricted" in _probe("--help").stdout
+    except (OSError, subprocess.SubprocessError):
+        result["restricted_supported"] = None
+    return result
+
+
+def auth_login():
+    global _login_process
+    with _auth_lock:
+        if _login_process is None or _login_process.poll() is not None:
+            process = subprocess.Popen(_auth_command("auth", "login", "--claudeai"),
+                                       cwd=tempfile.gettempdir(), env=environment(), stdin=subprocess.DEVNULL,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                       creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+            _login_process = process
+
+            def wait():
+                try:
+                    process.wait(timeout=300)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+
+            threading.Thread(target=wait, daemon=True).start()
+        return {"login_running": True}
+
+
+def auth_logout():
+    with _auth_lock:
+        if _login_process is not None and _login_process.poll() is None:
+            _login_process.kill()
+            _login_process.wait(timeout=5)
+        if _probe("auth", "logout").returncode:
+            raise ValueError("Claude Code CLIのログアウトに失敗しました。")
+    return {"authentication": "logged_out"}
+
+
 def error_category(text: str) -> str:
     # Classify in memory; provider text is never stored or returned.
     lower = text.lower()
@@ -85,11 +154,11 @@ def error_category(text: str) -> str:
     return agy.error_category(text)
 
 
-def command(binary: str, model: str = "") -> list[str]:
+def command(binary: str, model: str = "", effort: str | None = None) -> list[str]:
     result = [binary, "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config",
               "--setting-sources", "", "--disable-slash-commands", "--no-session-persistence",
               "--system-prompt", SYSTEM_PROMPT, "--json-schema", json.dumps(RESPONSE_SCHEMA, separators=(",", ":"))]
-    return result + (["--model", model] if model else [])
+    return result + (["--model", model] if model else []) + (["--effort", effort] if effort else [])
 
 
 def parse_output(raw: str, catalog) -> tuple[dict, dict]:
@@ -130,7 +199,7 @@ def completion(target: dict, messages: list, catalog, check):
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="petit-claude-brain-", ignore_cleanup_errors=True) as folder:
         try:
-            code, output, error = shared.invoke(command(binary, target.get("model") or ""), Path(folder), prompt, check,
+            code, output, error = shared.invoke(command(binary, target.get("model") or "", target.get("effort")), Path(folder), prompt, check,
                                                 timeout=target.get("timeout_seconds", 120), label=LABEL,
                                                 raw_stdin=True, env=environment())
         except OSError:

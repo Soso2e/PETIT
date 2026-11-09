@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pytest
 
-from backend import coding_jobs as jobs, coding_api, coding_agents, config, db, setup_store as settings
+from backend import coding_jobs as jobs, coding_api, coding_agents, config, db, development_models, setup_store as settings
 from backend import setup_api, brain, tools, conversation_store as store, conversation_api as conversations
 from tests.test_setup_integrations import isolated, admin
 
@@ -144,21 +144,100 @@ def test_api_auth_proposal_diff_and_manual_completion(repository, client, monkey
         assert connection.execute("SELECT status FROM tasks_cache WHERE id=?",(completed["task_id"],)).fetchone()[0] == "done"
 
 
-def test_chat_delegation_uses_existing_approval_and_receipt(repository, monkeypatch):
-    head=jobs.git(repository,"rev-parse","HEAD").strip()
-    arguments={"repository":str(repository),"goal":"合成開発依頼","provider":"codex","base_commit":head}
+@pytest.fixture
+def development_quota(monkeypatch):
+    quota = {key: {"available": key == "codex_sol", "five_hour": 80, "weekly": 50} for key in development_models.MODELS}
+    monkeypatch.setattr(development_models, "usage", lambda: quota)
+
+
+def test_chat_development_proposal_uses_receipt_and_waits_for_owner(repository, development_quota, monkeypatch):
+    arguments={"repository":str(repository),"goal":"合成開発依頼","model_key":"codex_sol"}
     responses=iter([{"role":"assistant","content":"","tool_calls":[{"id":"delegate","type":"function","function":{
-        "name":"delegate_coding_task","arguments":json.dumps(arguments)}}]}, {"role":"assistant","content":"キューへ登録しました。"}])
+        "name":"propose_development_job","arguments":json.dumps(arguments)}}]}, {"role":"assistant","content":"開始を確認してください。"}])
     monkeypatch.setattr(brain.lmstudio_client,"chat_completion",lambda *a,**k:next(responses))
     monkeypatch.setattr(brain,"check_provider",lambda thread:{"provider":"lm_studio","profile":"local","model":"synthetic","base_url":"http://localhost","configured":True})
     result=conversations.submit("coding-chat","coding-request","開発をお願い", is_admin=True)
-    assert result["status"] == "waiting_approval" and not jobs.list_jobs()
-    approval=store.approvals("coding-request")[0]["approval_id"]
-    assert conversations.decide(approval,True)["status"] == "completed"
-    assert conversations.decide(approval,True)["status"] == "completed"
-    assert len(jobs.list_jobs()) == 1 and jobs.list_jobs()[0]["status"] == "queued"
+    job_id = result["development_job_id"]
+    assert result["status"] == "completed" and jobs.get(job_id)["status"] == "proposed"
+    assert not jobs.pump()
+    assert jobs.list_jobs("coding-chat")[0]["id"] == job_id
+    assert db.recent_conversations(session_id="coding-chat")[0]["development_job_id"] == job_id
+    assert jobs.approve(job_id)["status"] == jobs.approve(job_id)["status"] == "queued"
     with db.get_connection() as connection:
-        assert connection.execute("SELECT count(*) FROM effect_receipts WHERE tool='delegate_coding_task'").fetchone()[0] == 1
+        assert connection.execute("SELECT count(*) FROM effect_receipts WHERE tool='propose_development_job'").fetchone()[0] == 1
+
+
+def test_develop_direct_runs_checks_and_reviews_committed_changes(repository, client, development_quota, monkeypatch):
+    admin(client)
+    (repository / "test_main.py").write_text(
+        "import unittest\nfrom main import VALUE\n\n"
+        "class TestValue(unittest.TestCase):\n"
+        "    def test_new_value(self):\n"
+        "        self.assertEqual(VALUE, 2)\n", encoding="utf-8")
+    jobs.git(repository, "add", "test_main.py")
+    jobs.git(repository, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "add test")
+    observed = {}
+
+    def agent(provider, target, goal, invoke, check, progress, **kwargs):
+        observed["target"] = (target["model"], target["effort"])
+        synthetic_agent(provider, target, goal, invoke, check, progress)
+        observed["check"] = invoke("run_repository_check", {"argv": ["python", "-m", "unittest", "discover"]})
+        observed["commit"] = invoke("commit_repository", {"message": "Update fixture value"})
+        observed["push"] = invoke("push_repository", {})
+        return "fixture"
+
+    monkeypatch.setattr(coding_agents, "run", agent)
+    payload = {"request_id": "direct", "repository": str(repository), "goal": "合成変更", "effort": "high"}
+    job = client.post("/api/coding/jobs/start", json=payload).json()
+    assert job["status"] == "queued"
+    assert client.post("/api/coding/jobs/start", json=payload).json()["id"] == job["id"]
+    assert jobs.pump()
+    detail = jobs.get(job["id"])
+    assert observed["target"] == ("gpt-6.1-sol", "high")
+    assert observed["check"].get("passed"), observed["check"]
+    assert observed["commit"].get("committed"), observed["commit"]
+    assert observed["push"]["error"] == "invalid_tool_arguments"
+    assert detail["status"] == "ready_for_review" and detail["tests"] == "passed", detail["error"]
+    result = client.get(f"/api/coding/jobs/{job['id']}/diff").json()
+    assert result["files"] == ["main.py"] and "+VALUE = 2" in result["diff"]
+    assert (repository / "main.py").read_text(encoding="utf-8") == "VALUE = 1\n"
+
+
+def test_pc_scope_copy_and_approval_for_original(repository, client, development_quota, monkeypatch, tmp_path):
+    admin(client)
+    folder = tmp_path / "documents"
+    folder.mkdir()
+    original = folder / "note.txt"
+    original.write_text("before", encoding="utf-8")
+    secret = folder / ".env"
+    secret.write_text("hidden", encoding="utf-8")
+    added = client.post("/api/coding/config/root", json={"path": str(folder)})
+    assert added.status_code == 200 and added.json()["repositories"][-1]["mode"] == "folder"
+
+    def agent(provider, target, goal, invoke, check, progress, **kwargs):
+        assert invoke("read_pc_file", {"path": str(original)})["content"] == "before"
+        assert "error" in invoke("read_pc_file", {"path": str(secret)})
+        assert "error" in invoke("read_pc_file", {"path": str(repository / "main.py")})
+        assert invoke("copy_pc_file_to_workspace", {"path": str(original), "destination": "copy.txt"})["copied"]
+        copy = invoke("read_file", {"path": "copy.txt"})
+        assert invoke("write_file", {"path": "copy.txt", "content": "after", "expected_sha256": copy["sha256"]})["saved"]
+        assert invoke("write_pc_file", {"path": str(original), "source": "copy.txt"})["approval_required"]
+        assert original.read_text(encoding="utf-8") == "before"
+        return "承認待ち"
+
+    monkeypatch.setattr(coding_agents, "run", agent)
+    job = client.post("/api/coding/jobs/start", json={"request_id": "pc", "repository": str(folder), "goal": "編集"}).json()
+    jobs.pump()
+    detail = jobs.get(job["id"])
+    assert detail["status"] == "waiting_approval"
+    action = detail["actions"][0]
+    endpoint = f"/api/coding/jobs/{job['id']}/actions/{action['id']}"
+    assert "-before" in client.get(endpoint + "/preview").json()["preview"]
+    assert client.post(endpoint + "/approve").json()["status"] == "applied"
+    assert client.post(endpoint + "/approve").json()["status"] == "applied"
+    assert original.read_text(encoding="utf-8") == "after"
+    assert jobs.get(job["id"])["status"] == "ready_for_review"
+    assert client.request("DELETE", "/api/coding/config/root", json={"path": str(folder)}).status_code == 200
 
 
 def test_local_only_thread_cannot_delegate_private_context(repository):

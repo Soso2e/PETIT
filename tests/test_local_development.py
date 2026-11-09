@@ -96,12 +96,12 @@ class LocalDevelopmentTests(unittest.TestCase):
         self.assertEqual(result["development"]["documents"][0]["status"], "excluded_symlink")
         self.assertNotIn("private content", json.dumps(result))
 
-    def test_disabled_detail_preserves_existing_git_observation(self):
+    def test_git_details_do_not_require_legacy_flag(self):
         self.initialize()
         with patch.object(config, "WORKSPACE_LOCAL_DEVELOPMENT_ENABLED", False):
             result = context.observe_workspace(self.root)
         self.assertEqual(result["status"], "ok")
-        self.assertNotIn("development", result)
+        self.assertIn("development", result)
 
     def test_read_only_cached_tool_and_missing_selection(self):
         self.initialize()

@@ -1,20 +1,18 @@
-# ローカル開発環境の読取（Issue #341 / Phase 1）
+# ローカル開発環境の観測（#341 / #418）
 
-PETITを起動している **PC側Coreのローカルファイル** について、登録済みGitルートのみを読み取る任意機能。iPhone/PWAやDesktopは同じCoreの観測キャッシュを参照する。GitHub APIの情報とは別ソースであり、サーバーの外にある別PCのファイルを直接読める機能ではない。
+PETIT を起動している PC の登録フォルダを定期観測する。Git ルートではローカルの状態とルート文書を、非 Git フォルダでは登録状態を取得する。接続クライアントは同じ Core の観測キャッシュを参照する。
 
 ## 設定
 
-`.env` に必要なものだけ設定する。
+Develop タブから登録する。サーバーで配布する登録ルートや観測間隔がある場合は `.env` も使用できる。
 
 ```env
-PETIT_WORKSPACE_CONTEXT_ENABLED=1
-PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1
 PETIT_WORKSPACE_CONTEXT_DIRS=C:\Projects\PETIT;C:\Projects\WEVORA
 PETIT_WORKSPACE_CONTEXT_INTERVAL_SECONDS=30
 PETIT_WORKSPACE_CONTEXT_MAX_AGE_SECONDS=90
 ```
 
-Windowsの複数パス区切りは `;`、macOS/Linuxは `:`。ルートを最大8件明示する。自動発見・ディスク全体探索は行わない。`PETIT_WORKSPACE_CONTEXT_FOREGROUND_ENABLED` は別機能で、未設定なら前面アプリを取得しない。いずれかのOpt-inが0なら開発資料本文は読まない。
+Windowsの複数パス区切りは `;`、macOS/Linuxは `:`。UI と環境設定はそれぞれ最大8件。自動観測は登録フォルダに限る。PC 上のファイル探索は、利用者が開始した [開発ジョブ](coding-tasks.md) が扱う。
 
 設定後はCoreを再起動し、`GET /api/workspace-context` の `enabled`、`status`、`collected_at`、各workspaceの `status` を確認する。 `status=observed` であっても各workspaceの `status=unavailable` はあり得る。LLMからは `get_local_development_status` Toolでキャッシュ参照する。 `workspace` に登録フォルダ名を指定した場合はその1件の詳細、指定なし・複数件の場合は一覧。データを得るためのGit fetchやファイル探索は発生しない。
 
@@ -27,7 +25,7 @@ Windowsの複数パス区切りは `;`、macOS/Linuxは `:`。ルートを最大
 - リポジトリ直下の `Concept.md`（最大2400文字）、`PROGRESS.md`（最大3600文字）、`README.md`（最大1200文字）。各ファイル128KB超・symlink・バイナリは内容取得対象外
 - ファイル欠損、tracking未設定、Git障害、キャッシュのstaleを区別する
 
-通常のBrainへ常時入る観測packetでは文書本文をさらに短くし、Tool呼出時のみ収集済みの長めの抜粋を返す。
+会話コンテキストへの観測注入を有効にする場合は `PETIT_WORKSPACE_CONTEXT_ENABLED=1` を使う。注入時は文書の抜粋を短くし、Tool 呼出時は収集済みの抜粋を返す。前面アプリの観測には `PETIT_WORKSPACE_CONTEXT_FOREGROUND_ENABLED=1` も必要。
 
 ## 何がわからないか
 
@@ -53,4 +51,4 @@ python -m compileall backend/workspace_context.py backend/local_development.py b
 
 ## 次段階
 
-明示許可したファイル範囲のコード・diffの根拠照合、PETIT内部Project IDとローカルrootの確認付き紐付け、登録設定UI、複数PCの主体/アクセス制御、観測結果をプロジェクト単位で検索できる導線は後続Issueに分割する。
+複数 PC の主体・アクセス制御と、観測結果をプロジェクト単位で検索する導線は今後の対象。

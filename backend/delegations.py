@@ -26,7 +26,7 @@ TOOLS = {"delegate_to_agent", "get_delegation_status", "cancel_delegation"}
 # First-call schemas for the Front Brain. Approval Tools stay behind discover_tools.
 FRONT_DIRECT = {"get_work_status", "start_work_session", "update_work_session", "record_past_work",
                 "create_task", "complete_task", "create_reminder", "search_memory",
-                "delegate_to_agent", "get_delegation_status"}
+                "delegate_to_agent", "get_delegation_status", "list_coding_repositories", "propose_development_job"}
 # Mail bodies stay away from the Front Brain; a delegated CLI can still read them.
 # Repository and Home-file work is delegated (FRONT_HINT), so its Tools stay out of the Front index too.
 FRONT_HIDDEN = {"gmail_get_message",
@@ -34,9 +34,11 @@ FRONT_HIDDEN = {"gmail_get_message",
                 "push_worktree", "create_worktree_pull_request", "close_worktree",
                 "delegate_coding_task", "get_coding_task_status", "cancel_coding_task",
                 "write_home_file", "edit_home_file"}
-FRONT_HINT = ("\n自分で完結しない作業（PETIT Homeのファイル作業、登録リポジトリの調査や開発、複数ステップの作業、メール本文の確認）は"
+FRONT_HINT = ("\n開発・コード修正・リポジトリ調査・PCファイル作業は list_coding_repositories で対象を確認し、"
+              "具体的な目的と制約を整理して propose_development_job で提案する。利用者の開始確認を待つ。"
+              "その他の複数ステップの作業（PETIT Home内の作業、メール本文の確認）は"
               "delegate_to_agentでCLIに任せる。「できない」と答える前に、任せられないか確かめる。"
-              "雑談・予定・タスク・作業記録は任せず自分で処理する。PC全体のファイル探索とWeb調査は任せてもできないので、まだできないと伝える。"
+              "雑談・予定・タスク・作業記録は任せず自分で処理する。Web調査は委譲しない。"
               "任せた作業を完了と言わない。進み具合はget_delegation_statusで確認する。")
 REPORTABLE = ("waiting_approval", "completed", "failed", "cancelled", "interrupted")
 ACTIVE = ("queued", "running")

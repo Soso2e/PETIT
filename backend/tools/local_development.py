@@ -1,7 +1,7 @@
 """Read-only, cached development evidence tools for PETIT's Agent Runtime."""
 from __future__ import annotations
 
-from .. import config, workspace_context
+from .. import development_roots, workspace_context
 from .registry import tool
 
 
@@ -28,9 +28,9 @@ from .registry import tool
     risk="safe_read",
 )
 def get_local_development_status(workspace: str = "", project_id: str | None = None) -> dict:
-    if not config.WORKSPACE_CONTEXT_ENABLED or not config.WORKSPACE_LOCAL_DEVELOPMENT_ENABLED:
+    if not development_roots.configured():
         return {"ok": False, "status": "disabled",
-                "reason": "local_development_observation_requires_opt_in"}
+                "reason": "no_registered_development_folders"}
     if project_id:
         from .. import project_workspaces
         return project_workspaces.status(project_id)

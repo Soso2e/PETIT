@@ -40,9 +40,8 @@ AGENT_RULES = """
 - タスク・予定・記憶・通知など PETIT のデータは mcp__petit__* の Tool で扱う。Core が正本。
 - 外部への送信・push・PR・公開・インストールはしない（L2）。必要ならユーザーに伝える。取り返しのつかない操作と秘密情報には触れない（L3）。
 - Tool が承認待ち（awaiting_user_approval）を返したら、それ以上進めずに、何を承認してほしいかを短く伝えて回答を終える。承認前に実行済みと言わない。
-- 開発（L1）: list_coding_repositories → open_worktree で Home の worktrees/ に作業用 worktree を作り、その中のファイルを編集する。
-  run_worktree_check でテストし、通ったら commit_worktree → push_worktree（petit/ ブランチだけ、確認なし）。
-  PR は create_worktree_pull_request（承認つき）。テストの結果は実際の出力どおりに伝え、通っていないものを通ったと言わない。
+- 開発: list_coding_repositories で対象を確認し、propose_development_job が利用可能な通常会話で開始確認を取る。
+  委譲中にリポジトリの変更が必要だと分かったら利用者に報告する。
 - 拒否された操作を別の方法で回避しない。
 """
 

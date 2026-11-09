@@ -1,1 +1,51 @@
-textarea{width:100%;box-sizing:border-box;resize:vertical;background:var(--bg,#121826);color:inherit;border:1px solid #45516b;border-radius:8px;padding:12px;font:inherit}select{max-width:100%}#notice{position:static;inset:auto;max-width:none;margin:16px 0}#notice:empty{display:none}.coding-job{padding:20px 0;border-bottom:1px solid #38445b}.coding-job h3{margin:0 0 10px;font-size:1.05rem;overflow-wrap:anywhere}.coding-job p,.coding-job li{overflow-wrap:anywhere}.coding-job pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:480px;overflow:auto;background:#0d1421;padding:12px;border-radius:8px;font-size:.85rem}.coding-job .actions{display:flex;flex-wrap:wrap;gap:8px}.job-status{font-weight:700;color:#a8caff}.coding-job summary{cursor:pointer;padding:10px 0}.muted{line-height:1.7}@media(max-width:500px){.coding-job{padding:16px 0}.coding-job .actions button{width:100%}}
+.development-request, .coding-job {
+  padding: 1rem;
+  margin: .75rem 0;
+  border: 1px solid var(--line, #45516b);
+  border-radius: .75rem;
+  overflow-wrap: anywhere;
+}
+.development-request label {
+  display: grid;
+  gap: .3rem;
+  margin: .55rem 0;
+  min-width: 0;
+}
+.development-request label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+.development-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: .65rem;
+}
+.development-request :is(select, input:not([type="checkbox"]), textarea) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: .55rem;
+  border: 1px solid var(--line, #45516b);
+  border-radius: .4rem;
+  color: inherit;
+  background: var(--bg, #121826);
+  font: inherit;
+}
+.development-request textarea { resize: vertical; }
+.development-request summary, .coding-job summary { cursor: pointer; }
+.coding-job h3 { margin: .5rem 0; font-size: 1rem; white-space: pre-wrap; }
+.coding-job p { margin: .5rem 0; }
+.coding-job pre {
+  padding: .65rem;
+  max-height: 22rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg, #121826);
+  border-radius: .45rem;
+}
+.coding-job .actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.coding-job .job-status { font-weight: 700; }
+.development-action { padding-top: .6rem; border-top: 1px solid var(--line, #45516b); }
+#development-root-list li button, .development-action button { margin-inline-end: .4rem; }
+#development-job-notice:empty { display: none; }

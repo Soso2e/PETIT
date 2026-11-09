@@ -9,8 +9,8 @@ from .. import delegations, request_context
     name="delegate_to_agent",
     description=(
         "複数ステップの作業をCLIエージェントに任せ、裏で動かす。すぐ受付結果を返すので、利用者は会話を続けられる。"
-        "できること: PETIT Homeのファイル作業、登録リポジトリの調査と開発、PETIT Toolを組み合わせた作業、メール本文の確認。"
-        "できないこと: PC全体のファイル探索、Web調査。雑談・予定・タスク・作業記録の単純な操作には使わない。"
+        "対象はPETIT Homeのファイル作業、PETIT Toolを組み合わせた作業、メール本文の確認。"
+        "開発・リポジトリ調査・PCファイル作業には propose_development_job を使う。Web調査や単純な定型操作には使わない。"
         "1回の依頼につき1件まで。使うCLIはCoreが決める。"
     ),
     parameters={

@@ -89,25 +89,17 @@ v0.25.0では、小型会話の「作業画面」から既存Tasks / Universeを
 
 AccessKey不要の方式に向けた「へいプティ」の実験モデル学習は [openWakeWord学習環境](docs/voice/openwakeword.md) を参照。Desktop実行経路は統合済みです。実モデルの配布と実声・実マイクでの精度評価は未確認です。
 
-## Coding Job Activity（v0.40.0）
+## 開発ジョブ（v0.52.0）
 
-Development Hubには、一般のバックグラウンドJobに加え、Codex／Antigravity CLIへ委譲したCoding Jobの保存済み状態も表示されます。開発の詳細確認・承認・差分レビューは引き続き [開発タスク画面](/static/development.html) で行います。GET /api/coding/activity?limit=30 は管理者認証が必要で、ID・Task ID・Provider・状態・時刻だけを返します。秘密の目的文・リポジトリパス・生成差分・エラー本文はActivityには含みません。未初期化の場合は空の状態を返し、アクセスだけでDBバックアップを作りません。Coding Jobの状態は永続記録で、稼働中プロセス・再起動後の自動再開を保証しません。
+[Develop タブ](/static/universe.html?view=development) でフォルダを登録し、モデル・Effort・依頼内容を選んで直接送信できます。Chat の開発提案も同じ一覧に表示され、開始ボタンで実行します。Git では専用ブランチで作業し、PC 上の元ファイルへの操作は個別に承認します。詳細は [開発ジョブ](docs/dev/coding-tasks.md) を参照してください。
 
 ## Activity（v0.38.0・ジョブ状態の確認）
 
 Development Hubに、PETITの既存SQLite Job（background_research / agent_followup）の実行待ち・実行中記録・完了・失敗の一覧を追加しました。管理者認証後、Dev画面の「ジョブ状態を更新」で結果を取得できます。APIは GET /api/activity/jobs?limit=30。最大100件で、入力本文・出力本文・エラー本文を返さず、通知の既読/ACKも変更しません。runningはDB上の状態であり実プロセス生存の保証ではありません。PR #371のCoding Jobs、長時間処理の自動復旧・lease・通知連携は未統合です。
 
-## Development Hub（v0.37.0・読み取り専用）
+## ローカル開発状況の参照
 
-PETITのメイン画面から **Dev** を選ぶと、許可済みのローカルGitリポジトリのブランチ・HEAD・未コミット変更数・コンフリクト数・直近コミット・Concept/PROGRESS/READMEの存在を確認できます。PCの既存観測キャッシュを表示するだけで、Git fetch・コマンド実行・ファイル編集・AI Coding Job作成は行いません。macOS/iPhone実機の表示確認は今後実施します。
-
-利用には PETIT_WORKSPACE_CONTEXT_ENABLED=1、PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1 と PETIT_WORKSPACE_CONTEXT_DIRS（明示許可するGitルート、最大8件）の設定が必要です。観測の鮮度が切れた場合は過去の情報を現在値とみなさず、状態を表示します。PC上のローカル追跡refの比較であり、GitHubの最新状態を保証しません。正式な開発ジョブ・Codexの稼働セッション管理は後続の開発項目です。詳細は [Runtime Flows](docs/runtime-flows.md) と [ローカル開発環境の読取](docs/dev/local-development-insight.md)。
-
-## ローカル開発状況の参照（#341 / 開発ブランチ）
-
-既存PC観測をOpt-inで拡張し、登録済みローカルGitリポジトリのHEAD・ブランチ・ahead/behind・直近コミットと、直下の`Concept.md`・`PROGRESS.md`・`README.md`を読み取り専用で参照します。PETITのDesktop・iPhone PWAからの会話でも、同じCoreの観測キャッシュを利用できます。文書記載は実装・動作検証を証明しません。Git fetchは行いません。
-
-`PETIT_WORKSPACE_CONTEXT_ENABLED=1`、`PETIT_WORKSPACE_LOCAL_DEVELOPMENT_ENABLED=1`、`PETIT_WORKSPACE_CONTEXT_DIRS`（最大8件の明示したGitルート）が必要。既定OFFで、自動フォルダ探索や任意パス読取はありません。設定、API、テスト、制限は[ローカル開発環境の読取](docs/dev/local-development-insight.md)を参照。
+Develop で登録済みフォルダの観測結果を確認できます。Git のブランチ・HEAD・変更数・直近コミット・ルート文書の観測に、環境変数での有効化は不要です。環境変数 `PETIT_WORKSPACE_CONTEXT_DIRS` の登録分も表示されます。追跡 ref の比較はローカルに保存された状態を使います。[ローカル開発環境の読取](docs/dev/local-development-insight.md)
 
 ## 初期設定・接続管理（v0.34.0 開発版）
 

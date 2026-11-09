@@ -121,6 +121,23 @@ def test_connect_disconnect_and_models(client, monkeypatch):
         runtime.require_production_permission()
 
 
+def test_cli_auth_status_and_actions_require_admin_and_same_origin(client, monkeypatch):
+    auth = Mock(return_value={"authentication": "logged_out", "restricted_supported": False, "login_running": False})
+    login = Mock(return_value={"login_running": True})
+    logout = Mock(return_value={"authentication": "logged_out"})
+    monkeypatch.setattr(runtime, "auth_status", auth)
+    monkeypatch.setattr(runtime, "auth_login", login)
+    monkeypatch.setattr(runtime, "auth_logout", logout)
+    assert client.post("/api/setup/claude-code/auth/login").status_code == 401
+    admin(client)
+    assert client.get("/api/setup/claude-code").json()["restricted_supported"] is False
+    assert client.post("/api/setup/claude-code/auth/login", headers={"Origin": "https://example.invalid"}).status_code == 403
+    assert client.post("/api/setup/claude-code/auth/login").json() == {"login_running": True}
+    assert client.post("/api/setup/claude-code/auth/logout").json() == {"authentication": "logged_out"}
+    login.assert_called_once_with()
+    logout.assert_called_once_with()
+
+
 def test_coding_job_runs_through_core_catalog(selected, monkeypatch):
     steps = [({"role": "assistant", "content": "", "tool_calls": [{"id": "cc-1", "type": "function",
               "function": {"name": "list_files", "arguments": "{}"}}]}, {}),

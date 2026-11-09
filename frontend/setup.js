@@ -364,8 +364,12 @@
 
     const claude = state.claude_code;
     if ($('claude-code-status')) {
+      const auth = { logged_in: 'ログイン済み', logged_out: '未ログイン', unknown: '未確認' };
       $('claude-code-status').textContent = claude
-        ? (claude.installed ? '公式CLIを検出' : 'CLI未検出（サーバーのPATH・標準配置先）') + ' / Brain接続: ' + (claude.production_enabled ? '設定済み' : '未接続') + ' / ログイン・契約枠残量: unknown（接続テストと公式CLIで確認）'
+        ? (claude.installed ? '公式CLIを検出' : 'CLI未検出（サーバーのPATH・標準配置先）') +
+          ' / Brain接続: ' + (claude.production_enabled ? '設定済み' : '未接続') +
+          ' / ' + (claude.login_running ? '認証を待機中' : auth[claude.authentication] || '未確認') +
+          (claude.restricted_supported === false ? ' / エージェントモードには claude update が必要です' : '')
         : 'CLIの診断情報を取得できません。';
     }
     if ($('claude-code-model')) $('claude-code-model').value = s.claude_code_model || '';
@@ -475,10 +479,23 @@
     notice('CLIの配置だけを確認しました。ログイン・推論は実行していません。');
   });
   if ($('claude-code-diagnose')) {
-    action($('claude-code-diagnose'), async () => {
+    const refreshClaudeAuth = async () => {
       state.claude_code = await api('/claude-code');
       render();
-      notice('CLIの配置だけを確認しました。ログイン・推論は実行していません。');
+    };
+    action($('claude-code-diagnose'), async () => {
+      await refreshClaudeAuth();
+      notice('CLIのログイン状態を取得しました。');
+    });
+    action($('claude-code-login'), async () => {
+      await api('/claude-code/auth/login', 'POST');
+      await refreshClaudeAuth();
+      notice('サーバーPCのブラウザで認証を完了し、ログイン状態を確認してください。');
+    });
+    action($('claude-code-logout'), async () => {
+      await api('/claude-code/auth/logout', 'POST');
+      await refreshClaudeAuth();
+      notice('Claude Code CLIからログアウトしました。');
     });
   }
   action($('codex-diagnose'), async () => {

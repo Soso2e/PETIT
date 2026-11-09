@@ -18,6 +18,12 @@ def available(schema: dict, *, local_only: bool, setup: dict) -> bool:
     if name not in tools.registered_names():
         return False
     from . import delegations
+    work_thread = delegations.is_work_thread(request_context.current_ids()[1])
+    if name == "propose_development_job":
+        return not (local_only or work_thread)
+    if name in {"open_worktree", "run_worktree_check", "commit_worktree", "push_worktree",
+                "create_worktree_pull_request", "close_worktree"}:
+        return False
     if name in delegations.TOOLS:
         return delegations.tool_available(name, setup, local_only=local_only)
     if name in delegations.FRONT_HIDDEN and delegations.is_front_turn(setup):
@@ -32,7 +38,8 @@ def available(schema: dict, *, local_only: bool, setup: dict) -> bool:
     if name == "search_notion":
         return bool(config.NOTION_API_KEY)
     if name in {"get_local_development_status", "list_project_workspaces", "link_project_workspace", "unlink_project_workspace"}:
-        return bool(config.WORKSPACE_CONTEXT_ENABLED and config.WORKSPACE_LOCAL_DEVELOPMENT_ENABLED)
+        from .development_roots import configured
+        return bool(configured(setup))
     return True
 
 

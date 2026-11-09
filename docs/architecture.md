@@ -80,7 +80,7 @@ flowchart TD
   - **Claude Code CLI**: 公式 `claude` をヘッドレスで起動し、組込みTool・MCP・設定読込を無効にしてJSONで判断だけを受け取る。明示接続時のみ（[brain/claude-code-cli.md](brain/claude-code-cli.md)）。
     - **エージェントモード（v0.46.0、設定で ON のときだけ）**: PETIT Home を作業場所に、組込みファイル Tool と PETIT Tool（MCP）を使い、PreToolUse Hook で L0〜L3 の線を引く。人格ファイルは差分承認。詳細は [brain/agent-home.md](brain/agent-home.md) §4.3。
 - 既定の優先順位は Concept §4 と同じ Antigravity CLI → Codex → Claude Code → DeepSeek。未接続の候補は飛ばす。保存済みの順位は書き換えず、新しく接続したCLIは方針順の位置へ挿入する（Antigravity CLIの「先頭へ」ボタンは従来どおり）。
-- **Front Brain（v0.50.0、設定のトグルで ON のときだけ）**: Turn の順位だけ DeepSeek を先頭にする（保存済みの順位は変えない）。複数ステップの作業は `delegate_to_agent` で作業用 Thread の Turn としてエージェントモードの CLI に任せ、結果は Core が元の Thread へ報告する。詳細は [brain/front-brain-delegation.md](brain/front-brain-delegation.md)。
+- **Front Brain（設定のトグルで ON のときだけ）**: Turn の順位だけ DeepSeek を先頭にする。開発は `propose_development_job` で開始確認を待ち、その他の複数ステップ作業は `delegate_to_agent` で作業用 Thread に任せる。詳細は [brain/front-brain-delegation.md](brain/front-brain-delegation.md)。
 - `brain_transport=cli_only` にすると、CLI（Codex / Antigravity CLI / Claude Code CLI）だけを使い、APIへは切り替えない。
 - 障害時は、Toolを実行する前に限って次の候補へ切り替える。Tool実行後に障害が起きたら、そのTurnは失敗として扱う。
 - Antigravity SDK は撤去済み（[brain/sdk-retirement.md](brain/sdk-retirement.md)）。
@@ -102,7 +102,7 @@ flowchart TD
 | 作業記録 | 作業セッション、作業統計、Dashboard の90日集計、引き継ぎメモ | [life/work-statistics.md](life/work-statistics.md) |
 | 記憶 | 記憶の保存と訂正、元発言の検索、Obsidian BRAIN 検索、Chroma（置き換え可能な検索インデックス） | [core/renaissance-memory.md](core/renaissance-memory.md)、[core/assistant-architecture.md](core/assistant-architecture.md) |
 | プロジェクト | Project Continuity（開始・再開・完了の確認）、GitHub evidence、ローカル開発環境の観測 | [core/assistant-architecture.md](core/assistant-architecture.md)、[dev/](dev/) |
-| 開発の委譲 | Coding Job: 許可したGitルートを専用のcloneにコピーし、Codex / Antigravity CLI / Claude Code CLI が Core の限定Tool（list / read / write / 静的check）で作業する。実テスト・Push・PRは未対応 | [dev/coding-tasks.md](dev/coding-tasks.md) |
+| 開発ジョブ | Chat の開始確認と Develop の直接送信を同じ台帳へ保存。Git の作業ブランチで編集・検査・commit、PC モードで検索・コピー・承認付きの直接操作を扱う。モデル・Effort と利用枠は開発ジョブごとに選ぶ | [dev/coding-tasks.md](dev/coding-tasks.md) |
 | バックグラウンド | Durable Read Task（ニュース・天気）、通知イベント、Web Push | [core/durable-read-tasks.md](core/durable-read-tasks.md)、[channels/web_push_notifications.md](channels/web_push_notifications.md) |
 
 ### 2.6 データの正本

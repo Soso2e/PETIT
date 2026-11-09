@@ -1,10 +1,13 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.51.0 (main)**
+**Current Version: v0.52.0 (開発ブランチ)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #418 開発ルート統合（v0.52.0）: Chat の開始確認と Develop の直接送信を同じ Coding Job 台帳へ接続。UI フォルダ登録、モデル・Effort と残量選択、Git の専用ブランチでの編集・検査・commit、PC の Everything IPC／走査・scratch コピー・元ファイル操作の承認、Claude 認証 UI と Codex 既存認証を実装。Windows の実 Codex Sol／Antigravity Argon・Flash で合成 Tool 往復、利用枠と Everything IPC、Claude の未ログイン状態を確認。合成 HTTP と Chromium で Develop からの直接送信・差分、Chat の提案カード復元・承認を確認。Claude の OAuth 完了・実 Opus 推論、実 DeepSeek の意図判定、実端末は未確認。Git のテスト・ビルドは信頼済みリポジトリのコードをホストで実行する。
+- #418 検証: 関連 pytest 225件、Node 契約テスト11件が成功。Windows の広範囲 pytest には別機能の失敗が残り、旧 API・パス表記等の19件は変更前の `origin/main` でも再現した。
 
 - #414 設定UI・AI/サービス接続・接続ステータスの再設計と統合（v0.51.0）: 通常Settingsタブ最上部に「現在の接続状態とショートカット（AI Brain順位・カレンダー同期元・Notion/Gmail・接続ステータス診断）」ハブを配置し、画面/音声/通知設定と外部接続設定の役割を明確に分離。`/static/setup.html` に常設ステータス概要バー・状態/保存済みバッジ（`利用可能`/`接続済み`/`🔑 キー保存済み`）・2カラム整理・冗長な注意事項や旧SDK/実験ACPの折りたたみ（`<details>`）・TimeTree/Googleカード内でカレンダー同期元切替と手動同期を1クリック完結する導線・ハッシュ直通移動（`#ai`/`#notion`/`#timetree`/`#google`/`#sync`）を追加。接続ステータスダイアログにも色分けピルと各設定セクションへの直通リンクを追加。単体テストとPlaywright実ブラウザ（1440/390/320px）で確認済み。実アカウント（TimeTree/Notion/Google OAuth/実CLI）での手動受入と実スマホ端末は未確認。
 
@@ -393,3 +396,4 @@
 | 2026-11-09 | 06:04 | #411 | v0.50.0: DeepSeekを最初の担当にするトグルとCLI委譲（作業用Thread・専用Worker・親Threadへの報告と承認・状態表示）を追加。単体テストと合成Providerの実ブラウザ操作を確認。実CLIの通しはCLI未ログインのため未確認。 |
 | 2026-11-09 | 08:37 | - | v0.50.1: システムプロンプトを縮小（人格・原則を短縮、Tool固有の規則をTool説明へ、FrontのCapability一覧からworktree・Coding Job・Home書込を除外）。未編集のPETIT Home AGENTS.mdは新しい既定へ自動更新。DeepSeek評価は変更前60/60・変更後98/100（`reports/prompt-slimming-evaluation.json`）、Front経路は未評価。 |
 | 2026-11-09 | 08:38 | #414 | v0.51.0: 設定UI・AI/サービス接続・接続ステータスを再設計（Settings最上部の状態/直通ハブ、setup画面の常設概要バー・状態/キー保存済みバッジ・TimeTree/Googleのカード内同期元切替、接続ステータスの色分けピルと設定直通リンク）。Playwright 1440/390/320pxと関連単体テスト確認済み、実アカウント手動受入は未確認。 |
+| 2026-11-09 | 10:01 | #418 | v0.52.0: Chat提案・Develop直接送信をCoding Jobへ統合し、利用枠ルーティング、CLI認証、Git作業とPC操作承認を実装。Codex/Antigravityの合成Tool往復とEverything IPCを実機確認。 |

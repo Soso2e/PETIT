@@ -239,6 +239,11 @@ def finish(request_id: str, data: dict, *, status="completed") -> dict:
                      encode(data.get("used_tools", [])), row["thread_id"], payload.get("source")))
                 conversation_id = cursor.lastrowid
         metadata = {k: v for k, v in data.items() if k not in {"reply", "pending_actions", "messages"}}
+        if payload.get("is_admin") or row["conversation_id"]:
+            from .coding_jobs import turn_job
+            job_id = turn_job(request_id)
+            if job_id:
+                metadata["development_job_id"] = job_id
         connection.execute(
             "UPDATE turns SET status=?,conversation_id=?,result_json=?,updated_at=?,"
             "messages_json=CASE WHEN ?='waiting_approval' THEN messages_json ELSE NULL END,"
