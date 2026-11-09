@@ -91,5 +91,42 @@ class WorkSessionToolTests(unittest.TestCase):
         self.assertNotIn("session", result)
 
 
+
+    def test_record_past_work_with_matched_task(self) -> None:
+        task_id = self.add_task("PETIT開発を爆速で進める")
+        res = self.dispatch("record_past_work", {"task": "PETIT開発", "duration_minutes": 60})
+        self.assertTrue(res["recorded"])
+        self.assertTrue(res["matched_existing_task"])
+        self.assertEqual(res["task"], "PETIT開発を爆速で進める")
+        self.assertEqual(res["duration_minutes"], 60)
+        self.assertEqual(res["session"]["status"], "ended")
+        self.assertEqual(res["session"]["elapsed_seconds"], 3600)
+
+        # today_summary check
+        summary = work_sessions.today_summary()
+        self.assertEqual(summary["total_seconds"], 3600)
+        self.assertEqual(len(summary["sessions"]), 1)
+
+    def test_record_past_work_with_custom_task_name(self) -> None:
+        res = self.dispatch("record_past_work", {"task": "TurfLab開発", "duration_minutes": 45})
+        self.assertTrue(res["recorded"])
+        self.assertFalse(res["matched_existing_task"])
+        self.assertEqual(res["task"], "TurfLab開発")
+        self.assertEqual(res["duration_minutes"], 45)
+        self.assertEqual(res["session"]["status"], "ended")
+        self.assertEqual(res["session"]["elapsed_seconds"], 2700)
+
+    def test_record_past_work_validation(self) -> None:
+        # Invalid duration
+        res = self.dispatch("record_past_work", {"task": "test", "duration_minutes": 0})
+        self.assertFalse(res["recorded"])
+        self.assertIn("error", res)
+
+        # Empty task
+        res = self.dispatch("record_past_work", {"task": "", "duration_minutes": 30})
+        self.assertFalse(res["recorded"])
+        self.assertIn("error", res)
+
+
 if __name__ == "__main__":
     unittest.main()

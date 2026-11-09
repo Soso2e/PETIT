@@ -365,16 +365,23 @@ def save_conversation(user_text: str, assistant_text: str, used_tools: str | Non
 def recent_conversations(limit: int = 20, session_id: str | None = None) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit), 200))
     with get_connection() as conn:
+        has_turns = bool(conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='turns'").fetchone())
+        if has_turns:
+            query_select = (
+                "SELECT c.id, c.timestamp, c.user_text, c.assistant_text, c.used_tools, c.session_id, "
+                "(SELECT t.result_json FROM turns t WHERE t.conversation_id = c.id ORDER BY t.updated_at DESC LIMIT 1) AS result_json "
+                "FROM conversations c "
+            )
+        else:
+            query_select = "SELECT c.id, c.timestamp, c.user_text, c.assistant_text, c.used_tools, c.session_id FROM conversations c "
         if session_id:
             rows = conn.execute(
-                "SELECT id, timestamp, user_text, assistant_text, used_tools, session_id "
-                "FROM conversations WHERE session_id = ? ORDER BY id DESC LIMIT ?",
+                query_select + "WHERE c.session_id = ? ORDER BY c.id DESC LIMIT ?",
                 (session_id, limit),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT id, timestamp, user_text, assistant_text, used_tools, session_id "
-                "FROM conversations ORDER BY id DESC LIMIT ?",
+                query_select + "ORDER BY c.id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
     return [present_conversation(dict(r)) for r in reversed(rows)]
@@ -383,7 +390,15 @@ def recent_conversations(limit: int = 20, session_id: str | None = None) -> list
 def present_conversation(row: dict) -> dict:
     """Internal app events are stored evidence, not words typed by the owner."""
     if str(row.get("user_text") or "").startswith("[PETIT_INTERNAL_EVENT]"):
-        return {**row, "user_text": "", "kind": "internal_event"}
+        row = {**row, "user_text": "", "kind": "internal_event"}
+    raw_result = row.pop("result_json", None)
+    if raw_result and not row.get("model_route"):
+        try:
+            data = json.loads(raw_result)
+            if isinstance(data, dict) and "model_route" in data:
+                row["model_route"] = data["model_route"]
+        except Exception:
+            pass
     return row
 
 

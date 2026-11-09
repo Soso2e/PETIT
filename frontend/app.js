@@ -131,11 +131,32 @@ function addMessage(role, text, { tools, error, actions, modelRoute, silent = fa
       fallback_reason: modelRoute.fallback_reason,
       llm_calls: modelRoute.llm_call_count,
     };
+    const isDev = window.PetitUiPreferences?.developer?.() || document.documentElement.dataset.petitDeveloper === "true";
+
+    const badge = document.createElement("div");
+    badge.className = "turn-author-badge";
+    badge.setAttribute("data-developer-only", "");
+    if (!isDev) badge.setAttribute("hidden", "");
+
+    const providerName = o.provider
+      ? (o.provider === "antigravity_cli" ? "Antigravity CLI"
+         : o.provider === "codex" ? "Codex CLI"
+         : o.provider === "claude_code" ? "Claude Code CLI"
+         : o.provider === "deepseek" ? "DeepSeek"
+         : o.provider === "lm_studio" ? "LM Studio"
+         : o.provider)
+      : (o.actual_route === "instant" ? "PETIT Instant" : "PETIT Core");
+    const modelName = o.model ? ` (${o.model})` : "";
+    const icon = o.provider ? "🧠" : "⚡";
+    badge.textContent = `${icon} 回答: ${providerName}${modelName}${o.fallback ? " [Fallback]" : ""}`;
+    badge.title = "開発者モード: クリックで詳細を開閉";
+
     const details = document.createElement("details");
     details.className = "turn-details";
     details.setAttribute("data-developer-only", "");
-    const isDev = window.PetitUiPreferences?.developer?.() || document.documentElement.dataset.petitDeveloper === "true";
     if (!isDev) details.setAttribute("hidden", "");
+
+    badge.onclick = () => { details.open = !details.open; };
 
     const summary = document.createElement("summary");
     const fallback = o.fallback ? " · フォールバック" : "";
@@ -159,7 +180,16 @@ function addMessage(role, text, { tools, error, actions, modelRoute, silent = fa
     body.textContent = lines.join("\n");
 
     details.append(summary, body);
+    bubble.appendChild(badge);
     bubble.appendChild(details);
+  } else if (role === "assistant") {
+    const isDev = window.PetitUiPreferences?.developer?.() || document.documentElement.dataset.petitDeveloper === "true";
+    const badge = document.createElement("div");
+    badge.className = "turn-author-badge turn-author-badge--system";
+    badge.setAttribute("data-developer-only", "");
+    if (!isDev) badge.setAttribute("hidden", "");
+    badge.textContent = "⚡ 回答: PETIT System";
+    bubble.appendChild(badge);
   }
 
   messagesEl.appendChild(wrap);
@@ -488,7 +518,17 @@ async function restoreHistory() {
         history.push({ role: "user", content: row.user_text });
       }
       if (row.assistant_text) {
-        addMessage("assistant", row.assistant_text, { silent: true });
+        let tools = [];
+        if (row.used_tools) {
+          try {
+            tools = typeof row.used_tools === "string" ? JSON.parse(row.used_tools) : row.used_tools;
+          } catch {}
+        }
+        addMessage("assistant", row.assistant_text, {
+          silent: true,
+          tools,
+          modelRoute: row.model_route,
+        });
         history.push({ role: "assistant", content: row.assistant_text });
       }
     }

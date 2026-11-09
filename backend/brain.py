@@ -14,7 +14,7 @@ from .petit_prompt import voice_turn_instructions
 PUBLIC_TOOLS = {
     "list_coding_repositories", "delegate_coding_task", "get_coding_task_status", "cancel_coding_task",
     "get_current_time", "get_tasks", "get_schedule", "save_memory", "search_memory",
-    "get_work_status", "get_work_report", "start_work_session", "update_work_session",
+    "get_work_status", "get_work_report", "start_work_session", "update_work_session", "record_past_work",
     "create_task", "update_task", "complete_task", "set_task_parent", "get_task_sync_status",
     "retry_task_sync", "add_schedule", "get_project_status", "register_project", "record_project_checkpoint",
     "get_local_development_status", "search_conversations", "list_project_workspaces",
@@ -29,7 +29,7 @@ PUBLIC_TOOLS = {
 }
 LOCAL_WRITES = {
     "delegate_coding_task", "cancel_coding_task", "delegate_background_research",
-    "start_work_session", "update_work_session", "save_memory", "create_task",
+    "start_work_session", "update_work_session", "record_past_work", "save_memory", "create_task",
     "update_task", "complete_task", "set_task_parent", "retry_task_sync",
     "create_internal_project", "add_internal_project_alias", "activate_internal_project",
     "save_project_completion", "link_project_workspace", "unlink_project_workspace",

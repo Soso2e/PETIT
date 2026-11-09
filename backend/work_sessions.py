@@ -5,6 +5,7 @@ import json
 import logging
 from datetime import date as CalendarDate, datetime, timedelta, timezone
 from typing import Any, Callable
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query
@@ -64,6 +65,15 @@ class WorkSessionStart(BaseModel):
     task_id: str | None = Field(default=None, max_length=160)
     task: str = Field(min_length=1, max_length=160)
     project_id: str | None = Field(default=None, max_length=160)
+
+
+class WorkSessionRecord(BaseModel):
+    task: str = Field(min_length=1, max_length=160)
+    duration_minutes: int = Field(ge=1, le=1440)
+    task_id: str | None = Field(default=None, max_length=160)
+    project_id: str | None = Field(default=None, max_length=160)
+    started_at: str | None = Field(default=None, max_length=80)
+    ended_at: str | None = Field(default=None, max_length=80)
 
 
 class WorkDayReflection(BaseModel):
@@ -209,6 +219,69 @@ def start_session(
         )
         _record_event(conn, session_id, "started", current_iso)
     return session_snapshot(_row(session_id), now=current) or {}
+
+
+def record_past_session(
+    task: str,
+    duration_minutes: int,
+    *,
+    session_id: str | None = None,
+    task_id: str | None = None,
+    project_id: str | None = None,
+    started_at: datetime | None = None,
+    ended_at: datetime | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    if duration_minutes <= 0 or duration_minutes > 1440:
+        raise ValueError("duration_minutes must be between 1 and 1440")
+    ensure_schema()
+    current = _now(now)
+
+    if ended_at is not None and started_at is not None:
+        calc_start = _now(started_at)
+        calc_end = _now(ended_at)
+    elif ended_at is not None:
+        calc_end = _now(ended_at)
+        calc_start = calc_end - timedelta(minutes=duration_minutes)
+    elif started_at is not None:
+        calc_start = _now(started_at)
+        calc_end = calc_start + timedelta(minutes=duration_minutes)
+    else:
+        calc_end = current
+        calc_start = current - timedelta(minutes=duration_minutes)
+
+    if calc_start >= calc_end:
+        raise ValueError("started_at must be before ended_at")
+
+    sid = session_id or f"past-{uuid4()}"
+    start_iso = _iso(calc_start)
+    end_iso = _iso(calc_end)
+    updated_iso = _iso(current)
+
+    with db.get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("DELETE FROM work_session_events WHERE session_id=?", (sid,))
+        conn.execute(
+            "INSERT INTO work_sessions(session_id, task_id, task, project_id, status, started_at, ended_at, paused_at, paused_total_seconds, next_check_at, updated_at) "
+            "VALUES (?, ?, ?, ?, 'ended', ?, ?, NULL, 0, NULL, ?) "
+            "ON CONFLICT(session_id) DO UPDATE SET task_id=excluded.task_id, task=excluded.task, "
+            "project_id=excluded.project_id, status='ended', started_at=excluded.started_at, ended_at=excluded.ended_at, "
+            "paused_at=NULL, paused_total_seconds=0, next_check_at=NULL, updated_at=excluded.updated_at",
+            (
+                sid,
+                (task_id or "").strip() or None,
+                task.strip(),
+                (project_id or "").strip() or None,
+                start_iso,
+                end_iso,
+                updated_iso,
+            ),
+        )
+        _record_event(conn, sid, "started", start_iso, {"manual_entry": True})
+        _record_event(conn, sid, "ended", end_iso, {"manual_entry": True, "duration_minutes": duration_minutes})
+        saved = dict(conn.execute("SELECT * FROM work_sessions WHERE session_id=?", (sid,)).fetchone())
+        conn.commit()
+    return session_snapshot(saved, now=current) or {}
 
 
 def respond(session_id: str, *, now: datetime | None = None) -> dict[str, Any] | None:
@@ -583,6 +656,24 @@ def start_work_session(payload: WorkSessionStart) -> dict[str, Any]:
             project_id=payload.project_id,
         )
     }
+
+
+@router.post("/record", status_code=201)
+def record_work_session(payload: WorkSessionRecord) -> dict[str, Any]:
+    started_dt = _parse(payload.started_at) if payload.started_at else None
+    ended_dt = _parse(payload.ended_at) if payload.ended_at else None
+    try:
+        session = record_past_session(
+            payload.task,
+            payload.duration_minutes,
+            task_id=payload.task_id,
+            project_id=payload.project_id,
+            started_at=started_dt,
+            ended_at=ended_dt,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"session": session}
 
 
 @router.get("/active")
