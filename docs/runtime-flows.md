@@ -797,3 +797,16 @@ flowchart TD
 ```
 
 背景Readの状態表示は既存APIの投影を利用し、入力・結果本文を取得しない。手動更新も維持する。
+
+
+## Activity取得の鮮度表示（v0.47.1開発版）
+
+```mermaid
+flowchart TD
+  UI[Development Hub Activity] --> GET[GET /api/activity/jobs]
+  GET -->|成功| Saved[一覧更新・最終取得日時を保存]
+  GET -->|失敗| Stale[前回一覧を保持・取得失敗と最終成功日時を表示]
+  Saved --> SQLite[(既存SQLite jobsの読み取り投影)]
+```
+
+この表示はブラウザでの最終取得時刻であり、Workerの生存確認ではない。Brainや永続ジョブの実行契約は変更しない。

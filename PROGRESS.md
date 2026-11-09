@@ -1,12 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.48.0 (`feat/discord-guild-mode-d3`・未マージ)**
+**Current Version: v0.48.1 (`fix/activity-refresh-freshness-v0471`・未マージ。main は v0.48.0)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- v0.46.0（PR #402）は main にマージ済み。H5（v0.47.0、`feat/agent-mode-codex-antigravity-h5`・未マージ）: Home ファイル Tool（list/read/search/write/edit、Hook と同じ線、`.git` は読取も拒否）を全 Brain に公開し、Codex エージェントモード（cwd=Home、shell なし）を追加（#404）。未確認: 実 Codex / agy。並行: D3（Discord Guild モード、`feat/discord-guild-mode-d3`、Antigravity が担当、#403）。後からマージする方はバージョンを v0.48.0 に上げ直す。
+- #372 Activity鮮度表示（v0.48.1、#406）: Development Hubの背景Activityに最終取得日時を表示し、通信失敗時に前回成功時刻と取得失敗を区別する。SQLiteのジョブ状態を稼働保証と誤認しない。Brain/Worker/認証は変更なし。Windows/iPhone実機とCIは未確認。
+
+- v0.48.0（PR #407）、v0.47.0（PR #405）、v0.46.0（PR #402）は main にマージ済み。H5（v0.47.0）: Home ファイル Tool（list/read/search/write/edit、Hook と同じ線、`.git` は読取も拒否）を全 Brain に公開し、Codex エージェントモード（cwd=Home、shell なし）を追加（#404）。未確認: 実 Codex / agy。D3（v0.48.0、Discord Guild モード、#403）。
 
 - 再設計 H1 + D1（v0.46.0、`claude/ai-redesign-discord-bot-h0xlft`・未マージ）: 人格の正本を PETIT Home（`~/PETIT-Home` / `PETIT_HOME`）へ移し全Brainで共有、人格変更は Core 計算の差分を確認カードで承認（#396）。Discord Bot Owner モード MVP を別プロセスで追加、owner 判定は Core（#397）。未確認: 実 Discord 接続、Desktop の確認カードでの差分表示、Home の場所の設定UI。H2: PETIT Tool の MCP bridge（#398、実 Claude Code CLI の接続確認済み）、D2: Discord の承認ボタンと通知 DM（#399）も同じブランチに追加。H3: Claude Code エージェントモード（#400、設定で ON のときだけ。cwd=Home・--restricted・MCP・L0〜L3 Hook・--resume・承認後の再開。実 CLI で通し確認済み、Bash はサンドボックス依存がある環境でのみ・未確認）。H4: worktree での開発（#401、`petit/` ブランチへの push は確認なし・PR は承認・main への push は禁止。実 CLI で worktree→テスト→commit→push→PR 提案まで確認、GitHub での PR 実作成は未確認）。次: D3（Guild モードの土台）、または H5（Codex / Antigravity CLI の追従）。
 

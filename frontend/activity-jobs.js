@@ -96,6 +96,17 @@
 
   let loading = false;
   let loadedAt = 0;
+  let lastSuccessfulUpdate = null;
+  const freshness = document.createElement("p");
+  freshness.className = "development-note";
+  freshness.setAttribute("aria-live", "polite");
+  freshness.textContent = "最終取得: 未取得";
+  state.after(freshness);
+  const showFreshness = (failed = false) => {
+    freshness.textContent = lastSuccessfulUpdate
+      ? "最終取得: " + lastSuccessfulUpdate.toLocaleString("ja-JP") + (failed ? " · 最新状態を取得できませんでした" : "")
+      : "最終取得: 未取得" + (failed ? " · 取得失敗" : "");
+  };
   const load = async (force = false) => {
     if (loading || (!force && Date.now() - loadedAt < 30000)) return;
     loading = true;
@@ -109,8 +120,11 @@
         ? "管理者ログインが必要です。" : "Activity取得失敗（HTTP " + response.status + "）");
       render(await response.json());
       loadedAt = Date.now();
+      lastSuccessfulUpdate = new Date(loadedAt);
+      showFreshness();
     } catch (error) {
       state.textContent = error.message || "Activityを取得できません。";
+      showFreshness(true);
     } finally {
       refresh.disabled = false;
       loading = false;
