@@ -30,7 +30,35 @@
     }
     throw new Error('応答の待機を終了しました。依頼はCoreに残っています。結果を再取得できます。');
   }
-  async function send(payload, transport = json) {
+  const progressLabel = (data) => {
+    if (data.phase === 'queued') return '受付済み…';
+    if (data.phase === 'vision') return '画像を確認中…';
+    if (data.phase === 'tool') return data.tool ? 'ツールを実行中…（' + data.tool + '）' : 'ツールを実行中…';
+    if (data.phase === 'thinking' && data.round > 1) return '結果をまとめ中…';
+    return '考え中…';
+  };
+  // Display-only live progress for one request. The final reply still comes from
+  // /api/chat or /api/turns/{id}; a missing stream simply leaves "考え中…".
+  function watch(requestId, onProgress) {
+    if (typeof onProgress !== 'function' || typeof window.EventSource !== 'function') return () => {};
+    let source;
+    try { source = new window.EventSource('/api/turns/' + encodeURIComponent(requestId) + '/stream'); } catch { return () => {}; }
+    let text = '';
+    const stop = () => source.close();
+    source.addEventListener('progress', (event) => {
+      let data;
+      try { data = JSON.parse(event.data); } catch { return; }
+      if (typeof data.text === 'string') text = data.text;
+      else if (typeof data.append === 'string') text += data.append;
+      try { onProgress({ phase: data.phase, tool: data.tool || null, label: progressLabel(data), text }); } catch { /* display only */ }
+    });
+    source.addEventListener('end', stop);
+    // Non-200 (guest / not logged in) closes for good; network errors auto-reconnect
+    // and receive a full snapshot again.
+    source.onerror = () => { if (source.readyState === window.EventSource.CLOSED) stop(); };
+    return stop;
+  }
+  async function send(payload, transport = json, onProgress = null) {
     stopped = false;
     // The legacy adapter also uses the same durable ledger, including images.
     // The pending input is kept only on this client until a result is known.
@@ -39,6 +67,7 @@
     const request = { ...payload, session_id: id, source };
     localStorage.setItem(pendingKey() + ':last', request.request_id);
     remember(request);
+    const stopWatching = watch(request.request_id, onProgress);
     try {
       const data = await transport('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
       if (['queued', 'running'].includes(data.status)) return await waitFor(request.request_id, transport);
@@ -48,6 +77,8 @@
       document.dispatchEvent(new Event("petit:turn-pending"));
       // An HTTP response may be lost after commit. Keep the same request ID.
       throw error;
+    } finally {
+      stopWatching();
     }
   }
   async function restore() {

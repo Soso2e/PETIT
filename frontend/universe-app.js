@@ -1333,7 +1333,14 @@
         applyWorkSession(session, { notifyAutoStop: false });
       }
       const data = await window.PETIT_SESSION.send({ message, attachment_ids: attachmentIds,
-        request_id: requestId, conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }, requestJson);
+        request_id: requestId, conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }, requestJson,
+        (progress) => {
+          const copy = pending.firstElementChild;
+          if (copy) copy.textContent = progress.text || progress.label;
+          pending.classList.toggle("is-loading", !progress.text);
+          pending.classList.toggle("is-streaming", Boolean(progress.text));
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        });
       if (data.error) throw new Error(data.error);
       window.PetitChatAttachments?.complete(attachmentIds);
       pending.remove();

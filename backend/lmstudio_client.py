@@ -1,6 +1,7 @@
 """OpenAI-compatible model client for local LM Studio and external providers."""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import ipaddress
@@ -8,8 +9,9 @@ import ssl
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
+from uuid import uuid4
 
 import httpx
 
@@ -186,6 +188,107 @@ def _post_completion(
         raise LMStudioError(f"{provider_name}の応答がJSONではありませんでした。") from exc
 
 
+class _StreamUnsupported(Exception):
+    """The endpoint rejected streaming parameters before any output."""
+
+
+def _post_completion_stream(
+    *,
+    url: str,
+    payload: dict[str, Any],
+    headers: dict[str, str],
+    route: str,
+    target: dict[str, Any],
+    on_delta: Callable[[str], None],
+) -> dict[str, Any]:
+    """Receive an OpenAI-compatible SSE stream and rebuild a non-stream response.
+
+    Only content deltas are forwarded for display. Tool calls are accumulated and
+    returned whole, so validation and approval are unchanged.
+    """
+    provider_name = _provider_name(target)
+    payload = {**payload, "stream": True, "stream_options": {"include_usage": True}}
+    content: list[str] = []
+    reasoning: list[str] = []
+    calls: dict[int, dict[str, Any]] = {}
+    finish_reason = None
+    usage = None
+    try:
+        verify = _SYSTEM_TRUST_CONTEXT if target.get("provider") == "deepseek" else True
+        with httpx.stream("POST", url, json=payload, headers=headers,
+                          timeout=target.get("timeout_seconds", config.LM_TIMEOUT), verify=verify) as resp:
+            if resp.status_code in {400, 404, 405, 415, 422}:
+                raise _StreamUnsupported()
+            if resp.status_code >= 400:
+                resp.read()
+                resp.raise_for_status()
+            for line in resp.iter_lines():
+                line = line.strip()
+                if not line.startswith("data:"):
+                    continue
+                body = line[5:].strip()
+                if body == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(body)
+                except ValueError as exc:
+                    raise LMStudioError(f"{provider_name}のstream応答を解釈できませんでした。") from exc
+                if not isinstance(chunk, dict):
+                    continue
+                if isinstance(chunk.get("usage"), dict):
+                    usage = chunk["usage"]
+                for choice in chunk.get("choices") or []:
+                    if not isinstance(choice, dict) or choice.get("index", 0) != 0:
+                        continue
+                    delta = choice.get("delta") or {}
+                    text = delta.get("content")
+                    if isinstance(text, str) and text:
+                        content.append(text)
+                        try:
+                            on_delta(text)
+                        except Exception:  # Display must never break the Turn.
+                            log.debug("stream delta sink failed", exc_info=True)
+                    thought = delta.get("reasoning_content")
+                    if isinstance(thought, str) and thought:
+                        reasoning.append(thought)
+                    for call in delta.get("tool_calls") or []:
+                        if not isinstance(call, dict):
+                            continue
+                        slot = calls.setdefault(int(call.get("index") or 0), {
+                            "id": None, "type": "function", "function": {"name": "", "arguments": ""}})
+                        if call.get("id"):
+                            slot["id"] = call["id"]
+                        function = call.get("function") or {}
+                        if isinstance(function.get("name"), str):
+                            slot["function"]["name"] += function["name"]
+                        if isinstance(function.get("arguments"), str):
+                            slot["function"]["arguments"] += function["arguments"]
+                    if choice.get("finish_reason"):
+                        finish_reason = choice["finish_reason"]
+    except httpx.ConnectError as exc:
+        raise LMStudioError(
+            f"{route}の{provider_name}に接続できませんでした ({target['base_url']})。"
+            "接続先、起動状態、ネットワークを確認してください。"
+        ) from exc
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        body = exc.response.text[:200]
+        hint = " APIキーと残高を確認してください。" if target.get("provider") == "deepseek" and status in {401, 402, 403} else ""
+        raise LMStudioError(f"{provider_name}がエラーを返しました: {status} {body}{hint}") from exc
+    except httpx.HTTPError as exc:
+        raise LMStudioError(f"{provider_name}との通信に失敗しました: {exc}") from exc
+    message: dict[str, Any] = {"role": "assistant", "content": "".join(content)}
+    if reasoning:
+        message["reasoning_content"] = "".join(reasoning)
+    if calls:
+        message["tool_calls"] = [
+            {**calls[index], "id": calls[index]["id"] or "call_" + uuid4().hex} for index in sorted(calls)]
+    data: dict[str, Any] = {"choices": [{"message": message, "finish_reason": finish_reason}]}
+    if usage is not None:
+        data["usage"] = usage
+    return data
+
+
 def _parse_choice(data: dict[str, Any], target: dict[str, Any]) -> dict[str, Any]:
     try:
         choice = data["choices"][0]
@@ -254,8 +357,12 @@ def chat_completion(
     max_tokens: int | None = None,
     route: str = "chat",
     target_override: dict[str, Any] | None = None,
+    on_delta: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
-    """Call the active OpenAI-compatible endpoint for Chat or Agent."""
+    """Call the active OpenAI-compatible endpoint for Chat or Agent.
+
+    ``on_delta`` receives display-only content chunks when streaming is used.
+    """
     if not any(
         message.get("role") == "user" and str(message.get("content") or "").strip()
         for message in messages
@@ -309,7 +416,15 @@ def chat_completion(
 
         _record_model_call(route, target, selected_model)
         try:
-            data = _post_completion(url=url, payload=payload, headers=headers, route=route, target=target)
+            data = None
+            if on_delta is not None and retry_count == 0:
+                try:
+                    data = _post_completion_stream(url=url, payload=payload, headers=headers, route=route,
+                                                   target=target, on_delta=on_delta)
+                except _StreamUnsupported:
+                    log.info("stream unsupported; falling back route=%s profile=%s", route, target["profile"])
+            if data is None:
+                data = _post_completion(url=url, payload=payload, headers=headers, route=route, target=target)
             _record_usage(data, target)
             message = _parse_choice(data, target)
         except LMStudioError:

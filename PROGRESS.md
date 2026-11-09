@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.49.0 (main)**
+**Current Version: v0.50.0 (main)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #410 会話Turn進捗・応答ドラフトのストリーミング表示（v0.50.0）: 実行中Turnの表示専用・揮発の進捗ハブ（`turn_stream.py`）とSSEエンドポイント（`GET /api/turns/{request_id}/stream`）を追加。OpenAI互換API Brain（LM Studio / DeepSeek）では `stream=True` で本文deltaを受信しドラフト表示、Toolラウンド・Brain Fallback時は途中ドラフトを破棄。CLI Brainは構造化応答検証後に使うためフェーズ表示のみ。確定結果・承認・effect receipt・保存は従来どおり `/api/chat` / `/api/turns/{id}` の台帳を正とする。Web / Desktop / Universe の「考え中…」バブルを進捗・ドラフトでリアルタイム更新。実LM Studio / DeepSeekでのストリーム推論・実端末表示は未確認。
 
 - #408 過去作業時間記録と開発者モード回答者表示（v0.49.0）: 過去作業時間を遡及登録できる新Tool `record_past_work`（`duration_minutes`, `task`, `started_at`, `ended_at`）とREST API（`/api/work-sessions/record`）を追加し、日別・期間集計（`today_summary`, `period_summary`）へ即時反映。開発者モードON時にメッセージ吹き出しへ回答者バッジ（`🧠 Provider (Model)`）を常時表示し、クリックで詳細を展開できるように改善。履歴復元（`/api/conversations`）時に `turns.result_json` から `model_route` を復元してリロード後も回答者情報を保持。単体・UI契約テスト追加。実端末での表示・実Provider推論は未確認。
 
@@ -383,3 +385,4 @@
 | 2026-11-09 | 03:20 | #390 | v0.48.3: Coding Job詳細更新の差分判定拡張（summary/error/checks/workspace/branch）とClaude Code CLI表示を修正。 |
 | 2026-11-09 | 03:25 | #393 #394 | v0.48.4: Univ 3Dのカメラ入力をOrbitControlsから自前コントローラへ置換（追跡外の指を無視・ピンチ後ロック・慣性・タップ統合）、見えない旧DOMボタンがCanvas入力を奪っていた不具合とラベルの広すぎる当たり判定を修正。 |
 | 2026-11-09 | 05:00 | #408 | v0.49.0: 過去作業時間の事後登録ツール record_past_work を追加（work_sessionsに記録・集計即時反映）、開発者モードでの回答者バッジ常時表示と履歴復元時のmodel_route維持を実装。 |
+| 2026-11-09 | 05:56 | #410 | v0.50.0: 会話Turnの表示専用SSEストリーミング（`GET /api/turns/{id}/stream`・`turn_stream.py`）とAPI Brainの`stream=True`ドラフト配信、Toolラウンド/Fallback時のドラフト破棄、Web/Desktop/Universeのリアルタイム進捗表示を実装。 |
