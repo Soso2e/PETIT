@@ -6,7 +6,7 @@ import hashlib
 import time
 from typing import Any
 
-from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, petit_home, request_context, time_context, tools
+from . import config, conversation_store as store, db, dialogue_state, lmstudio_client, petit_home, request_context, time_context, tools, turn_stream
 from .petit_prompt import voice_turn_instructions
 
 # A reviewed public catalog, never the registry's internal approval executors.
@@ -244,10 +244,13 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             "history_chars":sum(len(str(x.get("content") or "")) for x in store.history(row["thread_id"])),
             "state_chars":len(store.encode(dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:])),
             "index_chars":len(catalog.index()), "alerts_chars":len(service_sync.warning()), "tokens":None})
+    # A Brain fallback starts over; never keep the failed Brain's draft on screen.
+    turn_stream.reset_text(request_id)
     for _round in range(MAX_ROUNDS):
         if store.load_turn(request_id)["cancel_requested"]:
             raise TurnCancelled("取消要求を受け付けました。すでに実行された操作は取り消していません。")
         check_provider(thread)
+        turn_stream.phase(request_id, "thinking", round=_round + 1)
         if target.get("provider") == "antigravity_cli":
             from .antigravity_cli_brain import step
             response = step(request_id, target, messages, catalog)
@@ -257,8 +260,11 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         else:
             selected_schemas = catalog.schemas()
             call_started = time.monotonic()
+            # Display-only draft. The ledger keeps the validated final reply.
+            stream_kwargs = {"on_delta": lambda text: turn_stream.delta(request_id, text)} \
+                if config.STREAM_REPLIES and turn_stream.snapshot(request_id) else {}
             response = lmstudio_client.chat_completion(messages, tools=selected_schemas or None, route="chat",
-                                                       max_tokens=1600, target_override=target)
+                                                       max_tokens=1600, target_override=target, **stream_kwargs)
             with db.get_connection() as c:
                 metrics = lmstudio_client._turn_metrics.get() or {}
                 usage = (metrics.get("usage") or [None])[-1]
@@ -267,6 +273,8 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
                     "message_chars":sum(len(str(x.get("content") or "")) for x in messages),
                     "call_seconds":round(time.monotonic()-call_started, 4), "usage":usage})
         calls = response.get("tool_calls") or []
+        if calls:
+            turn_stream.reset_text(request_id)
         if not calls:
             reply = str(response.get("content") or "").strip()
             if not reply:
@@ -292,6 +300,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
                 raise lmstudio_client.LMStudioError("Tool call IDを取得できませんでした。")
             raw = None
             tool_started = time.monotonic()
+            turn_stream.phase(request_id, "tool", tool=name if name in PUBLIC_TOOLS or name == DISCOVER else None)
             try:
                 if name == DISCOVER:
                     if len(used) >= MAX_CALLS:

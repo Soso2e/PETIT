@@ -1,6 +1,7 @@
 """Shared Thread/Turn API; legacy chat is only a synchronous adapter."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -8,9 +9,10 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import brain, conversation_store as store, db, lmstudio_client, request_context
+from . import brain, conversation_store as store, db, lmstudio_client, request_context, turn_stream
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -34,6 +36,18 @@ def process(request_id: str) -> dict:
     request_context.forbid_guild_mode("Core Turn")
     if not store.claim(request_id):
         return store.result(request_id)
+    # Display-only live progress; the ledger below remains the source of truth.
+    turn_stream.open(request_id)
+    status = None
+    try:
+        result = _process_claimed(request_id)
+        status = result.get("status")
+        return result
+    finally:
+        turn_stream.close(request_id, status)
+
+
+def _process_claimed(request_id: str) -> dict:
     row = store.load_turn(request_id)
     payload = json.loads(row["input_json"])
     is_admin = bool(payload.get("is_admin", False))
@@ -50,7 +64,9 @@ def process(request_id: str) -> dict:
                         raise lmstudio_client.LMStudioError("CLIのみの画像付き会話は未対応です。画像を外して送信してください。SDK/APIへ自動送信しません。")
                     from . import attachments, vision, vision_reply
                     brain.check_provider(store.thread(row["thread_id"]))
+                    turn_stream.phase(request_id, "vision")
                     observations = vision.analyze(attachment_ids, row["thread_id"])
+                    turn_stream.phase(request_id, "thinking")
                     data = vision_reply.run_with_images(payload["message"], observations,
                                                          history=store.history(row["thread_id"]))
                     # Observations retain their existing 24h TTL, not a second
@@ -124,6 +140,80 @@ def submit_turn(thread_id: str, payload: TurnCreate, request: Request) -> dict:
 @router.get("/api/turns/{request_id}")
 def get_turn(request_id: str) -> dict:
     return store.result(request_id)
+
+
+TERMINAL_STATUSES = {"completed", "failed", "cancelled", "waiting_approval"}
+STREAM_TICK_SECONDS = 0.1
+STREAM_WAIT_FOR_TURN_SECONDS = 15.0
+STREAM_MAX_SECONDS = 600.0
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _ledger_status(request_id: str) -> str | None:
+    try:
+        return store.load_turn(request_id)["status"]
+    except HTTPException:
+        return None
+
+
+@router.get("/api/turns/{request_id}/stream")
+async def stream_turn(request_id: str, request: Request) -> StreamingResponse:
+    """Display-only progress (SSE). The final result stays in /api/turns/{id}.
+
+    The client may connect before /api/chat creates the Turn; it is awaited briefly.
+    Drafts are sent as ``append`` or as a full ``text`` replacement after a reset.
+    """
+    async def events():
+        started = last_sent = time.monotonic()
+        ledger_checked = 0.0
+        sent_text, sent_version = "", None
+        yield "retry: 3000\n\n"
+        while time.monotonic() - started < STREAM_MAX_SECONDS:
+            if await request.is_disconnected():
+                return
+            now = time.monotonic()
+            snap = turn_stream.snapshot(request_id)
+            if snap is not None:
+                if snap["version"] != sent_version:
+                    sent_version = snap["version"]
+                    data = {"phase": snap["phase"], "tool": snap["tool"], "round": snap["round"]}
+                    text = snap["text"]
+                    if text.startswith(sent_text):
+                        if len(text) > len(sent_text):
+                            data["append"] = text[len(sent_text):]
+                    else:
+                        data["text"] = text
+                    sent_text = text
+                    yield _sse("progress", data)
+                    last_sent = now
+                if snap["closed"]:
+                    yield _sse("end", {"status": snap["status"]})
+                    return
+            elif now - ledger_checked >= 1.0:
+                ledger_checked = now
+                status = await asyncio.to_thread(_ledger_status, request_id)
+                if status in TERMINAL_STATUSES:
+                    yield _sse("end", {"status": status})
+                    return
+                if status is None and now - started > STREAM_WAIT_FOR_TURN_SECONDS:
+                    yield _sse("end", {"status": "not_found"})
+                    return
+                if status and sent_version is None:
+                    sent_version = -1
+                    yield _sse("progress", {"phase": "queued" if status == "queued" else "thinking",
+                                            "tool": None, "round": 0})
+                    last_sent = now
+            if now - last_sent > 15:
+                yield ": keepalive\n\n"
+                last_sent = now
+            await asyncio.sleep(STREAM_TICK_SECONDS)
+        yield _sse("end", {"status": "stream_timeout"})
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
 @router.post("/api/turns/{request_id}/cancel")

@@ -417,7 +417,8 @@ async function sendMessage(text) {
 
   try {
     const data = await window.PETIT_SESSION.send({ message: text, attachment_ids: attachmentIds,
-      request_id: requestId, conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }, chatJson);
+      request_id: requestId, conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }, chatJson,
+      (progress) => setTyping(true, progress.text || progress.label));
     setTyping(false);
 
     if (data.request_id !== requestId) {

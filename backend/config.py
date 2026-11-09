@@ -62,6 +62,10 @@ WORKSPACE_CONTEXT_FOREGROUND_ENABLED = os.getenv("PETIT_WORKSPACE_CONTEXT_FOREGR
 WORKSPACE_CONTEXT_INTERVAL_SECONDS = max(15.0, float(os.getenv("PETIT_WORKSPACE_CONTEXT_INTERVAL_SECONDS", "30")))
 WORKSPACE_CONTEXT_MAX_AGE_SECONDS = max(15.0, float(os.getenv("PETIT_WORKSPACE_CONTEXT_MAX_AGE_SECONDS", "90")))
 
+# Display-only reply drafts from OpenAI-compatible Brains (stream=True). The
+# validated final reply in the Turn ledger is unchanged. Set 0 to disable.
+STREAM_REPLIES = os.getenv("PETIT_STREAM_REPLIES", "1") not in ("0", "false", "False")
+
 
 # Existing Obsidian vaults that PETIT can use as its Markdown brain.
 # Windows uses ';' as the separator: C:\VaultA;D:\VaultB
