@@ -144,6 +144,19 @@ flowchart TD
     WA --> Approve[承認 → conversation_api.decide → 同じセッションで --resume]
 ```
 
+## Development Job UI更新（v0.48.3）
+
+```mermaid
+flowchart LR
+    DB[(既存SQLite coding_jobs)] --> API[管理者GET /api/coding/jobs]
+    API --> Poll[Development UI / 3秒可視時poll]
+    Poll --> Signature[status / events / summary / error / checks / workspace / branch]
+    Signature -->|変化あり| Render[状態・実行CLI・結果・静的チェックを再描画]
+    Signature -->|変化なし| Keep[DOM維持]
+```
+
+既存の承認・取消・差分表示APIは不変。Claude CodeのProvider名を正しく表示し、実行完了の証拠と静的チェック・実機確認を混同しない。
+
 ## Claude Code CLI Executor（v0.44.0開発版）
 
 Concept §4 のExecutor順位（Antigravity CLI ＞ Codex ＞ Claude Code ＞ DeepSeek）の3番目。Antigravity CLIと同じ「構造化した1 round」方式で、Toolの実行・承認・receiptは既存native Loopが行う。
