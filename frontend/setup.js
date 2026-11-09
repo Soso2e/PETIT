@@ -35,6 +35,10 @@
   function render() {
     const s=state.settings;order=s.priority.filter(x=>x!=="antigravity");priority();$("sdk-migration").textContent=s.priority.includes("antigravity")?"旧SDK設定があります。利用するAIの接続・費用許可を確認し、AI設定を保存してください。":"";
     $('brain-transport').value=s.brain_transport||'mixed';
+    $('front-brain').checked=!!s.front_brain_deepseek;
+    $('delegate-priority').value=(s.delegate_priority||['claude_code','codex']).join(',');
+    $('delegate-claude-model').value=s.delegate_claude_model||'sonnet';
+    {const ready=state.delegation?.available||[],names={claude_code:'Claude Code',codex:'Codex'};$('delegate-status').textContent=ready.length?'今任せられるCLI: '+ready.map(x=>names[x]||x).join(' → '):'今任せられるCLIはありません。Claude CodeかCodexを接続してください。';}
     const codex=state.codex_cli;
     if ($('codex-cli-status')) $('codex-cli-status').textContent=codex?(codex.installed?'CLI検出済み':'CLI未検出')+' / '+(codex.error||('ChatGPT認証: '+(codex.authenticated===null?'未確認':codex.authenticated?'確認済み':'未認証')))+' / モデル応答: 接続テストで確認':'CLI状態は未確認です。';
     const cli=state.antigravity_cli;
@@ -78,6 +82,7 @@
   $('auth-form').addEventListener('submit',async event=>{event.preventDefault();const button=$('auth-submit');button.disabled=true;try{await api(session.initialized?'/login':'/bootstrap','POST',{password:$('password').value,bootstrap_token:$('bootstrap-token').value});$('password').value='';$('bootstrap-token').value='';await start();if(session.completed&&params.get('resume')==='1'){location.replace(next);return;}notice('ログインしました。');}catch(error){notice(error.message,true);}finally{button.disabled=false;}});
   if ($('claude-agent-save')) action($('claude-agent-save'),async()=>{await save({claude_code_agent_mode:$('claude-agent-mode').checked,claude_code_agent_bash:$('claude-agent-bash').checked});notice('エージェント設定を保存しました。');});
   action($('logout'),async()=>{await api('/logout','POST');await start();notice('ログアウトしました。');});
+  action($('save-front-brain'),async()=>{await save({front_brain_deepseek:$('front-brain').checked,delegate_priority:$('delegate-priority').value.split(','),delegate_claude_model:$('delegate-claude-model').value});notice('DeepSeekと任せる先の設定を保存しました。次の依頼から使います。');});
   action($('save-brain'),async()=>{await saveAI({brain_enabled:$('brain-enabled').checked,brain_transport:$('brain-transport').value});notice('AI設定を保存しました。');});
   document.querySelectorAll('[data-connect]').forEach(button=>action(button,async()=>{const id=button.dataset.connect;
     if(['codex','deepseek'].includes(id)){await saveKeys([['deepseek-key','deepseek_key']]);await saveAI();}

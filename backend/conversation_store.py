@@ -55,6 +55,14 @@ CREATE TABLE IF NOT EXISTS turn_approvals (
     call_id TEXT NOT NULL, tool TEXT NOT NULL, arguments_json TEXT NOT NULL,
     status TEXT NOT NULL, expires_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS delegations (
+    id TEXT PRIMARY KEY, parent_thread_id TEXT NOT NULL REFERENCES threads(id),
+    parent_request_id TEXT NOT NULL UNIQUE, work_thread_id TEXT NOT NULL REFERENCES threads(id),
+    work_request_id TEXT NOT NULL REFERENCES turns(request_id), goal TEXT NOT NULL,
+    provider TEXT NOT NULL, model TEXT NOT NULL DEFAULT '', reported_status TEXT, reported_at TEXT,
+    report_conversation_id INTEGER REFERENCES conversations(id), created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_delegations_parent ON delegations(parent_thread_id, created_at);
 """
 
 
@@ -114,7 +122,7 @@ def list_threads(limit=30) -> list[dict]:
     ensure_schema()
     with db.get_connection() as connection:
         return [dict(row) for row in connection.execute(
-            "SELECT * FROM threads ORDER BY created_at DESC,id DESC LIMIT ?", (min(100, max(1, limit)),))]
+            "SELECT * FROM threads WHERE source<>'delegate' ORDER BY created_at DESC,id DESC LIMIT ?", (min(100, max(1, limit)),))]
 
 
 def accept(thread_id: str, request_id: str, payload: dict) -> tuple[dict, bool]:
@@ -312,7 +320,8 @@ def snapshot(thread_id: str, after_seq=0) -> dict:
             "SELECT COALESCE(MAX(seq),0) FROM turn_events WHERE thread_id=?", (thread_id,)).fetchone()[0]
         pending = connection.execute(
             "SELECT a.* FROM turn_approvals a JOIN turns t ON t.request_id=a.request_id "
-            "WHERE t.thread_id=? AND a.status='pending' AND a.expires_at>?", (thread_id, time.time())).fetchall()
+            "WHERE (t.thread_id=? OR t.thread_id IN (SELECT work_thread_id FROM delegations WHERE parent_thread_id=?)) "
+            "AND a.status='pending' AND a.expires_at>?", (thread_id, thread_id, time.time())).fetchall()
     return {"thread": owner, "conversations": [db.present_conversation(dict(r)) for r in reversed(rows)],
             "events": [{**dict(r), "payload": json.loads(r["payload_json"])} for r in events],
             "last_seq": last_seq, "pending_actions": [

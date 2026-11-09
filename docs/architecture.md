@@ -80,6 +80,7 @@ flowchart TD
   - **Claude Code CLI**: 公式 `claude` をヘッドレスで起動し、組込みTool・MCP・設定読込を無効にしてJSONで判断だけを受け取る。明示接続時のみ（[brain/claude-code-cli.md](brain/claude-code-cli.md)）。
     - **エージェントモード（v0.46.0、設定で ON のときだけ）**: PETIT Home を作業場所に、組込みファイル Tool と PETIT Tool（MCP）を使い、PreToolUse Hook で L0〜L3 の線を引く。人格ファイルは差分承認。詳細は [brain/agent-home.md](brain/agent-home.md) §4.3。
 - 既定の優先順位は Concept §4 と同じ Antigravity CLI → Codex → Claude Code → DeepSeek。未接続の候補は飛ばす。保存済みの順位は書き換えず、新しく接続したCLIは方針順の位置へ挿入する（Antigravity CLIの「先頭へ」ボタンは従来どおり）。
+- **Front Brain（v0.50.0、設定のトグルで ON のときだけ）**: Turn の順位だけ DeepSeek を先頭にする（保存済みの順位は変えない）。複数ステップの作業は `delegate_to_agent` で作業用 Thread の Turn としてエージェントモードの CLI に任せ、結果は Core が元の Thread へ報告する。詳細は [brain/front-brain-delegation.md](brain/front-brain-delegation.md)。
 - `brain_transport=cli_only` にすると、CLI（Codex / Antigravity CLI / Claude Code CLI）だけを使い、APIへは切り替えない。
 - 障害時は、Toolを実行する前に限って次の候補へ切り替える。Tool実行後に障害が起きたら、そのTurnは失敗として扱う。
 - Antigravity SDK は撤去済み（[brain/sdk-retirement.md](brain/sdk-retirement.md)）。
@@ -149,7 +150,7 @@ PETIT/
 
 | 目標 | 現状 | 次の一手 |
 | --- | --- | --- |
-| Router（DeepSeek）と Executor（CLI）の分離 | 1つのBrainがTurnを最後まで担当し、優先順位で切り替える | 分けるかどうかを含めて設計する（Concept §10） |
+| Router（DeepSeek）と Executor（CLI）の分離 | 既定は1つのBrainがTurnを最後まで担当。トグル ON で DeepSeek が最初の担当になり、CLI へ委譲できる（v0.50.0） | 実 CLI での通し確認と振り分け精度の評価（[設計](brain/front-brain-delegation.md) §7） |
 | Executor の優先順位 Antigravity ＞ Codex ＞ Claude Code ＞ DeepSeek | 既定値を方針順に設定済み（v0.44.0）。保存済みの順位は変えない | 実端末で各CLIの接続テスト |
 | Claude Code CLI 対応 | 会話Brain・Coding Jobに実装（v0.44.0）。契約上の扱いは未確認 | 実ログイン環境での受入、得意分野による振り分け（§10） |
 | アカウント型の設定共通化 | ホスト別の設定と管理者1名 | アカウントのモデルと保存先を設計する |

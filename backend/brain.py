@@ -26,9 +26,10 @@ PUBLIC_TOOLS = {
     "open_worktree", "list_worktrees", "get_worktree_status", "run_worktree_check", "commit_worktree",
     "push_worktree", "create_worktree_pull_request", "close_worktree",
     "list_home_files", "read_home_file", "search_home_files", "write_home_file", "edit_home_file",
+    "delegate_to_agent", "get_delegation_status", "cancel_delegation",
 }
 LOCAL_WRITES = {
-    "delegate_coding_task", "cancel_coding_task", "delegate_background_research",
+    "delegate_coding_task", "cancel_coding_task", "delegate_background_research", "delegate_to_agent",
     "start_work_session", "update_work_session", "record_past_work", "save_memory", "create_task",
     "update_task", "complete_task", "set_task_parent", "retry_task_sync",
     "create_internal_project", "add_internal_project_alias", "activate_internal_project",
@@ -196,14 +197,19 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
     if target.get("provider") == "codex":
         from . import codex_brain
         return codex_brain.run(request_id, target, messages=messages, used_tools=used_tools)
+    from . import delegations, setup_store
+    settings = setup_store.load()
     if target.get("provider") == "claude_code":
-        from . import claude_agent, setup_store
-        if claude_agent.enabled(setup_store.load()):
+        from . import claude_agent
+        if claude_agent.enabled(settings) or delegations.is_work_thread(row["thread_id"]):
             # Agent mode: the CLI works in PETIT Home and calls PETIT Tools over MCP.
             return claude_agent.run(request_id, target, messages=messages, used_tools=used_tools)
     from .brain_catalog import Catalog, DISCOVER
     from .provider_runtime import validate_arguments
     catalog = Catalog()
+    front_turn = delegations.is_front_turn(settings, target.get("provider"))
+    if front_turn:
+        catalog.selected |= delegations.FRONT_DIRECT
     # Restore requested detail schemas after Approval without a second router.
     for prior in messages or []:
         for call in prior.get("tool_calls", []):
@@ -219,6 +225,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         persona = petit_home.persona()
         messages = [{"role": "system", "content": persona + voice_turn_instructions() + INSTRUCTIONS +
                     "\n必要ならdiscover_toolsで詳細schemaを取得する。場所は確認済みの情報だけを使い、不明なら質問する。タイムゾーンから推定しない。" + HOME_HINT +
+                    (delegations.FRONT_HINT if front_turn else "") +
                     "\nCapability一覧: " + catalog.index()},
                     {"role": "user", "content": "Coreの現在時刻（参考メタデータ）: " +
                      time_context.current_datetime().isoformat(timespec="seconds")}]
@@ -272,6 +279,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             reply = str(response.get("content") or "").strip()
             if not reply:
                 raise lmstudio_client.LMStudioError("モデルから返答を取得できませんでした。")
+            reply += delegations.turn_notice(request_id)
             return store.finish(request_id, {"reply": reply, "used_tools": used,
                 "model_route": {"kind": "brain", "actual_route": "chat", "llm_call_count": _round + 1,
                                 "provider": target.get("provider"), "model": target.get("model"),

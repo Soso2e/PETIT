@@ -1,0 +1,15 @@
+.delegation-strip { display: grid; gap: 4px; margin: 0 0 8px; }
+.delegation-strip[hidden] { display: none; }
+.delegation-strip__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--ui-border, rgba(127, 127, 127, .35));
+  border-radius: 8px;
+  color: var(--ui-text, inherit);
+  font-size: 12px;
+}
+.delegation-strip__text { min-width: 0; overflow-wrap: anywhere; }
+.delegation-strip__stop { flex: none; font-size: 12px; padding: 2px 8px; }

@@ -1346,6 +1346,7 @@
       pending.remove();
       appendMessage("assistant", data.reply || "", data.pending_actions || []);
       state.history.push({ role: "user", content: message }, { role: "assistant", content: data.reply || "" });
+      if (data.used_tools?.some((item) => item.name === "delegate_to_agent")) void window.PetitDelegations?.refresh();
       await loadUniverse();
     } catch (error) {
       pending.classList.remove("is-loading");
@@ -1739,6 +1740,13 @@
     setupChatLogDialog();
     await loadModelRouting();
     await restoreHistory();
+    void window.PetitDelegations?.attach({
+      threadId: () => state.sessionId,
+      append: (report, actions) => {
+        appendMessage("assistant", report, actions);
+        state.history.push({ role: "assistant", content: report });
+      },
+    });
     await loadUniverse();
     await restoreWorkSession();
   };

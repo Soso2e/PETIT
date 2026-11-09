@@ -21,6 +21,8 @@ const SHELL = [
   "/static/setup-gate.js",
   "/static/chat_attachments.js",
   "/static/chat_attachments.css",
+  "/static/delegations.js",
+  "/static/delegations.css",
   "/static/connection-status.js",
   "/static/connection-status.css",
   "/",

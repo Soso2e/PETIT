@@ -435,6 +435,7 @@ async function sendMessage(text) {
       if (data.reply || data.pending_actions?.length) {
         addMessage("assistant", data.reply, { tools: data.used_tools, actions: data.pending_actions, modelRoute: data.model_route });
         history.push({ role: "assistant", content: data.reply });
+        if (data.used_tools?.some((item) => item.name === "delegate_to_agent")) void window.PetitDelegations?.refresh();
       }
     }
   } catch (e) {
@@ -565,6 +566,13 @@ async function loadOpener() {
 async function restoreConversationOrOpener() {
   const restored = await restoreHistory();
   if (restored === null) return;
+  void window.PetitDelegations?.attach({
+    threadId: () => sessionId,
+    append: (report, actions) => {
+      addMessage("assistant", report, { actions, silent: true });
+      history.push({ role: "assistant", content: report });
+    },
+  });
   if (!restored) await loadOpener();
 }
 

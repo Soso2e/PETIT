@@ -34,6 +34,8 @@ def startup() -> None:
     worker.get_worker().start()
     from . import durable_reads
     durable_reads.get_worker().start()
+    from . import delegations
+    delegations.get_worker().start()
     # Complete this shared lazy migration before first-run UI requests race each other.
     from . import task_hierarchy
     task_hierarchy.ensure_task_hierarchy_schema()
@@ -52,7 +54,8 @@ def shutdown() -> None:
     attachments.stop_cleanup()
     if config.AUTO_SUMMARY_ENABLED:
         scheduler.get_scheduler().stop()
-    from . import durable_reads
+    from . import delegations, durable_reads
+    delegations.get_worker().stop()
     durable_reads.get_worker().stop()
     worker.get_worker().stop()
 

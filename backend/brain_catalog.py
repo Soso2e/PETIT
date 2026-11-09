@@ -17,6 +17,11 @@ def available(schema: dict, *, local_only: bool, setup: dict) -> bool:
     name = schema["function"]["name"]
     if name not in tools.registered_names():
         return False
+    from . import delegations
+    if name in delegations.TOOLS:
+        return delegations.tool_available(name, setup, local_only=local_only)
+    if name in delegations.FRONT_HIDDEN and delegations.is_front_turn(setup):
+        return False
     if name in {"get_weather", "search_news"} and tools.risk_for(name) != "safe_read":
         return False
     # A local-only Thread may use internal state, never external read services.

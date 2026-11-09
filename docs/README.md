@@ -52,6 +52,7 @@ Brainの選択、CLI（Antigravity / Codex / Claude Code）接続、モデル切
 - [agent-home.md](brain/agent-home.md) — PETIT Home：CLIを自立した作業者へ（方針承認済み・未実装）
 - [antigravity-cli.md](brain/antigravity-cli.md) — Antigravity CLIと既存契約枠（#355 / #349）
 - [claude-code-cli.md](brain/claude-code-cli.md) — Claude Code CLI Executor（v0.44.0）
+- [front-brain-delegation.md](brain/front-brain-delegation.md) — Front Brain と CLI 委譲（v0.50.0・試験機能・実 CLI 未確認）
 - [model_route_switcher.md](brain/model_route_switcher.md) — Chat / Agent モデル切り替え
 - [persistent-agent-workspace.md](brain/persistent-agent-workspace.md) — #368 Persistent Agent Workspace / compact tools
 - [sdk-retirement.md](brain/sdk-retirement.md) — #368 SDK撤去とProvider共通境界

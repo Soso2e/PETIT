@@ -29,6 +29,7 @@ CATEGORY_LABELS: dict[str, str] = {
     "github_ci_failure": "GitHub CI失敗",
     "sync_failure": "同期失敗（高優先度）",
     "background_task": "バックグラウンド調査の完了",
+    "delegation": "任せた作業の確認待ちと結果",
 }
 DEFAULT_PREFERENCES = {category: category == "sync_failure" for category in CATEGORY_LABELS}
 
