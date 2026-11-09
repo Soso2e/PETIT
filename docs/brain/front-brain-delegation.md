@@ -130,6 +130,18 @@ flowchart TD
 
 ---
 
+### 4.4 システムプロンプトの縮小（v0.50.1）
+
+人格と原則（`petit_prompt.CORE_SYSTEM_PROMPT`）を短くし、Tool 固有の規則（タスク期限と予定の区別、天気の場所）は各 Tool の説明へ移した。Front では `FRONT_HIDDEN` で worktree・Coding Job・Home 書き込みの Tool を一覧から外し、`FRONT_HINT` と矛盾する `HOME_HINT` を渡さない。Front の固定部分は約3,640字から約2,260字になった。
+
+DeepSeek Flash・合成データ（`experiments/evaluate_renaissance.py`、10ケース。結果は `reports/prompt-slimming-evaluation.json`）で比べて分かったこと:
+
+- Git の証拠に関する行は Front にも要る。外すと「コードどこまで進んでる？」で `get_local_development_status` を探しに行かなくなった（5/5 失敗）。
+- Tool の説明は `discover_tools` の後でしか見えない。記憶の訂正（`replaces_id`）の行はプロンプトに残す。
+- 「聞き返す前に調べる」行は要る。外すと検索せずに「調べますか？」で止まった。
+- 結果: 変更前 60/60（6回）、変更後 98/100（10回）。平均所要時間はほぼ同じ（約51秒）で、速度の改善は確認できなかった。残る失敗は Tool 呼び出し上限1件と、`start_work_session` の代わりに `update_task` で頼まれていない期限を入れた1件。
+- Front 経路（委譲先 CLI がある状態）では未評価。
+
 ## 5. CLI 委譲
 
 ### 5.1 なぜ同じ Thread で続けないか

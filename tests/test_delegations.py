@@ -99,6 +99,10 @@ def test_first_call_has_routine_writes_and_hand_off_but_no_mail_body(ready, mode
     assert "add_schedule" not in calls[0]["tools"]
     assert "gmail_get_message:" not in calls[0]["system"] and "gmail_search:" in calls[0]["system"]
     assert "delegate_to_agentでCLIに任せる" in calls[0]["system"]
+    # Repository and Home-file work is handed off, so the Front index omits those Tools and the Home hint.
+    for name in ("open_worktree", "commit_worktree", "delegate_coding_task", "write_home_file"):
+        assert name + ":" not in calls[0]["system"]
+    assert "read_home_file:" in calls[0]["system"] and "*_home_file Tool" not in calls[0]["system"]
 
 
 def test_toggle_off_has_no_hand_off_tool(ready, model):
@@ -108,6 +112,7 @@ def test_toggle_off_has_no_hand_off_tool(ready, model):
     submit()
     assert "delegate_to_agent" not in calls[0]["tools"] and "delegate_to_agent" not in calls[0]["system"]
     assert "start_work_session" not in calls[0]["tools"]
+    assert "open_worktree:" in calls[0]["system"] and "*_home_file Tool" in calls[0]["system"]
 
 
 def client():

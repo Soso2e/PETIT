@@ -28,7 +28,12 @@ FRONT_DIRECT = {"get_work_status", "start_work_session", "update_work_session", 
                 "create_task", "complete_task", "create_reminder", "search_memory",
                 "delegate_to_agent", "get_delegation_status"}
 # Mail bodies stay away from the Front Brain; a delegated CLI can still read them.
-FRONT_HIDDEN = {"gmail_get_message"}
+# Repository and Home-file work is delegated (FRONT_HINT), so its Tools stay out of the Front index too.
+FRONT_HIDDEN = {"gmail_get_message",
+                "open_worktree", "list_worktrees", "get_worktree_status", "run_worktree_check", "commit_worktree",
+                "push_worktree", "create_worktree_pull_request", "close_worktree",
+                "delegate_coding_task", "get_coding_task_status", "cancel_coding_task",
+                "write_home_file", "edit_home_file"}
 FRONT_HINT = ("\n自分で完結しない作業（PETIT Homeのファイル作業、登録リポジトリの調査や開発、複数ステップの作業、メール本文の確認）は"
               "delegate_to_agentでCLIに任せる。「できない」と答える前に、任せられないか確かめる。"
               "雑談・予定・タスク・作業記録は任せず自分で処理する。PC全体のファイル探索とWeb調査は任せてもできないので、まだできないと伝える。"

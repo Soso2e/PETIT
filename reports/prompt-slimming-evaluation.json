@@ -1,0 +1,38 @@
+{
+  "provider": "configured_deepseek_flash",
+  "data": "synthetic",
+  "script": "experiments/evaluate_renaissance.py",
+  "path": "native Loop (front toggle OFF; the Front path needs a delegate CLI, not available in the eval environment)",
+  "before": {
+    "runs": 6,
+    "passed": 60,
+    "cases": 60,
+    "failures_by_case": {},
+    "mean_total_ms": 50850
+  },
+  "after": {
+    "runs": 10,
+    "passed": 98,
+    "cases": 100,
+    "failures_by_case": {
+      "progress": 1,
+      "start": 1
+    },
+    "mean_total_ms": 51691
+  },
+  "front_prompt_chars": {
+    "before": {
+      "core_and_rules": 2033,
+      "capability_index": 1609
+    },
+    "after": {
+      "core_and_rules": 1087,
+      "capability_index": 1175
+    }
+  },
+  "notes": [
+    "Removing the Git evidence lines made progress fail 5/5: they cue the Front to look for get_local_development_status.",
+    "Tool descriptions are only seen after discover_tools, so the memory-correction line stays in the prompt.",
+    "Remaining after-failures: one Tool-call limit (progress), one update_task instead of start_work_session with an unrequested due date (start)."
+  ]
+}

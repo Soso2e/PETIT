@@ -13,6 +13,7 @@ from .tools.registry import tool
     description=(
         "指定した場所の天気予報を取得する。"
         "『今日の天気』『明日の東京の天気』のような短い天気確認で使う。"
+        "場所は発話や記憶で確認できたものだけ使い、不明なら質問する。タイムゾーンから推定しない。"
     ),
     parameters={
         "type": "object",
