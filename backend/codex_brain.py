@@ -190,13 +190,32 @@ def diagnose():
         if client is not None:
             client.close()
 
+HOME_RULES = """
+PETIT Home（作業ディレクトリ）で動くエージェントとして振る舞う。ファイル操作はすべて petit_read_tool 経由の Core Tool で行う。
+- Home の読み書き（L0）: list_home_files / read_home_file / search_home_files / write_home_file / edit_home_file。memory/ や skills/ に覚えたこと・手順を残してよい。
+- 人格ファイル（AGENTS.md / SOUL.md / USER.md）は update_persona_file に変更後の全文を渡す（差分承認）。
+- 開発（L1）: list_coding_repositories → open_worktree → worktrees/ のファイルを read/edit/write_home_file で編集 → run_worktree_check → commit_worktree → push_worktree（petit/ ブランチだけ）。PR は create_worktree_pull_request（承認つき）。
+- テスト結果は実際の出力どおりに伝える。拒否された操作を別の方法で回避しない。
+"""
+
+
+def agent_mode() -> bool:
+    from . import request_context
+    return bool(settings.load().get("codex_agent_mode")) and request_context.current_is_admin()
+
+
 def run(request_id, target, *, messages=None, used_tools=None):
     from . import brain, external_brain
     used = list(used_tools or [])
     invoke = external_brain.tool_bridge(request_id, target, used)
-    from . import agent_workspace, request_context
-    workspace = agent_workspace.prepare()
+    from . import agent_workspace, petit_home, request_context
+    home_mode = agent_mode()
+    # Agent mode: Codex works in PETIT Home and reads its AGENTS.md (the persona) natively.
+    # Its own sandbox stays read-only with no shell; every file change goes through Core Tools.
+    workspace = petit_home.ensure() if home_mode else agent_workspace.prepare()
+    extra = (brain.INSTRUCTIONS + HOME_RULES) if home_mode else ""
     instructions, _ = external_brain.context(request_id, messages, include_history=False, record_metrics=False)
+    instructions = extra + instructions
     web_search = settings.load().get("codex_web_search", "disabled") if request_context.current_is_admin() else "disabled"
     key = agent_workspace.boundary(target, instructions + web_search, workspace)
     row = store.load_turn(request_id)
@@ -215,6 +234,7 @@ def run(request_id, target, *, messages=None, used_tools=None):
         # A crash after this point cannot leave an unfinished session resumable.
         agent_workspace.forget(row["thread_id"], "codex")
         instructions, prompt = external_brain.context(request_id, messages, include_history=not bool(saved))
+        instructions = extra + instructions
         from . import request_context
         dynamic_tools = [{"name": "petit_read_tool", "description": "PETITのToolをCore経由で実行",
                       "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "arguments_json": {"type": "string"}},
@@ -235,6 +255,8 @@ def run(request_id, target, *, messages=None, used_tools=None):
             parameters.pop("excludeTurns", None)
             parameters.update(ephemeral=False, dynamicTools=dynamic_tools)
             instructions, prompt = external_brain.context(request_id, messages, include_history=True)
+            instructions = extra + instructions
+            parameters["developerInstructions"] = instructions
             result = client.request("thread/start", parameters)
         thread = result["thread"]["id"]
         if saved and thread != saved["session_id"]:

@@ -63,6 +63,20 @@ flowchart TD
     Risk -->|no| Exec[brain.execute<br/>書き込みは effect receipt]
 ```
 
+## Home ファイル Tool と Codex エージェントモード（v0.47.0開発版・#404）
+
+```mermaid
+flowchart TD
+    Brain[どの Brain でも<br/>native / Codex / Antigravity CLI / Claude Code MCP] --> HT[list / read / search / write / edit _home_file]
+    HT --> Line{agent_hooks.path_decision<br/>Hook と同じ線}
+    Line -->|Home外・..・~・秘密・.git読書き| L3[拒否]
+    Line -->|人格ファイルの変更| Persona[拒否 → update_persona_file 差分承認]
+    Line -->|Home L0| Home[読み書き・Home を git commit]
+    Line -->|worktrees/ L1| WT[読み書き・commit は commit_worktree]
+    Codex{Codex: codex_agent_mode ON かつ管理者?} -->|yes| CH[cwd = PETIT Home<br/>AGENTS.md=人格を Codex が読む<br/>sandbox read-only・shell なし]
+    Codex -->|no| CW[従来の agent-workspace]
+```
+
 ## Worktree での開発（v0.46.0開発版・#401）
 
 ```mermaid

@@ -104,7 +104,7 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 | **H2 PETIT MCP サーバー** | Tool Registry を MCP（stdio）で公開。risk・承認・receipt は既存のまま | Claude Code から MCP 経由で Read Tool と承認つき Write が動き、receipt が残る **実装済み（v0.46.0・#398）。実 Turn への組込みは H3** |
 | **H3 Claude Code エージェントモード** | cwd=Home、組込みTool有効、権限ルール + Hook、`--resume` によるセッション継続 | Home 内で自由に作業し、L2 は承認、L3 は拒否されることをテストで確認 **実装済み（v0.46.0・#400）。実 CLI で通し確認済み** |
 | **H4 Coding Job v2** | 登録 repo の git worktree で作業、テスト実行、ブランチ commit。push / PR は承認つき Core Tool | 実 repo で「Issue → ブランチ → テスト → PR（承認）」が通る **実装済み（v0.46.0・#401）。実 CLI で通し確認済み（PR の実作成は未確認）** |
-| **H5 Codex / Antigravity CLI の追従** | 同じ Home・MCP・段階ルールを各 CLI の設定へ写す | 3 CLI で同じシナリオが通る。差分は文書に記録 |
+| **H5 Codex / Antigravity CLI の追従** | 同じ Home・MCP・段階ルールを各 CLI の設定へ写す | 3 CLI で同じシナリオが通る。差分は文書に記録 **実装済み（v0.47.0・#404）。実 Codex / agy は未確認** |
 
 最初に Claude Code で作る理由: 権限ルール・Hook・MCP・`--resume` がそろっていて、L0〜L3 の境界を最も素直に実装できるため。Concept の Executor 順位（Antigravity CLI 最優先）は会話 Brain の順位として残し、エージェントモードの対応順とは分けて扱う。
 
@@ -175,6 +175,20 @@ PETIT-Home/                 # 既定: ユーザーが選ぶ場所（例 ~/PETIT-
 - `worktrees/` は Home の中にあるので、エージェントモードのファイル Tool でそのまま編集できる。Home の git 管理からは外す（`.gitignore`）。Hook は worktree 内の `.git` への書き込みと、Bash からの `git worktree` を拒否する。
 - 注意: `run_worktree_check` は repo のテストコードを PC 上で実行する（OS サンドボックスなし・ネットワーク制限なし）。登録した自分の repo だけが対象。
 - 実 CLI での確認（haiku・ローカルの合成 repo と bare origin）: 「登録 repo 確認 → worktree 作成 → 関数とテストを追加 → pytest 2 passed → commit → `petit/` へ push → PR は差分つきで承認待ち」が通り、origin の main は変わらないことを確認。GitHub への PR の実作成は未確認。
+
+## 4.5 H5 の実装（v0.47.0・#404）
+
+Codex と Antigravity CLI の組込みファイル Tool は、PETIT 側からフォルダ境界を保証できない（[antigravity-cli.md](antigravity-cli.md)）。そこで CLI ごとのサンドボックスや Hook に頼らず、**Home のファイル操作そのものを Core の Tool にした**。どの Brain から呼んでも同じ線になる。
+
+| Tool | 段階 | 中身 |
+| --- | --- | --- |
+| `list_home_files` / `read_home_file` / `search_home_files` | 読取 | Home（と worktrees/）の一覧・行範囲の読取・文字列検索。秘密ファイル・`.git`・リンクは出さない |
+| `write_home_file` / `edit_home_file` | L0 / L1（確認なし） | 新規・上書き・追記、1か所だけ一致する置換。Home の変更はその場で git commit（worktree は `commit_worktree` で） |
+
+- 線は Claude Code の Hook と同じ `agent_hooks.path_decision`: Home の外・`..`・`~`・秘密ファイル名・`.git`（**読取も拒否**。`.git/config` にリモートの認証情報が入ることがあるため。Hook 側も同じに変更）・人格ファイルの変更（`update_persona_file` へ誘導）。
+- **Codex エージェントモード**（設定の Codex カード、既定 OFF・管理者の Turn だけ）: 作業場所を PETIT Home にし、Home の `AGENTS.md`（人格）を Codex が直接読む。Core の規則（`brain.INSTRUCTIONS` と Home / worktree の使い方）は developerInstructions で渡す。Codex 自身の sandbox は read-only・shell なしのままで、ファイル操作と開発はすべて上の Tool と worktree Tool（`petit_read_tool` 経由）。
+- **Antigravity CLI・DeepSeek・LM Studio**: 呼び出し方は変えない。公開 catalog に上の Tool が入り、system に Home の使い方を一文足した（`brain.HOME_HINT`）。`brain.INSTRUCTIONS` は旧形式の agent-workspace 判定に使うので変えていない。
+- 未確認: 実 Codex / agy での動作（この開発環境に未導入）。Codex の `instructionSources` が Home の AGENTS.md を返すかは実機で確かめる必要がある（一致しないと Turn は失敗として止まる）。
 
 ## 5. 決定事項と残りの問い
 

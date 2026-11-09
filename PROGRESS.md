@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.46.0 (`claude/ai-redesign-discord-bot-h0xlft`・未マージ)**
+**Current Version: v0.47.0 (`feat/agent-mode-codex-antigravity-h5`・未マージ。main は v0.46.0)**
 
-**Last Updated: 2026-11-08 UTC**
+**Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- v0.46.0（PR #402）は main にマージ済み。H5（v0.47.0、`feat/agent-mode-codex-antigravity-h5`・未マージ）: Home ファイル Tool（list/read/search/write/edit、Hook と同じ線、`.git` は読取も拒否）を全 Brain に公開し、Codex エージェントモード（cwd=Home、shell なし）を追加（#404）。未確認: 実 Codex / agy。並行: D3（Discord Guild モード、`feat/discord-guild-mode-d3`、Antigravity が担当、#403）。後からマージする方はバージョンを v0.48.0 に上げ直す。
 
 - 再設計 H1 + D1（v0.46.0、`claude/ai-redesign-discord-bot-h0xlft`・未マージ）: 人格の正本を PETIT Home（`~/PETIT-Home` / `PETIT_HOME`）へ移し全Brainで共有、人格変更は Core 計算の差分を確認カードで承認（#396）。Discord Bot Owner モード MVP を別プロセスで追加、owner 判定は Core（#397）。未確認: 実 Discord 接続、Desktop の確認カードでの差分表示、Home の場所の設定UI。H2: PETIT Tool の MCP bridge（#398、実 Claude Code CLI の接続確認済み）、D2: Discord の承認ボタンと通知 DM（#399）も同じブランチに追加。H3: Claude Code エージェントモード（#400、設定で ON のときだけ。cwd=Home・--restricted・MCP・L0〜L3 Hook・--resume・承認後の再開。実 CLI で通し確認済み、Bash はサンドボックス依存がある環境でのみ・未確認）。H4: worktree での開発（#401、`petit/` ブランチへの push は確認なし・PR は承認・main への push は禁止。実 CLI で worktree→テスト→commit→push→PR 提案まで確認、GitHub での PR 実作成は未確認）。次: D3（Guild モードの土台）、または H5（Codex / Antigravity CLI の追従）。
 
@@ -363,3 +365,5 @@
 | 2026-11-08 | 02:05 | #398 #399 | v0.46.0（同ブランチ追加）: PETIT MCP bridge（Turn限定トークン、catalog・検証・risk・承認・receipt は native と同じ、stdio JSON-RPC。実 Claude Code CLI の `mcp list` で接続確認）。Discord 承認ボタン（owner・Discord 由来のみ）と通知 DM（opt-in、claimed→sent/failed、不明は再送しない）。管理者 cookie ミドルウェアが Bearer 窓口を弾いていた不具合を修正。 |
 | 2026-11-08 | 02:26 | #400 | v0.46.0（同ブランチ追加）: Claude Code エージェントモード（opt-in）。Home で組込みファイルTool + PETIT MCP、PreToolUse Hook で L0〜L3、Thread ごとに --resume、MCP 承認→同セッションで再開、Turn ごとに Home を git commit。実 CLI で発見: サンドボックス依存が無いと Bash が無保護で動く→Core が依存を確認して Bash を渡さない／承認後の再開で input_json 消費済みにより MCP が失敗→修正。 |
 | 2026-11-08 | 05:45 | #401 | v0.46.0（同ブランチ追加）: worktree Tool（open/status/check/commit/push/PR/close）。L1 を「petit/ ブランチへの push まで」に拡張（Concept §4 更新）、PR は承認、main・既定ブランチ・force push は禁止。git・gh は Core が本人の認証で実行、repo の hook 無効。実 CLI で通し確認。 |
+| 2026-11-09 | 01:47 | #402 | v0.46.0 を main へマージ（再設計: PETIT Home・MCP・Claude Code エージェントモード・worktree 開発・Discord Owner モード）。CI 13 本成功。 |
+| 2026-11-09 | 01:47 | #404 | v0.47.0: Home ファイル Tool を全 Brain に公開（Core が L0/L1 の線を判定、Hook と共通。`.git` は読取も拒否に変更）、Codex エージェントモード（cwd=Home・AGENTS.md=人格・sandbox read-only・shell なし）。実 Codex / agy は未確認。 |
