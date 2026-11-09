@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.50.0 (main)**
+**Current Version: v0.51.0 (main)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #414 設定UI・AI/サービス接続・接続ステータスの再設計と統合（v0.51.0）: 通常Settingsタブ最上部に「現在の接続状態とショートカット（AI Brain順位・カレンダー同期元・Notion/Gmail・接続ステータス診断）」ハブを配置し、画面/音声/通知設定と外部接続設定の役割を明確に分離。`/static/setup.html` に常設ステータス概要バー・状態/保存済みバッジ（`利用可能`/`接続済み`/`🔑 キー保存済み`）・2カラム整理・冗長な注意事項や旧SDK/実験ACPの折りたたみ（`<details>`）・TimeTree/Googleカード内でカレンダー同期元切替と手動同期を1クリック完結する導線・ハッシュ直通移動（`#ai`/`#notion`/`#timetree`/`#google`/`#sync`）を追加。接続ステータスダイアログにも色分けピルと各設定セクションへの直通リンクを追加。単体テストとPlaywright実ブラウザ（1440/390/320px）で確認済み。実アカウント（TimeTree/Notion/Google OAuth/実CLI）での手動受入と実スマホ端末は未確認。
 
 - #411 Front Brain と CLI 委譲（v0.50.0、既定 OFF の試験機能）: 設定のトグルで DeepSeek を最初の担当にし、複数ステップの作業を作業用 Thread の Turn として CLI（既定 Claude Code → Codex、Claude は Sonnet / Haiku）に任せる。開始は確認なしで、返答末尾とチャット上部に表示する。単体テストと合成 Provider の実ブラウザ操作は確認済み。**実 CLI での通しは未確認**（この PC の `claude` は v2.1.126 で `--restricted` 未対応かつ未ログイン。`claude update` と `claude login` が必要）。DeepSeek の振り分け精度の評価も未実施。次: 実 CLI での確認、`docs/brain/front-brain-delegation.md` §7 の評価。既存の失敗: `tests/test_claude_agent.py` と `tests/test_home_files.py` の計3件は Windows のテスト側の文字コード（cp932）の問題で、main でも落ちる。
 
@@ -389,3 +391,4 @@
 | 2026-11-09 | 05:00 | #408 | v0.49.0: 過去作業時間の事後登録ツール record_past_work を追加（work_sessionsに記録・集計即時反映）、開発者モードでの回答者バッジ常時表示と履歴復元時のmodel_route維持を実装。 |
 | 2026-11-09 | 05:56 | #410 | v0.50.0: 会話Turnの表示専用SSEストリーミング（`GET /api/turns/{id}/stream`・`turn_stream.py`）とAPI Brainの`stream=True`ドラフト配信、Toolラウンド/Fallback時のドラフト破棄、Web/Desktop/Universeのリアルタイム進捗表示を実装。 |
 | 2026-11-09 | 06:04 | #411 | v0.50.0: DeepSeekを最初の担当にするトグルとCLI委譲（作業用Thread・専用Worker・親Threadへの報告と承認・状態表示）を追加。単体テストと合成Providerの実ブラウザ操作を確認。実CLIの通しはCLI未ログインのため未確認。 |
+| 2026-11-09 | 08:38 | #414 | v0.51.0: 設定UI・AI/サービス接続・接続ステータスを再設計（Settings最上部の状態/直通ハブ、setup画面の常設概要バー・状態/キー保存済みバッジ・TimeTree/Googleのカード内同期元切替、接続ステータスの色分けピルと設定直通リンク）。Playwright 1440/390/320pxと関連単体テスト確認済み、実アカウント手動受入は未確認。 |

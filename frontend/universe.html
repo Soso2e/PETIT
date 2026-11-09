@@ -311,14 +311,17 @@
         <div class="settings-grid">
           <section class="settings-card">
             <h3>接続と同期</h3>
-            <p>各サービスの接続、同期履歴、失敗したタスクを確認できます。</p>
-            <button type="button" data-open-connections aria-haspopup="dialog">接続ステータスを開く</button>
+            <p>Notion・Google・LM Studio・AivisSpeech・BRAINの接続確認と、同期失敗タスクの再試行・競合解消を行います。</p>
+            <div class="notification-panel__actions">
+              <button type="button" data-open-connections aria-haspopup="dialog">接続ステータスを開く</button>
+              <a href="/static/setup.html#services" class="setup-hub-btn setup-hub-btn--secondary">サービス接続設定を開く</a>
+            </div>
           </section>
           <section class="settings-card">
             <div class="settings-card__head">
               <div>
-                <h3>AIモデル</h3>
-                <p>通常会話とツール操作で使うモデルを個別設定します。</p>
+                <h3>AIモデル（優先順位OFF時の個別指定）</h3>
+                <p>AI優先順位がOFFの場合のフォールバック設定です。通常のAI選択は上の「AI設定・優先順位を変更」から設定します。</p>
               </div>
             </div>
             <div class="model-routing" aria-label="使用モデルの切り替え">

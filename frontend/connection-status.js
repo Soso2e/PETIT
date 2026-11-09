@@ -1,8 +1,23 @@
 // Saved connection/sync diagnostics. No automatic probes or synchronization.
 (() => {
-  const labels = { unconfigured: "未設定", unverified: "未確認", syncing: "同期中", healthy: "正常",
-    connected: "接続済み", error: "エラー", conflict: "同期競合", stale: "古いキャッシュ",
-    failed: "同期失敗", pending: "同期待ち", processing: "同期中" };
+  const labels = {
+    unconfigured: "未設定",
+    unverified: "未確認",
+    syncing: "同期中",
+    healthy: "正常",
+    connected: "接続済み",
+    error: "エラー",
+    conflict: "同期競合",
+    stale: "古いキャッシュ",
+    failed: "同期失敗",
+    pending: "同期待ち",
+    processing: "同期中",
+  };
+  const setupTargets = {
+    notion: "/static/setup.html#notion",
+    calendar: "/static/setup.html#google",
+    lmstudio: "/static/setup.html#ai",
+  };
   const element = (tag, text, className) => {
     const node = document.createElement(tag);
     if (text != null) node.textContent = text;
@@ -30,10 +45,14 @@
     const close = element("button", "閉じる"); close.type = "button"; close.onclick = () => dialog.close();
     const header = element("div", null, "connection-header"); header.append(title, close);
     const hint = element("p", "保存済み状態を表示します。接続確認は同期を実行しません。時刻は日本時間です。", "connection-hint");
-    const feedback = element("p", "読み込み中…"); feedback.setAttribute("role", "status"); feedback.setAttribute("aria-live", "polite");
-    const content = element("div", null, "connection-services");
+    const feedback = element("p", "読み込み中…", "connection-feedback"); feedback.setAttribute("role", "status"); feedback.setAttribute("aria-live", "polite");
+    const toolbar = element("div", null, "connection-toolbar");
     const refresh = element("button", "保存済み状態を更新"); refresh.type = "button";
-    dialog.append(header, hint, feedback, refresh, content); document.body.append(dialog);
+    const setupLink = element("a", "AI・サービス接続設定を開く", "connection-setup-link");
+    setupLink.href = "/static/setup.html";
+    toolbar.append(refresh, setupLink);
+    const content = element("div", null, "connection-services");
+    dialog.append(header, hint, feedback, toolbar, content); document.body.append(dialog);
     dialog.addEventListener("close", () => {
       dialog.remove();
       if (activeDialog === dialog) { activeDialog = null; previousFocus?.focus(); }
@@ -87,14 +106,21 @@
           field(list, "同期失敗 / 競合", `${service.failed_count || 0}件 / ${service.conflict_count || 0}件`);
           if (service.id === "notion") field(list, "Webhook受信処理失敗", `${service.inbox_failed_count || 0}件`);
           details.append(list, element("p", service.note || "このサービスの状態を取得できませんでした。", "connection-hint"));
+          const serviceActions = element("div", null, "connection-service-actions");
           if (service.can_check) {
-            const button = action(details, "接続確認", async () => {
+            const button = action(serviceActions, "接続確認", async () => {
               feedback.textContent = `${service.name}の接続を確認中…`;
               await request(`/api/connections/${service.id}/check`, "POST");
               await load();
             });
             button.dataset.connectionAction = service.id;
           }
+          if (setupTargets[service.id]) {
+            const link = element("a", "設定画面を開く", "connection-setup-link");
+            link.href = setupTargets[service.id];
+            serviceActions.append(link);
+          }
+          if (serviceActions.childNodes.length) details.append(serviceActions);
           for (const operation of service.operations || []) {
             const card = element("section", null, "connection-operation");
             card.append(element("h3", `タスク：${operation.title}`));
