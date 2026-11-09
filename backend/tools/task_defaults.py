@@ -17,6 +17,7 @@ _PRIORITIES = list(tasks_phase2._PRIORITIES)  # noqa: SLF001 - keep the register
         "新しいタスクを作成する。明示依頼ならすぐSQLiteへ保存し、Notion書き込みは"
         "pendingキューでバックグラウンド実行する。priority省略時はHigh。"
         "due_dateはユーザーが日付を指定した場合だけ設定し、省略時は期限なしにする。"
+        "期限はカレンダー予定ではない（予定はadd_schedule）。作成前にget_tasksで重複を確かめる。"
     ),
     parameters={
         "type": "object",

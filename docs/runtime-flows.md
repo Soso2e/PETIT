@@ -37,7 +37,7 @@ flowchart TD
     Turn[既存 Thread / Turn 受付] --> Order{front_brain_deepseek ON<br/>かつ mixed?}
     Order -->|no| Saved[保存済みの順位]
     Order -->|yes| Front[このTurnだけ DeepSeek を先頭に<br/>保存済みの順位は変えない]
-    Front --> Native[native Loop / 初回から定型Tool + delegate_to_agent<br/>gmail_get_message は非公開]
+    Front --> Native[native Loop / 初回から定型Tool + delegate_to_agent<br/>gmail_get_message・worktree・Coding Job・Home書込は非公開<br/>HOME_HINT の代わりに FRONT_HINT]
     Front -->|DeepSeek 不可・Tool実行前| Fallback[既存の順位で次のBrain]
     Native -->|テキスト| Reply[回答・確認質問]
     Native -->|PETIT Tool| Gate[既存の検証・risk・承認・receipt]
