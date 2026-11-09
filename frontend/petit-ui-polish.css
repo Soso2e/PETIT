@@ -283,10 +283,52 @@ body.petit-chat-screen .chat-voice-options > select {
 @media (max-width: 959px) {
   body:has(.universe-shell) { --petit-work-top: calc(76px + env(safe-area-inset-top)); }
   body:has(#petit-desktop-toolbar) { --petit-work-top: calc(120px + env(safe-area-inset-top)); }
+  body.petit-chat-screen [data-view-panel="chat"] {
+    position: fixed;
+    inset: calc(var(--petit-work-top) + 54px) 12px calc(var(--petit-bottom-nav-height, 70px) + 10px) 12px;
+    width: auto;
+    max-width: none;
+  }
   body.petit-chat-screen .petit-utility-dock {
     top: calc(var(--petit-work-top) + 52px); bottom: auto; left: 16px;
   }
   body.petit-chat-screen .chat-panel .section-head { min-height: 52px; padding-right: 0; }
+}
+
+@media (max-width: 640px) {
+  body.petit-chat-screen [data-view-panel="chat"] {
+    inset: calc(var(--petit-work-top) + 50px) 8px calc(var(--petit-bottom-nav-height, 70px) + 8px) 8px;
+  }
+  body.petit-chat-screen .chat-composer {
+    margin: 4px 0 0;
+    padding: 8px;
+    gap: 6px;
+    border-radius: 14px;
+  }
+  body.petit-chat-screen .chat-composer textarea {
+    font-size: 14px;
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+  body.petit-chat-screen .chat-composer button[type="submit"] {
+    min-width: 50px;
+    min-height: 38px;
+    padding: 0 10px;
+  }
+  body.petit-chat-screen .chat-composer .mic {
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0 8px;
+  }
+  body.petit-chat-screen .petit-thread-controls {
+    font-size: 11px;
+    gap: 4px;
+    padding: 4px 0;
+  }
+  body.petit-chat-screen .petit-thread-controls select {
+    max-width: 140px;
+    font-size: 11px;
+  }
 }
 /* v27 UX follow-up: native hidden must win over component display rules. */
 body #detail-panel [hidden] { display: none !important; }
