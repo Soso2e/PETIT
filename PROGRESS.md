@@ -1,12 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.48.1 (`fix/activity-refresh-freshness-v0471`・未マージ。main は v0.48.0)**
+**Current Version: v0.48.2 (`feat/activity-status-filter-v0461`・未マージ。main は v0.48.1)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #372 Activity鮮度表示（v0.48.1、#406）: Development Hubの背景Activityに最終取得日時を表示し、通信失敗時に前回成功時刻と取得失敗を区別する。SQLiteのジョブ状態を稼働保証と誤認しない。Brain/Worker/認証は変更なし。Windows/iPhone実機とCIは未確認。
+- #372 Activity状態フィルター（v0.48.2、#395）: 既存SQLite Activityの最新取得結果を画面上で「すべて／待機・実行中／失敗／完了」に絞り込めるようにした。切替時に再通信せず、30秒自動更新・管理者API・秘密本文非表示を維持。実Windows/iPhone受入・CIは未確認。
+
+- #372 Activity鮮度表示（v0.48.1、#406、mainマージ済み）: Development Hubの背景Activityに最終取得日時を表示し、通信失敗時に前回成功時刻と取得失敗を区別する。SQLiteのジョブ状態を稼働保証と誤認しない。Brain/Worker/認証は変更なし。Windows/iPhone実機は未確認。
 
 - v0.48.0（PR #407）、v0.47.0（PR #405）、v0.46.0（PR #402）は main にマージ済み。H5（v0.47.0）: Home ファイル Tool（list/read/search/write/edit、Hook と同じ線、`.git` は読取も拒否）を全 Brain に公開し、Codex エージェントモード（cwd=Home、shell なし）を追加（#404）。未確認: 実 Codex / agy。D3（v0.48.0、Discord Guild モード、#403）。
 
@@ -370,3 +372,5 @@
 | 2026-11-09 | 01:47 | #402 | v0.46.0 を main へマージ（再設計: PETIT Home・MCP・Claude Code エージェントモード・worktree 開発・Discord Owner モード）。CI 13 本成功。 |
 | 2026-11-09 | 01:47 | #404 | v0.47.0: Home ファイル Tool を全 Brain に公開（Core が L0/L1 の線を判定、Hook と共通。`.git` は読取も拒否に変更）、Codex エージェントモード（cwd=Home・AGENTS.md=人格・sandbox read-only・shell なし）。実 Codex / agy は未確認。 |
 | 2026-11-09 | 02:30 | #403 | v0.48.0: Discord Guild モード土台（D3）。`/api/guild/*`（Bearer サービストークン）、サーバー別 SQLite（`storage/guilds/<guild_id>.db`）、`/petit setup・reset`（Manage Server 権限のみ）・`/petit me・forget-me`、DeepSeek のみの会話、1日上限・ユーザーレート制限、owner の DB/Tool/Home/CLI への到達遮断（`GuildIsolationError`）を実装。実 Discord・実 DeepSeek 未確認。 |
+| 2026-11-09 | 03:15 | #406 | v0.48.1: Development Hubの背景Activityに最終取得日時を表示し、通信失敗時に前回成功時刻と取得失敗を区別。 |
+| 2026-11-09 | 03:17 | #395 | v0.48.2: Development Hubの背景Activityに状態別フィルター（すべて／待機・実行中／失敗／完了）を追加。 |

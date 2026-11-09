@@ -257,7 +257,7 @@ flowchart LR
     Worker[既存JobWorker] --> Jobs[(SQLite jobs / 状態正本)]
     Jobs --> Read[db.list_job_activity / 公開項目を限定]
     Read --> API[管理者GET /api/activity/jobs]
-    API --> Activity[Development Hub Activity / 手動更新]
+    API --> Activity[Development Hub Activity / 30秒更新・状態別フィルター]
     Activity --> Labels[queued / running / done / failed]
     Jobs --> Ack[旧GET /api/jobsとACKは変更なし]
 ```
@@ -799,7 +799,7 @@ flowchart TD
 背景Readの状態表示は既存APIの投影を利用し、入力・結果本文を取得しない。手動更新も維持する。
 
 
-## Activity取得の鮮度表示（v0.47.1開発版）
+## Activity取得の鮮度表示（v0.48.1）
 
 ```mermaid
 flowchart TD
