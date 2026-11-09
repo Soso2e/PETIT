@@ -1,5 +1,33 @@
 # PETIT Runtime Flows
 
+## 会話Turn進捗・応答ドラフトのストリーミング表示（v0.50.0・#410）
+
+体感待ち時間を減らすため、実行中Turnの**表示専用・揮発**の進捗（フェーズ・実行中Tool・返答ドラフト）を `turn_stream` に保持し、`GET /api/turns/{request_id}/stream`（SSE）で配信する。確定結果・承認・effect receipt・保存形式は従来どおり `/api/chat` / `/api/turns/{request_id}` のSQLite台帳を正とする。
+
+```mermaid
+flowchart TD
+    Client["Web / Desktop / Universe<br/>PETIT_SESSION.send"] --> Post["POST /api/chat (または /api/threads/{id}/turns)"]
+    Client -.->|"管理者セッション時: EventSource"| SSE["GET /api/turns/{request_id}/stream"]
+    Post --> Claim["store.claim → turn_stream.open"]
+    Claim --> Loop["brain._run / vision_reply"]
+    Loop --> Phase["turn_stream.phase<br/>thinking / vision / tool"]
+    Loop --> Kind{Provider種別}
+    Kind -->|"LM Studio / DeepSeek<br/>(PETIT_STREAM_REPLIES=1)"| StreamAPI["lmstudio_client._post_completion_stream<br/>stream=True で delta.content を turn_stream.delta へ"]
+    StreamAPI -->|"400/404/405/415/422"| FallbackPost["従来の非stream _post_completion へ自動フォールバック"]
+    Kind -->|"Antigravity CLI / Codex / Claude Code"| CLIStep["構造化応答検証まで本文は流さず<br/>フェーズ表示のみ"]
+    StreamAPI --> HasTool{tool_calls あり?<br/>または Brain Fallback?}
+    HasTool -->|yes| Reset["turn_stream.reset_text<br/>途中ドラフトを破棄して Tool 実行へ"]
+    HasTool -->|no| Ledger["store.finish (SQLite turns / conversations)"]
+    CLIStep --> Ledger
+    Reset --> Loop
+    Ledger --> Close["turn_stream.close(status)"]
+    Phase -.->|"event: progress"| SSE
+    StreamAPI -.->|"event: progress (append / text)"| SSE
+    Reset -.->|"event: progress (text='')"| SSE
+    Close -.->|"event: end"| SSE
+    Ledger --> Final["/api/chat 応答で確定本文・used_tools・pending_actions・model_route を描画"]
+```
+
 ## PETIT Home: 人格の単一ソースと差分承認（v0.46.0開発版）
 
 全Brain（native Tool Loop / Claude Code CLI / Antigravity CLI / Codex）は、同じ PETIT Home の人格ファイルから system 指示を作る。人格ファイルの変更は Core が計算した差分を確認カードに出し、承認後に一度だけ書き込んで git commit する。詳細は [brain/agent-home.md](brain/agent-home.md)。
