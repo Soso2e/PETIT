@@ -1,8 +1,8 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.46.0 (`claude/ai-redesign-discord-bot-h0xlft`・未マージ)**
+**Current Version: v0.47.0 (`feat/discord-guild-mode-d3`・未マージ)**
 
-**Last Updated: 2026-11-08 UTC**
+**Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
@@ -363,3 +363,4 @@
 | 2026-11-08 | 02:05 | #398 #399 | v0.46.0（同ブランチ追加）: PETIT MCP bridge（Turn限定トークン、catalog・検証・risk・承認・receipt は native と同じ、stdio JSON-RPC。実 Claude Code CLI の `mcp list` で接続確認）。Discord 承認ボタン（owner・Discord 由来のみ）と通知 DM（opt-in、claimed→sent/failed、不明は再送しない）。管理者 cookie ミドルウェアが Bearer 窓口を弾いていた不具合を修正。 |
 | 2026-11-08 | 02:26 | #400 | v0.46.0（同ブランチ追加）: Claude Code エージェントモード（opt-in）。Home で組込みファイルTool + PETIT MCP、PreToolUse Hook で L0〜L3、Thread ごとに --resume、MCP 承認→同セッションで再開、Turn ごとに Home を git commit。実 CLI で発見: サンドボックス依存が無いと Bash が無保護で動く→Core が依存を確認して Bash を渡さない／承認後の再開で input_json 消費済みにより MCP が失敗→修正。 |
 | 2026-11-08 | 05:45 | #401 | v0.46.0（同ブランチ追加）: worktree Tool（open/status/check/commit/push/PR/close）。L1 を「petit/ ブランチへの push まで」に拡張（Concept §4 更新）、PR は承認、main・既定ブランチ・force push は禁止。git・gh は Core が本人の認証で実行、repo の hook 無効。実 CLI で通し確認。 |
+| 2026-11-09 | 02:06 | #403 | v0.47.0: Discord Guild モード土台（D3）。`/api/guild/*`（Bearer サービストークン）、サーバー別 SQLite（`storage/guilds/<guild_id>.db`）、`/petit setup・reset`（Manage Server 権限のみ）・`/petit me・forget-me`、DeepSeek のみの会話、1日上限・ユーザーレート制限、owner の DB/Tool/Home/CLI への到達遮断（`GuildIsolationError`）を実装。実 Discord・実 DeepSeek 未確認。 |

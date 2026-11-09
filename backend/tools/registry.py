@@ -205,6 +205,8 @@ def parse_arguments(name: str, arguments: dict[str, Any] | str | None) -> dict[s
 
 def openai_tools_schema() -> list[dict[str, Any]]:
     """Return the tool list in the format the chat completions API expects."""
+    from .. import request_context
+    request_context.forbid_guild_mode("Tool Registry")
     return [
         {
             "type": "function",
@@ -225,6 +227,8 @@ def dispatch(name: str, arguments: dict[str, Any] | str | None) -> str:
     Errors are returned as text rather than raised, so the agent loop can
     feed them back to the model.
     """
+    from .. import request_context
+    request_context.forbid_guild_mode("Tool Registry")
     tool_obj = _REGISTRY.get(name)
     if tool_obj is None:
         return f"[error] unknown tool: {name}"

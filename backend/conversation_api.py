@@ -31,6 +31,7 @@ class TurnCreate(BaseModel):
 
 
 def process(request_id: str) -> dict:
+    request_context.forbid_guild_mode("Core Turn")
     if not store.claim(request_id):
         return store.result(request_id)
     row = store.load_turn(request_id)
@@ -75,6 +76,7 @@ def process(request_id: str) -> dict:
 
 def submit(thread_id: str, request_id: str, message: str, *, source="web", conversation_mode="text",
            attachment_ids: list[str] | None = None, is_admin: bool = False, background=False) -> dict:
+    request_context.forbid_guild_mode("Core Turn")
     store.create_thread(thread_id, source=source)
     row, created = store.accept(thread_id, request_id, {"message": message, "conversation_mode": conversation_mode,
                                                      "source": source, "is_admin": is_admin,

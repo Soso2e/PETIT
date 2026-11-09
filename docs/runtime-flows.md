@@ -30,7 +30,9 @@ flowchart TD
     Auth -->|未設定| E503[503]
     Auth -->|不一致| E401[401]
     Auth --> Mode{発話者 = OWNER_ID かつ<br/>DM か OWNER_GUILD_IDS?}
-    Mode -->|no| Guide[固定の案内のみ<br/>Brain 呼び出し 0 回]
+    Mode -->|no| GuildCheck{guild_id あり かつ<br/>guild_api.is_configured?}
+    GuildCheck -->|no| Guide[固定の案内のみ<br/>Brain / DeepSeek 呼び出し 0 回]
+    GuildCheck -->|yes| GuildMention[guild_api.handle_mention<br/>Guild モードへ]
     Mode -->|yes| Submit[conversation_api.submit<br/>thread=discord:channel / request=discord:message<br/>source=discord・is_admin]
     Submit --> Turn[既存の単一Brain Turn<br/>8 rounds / 12 calls・承認・receipt]
     Turn -->|waiting_approval| Buttons[Core計算 preview + 承認/やめるボタン]
@@ -43,6 +45,31 @@ flowchart TD
     Claim --> Mark[配信記録 claimed を先に書く]
     Mark --> DM[owner へ DM]
     DM --> Report[sent / failed を報告<br/>未報告は claimed=不明のまま再送しない]
+```
+
+## Discord Guild モード（v0.47.0開発版・#403）
+
+owner 以外、または owner 指定外のサーバーでは、管理者が `/petit setup` を実行したサーバーだけ Guild モードで動く。データは `storage/guilds/<guild_id>.db` に完全分離し、request_context の `guild_mode` によって owner の DB・Tool Registry・PETIT Home・CLI Brain への到達を遮断する。詳細は [channels/discord-bot.md](channels/discord-bot.md) §3・§5.3。
+
+```mermaid
+flowchart TD
+    Slash["/petit setup・reset・me・forget-me"] --> RelaySlash["Bot: dispatch_slash_interaction<br/>POST /api/guild/* (Bearer サービストークン)"]
+    RelaySlash --> Perm{setup / reset ?}
+    Perm -->|Manage Server 権限なし| Deny403[403 拒否]
+    Perm -->|setup・権限あり| InitDB[("storage/guilds/&lt;guild_id&gt;.db<br/>guild_settings を保存・有効化")]
+    Perm -->|reset・権限あり| DropDB["&lt;guild_id&gt;.db を削除"]
+    Perm -->|me| MeDB["guild_members・guild_conversations<br/>自分の記録だけ表示/更新"]
+    Perm -->|forget-me| ForgetDB["自分の guild_members と<br/>guild_conversations を全消去"]
+
+    Mention[設定済みサーバーのメンション] --> Guard["request_context.guild_mode<br/>owner DB / Tool / Home / CLI は即 GuildIsolationError"]
+    Guard --> Config{guild_settings.enabled?}
+    Config -->|未設定 / 無効| Zero[GUEST_GUIDE のみ<br/>DeepSeek 0 回]
+    Config -->|有効| Idem{同じ event_id の返答が保存済み?}
+    Idem -->|yes| Saved[保存済み返答を再利用<br/>DeepSeek 0 回]
+    Idem -->|no| Budget{1日上限（回数/トークン）<br/>・ユーザー1時間上限内?}
+    Budget -->|超過| Stop["「今日はここまで」を返す<br/>DeepSeek 0 回"]
+    Budget -->|上限内| DS["DeepSeek API のみ (tools=None)<br/>サーバー専用 DB のメンバー・直近会話だけ参照"]
+    DS --> Redact[秘密値を伏せて guild_conversations と<br/>guild_usage_log に記録し返信]
 ```
 
 ## PETIT MCP bridge（v0.46.0開発版・#398）

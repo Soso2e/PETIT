@@ -29,6 +29,7 @@ class DiscordEvent(BaseModel):
     channel_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
     guild_id: str | None = Field(default=None, max_length=40, pattern=r"^[0-9]+$")
     author_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
+    display_name: str = Field(default="", max_length=120)
     message: str = Field(min_length=1, max_length=20000)
 
 
@@ -83,6 +84,19 @@ def _reply(result: dict) -> dict:
 def receive(event: DiscordEvent, authorization: str | None = Header(default=None)) -> dict:
     _authorize(authorization)
     if mode_for(event) != "owner":
+        if event.guild_id is not None:
+            from . import guild_api
+            if guild_api.is_configured(event.guild_id):
+                return guild_api.handle_mention(
+                    guild_api.GuildMessageRequest(
+                        event_id=event.event_id,
+                        guild_id=event.guild_id,
+                        channel_id=event.channel_id,
+                        author_id=event.author_id,
+                        display_name=event.display_name,
+                        message=event.message,
+                    )
+                )
         return {"mode": "guest", "status": "completed", "reply": GUEST_GUIDE, "approvals": []}
     # One Core Thread per Discord channel / thread; the message ID is the request ID,
     # so a redelivered gateway event returns the saved result instead of re-running.

@@ -35,7 +35,7 @@ def _same_origin(request: Request):
         raise HTTPException(403, "操作元を確認できません。設定画面から操作してください。")
 
 
-TOKEN_AUTH_PREFIXES = ("/api/agent-bridge/", "/api/channels/discord/")
+TOKEN_AUTH_PREFIXES = ("/api/agent-bridge/", "/api/channels/discord/", "/api/guild/")
 
 
 def install(app):

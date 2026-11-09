@@ -14,7 +14,7 @@ import os
 
 import httpx
 
-from .relay import (Incoming, approval_text, button_id, extract, notification_text, parse_button, payload, split)
+from .relay import (Incoming, approval_text, button_id, extract, notification_text, parse_button, parse_slash, payload, split)
 
 log = logging.getLogger("petit.discord")
 TIMEOUT = httpx.Timeout(connect=10, read=600, write=30, pool=10)
@@ -29,7 +29,7 @@ class CoreClient:
     async def _call(self, method: str, path: str, **kwargs) -> dict | None:
         try:
             response = await self._client.request(method, path, **kwargs)
-            if response.status_code in {403, 404, 409, 429}:
+            if response.status_code in {400, 403, 404, 409, 429}:
                 detail = response.json().get("detail")
                 return {"reply": detail if isinstance(detail, str) else "この操作はできませんでした。", "approvals": []}
             response.raise_for_status()
@@ -43,6 +43,9 @@ class CoreClient:
 
     async def decide(self, body: dict) -> dict:
         return await self._call("POST", "/api/channels/discord/approvals", json=body) or {"reply": UNAVAILABLE, "approvals": []}
+
+    async def guild_command(self, subcommand: str, body: dict) -> dict:
+        return await self._call("POST", f"/api/guild/{subcommand}", json=body) or {"reply": UNAVAILABLE, "approvals": []}
 
     async def claim_notifications(self) -> dict:
         return await self._call("GET", "/api/channels/discord/notifications") or {"notifications": []}
@@ -71,8 +74,44 @@ async def deliver_notifications(core: CoreClient, fetch_user) -> int:
     return sent
 
 
+async def dispatch_slash_interaction(core: CoreClient, *, interaction_id: str, guild_id: str | None,
+                                     author_id: str, display_name: str, manage_guild: bool,
+                                     permissions: int | None, data: dict | None) -> str | None:
+    """Relay a `/petit` slash command to Core `/api/guild/*` and return the reply text."""
+    parsed = parse_slash(data)
+    if parsed is None:
+        return None
+    if not guild_id:
+        return "このコマンドはサーバー内でのみ使えます。"
+    sub, params = parsed
+    body: dict = {
+        "interaction_id": interaction_id,
+        "guild_id": guild_id,
+        "author_id": author_id,
+    }
+    if sub in {"setup", "reset"}:
+        body["manage_guild"] = manage_guild
+        body["permissions"] = permissions
+        if sub == "setup":
+            if "timezone" in params:
+                body["timezone"] = str(params["timezone"])
+            if "daily_call_limit" in params:
+                body["daily_call_limit"] = int(params["daily_call_limit"])
+            if "daily_token_limit" in params:
+                body["daily_token_limit"] = int(params["daily_token_limit"])
+            if "user_hourly_limit" in params:
+                body["user_hourly_limit"] = int(params["user_hourly_limit"])
+    elif sub == "me":
+        body["display_name"] = str(params.get("display_name") or display_name or "")
+        body["role_note"] = str(params.get("role_note") or "")
+        body["memo"] = str(params.get("memo") or "")
+    result = await core.guild_command(sub, body)
+    return str(result.get("reply") or "")
+
+
 def build_client(core: CoreClient):
     import discord  # optional dependency: requirements-discord.txt
+    from discord import app_commands
 
     intents = discord.Intents.default()  # no privileged Message Content Intent
     intents.dm_messages = True
@@ -96,7 +135,15 @@ def build_client(core: CoreClient):
             await channel.send(approval_text(item), view=approval_view(item))
 
     class PetitClient(discord.Client):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.tree = app_commands.CommandTree(self)
+
         async def setup_hook(self):
+            try:
+                await self.tree.sync()
+            except Exception as exc:  # noqa: BLE001 - command sync failure must not crash Bot
+                log.warning("command tree sync failed: %s", type(exc).__name__)
             self.loop.create_task(self.notification_loop())
 
         async def notification_loop(self):
@@ -110,6 +157,26 @@ def build_client(core: CoreClient):
                 await asyncio.sleep(interval)
 
     client = PetitClient(intents=intents, allowed_mentions=discord.AllowedMentions.none())
+    petit_group = app_commands.Group(name="petit", description="プティのサーバー設定・プロフィール管理")
+
+    @petit_group.command(name="setup", description="このサーバーでプティの Guild モードを有効化します（管理者のみ）")
+    async def _cmd_setup(interaction: discord.Interaction, timezone: str = "Asia/Tokyo",
+                         daily_call_limit: int = 50, daily_token_limit: int = 60000):
+        pass  # handled centrally in on_interaction
+
+    @petit_group.command(name="reset", description="このサーバーのプティ設定と保存データを削除します（管理者のみ）")
+    async def _cmd_reset(interaction: discord.Interaction):
+        pass
+
+    @petit_group.command(name="me", description="このサーバーでプティが覚えている自分の情報を確認・更新します")
+    async def _cmd_me(interaction: discord.Interaction, display_name: str = "", role_note: str = "", memo: str = ""):
+        pass
+
+    @petit_group.command(name="forget-me", description="このサーバーに保存された自分の記録をすべて消去します")
+    async def _cmd_forget_me(interaction: discord.Interaction):
+        pass
+
+    client.tree.add_command(petit_group)
 
     @client.event
     async def on_ready():
@@ -123,7 +190,8 @@ def build_client(core: CoreClient):
             event_id=str(message.id), channel_id=str(message.channel.id),
             guild_id=str(message.guild.id) if message.guild else None, author_id=str(message.author.id),
             content=message.content or "", author_is_bot=bool(message.author.bot),
-            mentions_bot=client.user in message.mentions)
+            mentions_bot=client.user in message.mentions,
+            display_name=getattr(message.author, "display_name", "") or "")
         text = extract(incoming, str(client.user.id))
         if text is None:
             return
@@ -133,6 +201,26 @@ def build_client(core: CoreClient):
 
     @client.event
     async def on_interaction(interaction):
+        if interaction.type == discord.InteractionType.application_command:
+            perms = getattr(interaction.user, "guild_permissions", None) or getattr(interaction, "permissions", None)
+            manage_guild = bool(getattr(perms, "manage_guild", False))
+            perm_value = getattr(perms, "value", None)
+            await interaction.response.defer(ephemeral=True)
+            reply = await dispatch_slash_interaction(
+                core,
+                interaction_id=str(interaction.id),
+                guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+                author_id=str(interaction.user.id),
+                display_name=getattr(interaction.user, "display_name", "") or "",
+                manage_guild=manage_guild,
+                permissions=perm_value if isinstance(perm_value, int) else None,
+                data=interaction.data,
+            )
+            if reply:
+                for chunk in split(reply):
+                    await interaction.followup.send(chunk, ephemeral=True)
+            return
+
         if interaction.type != discord.InteractionType.component:
             return
         parsed = parse_button((interaction.data or {}).get("custom_id"))
