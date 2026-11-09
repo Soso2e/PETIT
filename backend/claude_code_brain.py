@@ -76,6 +76,8 @@ def status(data: dict | None = None) -> dict:
 def error_category(text: str) -> str:
     # Classify in memory; provider text is never stored or returned.
     lower = text.lower()
+    if "unknown option" in lower:
+        return "cli_outdated"
     if any(x in lower for x in ("not logged in", "/login", "invalid api key", "oauth", "authentication")):
         return "authentication_required"
     if any(x in lower for x in ("usage limit", "rate limit", "credit balance", "overloaded")):

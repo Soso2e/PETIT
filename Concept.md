@@ -69,6 +69,8 @@ Executorの優先順位:
 
 DeepSeekにはできないこと（ファイル操作、開発作業、長い自律作業など）があるため、ルーティングはDeepSeekでもよいが、**実際の処理はCLIへ任せる**。
 
+**試験中（2026-11-09 決定、既定 OFF）**: 設定のトグルで DeepSeek を最初の担当にし、雑談と定型操作（予定・タスク・作業記録）はその場で処理し、複数ステップの作業だけ CLI に任せる構成を試している。別の Router は置かず、同じ1回の応答で判断する。結果を見て本方針へ反映するか決める。詳細は [docs/brain/front-brain-delegation.md](docs/brain/front-brain-delegation.md)。
+
 ### Coreが守ること
 
 CLIに任せても、次の責任はCoreから動かさない。
@@ -87,7 +89,7 @@ CLIに任せても、次の責任はCoreから動かさない。
 ### 現状との差
 
 現在の実装は「1回の会話（Turn）を、優先順位で選んだ1つのBrainが最後まで担当する」方式である。DeepSeek / LM Studio / Codex / Antigravity CLI / Claude Code CLI に対応し、Antigravity SDK は撤去済み。
-**RouterとExecutorを分ける構成は未実装。** 詳細は [docs/architecture.md](docs/architecture.md)。
+別の呼び出しとしてRouterとExecutorを分ける構成は採らず、上記のトグルで試している。詳細は [docs/architecture.md](docs/architecture.md)。
 
 ---
 
@@ -164,7 +166,7 @@ CLIに任せても、次の責任はCoreから動かさない。
 | テーマ | 問い |
 | --- | --- |
 | Claude Code CLI | Executorの何番目に置くか。Antigravity / Codex / Claude Code の得意分野で振り分けるか |
-| Router | RouterとExecutorを分けるか、今の「1つのBrainが最後まで担当する」方式を基本にするか。雑談をRouterだけで返す範囲 |
+| Router | **試験中（2026-11-09）**: 振り分けと回答を別の呼び出しに分けず、DeepSeek の1回の応答で判断する。トグルで試し、定着させるかを決める |
 | Antigravity CLIの規約 | 公式FAQでは「個人プランを第三者アプリがラップする用途」がサポート外とされ、許諾は確定していない（[詳細](docs/brain/antigravity-cli.md)）。最優先に置くうえでのリスクの扱い。Claude Code CLI も、自作アプリから呼び出す使い方の契約上の扱いを確認する |
 | アカウント | 本人専用の1アカウントか、複数ユーザーか。設定の保存先（自宅Core / クラウド） |
 | 開発の自律度 | **決定（2026-11-08）**: §4 の L0〜L3。テスト実行・commit・`petit/` ブランチへの push は確認なし、PR は承認、main への push は禁止 |

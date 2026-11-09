@@ -56,6 +56,16 @@ def target(provider: str, data: dict | None = None) -> dict:
     raise ValueError("unknown_provider")
 
 
+def delegate_target(provider: str, data: dict | None = None) -> dict:
+    """A delegated Turn uses its own low-consumption Claude model, not the chat one."""
+    data = settings.load() if data is None else data
+    item = target(provider, data)
+    if provider == "claude_code":
+        item["model"] = data.get("delegate_claude_model", "sonnet")
+    item["_delegate"] = True
+    return item
+
+
 def permitted(provider: str, data: dict, privacy="standard") -> bool:
     if data.get("brain_transport") == "cli_only" and provider not in CLI_PROVIDERS:
         return False
@@ -79,7 +89,7 @@ def current() -> dict | None:
         data = settings.load()
         if (not data["brain_enabled"] and not active.get("_connection_test")) or not permitted(active["profile"], data):
             raise lmstudio_client.LMStudioError("実行中のAI接続または費用許可が解除されました。")
-        live = target(active["profile"])
+        live = delegate_target(active["profile"], data) if active.get("_delegate") else target(active["profile"])
         if any(live.get(k) != active.get(k) for k in ("provider", "model", "base_url", "auth_mode", "api_key")):
             raise lmstudio_client.LMStudioError("実行中のAI設定が変更されました。自動再送しません。")
     return active
@@ -100,7 +110,9 @@ def run(request_id, execute, *, messages=None, used_tools=None):
         raise lmstudio_client.LMStudioError(RETIRED_SDK_MESSAGE)
     row = store.load_turn(request_id)
     privacy = store.thread(row["thread_id"])["privacy"]
-    candidates = list(data["priority"])
+    from . import delegations
+    delegated = delegations.is_work_thread(row["thread_id"])
+    candidates = delegations.candidates(data) if delegated else delegations.front_order(data)
     if messages is not None:
         with db.get_connection() as c:
             selected = c.execute("SELECT payload_json FROM turn_events WHERE request_id=? AND type='brain_selection' ORDER BY seq DESC LIMIT 1", (request_id,)).fetchone()
@@ -111,7 +123,7 @@ def run(request_id, execute, *, messages=None, used_tools=None):
     for provider in candidates:
         if not permitted(provider, data, privacy):
             continue
-        destination = target(provider)
+        destination = delegate_target(provider, data) if delegated else target(provider)
         if not destination["configured"]:
             diagnostic(request_id, provider, "unavailable", "not_configured")
             previous = "not_configured"
@@ -139,6 +151,8 @@ def run(request_id, execute, *, messages=None, used_tools=None):
                 c.execute("UPDATE turns SET provider_key=NULL WHERE request_id=?", (request_id,))
         finally:
             _active.reset(token)
+    if delegated:
+        raise lmstudio_client.LMStudioError(delegations.failure_message(previous))
     if data.get("brain_transport") == "cli_only":
         raise lmstudio_client.LMStudioError("利用可能なCLI Brainがありません。CLIの導入・公式ログイン・接続テストを確認してください。CLIのみの設定ではSDK/APIへ切り替えません。")
     raise lmstudio_client.LMStudioError("利用可能なAIがありません。設定で認証・モデル・費用許可を確認してください。")

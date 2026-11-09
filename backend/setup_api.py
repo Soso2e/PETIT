@@ -148,8 +148,10 @@ def get_config():
     from . import codex_brain
     from .antigravity_cli import status
     from . import claude_code_brain
+    from . import delegations
     data = settings.load()
     return {"settings": settings.public(), "brain": brain_priority.public_status(), "sync": service_sync.status(),
+            "delegation": {"available": delegations.candidates(data)},
             "antigravity_cli": status(data), "codex_cli": codex_brain.status(), "claude_code": claude_code_brain.status(data)}
 
 
@@ -248,6 +250,9 @@ class SettingsUpdate(BaseModel):
     claude_code_agent_mode: bool | None = None
     claude_code_agent_bash: bool | None = None
     codex_agent_mode: bool | None = None
+    front_brain_deepseek: bool | None = None
+    delegate_priority: list[Literal["claude_code", "codex"]] | None = None
+    delegate_claude_model: Literal["sonnet", "haiku"] | None = None
     sync_notifications: bool | None = None
 
 
@@ -273,6 +278,14 @@ def put_config(payload: SettingsUpdate):
         candidate = {**data, **values}
         if not any(brain_priority.permitted(x, candidate) and brain_priority.target(x, candidate)["configured"] for x in candidate["priority"]):
             raise HTTPException(400, "AIを接続し、必要な費用許可を設定してください。")
+    if "delegate_priority" in values and (not values["delegate_priority"] or len(set(values["delegate_priority"])) != len(values["delegate_priority"])):
+        raise HTTPException(400, "任せる先を重複なく指定してください。")
+    if values.get("front_brain_deepseek"):
+        candidate = {**data, **values}
+        if not candidate["brain_enabled"] or candidate["brain_transport"] == "cli_only":
+            raise HTTPException(400, "接続方式を「CLI・SDK・APIを使う」にし、「この優先順位を会話で使う」をONにしてください。")
+        if not brain_priority.permitted("deepseek", candidate) or not brain_priority.target("deepseek", candidate)["configured"]:
+            raise HTTPException(400, "先にDeepSeekを接続し、文脈送信とAPI料金を許可してください。")
     settings.update(values)
     if "sync_notifications" in values:
         from . import notifications

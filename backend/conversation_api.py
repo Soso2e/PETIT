@@ -61,7 +61,9 @@ def process(request_id: str) -> dict:
                                                  row["thread_id"], observations)
                     return result
                 result = brain.run(request_id)
-                if result["status"] == "completed" and store.thread(row["thread_id"])["privacy"] != "local_only":
+                from . import delegations
+                if (result["status"] == "completed" and store.thread(row["thread_id"])["privacy"] != "local_only"
+                        and not delegations.is_work_thread(row["thread_id"])):
                     from .chat import _artifact_executor, _persist_chat_artifacts
                     _artifact_executor.submit(_persist_chat_artifacts, store.load_turn(request_id)["conversation_id"],
                         payload["message"], result["reply"], ", ".join(t["name"] for t in result.get("used_tools", [])) or None)
@@ -173,8 +175,23 @@ def decide(approval_id: str, approved: bool) -> dict | None:
                 with db.get_connection() as connection:
                     connection.execute("UPDATE turns SET status='waiting_approval' WHERE request_id=?", (request_id,))
                 return store.result(request_id)
-            return brain.run(request_id, messages=messages,
-                             used_tools=json.loads(row["result_json"]).get("used_tools", []))
+            used_tools = json.loads(row["result_json"]).get("used_tools", [])
+            from . import delegations
+            if delegations.is_work_thread(row["thread_id"]):
+                return delegations.resume(request_id, lambda: _continue(request_id, row["thread_id"], messages, used_tools))
+            return brain.run(request_id, messages=messages, used_tools=used_tools)
+    except Exception as exc:
+        error = str(exc) if isinstance(exc, lmstudio_client.LMStudioError) else "承認後の結果生成に失敗しました。操作結果を照会してください。"
+        return store.finish(request_id, {"reply": "", "error": error}, status="failed")
+
+
+def _continue(request_id: str, thread_id: str, messages: list, used_tools: list) -> dict:
+    """Delegated work continues after approval on its own worker."""
+    try:
+        with request_context.bind(request_id=request_id, session_id=thread_id, is_admin=True):
+            return brain.run(request_id, messages=messages, used_tools=used_tools)
+    except brain.TurnCancelled as exc:
+        return store.finish(request_id, {"reply": "", "error": str(exc)}, status="cancelled")
     except Exception as exc:
         error = str(exc) if isinstance(exc, lmstudio_client.LMStudioError) else "承認後の結果生成に失敗しました。操作結果を照会してください。"
         return store.finish(request_id, {"reply": "", "error": error}, status="failed")

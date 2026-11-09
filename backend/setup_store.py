@@ -23,6 +23,7 @@ DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["antigravit
             "antigravity_cli_enabled": False, "antigravity_cli_model": "",
             "claude_code_enabled": False, "claude_code_model": "",
             "claude_code_agent_mode": False, "claude_code_agent_bash": False, "codex_agent_mode": False,
+            "front_brain_deepseek": False, "delegate_priority": ["claude_code", "codex"], "delegate_claude_model": "sonnet",
             "coding_roots": [],
             "paid_allowed": [], "connected": [], "calendar": "local", "google_calendar_id": "primary",
             "notion_tasks_db": "", "notion_projects_db": "", "notion_pages": [],

@@ -200,8 +200,9 @@ PETIT Home（作業ディレクトリ）で動くエージェントとして振�
 
 
 def agent_mode() -> bool:
-    from . import request_context
-    return bool(settings.load().get("codex_agent_mode")) and request_context.current_is_admin()
+    from . import delegations, request_context
+    delegated = delegations.is_work_thread(request_context.current_ids()[1])
+    return bool(settings.load().get("codex_agent_mode") or delegated) and request_context.current_is_admin()
 
 
 def run(request_id, target, *, messages=None, used_tools=None):

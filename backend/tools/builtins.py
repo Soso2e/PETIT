@@ -22,6 +22,7 @@ _BUILTIN_MODULES = (
     "backend.tools.github",
     "backend.tools.home_files",
     "backend.tools.gmail",
+    "backend.tools.delegations",
     "backend.tools.local_development",
     "backend.tools.lists",
     "backend.tools.memory",

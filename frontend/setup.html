@@ -25,6 +25,15 @@
         <label class="check"><input type="checkbox" id="brain-enabled">この優先順位を会話で使う</label>
         <button id="save-brain">AI設定を保存</button><p class="muted">Tool実行後の障害では、自動切替で処理を再実行せず、保存済み結果を保持します。</p>
       </section>
+      <section class="card"><h2>DeepSeekを最初の担当にする（試験）</h2>
+        <p>普段の会話・予定・タスク・作業記録はDeepSeekがすぐ返し、複数ステップの作業はCLIに任せます。上の優先順位は変更しません。OFFにすると元に戻ります。</p>
+        <label class="check"><input type="checkbox" id="front-brain">DeepSeekを最初の担当にする</label>
+        <label>任せる先の順位<select id="delegate-priority"><option value="claude_code,codex">Claude Code → Codex</option><option value="codex,claude_code">Codex → Claude Code</option><option value="claude_code">Claude Codeだけ</option><option value="codex">Codexだけ</option></select></label>
+        <label>Claude Codeのモデル（任せる作業用）<select id="delegate-claude-model"><option value="sonnet">Sonnet</option><option value="haiku">Haiku（消費が少ない）</option></select></label>
+        <p id="delegate-status" role="status"></p>
+        <p class="muted">任せる作業の開始に確認は出ません。開始と状態はチャット画面に表示し、外部への送信や書き込みは従来どおり確認します。この作業ではエージェントモードの設定に関わらず、PETIT Homeと登録リポジトリのworktreeの中で作業します。DeepSeekへの文脈送信の許可が必要です。メール本文はDeepSeekへ送らず、CLIに任せます。</p>
+        <button id="save-front-brain">この設定を保存</button>
+      </section>
       <section class="card"><h2>Codex CLI / ChatGPT</h2><p>サーバーの公式Codex CLIを使います。PETIT専用の認証を公式の資格情報ストアへ保存します。チャット・Tool選択はCodex、Toolの検証・承認・実行結果の保存はPETITが担当します。</p>
         <p id="codex-cli-status" role="status"></p><button id="codex-diagnose" class="quiet">CLI導入・認証状態を確認（推論なし）</button>
         <p class="muted">Codexの認証状態は導入検出と別に確認します。実際のモデル応答は「接続テスト」で確認してください。CLIへの直接のファイル編集・Shell操作は許可せず、PETITの公開Toolを使用します。CLIのみの画像付き会話は未対応です。</p>

@@ -1,5 +1,41 @@
 # PETIT Runtime Flows
 
+## Front Brain と CLI 委譲（v0.50.0開発版・#411）
+
+`front_brain_deepseek` が ON のときだけ動く（既定 OFF）。委譲は作業用 Thread の通常の Turn なので、承認・receipt・取消・events は既存のものを使う。実行状態の正本は `turns.status`。詳細は [brain/front-brain-delegation.md](brain/front-brain-delegation.md)。
+
+```mermaid
+flowchart TD
+    Turn[既存 Thread / Turn 受付] --> Order{front_brain_deepseek ON<br/>かつ mixed?}
+    Order -->|no| Saved[保存済みの順位]
+    Order -->|yes| Front[このTurnだけ DeepSeek を先頭に<br/>保存済みの順位は変えない]
+    Front --> Native[native Loop / 初回から定型Tool + delegate_to_agent<br/>gmail_get_message は非公開]
+    Front -->|DeepSeek 不可・Tool実行前| Fallback[既存の順位で次のBrain]
+    Native -->|テキスト| Reply[回答・確認質問]
+    Native -->|PETIT Tool| Gate[既存の検証・risk・承認・receipt]
+    Gate --> Native
+    Native -->|delegate_to_agent| Create[同じ transaction で receipt・作業用Thread・queued Turn・delegations]
+    Create --> Notice[返答末尾に Core が「…に任せました」を追記]
+    Create -.->|2秒ごと| Worker[委譲 Worker / 同時1件 / 会話用Workerを使わない]
+    Worker --> Pick[delegate_priority の順 / 接続済みのCLIだけ<br/>Claude は delegate_claude_model]
+    Pick --> Agent[エージェントモードで実行 / L0〜L3 は既存どおり]
+    Pick -->|全候補が不可| Fail[理由つきで failed]
+    Agent -->|L2 承認待ち| Wait[waiting_approval]
+    Wait --> Parent[親Threadに報告と確認カード]
+    Parent -->|判断| Resume[HTTP を待たせず専用Workerで同じセッションを再開]
+    Resume --> Agent
+    Parent -->|期限切れ| Cancelled[cancelled]
+    Agent --> Done{completed / failed / cancelled / interrupted}
+    Fail --> Done
+    Cancelled --> Done
+    Restart[Core 再起動] -->|自動再実行なし| Done
+    Done --> Report[reconcile: 状態ごとに1回だけ親Threadへ保存<br/>Coreの確認事実とCLIの報告（未検証）を分ける / LLMを呼ばない]
+    Report --> Notify[通知 delegation / 初期OFF・文面に作業内容なし]
+    UI[チャット画面] -->|実行中は5秒ごと| Status[GET /api/delegations]
+    Status --> Strip[上部に状態と止めるボタン / 新しい報告を表示]
+    Strip -->|止める| Cancel[POST /api/delegations/id/cancel]
+```
+
 ## PETIT Home: 人格の単一ソースと差分承認（v0.46.0開発版）
 
 全Brain（native Tool Loop / Claude Code CLI / Antigravity CLI / Codex）は、同じ PETIT Home の人格ファイルから system 指示を作る。人格ファイルの変更は Core が計算した差分を確認カードに出し、承認後に一度だけ書き込んで git commit する。詳細は [brain/agent-home.md](brain/agent-home.md)。
