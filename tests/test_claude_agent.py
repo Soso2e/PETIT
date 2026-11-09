@@ -45,6 +45,7 @@ def test_persona_files_need_diff_approval(home, name):
     ("Write", {"file_path": "../escape.txt"}, hooks.OUTSIDE_REASON),
     ("Read", {"file_path": "~/.ssh/id_ed25519"}, hooks.OUTSIDE_REASON),
     ("Write", {"file_path": ".git/config"}, hooks.L3_REASON),
+    ("Read", {"file_path": ".git/config"}, hooks.L3_REASON),
     ("Edit", {"file_path": ".claude/settings.json"}, hooks.L3_REASON),
     ("Read", {"file_path": "scratch/.env"}, hooks.L3_REASON),
     ("Bash", {"command": "git push origin main"}, hooks.L2_REASON),

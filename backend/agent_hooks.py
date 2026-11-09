@@ -25,7 +25,7 @@ PROTECTED_FILES = {"AGENTS.md", "SOUL.md", "USER.md", "CLAUDE.md"}
 PROTECTED_DIRS = {".git", ".claude"}
 SECRET_NAMES = re.compile(r"(^|/)(\.env[^/]*|.*\.pem|.*\.key|id_[a-z0-9]+|\.netrc|credentials[^/]*)$", re.I)
 
-PERSONA_REASON = ("人格ファイルは直接書き換えられません。update_persona_file（mcp__petit__update_persona_file）で"
+PERSONA_REASON = ("人格ファイルは直接書き換えられません。update_persona_file で"
                   "変更後の全文を渡すと、Core が差分を見せて承認を取ります。")
 OUTSIDE_REASON = ("PETIT Home の外は使えません。リポジトリを触るときは open_worktree で Home の worktrees/ に"
                   "作業用 worktree を作ってください。")
@@ -66,17 +66,25 @@ def _file_decision(tool: str, tool_input: dict, home: Path) -> str | None:
     raw = _target(tool_input)
     if raw is None:
         return None if tool in {"Glob", "Grep", "LS"} else OUTSIDE_REASON
+    return path_decision(raw, home, write=tool in WRITE_TOOLS)
+
+
+def path_decision(raw: str, home: Path, *, write: bool) -> str | None:
+    """The L0/L1 file line, shared by this hook and Core's Home file Tools (every Brain)."""
     path = Path(raw).expanduser()
     path = path if path.is_absolute() else home / path
     if not _inside(path, home):
         return OUTSIDE_REASON
     relative = path.resolve().relative_to(home.resolve())
-    # .git at any depth (Home itself and every worktree); .claude at the top.
-    if ".git" in relative.parts or (relative.parts and relative.parts[0] in PROTECTED_DIRS):
-        return L3_REASON if tool in WRITE_TOOLS else None
+    # .git at any depth (Home and every worktree): no reads either, since .git/config can hold
+    # remote credentials. .claude at the top: readable, never writable.
+    if ".git" in relative.parts:
+        return L3_REASON
+    if relative.parts and relative.parts[0] in PROTECTED_DIRS:
+        return L3_REASON if write else None
     if SECRET_NAMES.search(relative.as_posix()):
         return L3_REASON
-    if tool in WRITE_TOOLS and len(relative.parts) == 1 and relative.parts[0] in PROTECTED_FILES:
+    if write and len(relative.parts) == 1 and relative.parts[0] in PROTECTED_FILES:
         return PERSONA_REASON
     return None
 

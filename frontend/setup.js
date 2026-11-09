@@ -44,6 +44,7 @@
     if ($('claude-code-status')) $('claude-code-status').textContent=claude?(claude.installed?'公式CLIを検出':'CLI未検出（サーバーのPATH・標準配置先）')+' / Brain接続: '+(claude.production_enabled?'設定済み':'未接続')+' / ログイン・契約枠残量: unknown（接続テストと公式CLIで確認）':'CLIの診断情報を取得できません。';
     if ($('claude-code-model')) $('claude-code-model').value=s.claude_code_model||'';
     if ($('claude-agent-mode')) $('claude-agent-mode').checked=!!s.claude_code_agent_mode;
+    if ($('codex-agent-mode')) $('codex-agent-mode').checked=!!s.codex_agent_mode;
     if ($('claude-agent-bash')) $('claude-agent-bash').checked=!!s.claude_code_agent_bash;
     for (const [id,key] of [['codex-model','codex_model'],['codex-web-search','codex_web_search'],['deepseek-model','deepseek_model'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
     if (!$('google-redirect').value) $('google-redirect').value=location.origin+'/api/setup/google/callback';
@@ -68,7 +69,7 @@
   document.querySelectorAll('[data-models]').forEach(button=>action(button,async()=>{const id=button.dataset.models,[input]=modelFields[id];const result=await api('/services/'+id+'/models','POST');const select=$(input+'-options');select.replaceChildren(new Option('CLIの既定モデル',''));for(const item of result.models)select.add(new Option(item.label+' / '+item.id,item.id));select.value=$(input).value;notice(result.models.length+'件のモデル候補を取得しました。選択して保存後、接続テストで実応答を確認してください。');}));
   document.querySelectorAll('[data-save-model]').forEach(button=>action(button,async()=>{const [input,key]=modelFields[button.dataset.saveModel];await save({[key]:$(input).value});notice('モデル設定を保存しました。接続テストで実応答を確認してください。');}));
   async function saveKeys(fields){const values={};for(const [id,key]of fields){if($(id).value)values[key]=$(id).value;}if(Object.keys(values).length){await api('/credentials','PUT',{values});fields.forEach(([id])=>$(id).value='');}}
-  async function saveAI(extra={}){await save({priority:order,codex_model:$('codex-model').value,codex_web_search:$('codex-web-search').value,antigravity_cli_model:$('antigravity-cli-model').value,claude_code_model:$('claude-code-model').value,deepseek_model:$('deepseek-model').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null].filter(Boolean),...extra});}
+  async function saveAI(extra={}){await save({priority:order,codex_model:$('codex-model').value,codex_web_search:$('codex-web-search').value,codex_agent_mode:!!($('codex-agent-mode')&&$('codex-agent-mode').checked),antigravity_cli_model:$('antigravity-cli-model').value,claude_code_model:$('claude-code-model').value,deepseek_model:$('deepseek-model').value,paid_allowed:[$('paid-deepseek').checked?'deepseek':null].filter(Boolean),...extra});}
   document.querySelectorAll('[data-step]').forEach(x=>action(x,()=>showStep(Number(x.dataset.step))));
   action($('previous'),()=>showStep(step-1));action($('next'),()=>{showStep(step+1);notice('未設定のサービスはスキップできます。');});action($('refresh'),async()=>{await refresh();notice('保存済み状態を更新しました。');});
   action($('acp-install'),async()=>{const root=$('acp-install-root').value.trim();acpState=await api('/antigravity-acp/install','POST',root?{destination:root}:{});await refresh();notice('公式ACP AgentをRegistry SHA-256照合後に導入しました。');});
