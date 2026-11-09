@@ -47,7 +47,7 @@ flowchart TD
     DM --> Report[sent / failed を報告<br/>未報告は claimed=不明のまま再送しない]
 ```
 
-## Discord Guild モード（v0.47.0開発版・#403）
+## Discord Guild モード（v0.48.0開発版・#403）
 
 owner 以外、または owner 指定外のサーバーでは、管理者が `/petit setup` を実行したサーバーだけ Guild モードで動く。データは `storage/guilds/<guild_id>.db` に完全分離し、request_context の `guild_mode` によって owner の DB・Tool Registry・PETIT Home・CLI Brain への到達を遮断する。詳細は [channels/discord-bot.md](channels/discord-bot.md) §3・§5.3。
 
@@ -88,6 +88,20 @@ flowchart TD
     Public --> Risk{requires_confirmation?}
     Risk -->|yes| Propose[store.propose<br/>承認待ちを返す・実行しない]
     Risk -->|no| Exec[brain.execute<br/>書き込みは effect receipt]
+```
+
+## Home ファイル Tool と Codex エージェントモード（v0.47.0開発版・#404）
+
+```mermaid
+flowchart TD
+    Brain[どの Brain でも<br/>native / Codex / Antigravity CLI / Claude Code MCP] --> HT[list / read / search / write / edit _home_file]
+    HT --> Line{agent_hooks.path_decision<br/>Hook と同じ線}
+    Line -->|Home外・..・~・秘密・.git読書き| L3[拒否]
+    Line -->|人格ファイルの変更| Persona[拒否 → update_persona_file 差分承認]
+    Line -->|Home L0| Home[読み書き・Home を git commit]
+    Line -->|worktrees/ L1| WT[読み書き・commit は commit_worktree]
+    Codex{Codex: codex_agent_mode ON かつ管理者?} -->|yes| CH[cwd = PETIT Home<br/>AGENTS.md=人格を Codex が読む<br/>sandbox read-only・shell なし]
+    Codex -->|no| CW[従来の agent-workspace]
 ```
 
 ## Worktree での開発（v0.46.0開発版・#401）

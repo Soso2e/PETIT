@@ -75,6 +75,7 @@ flowchart TD
 - 対応するBrain:
   - **DeepSeek / LM Studio**: PETIT内部の native Tool Loop で動く（8 rounds / 12 calls で停止）。
   - **Codex CLI**: app-server の Agent Loop。PETIT の Tool は dynamic Tool として渡す。Codex の shell / apps / plugins / subagent は無効にしている。
+    - **エージェントモード（v0.47.0、設定で ON のときだけ）**: 作業場所を PETIT Home にし、ファイル操作・開発は Core の Home ファイル Tool と worktree Tool で行う。Codex 自身の sandbox は read-only・shell なしのまま。詳細は [brain/agent-home.md](brain/agent-home.md) §4.5。
   - **Antigravity CLI**: 公式 `agy` を本人のCLI認証で起動する。設定画面で明示的に接続したときだけ使える。規約上の許諾は未確定（[brain/antigravity-cli.md](brain/antigravity-cli.md)）。
   - **Claude Code CLI**: 公式 `claude` をヘッドレスで起動し、組込みTool・MCP・設定読込を無効にしてJSONで判断だけを受け取る。明示接続時のみ（[brain/claude-code-cli.md](brain/claude-code-cli.md)）。
     - **エージェントモード（v0.46.0、設定で ON のときだけ）**: PETIT Home を作業場所に、組込みファイル Tool と PETIT Tool（MCP）を使い、PreToolUse Hook で L0〜L3 の線を引く。人格ファイルは差分承認。詳細は [brain/agent-home.md](brain/agent-home.md) §4.3。

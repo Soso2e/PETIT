@@ -25,6 +25,7 @@ PUBLIC_TOOLS = {
     "get_persona", "update_persona_file",
     "open_worktree", "list_worktrees", "get_worktree_status", "run_worktree_check", "commit_worktree",
     "push_worktree", "create_worktree_pull_request", "close_worktree",
+    "list_home_files", "read_home_file", "search_home_files", "write_home_file", "edit_home_file",
 }
 LOCAL_WRITES = {
     "delegate_coding_task", "cancel_coding_task", "delegate_background_research",
@@ -35,6 +36,9 @@ LOCAL_WRITES = {
     "register_project",
 }
 MAX_CALLS = 12
+# PETIT Home (L0) and worktrees (L1) are reachable from every Brain through Core Tools.
+HOME_HINT = ("\nPETIT Home（プティの作業ディレクトリ）のファイルは *_home_file Tool で読み書きでき、memory/ や skills/ に覚えたことを残してよい。"
+             "人格ファイルは update_persona_file（差分承認）。リポジトリの開発は open_worktree から始める。")
 MAX_ROUNDS = 8
 
 
@@ -214,7 +218,8 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         focus = dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:]
         persona = petit_home.persona()
         messages = [{"role": "system", "content": persona + voice_turn_instructions() + INSTRUCTIONS +
-                    "\n必要ならdiscover_toolsで詳細schemaを取得する。場所は確認済みの情報だけを使い、不明なら質問する。タイムゾーンから推定しない。\nCapability一覧: " + catalog.index()},
+                    "\n必要ならdiscover_toolsで詳細schemaを取得する。場所は確認済みの情報だけを使い、不明なら質問する。タイムゾーンから推定しない。" + HOME_HINT +
+                    "\nCapability一覧: " + catalog.index()},
                     {"role": "user", "content": "Coreの現在時刻（参考メタデータ）: " +
                      time_context.current_datetime().isoformat(timespec="seconds")}]
         messages.extend(store.history(row["thread_id"]))
