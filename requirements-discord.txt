@@ -1,0 +1,3 @@
+# Only for the separate Discord Bot process (python -m backend.channels.discord).
+discord.py>=2.4,<3
+httpx>=0.27

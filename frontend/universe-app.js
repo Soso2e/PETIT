@@ -1255,7 +1255,7 @@
         ? `完了: ${text(action.arguments?.title_query || action.arguments?.task_id, "対象タスク")}`
         : `${action.name}を実行します`;
       const exact = document.createElement('pre'); exact.className = 'action-preview';
-      exact.textContent = JSON.stringify(action.arguments || {}, null, 2);
+      exact.textContent = action.preview || JSON.stringify(action.arguments || {}, null, 2);
       exact.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto';
       const approve = document.createElement("button");
       approve.type = "button";

@@ -41,6 +41,11 @@ def requires_confirmation(name):
     return _registry.requires_confirmation(name)
 
 
+def preview_for(name, arguments):
+    _ensure_builtin_tools()
+    return _registry.preview_for(name, arguments)
+
+
 def risk_for(name):
     _ensure_builtin_tools()
     return _registry.risk_for(name)
@@ -59,5 +64,6 @@ __all__ = [
     "register_builtin_tools",
     "registered_names",
     "requires_confirmation",
+    "preview_for",
     "risk_for",
 ]

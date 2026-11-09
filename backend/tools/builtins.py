@@ -27,6 +27,7 @@ _BUILTIN_MODULES = (
     "backend.tools.notion",
     "backend.tools.notion_projects",
     "backend.tools.notion_search",
+    "backend.tools.persona",
     "backend.tools.project_completion",
     "backend.tools.project_registration",
     "backend.tools.project_status",
@@ -39,6 +40,7 @@ _BUILTIN_MODULES = (
     "backend.tools.task_reads",
     "backend.tools.task_defaults",
     "backend.tools.work_sessions",
+    "backend.tools.worktrees",
     "backend.web_tools",
 )
 

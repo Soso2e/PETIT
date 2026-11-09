@@ -52,6 +52,11 @@
         <button data-models="claude_code">モデル候補を表示</button><label>一覧から選択<select id="claude-code-model-options"><option value="">CLIの既定モデル</option></select></label><button data-save-model="claude_code">このモデル設定を保存</button>
         <div class="actions"><button id="claude-code-diagnose">インストール状態を再確認</button><button data-connect="claude_code">CLIへ接続（Codexの次に配置）</button><button data-test="claude_code">接続テスト</button><button data-disconnect="claude_code" class="quiet">PETITから切断</button></div>
         <p class="muted">ログインはサーバーPCで <code>claude</code> を起動して行います。接続テストは実際に1回推論します。</p>
+        <h3>エージェントモード（試験的）</h3>
+        <p>ONにすると、Claude Code は PETIT Home（既定 <code>~/PETIT-Home</code>）の中でファイルを自由に読み書きし、PETIT の Tool を MCP で直接使います。外部への送信・push は止め、人格ファイルの変更とタスク等の書き込みは確認カードで承認します。</p>
+        <label><input type="checkbox" id="claude-agent-mode"> エージェントモードを使う</label>
+        <label><input type="checkbox" id="claude-agent-bash"> Home 内で Bash も許可する（Claude Code の OS サンドボックス内のみ・Windows では無効）</label>
+        <div class="actions"><button id="claude-agent-save">エージェント設定を保存</button></div>
       </section>
       <section class="card"><h2>Antigravity SDKは廃止しました</h2><p>旧設定・認証情報・会話履歴は保持しています。AI設定を確認して保存すると、利用するAIを明示的に再選択できます。</p><p id="sdk-migration" role="status"></p></section>
       <section class="card"><h2>Google Antigravity / 公式ACP</h2>

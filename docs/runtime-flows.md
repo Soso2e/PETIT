@@ -1,5 +1,108 @@
 # PETIT Runtime Flows
 
+## PETIT Home: 人格の単一ソースと差分承認（v0.46.0開発版）
+
+全Brain（native Tool Loop / Claude Code CLI / Antigravity CLI / Codex）は、同じ PETIT Home の人格ファイルから system 指示を作る。人格ファイルの変更は Core が計算した差分を確認カードに出し、承認後に一度だけ書き込んで git commit する。詳細は [brain/agent-home.md](brain/agent-home.md)。
+
+```mermaid
+flowchart TD
+    Turn[Turn開始] --> Persona[petit_home.persona<br/>AGENTS.md + SOUL.md + USER.md<br/>空テンプレートとコメントは除外]
+    Persona -->|Home不可| Fallback[petit_prompt.CORE_SYSTEM_PROMPT]
+    Persona --> Native[brain._run の system / vision_reply]
+    Persona --> Workspace[agent_workspace AGENTS.md<br/>Coreが生成したものだけ再生成・手編集は停止]
+    Native --> Call{update_persona_file?}
+    Call -->|confirm_write| Propose[store.propose<br/>引数を保存]
+    Propose --> Card[approvals: tools.preview_for<br/>表示時に現在ファイルとの差分を Core が計算]
+    Card -->|承認| Apply[petit_home.apply<br/>一時ファイル→置換・git commit・receipt]
+    Card -->|取消/期限切れ| Keep[ファイルは変更しない]
+```
+
+## Discord Owner モード（v0.46.0開発版・#397）
+
+Bot は別プロセスで、Gateway へ外向き接続するだけ。owner 判定は Core が行い、owner 以外には Brain を呼ばない。詳細は [channels/discord-bot.md](channels/discord-bot.md)。
+
+```mermaid
+flowchart TD
+    Msg[Discord メッセージ] --> Extract{relay.extract<br/>Botの発言? / サーバーでメンションなし?}
+    Extract -->|該当| Silent[何もしない]
+    Extract -->|DM・メンション| Post[POST /api/channels/discord/events<br/>Bearer サービストークン]
+    Post --> Auth{トークン一致?}
+    Auth -->|未設定| E503[503]
+    Auth -->|不一致| E401[401]
+    Auth --> Mode{発話者 = OWNER_ID かつ<br/>DM か OWNER_GUILD_IDS?}
+    Mode -->|no| Guide[固定の案内のみ<br/>Brain 呼び出し 0 回]
+    Mode -->|yes| Submit[conversation_api.submit<br/>thread=discord:channel / request=discord:message<br/>source=discord・is_admin]
+    Submit --> Turn[既存の単一Brain Turn<br/>8 rounds / 12 calls・承認・receipt]
+    Turn -->|waiting_approval| Buttons[Core計算 preview + 承認/やめるボタン]
+    Turn --> Split[relay.split 2000文字で分割して返信]
+    Buttons --> Press[POST /api/channels/discord/approvals]
+    Press --> Check{owner かつ DM/指定サーバー<br/>かつ request_id が discord: ?}
+    Check -->|no| Deny[403 / 404・消費しない]
+    Check -->|yes| Decide[conversation_api.decide<br/>一度だけ承認消費・receipt]
+    Poll[Bot 30秒ごと] --> Claim[GET /api/channels/discord/notifications<br/>NOTIFICATIONS=on・設定ONのカテゴリ・直近1時間]
+    Claim --> Mark[配信記録 claimed を先に書く]
+    Mark --> DM[owner へ DM]
+    DM --> Report[sent / failed を報告<br/>未報告は claimed=不明のまま再送しない]
+```
+
+## PETIT MCP bridge（v0.46.0開発版・#398）
+
+CLI に PETIT Tool を MCP（stdio）で渡す土台。呼び出し口が MCP になっても、catalog・検証・risk・承認・receipt は native Loop と同じ。実 Turn への組込みは H3（未実装）。
+
+```mermaid
+flowchart TD
+    Core[Core: agent_bridge.issue request_id<br/>使い捨てトークン 30分] --> CLI[CLI が petit_mcp を stdio で起動<br/>PETIT_BRIDGE_TOKEN]
+    CLI --> List[tools/list → POST /api/agent-bridge/tools/list]
+    CLI --> Call[tools/call → POST /api/agent-bridge/tools/call]
+    Call --> Grant{トークン有効・40回以内・<br/>Turn が queued/running・管理者?}
+    Grant -->|no| Reject[401 / 403 / 409 / 429]
+    Grant -->|yes| Public{brain.schemas に公開?<br/>JSON Schema 検証}
+    Public -->|no| ToolErr[isError: tool_not_public_or_unavailable]
+    Public --> Risk{requires_confirmation?}
+    Risk -->|yes| Propose[store.propose<br/>承認待ちを返す・実行しない]
+    Risk -->|no| Exec[brain.execute<br/>書き込みは effect receipt]
+```
+
+## Worktree での開発（v0.46.0開発版・#401）
+
+```mermaid
+flowchart TD
+    Agent[エージェント] --> Open[open_worktree L1<br/>coding_roots の repo だけ]
+    Open --> WT[Home/worktrees/repo-id<br/>petit/slug-id ブランチ]
+    WT --> Edit[ファイル Tool で編集<br/>Hook: worktree 内 .git 書込は拒否]
+    Edit --> Check[run_worktree_check L1<br/>許可コマンドのみ・シェルなし・秘密なし]
+    Check --> Commit[commit_worktree L1]
+    Commit --> Push{push_worktree L1<br/>作成時の petit/ ブランチ・HEAD 一致?}
+    Push -->|main・既定・他ブランチ・不一致| Refuse[拒否 L3]
+    Push -->|yes| Remote[origin へ push・receipt]
+    Remote --> PR[create_worktree_pull_request<br/>confirm_write・Core 計算 preview]
+    PR -->|承認| GH[PC の gh で PR 作成]
+```
+
+## Claude Code エージェントモード（v0.46.0開発版・#400）
+
+`claude_code_agent_mode` が ON のときだけ、Claude Code の Turn はこの経路になる（OFF なら下の「Claude Code CLI Executor」）。
+
+```mermaid
+flowchart TD
+    Run[brain._run provider=claude_code] --> Mode{agent_mode ON?}
+    Mode -->|no| Json[従来の JSON 判断 step]
+    Mode -->|yes| Prep[PETIT Home を用意・Turn 限定トークン発行<br/>MCP 設定と Hook 設定を 0600 一時ファイルへ]
+    Prep --> Session{同じ Thread の有効なセッション?<br/>承認後なら承認待ちにしたセッション}
+    Session --> CLI[claude -p --restricted cwd=Home<br/>Read/Write/Edit/Glob/Grep + mcp__petit<br/>Bash は opt-in かつ OS サンドボックス可のときだけ]
+    CLI --> Hook{PreToolUse: agent_hooks.decide}
+    Hook -->|Home外・秘密・.git/.claude書込・L2・L3| Deny[拒否して理由を返す]
+    Hook -->|人格ファイル直接編集| Persona[拒否 → update_persona_file へ誘導]
+    Hook -->|L0| Tool[ファイル操作]
+    Hook -->|mcp__petit__*| Bridge[PETIT MCP bridge<br/>catalog・検証・risk・承認・receipt]
+    Bridge -->|confirm_write| Wait[承認待ち・以後の Tool は stop]
+    CLI --> Done[終了: トークン失効・Home を git commit]
+    Done --> Finish{承認待ちあり?}
+    Finish -->|yes| WA[waiting_approval・セッションIDを記録]
+    Finish -->|no| OK[completed・provider_sessions に保存]
+    WA --> Approve[承認 → conversation_api.decide → 同じセッションで --resume]
+```
+
 ## Claude Code CLI Executor（v0.44.0開発版）
 
 Concept §4 のExecutor順位（Antigravity CLI ＞ Codex ＞ Claude Code ＞ DeepSeek）の3番目。Antigravity CLIと同じ「構造化した1 round」方式で、Toolの実行・承認・receiptは既存native Loopが行う。

@@ -42,6 +42,8 @@ class Tool:
     parameters: dict[str, Any]
     handler: Handler
     risk: ToolRisk = "safe_read"
+    # Core-computed text for the approval card (e.g. a diff). Never model-supplied.
+    preview: Callable[[dict[str, Any]], str] | None = None
 
 
 _REGISTRY: dict[str, Tool] = {}
@@ -71,6 +73,7 @@ def tool(
     *,
     requires_confirmation: bool = False,
     risk: ToolRisk | None = None,
+    preview: Callable[[dict[str, Any]], str] | None = None,
 ) -> Callable[[Handler], Handler]:
     """Decorator that registers a function as a callable tool.
 
@@ -89,6 +92,7 @@ def tool(
                 risk=risk,
                 requires_confirmation=requires_confirmation,
             ),
+            preview=preview,
         )
         return func
 
@@ -111,6 +115,17 @@ def registered_names() -> list[str]:
 def risk_for(name: str) -> ToolRisk:
     tool_obj = _REGISTRY.get(name)
     return tool_obj.risk if tool_obj else "safe_read"
+
+
+def preview_for(name: str, arguments: dict[str, Any]) -> str | None:
+    """Fresh Core-side preview for an approval card; failures never block the card."""
+    tool_obj = _REGISTRY.get(name)
+    if tool_obj is None or tool_obj.preview is None:
+        return None
+    try:
+        return str(tool_obj.preview(arguments))[:20000]
+    except Exception as exc:  # noqa: BLE001 - preview is advisory; the handler re-validates
+        return f"（プレビューを作成できませんでした: {type(exc).__name__}）"
 
 
 def requires_confirmation(name: str) -> bool:

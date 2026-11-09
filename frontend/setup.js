@@ -43,6 +43,8 @@
     const claude=state.claude_code;
     if ($('claude-code-status')) $('claude-code-status').textContent=claude?(claude.installed?'公式CLIを検出':'CLI未検出（サーバーのPATH・標準配置先）')+' / Brain接続: '+(claude.production_enabled?'設定済み':'未接続')+' / ログイン・契約枠残量: unknown（接続テストと公式CLIで確認）':'CLIの診断情報を取得できません。';
     if ($('claude-code-model')) $('claude-code-model').value=s.claude_code_model||'';
+    if ($('claude-agent-mode')) $('claude-agent-mode').checked=!!s.claude_code_agent_mode;
+    if ($('claude-agent-bash')) $('claude-agent-bash').checked=!!s.claude_code_agent_bash;
     for (const [id,key] of [['codex-model','codex_model'],['codex-web-search','codex_web_search'],['deepseek-model','deepseek_model'],['calendar-source','calendar'],['google-redirect','google_redirect_uri']]) $(id).value=s[key]||'';
     if (!$('google-redirect').value) $('google-redirect').value=location.origin+'/api/setup/google/callback';
     $('paid-deepseek').checked=s.paid_allowed.includes('deepseek');$('brain-enabled').checked=s.brain_enabled;$('sync-notifications').checked=s.sync_notifications;
@@ -73,6 +75,7 @@
   action($('acp-handshake'),async()=>{const started=performance.now();const result=await api('/antigravity-acp/handshake','POST');acpState={...acpState,...result};$('acp-latency').textContent=((performance.now()-started)/1000).toFixed(2)+'秒';$('acp-install-state').textContent='ACP initialize成功 / '+(result.agent_info?.version||'unknown');$('acp-auth-state').textContent='oauth-personal がAgentから提供 / 認証状態unknown';$('acp-error').textContent='なし';notice('ACP v'+result.protocol_version+' initialize成功。認証・モデル推論は未確認です。');});
   action($('acp-auth'),async()=>{const result=await api('/antigravity-acp/authenticate','POST');await refresh();notice(result.ok?'公式ACP Agentのoauth-personal認証処理が完了しました。利用枠とモデル応答は別途未確認です。':'認証を確認できませんでした。',!result.ok);});
   $('auth-form').addEventListener('submit',async event=>{event.preventDefault();const button=$('auth-submit');button.disabled=true;try{await api(session.initialized?'/login':'/bootstrap','POST',{password:$('password').value,bootstrap_token:$('bootstrap-token').value});$('password').value='';$('bootstrap-token').value='';await start();if(session.completed&&params.get('resume')==='1'){location.replace(next);return;}notice('ログインしました。');}catch(error){notice(error.message,true);}finally{button.disabled=false;}});
+  if ($('claude-agent-save')) action($('claude-agent-save'),async()=>{await save({claude_code_agent_mode:$('claude-agent-mode').checked,claude_code_agent_bash:$('claude-agent-bash').checked});notice('エージェント設定を保存しました。');});
   action($('logout'),async()=>{await api('/logout','POST');await start();notice('ログアウトしました。');});
   action($('save-brain'),async()=>{await saveAI({brain_enabled:$('brain-enabled').checked,brain_transport:$('brain-transport').value});notice('AI設定を保存しました。');});
   document.querySelectorAll('[data-connect]').forEach(button=>action(button,async()=>{const id=button.dataset.connect;

@@ -11,7 +11,8 @@ from typing import Any
 
 from . import conversation_state, dialogue_state, request_context
 from .lmstudio_client import LMStudioError, chat_completion
-from .petit_prompt import CORE_SYSTEM_PROMPT, voice_turn_instructions
+from . import petit_home
+from .petit_prompt import voice_turn_instructions
 
 _HISTORY_MESSAGES = 8
 _HISTORY_CHARS = 3200
@@ -47,7 +48,7 @@ def run_with_images(user_message: str, observations: dict, history: list[dict[st
     _request_id, session_id = request_context.current_ids()
     state_context = conversation_state.render_for_model(dialogue_state.load(session_id))
     recent = _bounded_history(history, state_present=bool(state_context))
-    messages: list[dict[str, Any]] = [{"role": "system", "content": CORE_SYSTEM_PROMPT + voice_turn_instructions() + IMAGE_RULES}]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": petit_home.persona() + voice_turn_instructions() + IMAGE_RULES}]
     if state_context:
         messages.append({"role": "system", "content": "以下は同一セッションの圧縮Conversation Stateです。"
                          "現在の会話理解に必要な範囲だけ参照し、ユーザーへ内部状態として説明しないでください。\n" + state_context})
