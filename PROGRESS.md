@@ -1,12 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.48.2 (`feat/activity-status-filter-v0461`・未マージ。main は v0.48.1)**
+**Current Version: v0.48.3 (`fix/develop-job-refresh-provider-v046`・未マージ。main は v0.48.2)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- #372 Activity状態フィルター（v0.48.2、#395）: 既存SQLite Activityの最新取得結果を画面上で「すべて／待機・実行中／失敗／完了」に絞り込めるようにした。切替時に再通信せず、30秒自動更新・管理者API・秘密本文非表示を維持。実Windows/iPhone受入・CIは未確認。
+- Development Job UI回帰修正（v0.48.3、#390）: 既存Coding Jobsの詳細がstatus/イベント番号不変でも更新されるようsummary/error/checks/workspace/branchを描画差分判定へ追加。Claude Code CLIをAntigravity CLIと誤表示しないよう修正。SQLite・Brain・Worker・承認は変更なし。静的回帰契約テスト追加。Windows実画面・CIは未確認。
+
+- #372 Activity状態フィルター（v0.48.2、#395、mainマージ済み）: 既存SQLite Activityの最新取得結果を画面上で「すべて／待機・実行中／失敗／完了」に絞り込めるようにした。切替時に再通信せず、30秒自動更新・管理者API・秘密本文非表示を維持。実Windows/iPhone受入は未確認。
 
 - #372 Activity鮮度表示（v0.48.1、#406、mainマージ済み）: Development Hubの背景Activityに最終取得日時を表示し、通信失敗時に前回成功時刻と取得失敗を区別する。SQLiteのジョブ状態を稼働保証と誤認しない。Brain/Worker/認証は変更なし。Windows/iPhone実機は未確認。
 
@@ -374,3 +376,4 @@
 | 2026-11-09 | 02:30 | #403 | v0.48.0: Discord Guild モード土台（D3）。`/api/guild/*`（Bearer サービストークン）、サーバー別 SQLite（`storage/guilds/<guild_id>.db`）、`/petit setup・reset`（Manage Server 権限のみ）・`/petit me・forget-me`、DeepSeek のみの会話、1日上限・ユーザーレート制限、owner の DB/Tool/Home/CLI への到達遮断（`GuildIsolationError`）を実装。実 Discord・実 DeepSeek 未確認。 |
 | 2026-11-09 | 03:15 | #406 | v0.48.1: Development Hubの背景Activityに最終取得日時を表示し、通信失敗時に前回成功時刻と取得失敗を区別。 |
 | 2026-11-09 | 03:17 | #395 | v0.48.2: Development Hubの背景Activityに状態別フィルター（すべて／待機・実行中／失敗／完了）を追加。 |
+| 2026-11-09 | 03:20 | #390 | v0.48.3: Coding Job詳細更新の差分判定拡張（summary/error/checks/workspace/branch）とClaude Code CLI表示を修正。 |
