@@ -16,7 +16,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from .petit_prompt import CORE_SYSTEM_PROMPT
+from .petit_prompt import CORE_SYSTEM_PROMPT, LEGACY_CORE_SYSTEM_PROMPT
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +50,10 @@ _TEMPLATES = {
 }
 
 
+# The earlier seed. Only an untouched copy is upgraded; an approved edit is never overwritten.
+_LEGACY_AGENTS = "# PETIT — 行動原則\n\n" + LEGACY_CORE_SYSTEM_PROMPT
+
+
 class HomeError(ValueError):
     pass
 
@@ -73,7 +77,7 @@ def _git(home: Path, *args: str) -> bool:
 
 
 def ensure() -> Path:
-    """Create missing skeleton files. Existing files are never overwritten."""
+    """Create missing skeleton files. Existing files are never overwritten, except an untouched earlier AGENTS.md seed."""
     home = root()
     if home.is_symlink():
         raise HomeError("PETIT Home にリンクは使用できません。")
@@ -91,6 +95,11 @@ def ensure() -> Path:
         if not path.exists():
             path.write_text(content, encoding="utf-8")
             created = True
+    upgraded = False
+    agents = home / "AGENTS.md"
+    if agents.is_file() and agents.read_text(encoding="utf-8") == _LEGACY_AGENTS:
+        agents.write_text(_TEMPLATES["AGENTS.md"], encoding="utf-8")
+        upgraded = True
     ignore = home / ".gitignore"
     if ignore.is_file() and "worktrees/" not in ignore.read_text(encoding="utf-8").splitlines():
         # Worktrees are their own git checkouts; Home's history must not swallow them.
@@ -101,6 +110,8 @@ def ensure() -> Path:
         created = True
     if created:
         _commit(home, "PETIT Home を初期化")
+    elif upgraded:
+        _commit(home, "AGENTS.md を新しい既定の行動原則へ更新（未編集の初期版のみ）")
     return home
 
 

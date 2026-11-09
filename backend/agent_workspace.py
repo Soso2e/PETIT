@@ -11,7 +11,7 @@ class WorkspaceError(lmstudio_client.LMStudioError, ValueError):
 
 def prepare() -> Path:
     from . import brain, petit_home
-    from .petit_prompt import CORE_SYSTEM_PROMPT
+    from .petit_prompt import LEGACY_CORE_SYSTEM_PROMPT, LEGACY_INSTRUCTIONS
     root = settings.root() / "agent-workspace"
     if root.is_symlink() or root.is_junction():
         raise WorkspaceError("Agent Workspaceにリンクは使用できません。配置を確認してください。")
@@ -34,7 +34,7 @@ def prepare() -> Path:
         elif (current := path.read_text(encoding="utf-8")) != content:
             # Regenerate only what Core wrote itself (persona approved in PETIT Home changed);
             # a hand edit inside the workspace is still never overwritten.
-            legacy = name == "AGENTS.md" and current == "# PETIT\n" + CORE_SYSTEM_PROMPT + brain.INSTRUCTIONS + rules
+            legacy = name == "AGENTS.md" and current == "# PETIT\n" + LEGACY_CORE_SYSTEM_PROMPT + LEGACY_INSTRUCTIONS + rules
             if generated.get(name) != _sha(current) and not legacy:
                 raise WorkspaceError("Agentの指示ファイルが変更されています。上書きせず停止しました。更新内容をレビューしてください。")
             path.write_text(content, encoding="utf-8")

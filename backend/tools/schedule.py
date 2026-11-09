@@ -87,6 +87,7 @@ def get_schedule(date: str | None = None, query: str | None = None) -> dict[str,
         "新しい予定をPETITのローカル予定へ追加する。ICS/Google Calendar本体には書き込まない。"
         "「明日15時に歯医者を予定に入れて」のような発話で使う。"
         "start_time / end_time は ISO 形式または YYYY-MM-DD HH:MM 形式。"
+        "タスクの期限は予定として登録しない。"
     ),
     parameters={
         "type": "object",

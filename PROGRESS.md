@@ -391,4 +391,5 @@
 | 2026-11-09 | 05:00 | #408 | v0.49.0: 過去作業時間の事後登録ツール record_past_work を追加（work_sessionsに記録・集計即時反映）、開発者モードでの回答者バッジ常時表示と履歴復元時のmodel_route維持を実装。 |
 | 2026-11-09 | 05:56 | #410 | v0.50.0: 会話Turnの表示専用SSEストリーミング（`GET /api/turns/{id}/stream`・`turn_stream.py`）とAPI Brainの`stream=True`ドラフト配信、Toolラウンド/Fallback時のドラフト破棄、Web/Desktop/Universeのリアルタイム進捗表示を実装。 |
 | 2026-11-09 | 06:04 | #411 | v0.50.0: DeepSeekを最初の担当にするトグルとCLI委譲（作業用Thread・専用Worker・親Threadへの報告と承認・状態表示）を追加。単体テストと合成Providerの実ブラウザ操作を確認。実CLIの通しはCLI未ログインのため未確認。 |
+| 2026-11-09 | 08:37 | - | v0.50.1: システムプロンプトを縮小（人格・原則を短縮、Tool固有の規則をTool説明へ、FrontのCapability一覧からworktree・Coding Job・Home書込を除外）。未編集のPETIT Home AGENTS.mdは新しい既定へ自動更新。DeepSeek評価は変更前60/60・変更後98/100（`reports/prompt-slimming-evaluation.json`）、Front経路は未評価。 |
 | 2026-11-09 | 08:38 | #414 | v0.51.0: 設定UI・AI/サービス接続・接続ステータスを再設計（Settings最上部の状態/直通ハブ、setup画面の常設概要バー・状態/キー保存済みバッジ・TimeTree/Googleのカード内同期元切替、接続ステータスの色分けピルと設定直通リンク）。Playwright 1440/390/320pxと関連単体テスト確認済み、実アカウント手動受入は未確認。 |
