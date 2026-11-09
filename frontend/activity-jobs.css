@@ -12,6 +12,12 @@
   flex-wrap: wrap;
   gap: 12px;
 }
+.development-activity__header select {
+  background: rgba(120, 151, 200, .14);
+  border: 1px solid rgba(163, 192, 231, .25);
+  color: inherit; padding: 8px 12px; border-radius: 9px;
+}
+.development-activity__header select option { color: #111827; }
 .development-activity__header h2 { margin: 0; font-size: 1.12rem; }
 .development-activity__header button {
   background: rgba(120, 151, 200, .14);

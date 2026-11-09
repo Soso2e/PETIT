@@ -28,7 +28,12 @@
   const refresh = document.createElement("button");
   refresh.type = "button";
   refresh.textContent = "ジョブ状態を更新";
-  header.append(title, refresh);
+  const filter = document.createElement("select");
+  filter.setAttribute("aria-label", "背景ジョブの状態で絞り込む");
+  for (const [value, label] of [["all", "すべて"], ["active", "待機・実行中"], ["failed", "失敗"], ["done", "完了"]]) {
+    filter.add(new Option(label, value));
+  }
+  header.append(title, filter, refresh);
   const state = document.createElement("p");
   state.className = "development-state";
   state.setAttribute("role", "status");
@@ -60,18 +65,23 @@
     const time = Date.parse(value || "");
     return Number.isFinite(time) ? new Date(time).toLocaleString("ja-JP") : "時刻未確認";
   };
+  let lastPayload = null;
   const render = (payload) => {
+    lastPayload = payload;
     const data = summarize(payload);
+    const visible = data.jobs.filter((job) => filter.value === "all"
+      || (filter.value === "active" && (job.status === "queued" || job.status === "running"))
+      || job.status === filter.value);
     list.replaceChildren();
-    if (!data.jobs.length) {
+    if (!visible.length) {
       const item = document.createElement("li");
       item.className = "development-activity__empty";
-      item.textContent = "最近のバックグラウンドジョブはありません。";
+      item.textContent = data.jobs.length ? "該当する状態のジョブはありません。" : "最近のバックグラウンドジョブはありません。";
       list.append(item);
-      state.textContent = "0件";
+      state.textContent = data.jobs.length ? "表示 0件 / 最近 " + data.jobs.length + "件" : "0件";
       return;
     }
-    for (const job of data.jobs) {
+    for (const job of visible) {
       const item = document.createElement("li");
       item.className = "development-activity__item";
       const main = document.createElement("div");
@@ -90,7 +100,7 @@
     }
     const n = data.jobs.length;
     const active = data.jobs.filter((j) => j.status === "queued" || j.status === "running").length;
-    state.textContent = "最近 " + n + "件 · 待機/実行中 " + active + "件"
+    state.textContent = "表示 " + visible.length + "件 / 最近 " + n + "件 · 待機/実行中 " + active + "件"
       + (data.excludesCoding ? " · Coding Jobsは別一覧" : "");
   };
 
@@ -139,6 +149,7 @@
   window.setInterval(poll, 30000);
   document.addEventListener("visibilitychange", poll);
   refresh.addEventListener("click", () => void load(true));
+  filter.addEventListener("change", () => { if (lastPayload) render(lastPayload); });
   window.addEventListener("petit:area-change", (event) => {
     if (event.detail?.area === "development") void load();
   });
