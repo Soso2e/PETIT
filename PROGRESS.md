@@ -1,12 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.48.3 (`fix/develop-job-refresh-provider-v046`・未マージ。main は v0.48.2)**
+**Current Version: v0.48.4 (`claude/jolly-gates-7k0047`・未マージ。main は v0.48.3)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- Development Job UI回帰修正（v0.48.3、#390）: 既存Coding Jobsの詳細がstatus/イベント番号不変でも更新されるようsummary/error/checks/workspace/branchを描画差分判定へ追加。Claude Code CLIをAntigravity CLIと誤表示しないよう修正。SQLite・Brain・Worker・承認は変更なし。静的回帰契約テスト追加。Windows実画面・CIは未確認。
+- #393 Univ 3Dカメラ入力（v0.48.4、#394）: OrbitControlsを自前の `createCameraController` に置き換え、ジェスチャーに属する指だけでカメラを動かす（2本目の指がHUDに乗っても振動しない）、ピンチ後に残った指は全指が離れるまで無効、軽い追従スムージングと短い慣性、タップ判定をカメラ入力側へ統合。WebGL表示中に見えない旧DOMボタン（`univ-space.css` の `pointer-events: auto`）がスマホで3Dビューの約15%を覆い、ドラッグ不発・何もない所のタップで近くのタスクが選択される原因だったため子孫も無効化。ラベルは見えている文字だけを当たりにした。#391（v0.45.1）のリサイズ時の巻き戻し修正はマージ済み。Playwright（Chromium・タッチエミュレーション）で確認、iPhone/Android実機は未確認。
+
+- Development Job UI回帰修正（v0.48.3、#390、mainマージ済み）: 既存Coding Jobsの詳細がstatus/イベント番号不変でも更新されるようsummary/error/checks/workspace/branchを描画差分判定へ追加。Claude Code CLIをAntigravity CLIと誤表示しないよう修正。SQLite・Brain・Worker・承認は変更なし。静的回帰契約テスト追加。Windows実画面は未確認。
 
 - #372 Activity状態フィルター（v0.48.2、#395、mainマージ済み）: 既存SQLite Activityの最新取得結果を画面上で「すべて／待機・実行中／失敗／完了」に絞り込めるようにした。切替時に再通信せず、30秒自動更新・管理者API・秘密本文非表示を維持。実Windows/iPhone受入は未確認。
 
@@ -377,3 +379,4 @@
 | 2026-11-09 | 03:15 | #406 | v0.48.1: Development Hubの背景Activityに最終取得日時を表示し、通信失敗時に前回成功時刻と取得失敗を区別。 |
 | 2026-11-09 | 03:17 | #395 | v0.48.2: Development Hubの背景Activityに状態別フィルター（すべて／待機・実行中／失敗／完了）を追加。 |
 | 2026-11-09 | 03:20 | #390 | v0.48.3: Coding Job詳細更新の差分判定拡張（summary/error/checks/workspace/branch）とClaude Code CLI表示を修正。 |
+| 2026-11-09 | 03:25 | #393 #394 | v0.48.4: Univ 3Dのカメラ入力をOrbitControlsから自前コントローラへ置換（追跡外の指を無視・ピンチ後ロック・慣性・タップ統合）、見えない旧DOMボタンがCanvas入力を奪っていた不具合とラベルの広すぎる当たり判定を修正。 |
