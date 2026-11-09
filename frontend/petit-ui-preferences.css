@@ -212,6 +212,38 @@
   display: none !important;
 }
 
+.turn-author-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--accent, #7bc5ff);
+  background: rgba(123, 197, 255, 0.1);
+  border: 1px solid rgba(123, 197, 255, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-family: inherit;
+}
+
+.turn-author-badge:hover {
+  background: rgba(123, 197, 255, 0.18);
+  border-color: var(--accent, #7bc5ff);
+}
+
+.turn-author-badge--system {
+  color: var(--text-sub, #cfd7e6);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--line-strong, rgba(255, 255, 255, 0.12));
+}
+
+.turn-details {
+  margin-top: 4px;
+}
+
 .petit-preference-dev-actions {
   margin-top: 10px;
   display: flex;

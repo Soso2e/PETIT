@@ -203,3 +203,70 @@ def update_work_session(action: str) -> dict[str, Any]:
     if not session:
         return {"updated": False, "error": "現在の状態ではその操作を実行できません。", "session": active}
     return {"updated": True, "action": action, "session": session}
+
+@tool(
+    name="record_past_work",
+    description=(
+        "完了した過去の作業時間を遡って記録する。"
+        "『〇〇を1時間作業した』『さっきまで2時間開発していた』『13:00から14:30まで作業した』などの事後記録で使う。"
+        "task（またはtask_id）と、duration_minutes（作業時間・分単位）を指定する。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "task": {"type": "string", "description": "作業したタスク名または内容（例: 'PETIT開発', 'バグ調査'）。"},
+            "duration_minutes": {"type": "integer", "minimum": 1, "maximum": 1440, "description": "作業した時間（分単位。1時間なら60）。"},
+            "task_id": {"type": "string", "description": "既存タスクがある場合のtask_id。"},
+            "started_at": {"type": "string", "description": "開始日時（ISO 8601形式）。省略可能。"},
+            "ended_at": {"type": "string", "description": "終了日時（ISO 8601形式）。省略時は現在時刻を基準に算出。"},
+        },
+        "required": ["task", "duration_minutes"],
+    },
+    risk="low_risk_write",
+)
+def record_past_work(
+    task: str,
+    duration_minutes: int,
+    task_id: str | None = None,
+    started_at: str | None = None,
+    ended_at: str | None = None,
+) -> dict[str, Any]:
+    task_name = (task or "").strip()
+    if not task_name and not task_id:
+        return {"recorded": False, "error": "作業タスク名またはtask_idを指定してください。"}
+    if duration_minutes <= 0 or duration_minutes > 1440:
+        return {"recorded": False, "error": "作業時間は1〜1440分の範囲で指定してください。"}
+
+    resolved_task = None
+    if task_id or task_name:
+        resolved = resolve_task(task_id=task_id, task=task_name)
+        if isinstance(resolved.get("task"), dict):
+            resolved_task = resolved["task"]
+
+    final_task_name = str(resolved_task["task"]) if resolved_task else task_name
+    final_task_id = str(resolved_task["task_id"]) if resolved_task else (task_id.strip() if task_id else None)
+    project_id = resolved_task.get("project_id") if resolved_task else None
+
+    started_dt = work_sessions._parse(started_at) if started_at else None
+    ended_dt = work_sessions._parse(ended_at) if ended_at else None
+
+    try:
+        session = work_sessions.record_past_session(
+            final_task_name,
+            duration_minutes,
+            task_id=final_task_id,
+            project_id=project_id,
+            started_at=started_dt,
+            ended_at=ended_dt,
+        )
+    except ValueError as e:
+        return {"recorded": False, "error": f"記録に失敗しました: {e}"}
+
+    return {
+        "recorded": True,
+        "task": final_task_name,
+        "duration_minutes": duration_minutes,
+        "session": session,
+        "matched_existing_task": resolved_task is not None,
+    }
+

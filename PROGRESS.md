@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.48.4 (`claude/jolly-gates-7k0047`・未マージ。main は v0.48.3)**
+**Current Version: v0.49.0 (main)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #408 過去作業時間記録と開発者モード回答者表示（v0.49.0）: 過去作業時間を遡及登録できる新Tool `record_past_work`（`duration_minutes`, `task`, `started_at`, `ended_at`）とREST API（`/api/work-sessions/record`）を追加し、日別・期間集計（`today_summary`, `period_summary`）へ即時反映。開発者モードON時にメッセージ吹き出しへ回答者バッジ（`🧠 Provider (Model)`）を常時表示し、クリックで詳細を展開できるように改善。履歴復元（`/api/conversations`）時に `turns.result_json` から `model_route` を復元してリロード後も回答者情報を保持。単体・UI契約テスト追加。実端末での表示・実Provider推論は未確認。
 
 - #393 Univ 3Dカメラ入力（v0.48.4、#394）: OrbitControlsを自前の `createCameraController` に置き換え、ジェスチャーに属する指だけでカメラを動かす（2本目の指がHUDに乗っても振動しない）、ピンチ後に残った指は全指が離れるまで無効、軽い追従スムージングと短い慣性、タップ判定をカメラ入力側へ統合。WebGL表示中に見えない旧DOMボタン（`univ-space.css` の `pointer-events: auto`）がスマホで3Dビューの約15%を覆い、ドラッグ不発・何もない所のタップで近くのタスクが選択される原因だったため子孫も無効化。ラベルは見えている文字だけを当たりにした。#391（v0.45.1）のリサイズ時の巻き戻し修正はマージ済み。Playwright（Chromium・タッチエミュレーション）で確認、iPhone/Android実機は未確認。
 
@@ -380,3 +382,4 @@
 | 2026-11-09 | 03:17 | #395 | v0.48.2: Development Hubの背景Activityに状態別フィルター（すべて／待機・実行中／失敗／完了）を追加。 |
 | 2026-11-09 | 03:20 | #390 | v0.48.3: Coding Job詳細更新の差分判定拡張（summary/error/checks/workspace/branch）とClaude Code CLI表示を修正。 |
 | 2026-11-09 | 03:25 | #393 #394 | v0.48.4: Univ 3Dのカメラ入力をOrbitControlsから自前コントローラへ置換（追跡外の指を無視・ピンチ後ロック・慣性・タップ統合）、見えない旧DOMボタンがCanvas入力を奪っていた不具合とラベルの広すぎる当たり判定を修正。 |
+| 2026-11-09 | 05:00 | #408 | v0.49.0: 過去作業時間の事後登録ツール record_past_work を追加（work_sessionsに記録・集計即時反映）、開発者モードでの回答者バッジ常時表示と履歴復元時のmodel_route維持を実装。 |
