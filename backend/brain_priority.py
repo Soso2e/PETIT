@@ -28,6 +28,8 @@ def enabled() -> bool:
 
 
 def target(provider: str, data: dict | None = None) -> dict:
+    from . import request_context
+    request_context.forbid_guild_mode("Brain / CLI")
     data = settings.load() if data is None else data
     if provider == "antigravity_cli":
         from .antigravity_cli import executable
@@ -90,6 +92,8 @@ def diagnostic(request_id, provider, state, reason=None):
 
 
 def run(request_id, execute, *, messages=None, used_tools=None):
+    from . import request_context
+    request_context.forbid_guild_mode("Brain / CLI")
     data = settings.load()
     if any(x in data["connected"] for x in ("antigravity", "antigravity_sdk")) and "antigravity" in data["priority"]:
         from .provider_runtime import RETIRED_SDK_MESSAGE

@@ -68,6 +68,8 @@ class _BorrowedConnection:
 @contextmanager
 def write_transaction():
     """One SQLite transaction for a local domain write and its receipt."""
+    from . import request_context
+    request_context.forbid_guild_mode("SQLite (app.db)")
     active = _transaction.get()
     if active is not None:
         yield _BorrowedConnection(active)
@@ -225,6 +227,8 @@ def now_iso() -> str:
 
 
 def get_connection() -> sqlite3.Connection:
+    from . import request_context
+    request_context.forbid_guild_mode("SQLite (app.db)")
     active = _transaction.get()
     if active is not None:
         return _BorrowedConnection(active)

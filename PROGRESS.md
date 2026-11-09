@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.47.0 (`feat/agent-mode-codex-antigravity-h5`・未マージ。main は v0.46.0)**
+**Current Version: v0.48.0 (`feat/discord-guild-mode-d3`・未マージ)**
 
 **Last Updated: 2026-11-09 UTC**
 
@@ -367,3 +367,4 @@
 | 2026-11-08 | 05:45 | #401 | v0.46.0（同ブランチ追加）: worktree Tool（open/status/check/commit/push/PR/close）。L1 を「petit/ ブランチへの push まで」に拡張（Concept §4 更新）、PR は承認、main・既定ブランチ・force push は禁止。git・gh は Core が本人の認証で実行、repo の hook 無効。実 CLI で通し確認。 |
 | 2026-11-09 | 01:47 | #402 | v0.46.0 を main へマージ（再設計: PETIT Home・MCP・Claude Code エージェントモード・worktree 開発・Discord Owner モード）。CI 13 本成功。 |
 | 2026-11-09 | 01:47 | #404 | v0.47.0: Home ファイル Tool を全 Brain に公開（Core が L0/L1 の線を判定、Hook と共通。`.git` は読取も拒否に変更）、Codex エージェントモード（cwd=Home・AGENTS.md=人格・sandbox read-only・shell なし）。実 Codex / agy は未確認。 |
+| 2026-11-09 | 02:30 | #403 | v0.48.0: Discord Guild モード土台（D3）。`/api/guild/*`（Bearer サービストークン）、サーバー別 SQLite（`storage/guilds/<guild_id>.db`）、`/petit setup・reset`（Manage Server 権限のみ）・`/petit me・forget-me`、DeepSeek のみの会話、1日上限・ユーザーレート制限、owner の DB/Tool/Home/CLI への到達遮断（`GuildIsolationError`）を実装。実 Discord・実 DeepSeek 未確認。 |

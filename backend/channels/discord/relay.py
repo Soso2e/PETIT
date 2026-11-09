@@ -16,6 +16,7 @@ class Incoming:
     content: str
     author_is_bot: bool
     mentions_bot: bool
+    display_name: str = ""
 
 
 def extract(incoming: Incoming, bot_user_id: str) -> str | None:
@@ -33,8 +34,11 @@ def extract(incoming: Incoming, bot_user_id: str) -> str | None:
 
 
 def payload(incoming: Incoming, text: str) -> dict:
-    return {"event_id": incoming.event_id, "channel_id": incoming.channel_id, "guild_id": incoming.guild_id,
+    body = {"event_id": incoming.event_id, "channel_id": incoming.channel_id, "guild_id": incoming.guild_id,
             "author_id": incoming.author_id, "message": text[:20000]}
+    if incoming.display_name:
+        body["display_name"] = incoming.display_name[:120]
+    return body
 
 
 def split(text: str, limit: int = LIMIT) -> list[str]:
@@ -80,3 +84,24 @@ def approval_text(item: dict) -> str:
 
 def notification_text(item: dict) -> str:
     return f"**{item.get('title', '')}**\n{item.get('body', '')}"[:LIMIT]
+
+
+SLASH_SUBCOMMANDS = {"setup", "reset", "me", "forget-me"}
+
+
+def parse_slash(data: dict | None) -> tuple[str, dict] | None:
+    """Parse Discord application_command interaction data for `/petit <subcommand>`."""
+    if not isinstance(data, dict) or data.get("name") != "petit":
+        return None
+    options = data.get("options") or []
+    if not options or not isinstance(options[0], dict):
+        return None
+    sub = options[0].get("name")
+    if sub not in SLASH_SUBCOMMANDS:
+        return None
+    params = {}
+    for opt in options[0].get("options") or []:
+        if isinstance(opt, dict) and "name" in opt and "value" in opt:
+            params[str(opt["name"])] = opt["value"]
+    return sub, params
+

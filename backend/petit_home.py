@@ -55,6 +55,8 @@ class HomeError(ValueError):
 
 
 def root() -> Path:
+    from . import request_context
+    request_context.forbid_guild_mode("PETIT Home")
     configured = os.getenv("PETIT_HOME", "").strip()
     return Path(configured).expanduser() if configured else Path.home() / "PETIT-Home"
 
@@ -132,6 +134,8 @@ def _meaningful(text: str) -> str:
 
 def persona() -> str:
     """The shared persona text. Falls back to the built-in prompt if Home is unusable."""
+    from . import request_context
+    request_context.forbid_guild_mode("PETIT Home")
     try:
         home = ensure()
         parts = []
