@@ -55,6 +55,11 @@ def get_searcher(zone: str = "personal") -> ArchiveSearch | None:
             "author_id": {"type": "string", "description": "特定の発言者IDで絞り込む場合（任意）"},
             "since": {"type": "string", "description": "開始日時（ISO 8601形式、任意）"},
             "until": {"type": "string", "description": "終了日時（ISO 8601形式、任意）"},
+            "permitted_channels": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "検索者が閲覧を許可されているチャンネルID一覧（指定時はこれらに制限、任意）",
+            },
             "limit": {"type": "integer", "description": "最大取得件数（1〜20、既定5）", "default": 5},
         },
         "required": ["query"],
@@ -62,7 +67,7 @@ def get_searcher(zone: str = "personal") -> ArchiveSearch | None:
     },
     risk="safe_read",
 )
-def search_discord_archive(query: str, limit: int = 5, **filters) -> dict[str, Any]:
+def search_discord_archive(query: str, limit: int = 5, permitted_channels: list[str] | None = None, **filters) -> dict[str, Any]:
     # Security Boundary Check:
     # If called from Guild Mode, restrict strictly to that Guild ID!
     is_guild = request_context.is_guild_mode()
@@ -96,6 +101,9 @@ def search_discord_archive(query: str, limit: int = 5, **filters) -> dict[str, A
             "matches": [],
             "note": "Discordアーカイブがまだ作成されていないか、登録チャンネルがありません。",
         }
+
+    if permitted_channels is not None:
+        filters["permitted_channels"] = permitted_channels
 
     raw_matches = searcher.search(query, limit=limit, **filters)
     matches = []

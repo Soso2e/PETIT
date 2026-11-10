@@ -15,6 +15,8 @@ from backend.discord_archive import (
     ArchivePolicy,
     ArchiveSearch,
     ArchiveIngestor,
+    extract_attachment_text,
+    ArchiveReconciler,
     set_registrations,
 )
 from backend.tools import dispatch
@@ -311,3 +313,220 @@ def test_attachment_text_extraction_and_fts_search(client: TestClient, configure
     # Search count must still be exactly 1, no duplicate entries!
     tool_result_after_dup = json.loads(dispatch("search_discord_archive", {"query": "Durable Read Task"}))
     assert tool_result_after_dup["count"] == 1
+
+
+def test_channel_and_user_authorization_in_search(client: TestClient, configured_env: Path):
+    """Users cannot see messages from channels they lack permission for (permitted_channels filter)."""
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+
+    # Register both public channel 101 and admin secret channel 102
+    client.post(
+        "/api/channels/discord/archive/register",
+        headers=headers,
+        json={
+            "guild_id": OTHER_GUILD_ID,
+            "author_id": "99999",
+            "channel_ids": ["101", "102"],
+            "enabled": True,
+            "manage_guild": True,
+        },
+    )
+
+    # Ingest message in public channel 101
+    client.post(
+        "/api/channels/discord/archive/events",
+        headers=headers,
+        json={
+            "message_id": "10001",
+            "guild_id": OTHER_GUILD_ID,
+            "channel_id": "101",
+            "author_id": "1",
+            "content": "全体公開のプロジェクト予算案",
+            "created_at": "2026-11-10T10:00:00Z",
+        },
+    )
+
+    # Ingest message in admin secret channel 102
+    client.post(
+        "/api/channels/discord/archive/events",
+        headers=headers,
+        json={
+            "message_id": "10002",
+            "guild_id": OTHER_GUILD_ID,
+            "channel_id": "102",
+            "author_id": "1",
+            "content": "管理者限定の秘密予算案と役員報酬",
+            "created_at": "2026-11-10T10:05:00Z",
+        },
+    )
+
+    # 1. Search with general user permission (only channel 101 permitted)
+    resp_general = client.get(
+        "/api/channels/discord/archive/search",
+        headers=headers,
+        params={"query": "予算案", "guild_id": OTHER_GUILD_ID, "permitted_channels": "101"},
+    )
+    assert resp_general.status_code == 200
+    gen_matches = resp_general.json()["matches"]
+    assert len(gen_matches) == 1
+    assert gen_matches[0]["message_id"] == "10001"
+    assert "秘密予算案" not in gen_matches[0]["content"]
+
+    # 2. Search with admin user permission (both channels 101 and 102 permitted)
+    resp_admin = client.get(
+        "/api/channels/discord/archive/search",
+        headers=headers,
+        params={"query": "予算案", "guild_id": OTHER_GUILD_ID, "permitted_channels": "101,102"},
+    )
+    assert resp_admin.status_code == 200
+    admin_matches = resp_admin.json()["matches"]
+    assert len(admin_matches) == 2
+    found_ids = {m["message_id"] for m in admin_matches}
+    assert found_ids == {"10001", "10002"}
+
+
+@pytest.mark.anyio
+async def test_archive_buffer_sqlite_persistence_across_process_restart(tmp_path: Path):
+    """ArchiveBuffer survives process kill/restart without losing pending events in SQLite queue."""
+    call_count = 0
+    succeed = False
+
+    class MockTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            nonlocal call_count
+            call_count += 1
+            if not succeed:
+                return httpx.Response(503, json={"error": "service unavailable"})
+            return httpx.Response(200, json={"status": "ok", "saved": True})
+
+    core = CoreClient(base_url="http://mock", token=TOKEN, transport=MockTransport())
+    buffer_db = tmp_path / "persistent_buffer.sqlite"
+
+    # Step 1: Process 1 pushes an event while Core is down, then suddenly terminates (simulated kill -9)
+    buf1 = ArchiveBuffer(core, db_path=buffer_db, maxsize=10)
+    buf1.push("event", {"message_id": "77701", "guild_id": "1", "channel_id": "1"})
+    assert buf1.pending_count == 1
+    # Terminate buf1 without delivering
+    await buf1.stop()
+
+    # Step 2: New Bot process restarts with the same buffer_db
+    buf2 = ArchiveBuffer(core, db_path=buffer_db, maxsize=10)
+    # The event is immediately loaded from SQLite on startup!
+    assert buf2.pending_count == 1
+    await buf2.start()
+
+    # Core recovers
+    succeed = True
+    await asyncio.sleep(1.2)  # Wait for backoff retry
+    assert buf2.pending_count == 0  # Delivered and cleared from SQLite!
+    assert call_count >= 1
+
+    await buf2.stop()
+    await core.close()
+
+
+def test_attachment_extraction_shielding_and_timeout():
+    """Extracting corrupted PDFs or huge texts does not crash and respects limits."""
+    # 1. Corrupted PDF garbage bytes should not crash
+    corrupted_pdf = b"%PDF-1.4\ncorrupted garbage\x00\xff\xfe\x01\x02\x03\n%%EOF"
+    result_corrupted = extract_attachment_text(corrupted_pdf, "broken.pdf")
+    assert result_corrupted is None or isinstance(result_corrupted, str)
+
+    # 2. Huge text file is bounded by max_chars
+    huge_text = ("A" * 200000).encode("utf-8")
+    result_huge = extract_attachment_text(huge_text, "huge.txt", max_chars=1000)
+    assert result_huge is not None
+    assert len(result_huge) == 1000
+
+    # 3. Non-text unsupported extension returns None
+    binary_data = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+    assert extract_attachment_text(binary_data, "image.png") is None
+
+
+def test_incremental_sync_and_edits(client: TestClient, configured_env: Path):
+    """Message edits update archive FTS, and unregistering a channel immediately denies search."""
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+
+    # Register channel 301
+    client.post(
+        "/api/channels/discord/archive/register",
+        headers=headers,
+        json={
+            "guild_id": OWNER_GUILD_ID,
+            "author_id": OWNER_ID,
+            "channel_ids": ["301"],
+            "enabled": True,
+            "manage_guild": True,
+        },
+    )
+
+    # 1. First revision of message
+    client.post(
+        "/api/channels/discord/archive/events",
+        headers=headers,
+        json={
+            "message_id": "20001",
+            "guild_id": OWNER_GUILD_ID,
+            "channel_id": "301",
+            "author_id": OWNER_ID,
+            "content": "来週のリリース日時は未定です",
+            "created_at": "2026-11-10T10:00:00Z",
+        },
+    )
+    res1 = client.get(
+        "/api/channels/discord/archive/search",
+        headers=headers,
+        params={"query": "未定です", "guild_id": OWNER_GUILD_ID},
+    )
+    assert res1.json()["count"] == 1
+
+    # 2. Edited revision of message
+    client.post(
+        "/api/channels/discord/archive/events",
+        headers=headers,
+        json={
+            "message_id": "20001",
+            "guild_id": OWNER_GUILD_ID,
+            "channel_id": "301",
+            "author_id": OWNER_ID,
+            "content": "来週のリリース日時は11月18日に確定しました",
+            "created_at": "2026-11-10T10:00:00Z",
+            "edited_at": "2026-11-10T10:30:00Z",
+        },
+    )
+    # Old query no longer hits
+    res_old = client.get(
+        "/api/channels/discord/archive/search",
+        headers=headers,
+        params={"query": "未定です", "guild_id": OWNER_GUILD_ID},
+    )
+    assert res_old.json()["count"] == 0
+
+    # New query hits updated text
+    res_new = client.get(
+        "/api/channels/discord/archive/search",
+        headers=headers,
+        params={"query": "11月18日", "guild_id": OWNER_GUILD_ID},
+    )
+    assert res_new.json()["count"] == 1
+    assert "確定しました" in res_new.json()["matches"][0]["content"]
+
+    # 3. Unregister channel 301 -> immediately excluded from search results!
+    client.post(
+        "/api/channels/discord/archive/register",
+        headers=headers,
+        json={
+            "guild_id": OWNER_GUILD_ID,
+            "author_id": OWNER_ID,
+            "channel_ids": ["301"],
+            "enabled": False,
+            "manage_guild": True,
+        },
+    )
+    res_after_unreg = client.get(
+        "/api/channels/discord/archive/search",
+        headers=headers,
+        params={"query": "11月18日", "guild_id": OWNER_GUILD_ID},
+    )
+    assert res_after_unreg.json()["count"] == 0
+

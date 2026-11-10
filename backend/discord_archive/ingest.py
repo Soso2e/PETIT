@@ -13,19 +13,23 @@ from .policy import ArchivePolicy
 log = logging.getLogger("petit.discord_archive")
 
 
-def extract_attachment_text(content: bytes, filename: str) -> str | None:
-    """Extract text from attachment bytes (PDF, txt, md, json)."""
+def extract_attachment_text(content: bytes, filename: str, max_chars: int = 100000) -> str | None:
+    """Extract text from attachment bytes (PDF, txt, md, json) with strict resource limits."""
     suffix = Path(filename).suffix.lower()
-    if suffix in (".txt", ".md", ".csv", ".tsv", ".py", ".sh", ".json"):
+    if suffix in (".txt", ".md", ".csv", ".tsv", ".py", ".sh", ".json", ".log"):
         try:
-            return content.decode("utf-8", errors="replace")
+            # Shield against massive memory allocations
+            text = content[:max_chars * 4].decode("utf-8", errors="replace")
+            return text[:max_chars]
         except Exception:
             return None
 
     if suffix == ".pdf":
         try:
             from pdfminer.high_level import extract_text as pdf_extract
-            return pdf_extract(io.BytesIO(content))
+            # Bound page count to prevent infinite processing on massive PDFs
+            text = pdf_extract(io.BytesIO(content), maxpages=50)
+            return text[:max_chars] if text else None
         except ImportError:
             log.debug("pdfminer.six not installed; skipping PDF text extraction")
             return None

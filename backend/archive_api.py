@@ -186,6 +186,7 @@ async def search_archive(
     query: str,
     guild_id: str | None = None,
     channel_id: str | None = None,
+    permitted_channels: str | None = None,
     limit: int = 10,
     zone: str | None = None,
     authorization: str | None = Header(default=None),
@@ -193,10 +194,12 @@ async def search_archive(
     _authorize(authorization)
     resolved_zone = resolve_zone(guild_id, zone, author_id=None)
     _, _, _, searcher = get_components(zone=resolved_zone)
-    filters = {}
+    filters: dict[str, Any] = {}
     if guild_id:
         filters["guild_id"] = guild_id
     if channel_id:
         filters["channel_id"] = channel_id
+    if permitted_channels:
+        filters["permitted_channels"] = [c.strip() for c in permitted_channels.split(",") if c.strip()]
     matches = searcher.search(query, limit=limit, **filters)
     return {"query": query, "zone": resolved_zone, "count": len(matches), "matches": matches}

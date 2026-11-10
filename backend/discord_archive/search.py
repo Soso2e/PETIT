@@ -37,6 +37,18 @@ class ArchiveSearch:
                 parts.append(f"m.{name}=?")
                 args.append(str(val))
 
+        # Channel-level authorization: caller may only see channels they have permission for
+        permitted = filters.get("permitted_channels")
+        if permitted is not None:
+            permitted_set = {str(c) for c in permitted}
+            if not permitted_set:
+                parts.append("0")  # No channels permitted -> return nothing
+            else:
+                placeholders = ",".join("?" for _ in permitted_set)
+                parts.append(f"(m.channel_id IN ({placeholders}) OR COALESCE(m.thread_id, '') IN ({placeholders}))")
+                args.extend(list(permitted_set))
+                args.extend(list(permitted_set))
+
         for name, op in (("since", ">="), ("until", "<=")):
             val = filters.get(name)
             if val:
@@ -112,11 +124,19 @@ class ArchiveSearch:
 
         scored_results.sort(key=lambda item: (-item["score"], item["message_id"]))
 
+        permitted = filters.get("permitted_channels")
+        permitted_set = {str(c) for c in permitted} if permitted is not None else None
+
         # Authoritative re-fetch ensuring fresh attachments and deleted status
         final: list[dict[str, Any]] = []
         for item in scored_results[:limit]:
             msg = self.archive.get_message(item["message_id"])
             if msg and not msg["is_deleted"] and self.policy.allows_message(msg):
+                if permitted_set is not None:
+                    cid = str(msg.get("channel_id") or "")
+                    tid = str(msg.get("thread_id") or "")
+                    if cid not in permitted_set and tid not in permitted_set:
+                        continue
                 msg["search_score"] = item["score"]
                 msg["match_type"] = item["match_type"]
                 final.append(msg)
