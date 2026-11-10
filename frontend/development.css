@@ -49,3 +49,85 @@
 .development-action { padding-top: .6rem; border-top: 1px solid var(--line, #45516b); }
 #development-root-list li button, .development-action button { margin-inline-end: .4rem; }
 #development-job-notice:empty { display: none; }
+
+/* Develop #428: the composer is shared by Home, Repository and Thread levels. */
+.development-level[hidden], #development-thread-attach[hidden] { display: none !important; }
+.development-level { max-width: 1100px; margin: 0 auto; }
+.development-head { max-width: 1100px; margin-inline: auto; }
+.development-hero {
+  padding: clamp(1rem, 2.8vw, 2rem);
+  border: 1px solid var(--line, #45516b);
+  border-radius: 1.1rem;
+  background: var(--surface, rgba(145, 157, 183, .05));
+}
+.development-hero h2 { margin: 0 0 .35rem; }
+.development-hero > p { color: var(--text-muted, #a8b2c4); margin: .25rem 0 1rem; }
+.development-hero .development-request { margin: 0; border: 0; padding: 0; }
+.development-section-title { display: flex; align-items: center; justify-content: space-between; margin: 1.3rem 0 .6rem; gap: 1rem; }
+.development-section-title h2 { font-size: 1.07rem; margin: 0; }
+.development-section-title span, .development-muted { color: var(--text-muted, #a8b2c4); font-size: .85rem; }
+.development-repository-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: .8rem; }
+.development-repository-card, .development-thread-card {
+  border: 1px solid var(--line, #45516b);
+  border-radius: .85rem;
+  padding: 1rem;
+  color: inherit;
+  background: var(--surface, rgba(145,157,183,.06));
+  text-align: left;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.development-repository-card:hover, .development-thread-card:hover,
+.development-repository-card:focus-visible, .development-thread-card:focus-visible {
+  background: var(--surface-hover, rgba(145,157,183,.14));
+  border-color: var(--accent, #8eaef9);
+}
+.development-repository-card:disabled { opacity: .65; cursor: not-allowed; }
+.development-repository-card strong { font-size: 1.05rem; }
+.development-repository-card strong span { float: right; padding-left: 1rem; }
+.development-repository-meta { font-size: .85rem; }
+.development-thread-list { display: grid; gap: .65rem; }
+.development-thread-preview { font-size: .92rem; color: var(--text-muted, #a8b2c4); line-height: 1.45; }
+.development-thread-card strong { font-size: .98rem; }
+.development-back { margin-bottom: 1rem; }
+.development-prompt-label { font-weight: 600; }
+.development-submit-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; margin-top: .7rem; }
+.development-submit-row label { margin: 0; }
+.development-submit-row button { margin-left: auto; }
+.development-advanced { margin: 1.2rem auto; max-width: 1100px; }
+.development-advanced > summary { cursor: pointer; color: var(--text-muted, #a8b2c4); }
+.development-advanced > details { margin-top: .65rem; }
+#development-repo-compose .development-request, #development-thread-compose .development-request { margin: .9rem 0; }
+.development-thread-history { display: flex; flex-direction: column; gap: 1rem; margin: 1.2rem 0; }
+.development-thread-turn { display: flex; flex-direction: column; gap: .65rem; }
+.development-thread-user {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: .85rem 1rem;
+  background: var(--surface-hover, rgba(145,157,183,.15));
+  border-radius: .9rem .9rem .2rem .9rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.development-thread-reply { align-self: stretch; max-width: 100%; padding: .8rem 1rem; border-left: 2px solid var(--accent, #8eaef9); }
+.development-thread-reply p { white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0; }
+.development-thread-turn > details summary { cursor: pointer; font-size: .85rem; }
+.development-thread-turn .coding-job { margin: .65rem 0; }
+#development-thread-attach { padding: .8rem 0; display: flex; gap: .5rem; align-items: end; flex-wrap: wrap; }
+#development-thread-attach label { display: grid; gap: .3rem; min-width: min(100%, 15rem); }
+#development-thread-attach select { max-width: 100%; }
+#development-job-notice { max-width: 1100px; margin: .75rem auto; }
+@media (max-width: 600px) {
+  .development-hero { padding: .85rem; }
+  .development-options { grid-template-columns: 1fr; gap: .25rem; }
+  .development-thread-user { max-width: 97%; }
+  .development-repository-grid { grid-template-columns: 1fr; }
+}
