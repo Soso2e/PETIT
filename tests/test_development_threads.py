@@ -116,11 +116,11 @@ def test_cli_receives_only_same_thread_handoff_and_no_unmerged_checkout_claim(re
     other = submit("unrelated", "other-first", "OTHER_THREAD_SECRET_MARKER")
     with db.get_connection() as connection:
         connection.execute("UPDATE coding_jobs SET summary='変更案を作成した' WHERE id=?", (prior["id"],))
-        connection.execute("UPDATE coding_jobs SET summary='別スレッド' WHERE id=?", (other["id"],))
+        connection.execute("UPDATE coding_jobs SET summary='UNRELATED_SUMMARY_SENTINEL' WHERE id=?", (other["id"],))
 
     next_job = submit("handoff", "handoff-second", "前回の続き")
     handoff = coding_jobs.development_context(coding_jobs.get(next_job["id"]))
     assert "1回目の依頼" in handoff and "変更案を作成した" in handoff
     assert "前回の続き" in handoff and "未統合変更" in handoff
     assert "OTHER_THREAD_SECRET_MARKER" not in handoff
-    assert "別スレッド" not in handoff
+    assert "UNRELATED_SUMMARY_SENTINEL" not in handoff
