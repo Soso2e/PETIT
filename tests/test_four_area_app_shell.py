@@ -94,6 +94,23 @@ class FourAreaAppShellTests(unittest.TestCase):
         self.assertIn("petit:tasks-updated", initialize)
         self.assertNotIn("void loadCatalog();", initialize)
 
+    def test_mobile_chat_panel_clears_bottom_navigation_bar(self):
+        polish_style = (FRONTEND / "petit-ui-polish.css").read_text(encoding="utf-8")
+        corner_style = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
+        univ_style = (FRONTEND / "univ-space.css").read_text(encoding="utf-8")
+
+        # Chat panel in mobile view must clear bottom nav
+        self.assertIn('body.petit-chat-screen [data-view-panel="chat"]', polish_style)
+        self.assertIn('--petit-bottom-nav-height', polish_style)
+
+        # Main view padding-bottom must accommodate bottom nav height
+        self.assertIn('padding-bottom: calc(var(--petit-bottom-nav-height', corner_style)
+        self.assertIn('padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important;', corner_style)
+
+        # Tab navigation must remain 4 columns even in univ-space
+        self.assertNotIn('grid-template-columns: repeat(3, minmax(0, 1fr))', univ_style)
+        self.assertIn('grid-template-columns: repeat(4, minmax(0, 1fr))', univ_style)
+
 
 if __name__ == "__main__":
     unittest.main()
