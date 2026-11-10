@@ -2,7 +2,7 @@
   const api = window.petitSettings;
   const byId = (id) => document.getElementById(id);
   const fields = ['serverUrl', 'sttUrl', 'sttModel', 'modelPath', 'backbonePath', 'wakeThreshold', 'notificationMode'];
-  const flags = ['wakeEnabled', 'login', 'updates', 'notifications', 'notificationSound'];
+  const flags = ['wakeEnabled', 'login', 'updates', 'notifications', 'notificationSound', 'petEnabled'];
   const state = await api.read();
   for (const name of fields) if (state[name] !== undefined && state[name] !== '') byId(name).value = state[name];
   for (const name of flags) byId(name).checked = Boolean(state[name]);

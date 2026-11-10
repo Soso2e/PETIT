@@ -25,3 +25,11 @@ test('persist per-window geometry separately from settings', () => {
     assert.equal(windowState(file).get('overlay', fallback, [area]).width, 430);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('small pet geometry remains small and is clamped when displays change', () => {
+  const pet = { x: 1120, y: 530, width: 132, height: 152 };
+  const limits = { minWidth: 110, minHeight: 120 };
+  assert.deepEqual(fitBounds(pet, pet, [area], limits), pet);
+  assert.deepEqual(fitBounds({ ...pet, x: 2000 }, pet, [area], limits), { ...pet, x: 1148 });
+  assert.equal(fitBounds(null, pet, [area]).width, 340); // old windows retain original minimum
+});

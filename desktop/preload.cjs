@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('petitDesktop', {
   transcribe: (wav) => ipcRenderer.invoke('desktop:transcribe', wav),
   cancel: () => ipcRenderer.invoke('desktop:cancel'),
   ready: () => ipcRenderer.invoke('desktop:ready'),
+  petActivity: (activity) => ipcRenderer.invoke('desktop:pet-activity', activity),
   onActivate: (callback) => {
     const listener = (_event, detail) => callback(detail);
     ipcRenderer.on('desktop:activate', listener);

@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.54.0 (開発ブランチ)**
+**Current Version: v0.54.1 (開発ブランチ)**
 
 **Last Updated: 2026-11-10 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #432 Desktop SVGマスコット（v0.54.1、開発PR）: Electronに初期OFFの小型透明マスコットを追加。位置保存/トレイ・設定切替/小型Chat起動、既存Wake・会話状態のアニメーション連動を実装。外部依存・サーバーAPI・音声処理は不変。Windows/macOS実機での常駐動作・マルチディスプレイ・負荷評価と、配布版の更新は未確認。
 
 - #429 CLI自由度向上とリポジトリ・作業記録ツールの拡充（v0.54.0）: チャットからGitリポジトリを安全に追加する `add_coding_repository` Tool、重複・誤記録した作業セッションを削除する `delete_work_session` Tool と REST API（`DELETE /api/work-sessions/{id}`）を追加。Front Brain からの一般作業委譲（`delegations.ELIGIBLE`）に `antigravity_cli` を追加し、`FRONT_DIRECT` へ両Toolを登録。新規単体テスト8件、関連テスト52件全件成功。実CLI（Antigravity CLI）での通し会話は受入確認が必要。
 
