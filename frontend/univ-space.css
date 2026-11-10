@@ -822,7 +822,7 @@ body.petit-univ-screen .univ-hud__help {
 }
 
 @media (max-width: 959px) {
-  .universe-topbar .view-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .universe-topbar .view-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
   .univ-viewport {
     --univ-hud-offset: 13px;
