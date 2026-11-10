@@ -53,6 +53,7 @@ Concept §6 の「Discord Bot：自分専用に常駐」をここで実装する
 - **開発の司令塔**: 「@PETIT WEVORA の続き進めて」→ [agent-home.md](../brain/agent-home.md) の Job として開始、進捗をスレッドに流す、PR は承認ボタン。
 - **個人情報の出し先**: 予定・タスク・記憶の中身は DM では返す。指定サーバーのチャンネルでは要約のみ・詳細は DM へ、を既定にする（Concept §10 の未決定事項への提案）。
 - **ファイル**: 添付は Home の `inbox/` に受け取り、渡すものは `outbox/` から確認後に送る。
+- **Discord 過去ログ収集・検索（Knowledge Gateway）**: Nocord-Botの資産を統合。許可されたチャンネルのメッセージをバックグラウンドで収集し、SQLite FTS5 + trigram + 添付テキスト抽出（PDF/テキスト等）で索引化。Brainから `search_discord_archive` ツールで自然言語検索し、メッセージURL・チャンネル・発言日時を出典として回答できる。サーバー管理者は `/petit archive` コマンドで対象チャンネルを設定・確認できる。Guild モードからは他サーバーや Personal Zone のデータに一切アクセスできない。
 
 ---
 

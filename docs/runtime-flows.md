@@ -924,3 +924,27 @@ flowchart TD
 ```
 
 この表示はブラウザでの最終取得時刻であり、Workerの生存確認ではない。Brainや永続ジョブの実行契約は変更しない。
+
+## Discord Archive & Knowledge Gateway（Nocord統合）
+
+Discord上の会話・添付ファイル（PDF/テキスト等）をバックグラウンドで収集・FTS5索引化し、全入口のBrainから出典つきで検索可能にする。通常会話を一切遅延させず、Guild/Ownerのセキュリティ境界を厳格に維持する。
+
+```mermaid
+flowchart TD
+    DiscordMsg[Discord メッセージ / 編集 / 削除] --> Bot[Discord Bot プロセス]
+    Bot --> IngestTask["バックグラウンド非同期タスク<br/>(通常会話への遅延ゼロ)"]
+    IngestTask --> API["POST /api/channels/discord/archive/events<br/>(Bearer サービストークン認証)"]
+    API --> Consent{Allowlist に登録済み?<br/>かつ ゾーン一致?}
+    Consent -->|No| Discard[安全に無視 / 保存しない]
+    Consent -->|Yes| Store[(SQLite storage/archive/zone.sqlite<br/>WAL / tombstone / revision)]
+    Store --> FTS["FTS5 + Trigram + 添付テキスト抽出<br/>(PDF / txt / md / json)"]
+
+    Brain[Brain: 自然言語での質問] --> NeedSearch{過去ログの検索が必要?}
+    NeedSearch -->|Yes| ToolCall["Tool: search_discord_archive"]
+    ToolCall --> ContextCheck{Guild モード?}
+    ContextCheck -->|Yes| GuildIsolate["GuildIsolationError<br/>または 自サーバーのみに強制制限"]
+    ContextCheck -->|No| SearchRun["FTS5 + Trigram + BM25 ハイブリッド検索<br/>(Personal Zone / 権限スコープ強制)"]
+    SearchRun --> Provenance["出典情報生成<br/>(URL / 発言者 / チャンネル / 日時 / 添付抜粋)"]
+    Provenance --> Brain
+    Brain --> Answer["根拠つきの回答をユーザーへ提示"]
+```

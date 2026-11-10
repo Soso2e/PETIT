@@ -100,16 +100,17 @@ flowchart TD
 | --- | --- | --- |
 | 生活・タスク | ローカルタスク（SQLite）、Notion 双方向同期、リスト、リマインダー、予定（ローカル / Google Calendar 読み取り / TimeTree 取り込み） | [life/](life/) |
 | 作業記録 | 作業セッション、作業統計、Dashboard の90日集計、引き継ぎメモ | [life/work-statistics.md](life/work-statistics.md) |
-| 記憶 | 記憶の保存と訂正、元発言の検索、Obsidian BRAIN 検索、Chroma（置き換え可能な検索インデックス） | [core/renaissance-memory.md](core/renaissance-memory.md)、[core/assistant-architecture.md](core/assistant-architecture.md) |
+| 記憶・ナレッジ | 記憶の保存と訂正、元発言の検索、Obsidian BRAIN 検索、Discord 過去ログ検索（Knowledge Gateway / FTS5）、Chroma（置き換え可能な検索インデックス） | [core/renaissance-memory.md](core/renaissance-memory.md)、[core/assistant-architecture.md](core/assistant-architecture.md) |
 | プロジェクト | Project Continuity（開始・再開・完了の確認）、GitHub evidence、ローカル開発環境の観測 | [core/assistant-architecture.md](core/assistant-architecture.md)、[dev/](dev/) |
 | 開発ジョブ | Chat の開始確認と Develop の直接送信を同じ台帳へ保存。Git の作業ブランチで編集・検査・commit、PC モードで検索・コピー・承認付きの直接操作を扱う。モデル・Effort と利用枠は開発ジョブごとに選ぶ | [dev/coding-tasks.md](dev/coding-tasks.md) |
-| バックグラウンド | Durable Read Task（ニュース・天気）、通知イベント、Web Push | [core/durable-read-tasks.md](core/durable-read-tasks.md)、[channels/web_push_notifications.md](channels/web_push_notifications.md) |
+| バックグラウンド | Durable Read Task（ニュース・天気）、通知イベント、Web Push、Discord ログ同期・索引化 | [core/durable-read-tasks.md](core/durable-read-tasks.md)、[channels/web_push_notifications.md](channels/web_push_notifications.md) |
 
 ### 2.6 データの正本
 
 | データ | 正本 |
 | --- | --- |
 | 会話・Turn・承認・実行記録・タスクのミラー・作業記録 | SQLite（`storage/app.db`、Git 管理外） |
+| Discord 過去ログ・添付ファイル索引 | SQLite（`storage/archive/<zone>.sqlite`、Git 管理外） |
 | 編集できるタスク・プロジェクト | Notion（SQLite はミラーと送信キュー） |
 | 個人の知識・決定 | Obsidian BRAIN（Markdown） |
 | 予定 | Google Calendar（読み取りのみ）。PETIT からの書き込みはローカル予定だけ |
