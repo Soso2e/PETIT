@@ -118,7 +118,14 @@ function publishPetState() {
   }));
 }
 function syncPetWindow() {
-  if (!config?.petEnabled || suspended || quitting) {
+  if (!config?.petEnabled || quitting) {
+    if (petWindow && !petWindow.isDestroyed()) {
+      geometry.remember('pet', petWindow.getBounds());
+      petWindow.destroy(); // OFF frees the renderer instead of leaving a hidden process.
+    }
+    return;
+  }
+  if (suspended) {
     if (petWindow && !petWindow.isDestroyed()) petWindow.hide();
     return;
   }
