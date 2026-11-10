@@ -92,7 +92,7 @@ flowchart TD
     Native -->|delegate_to_agent| Create[同じ transaction で receipt・作業用Thread・queued Turn・delegations]
     Create --> Notice[返答末尾に Core が「…に任せました」を追記]
     Create -.->|2秒ごと| Worker[委譲 Worker / 同時1件 / 会話用Workerを使わない]
-    Worker --> Pick[delegate_priority の順 / 接続済みのCLIだけ<br/>Claude は delegate_claude_model]
+    Worker --> Pick[delegate_priority の順 / 接続済みのCLIだけ（Antigravity CLI / Codex / Claude Code）<br/>Claude は delegate_claude_model]
     Pick --> Agent[エージェントモードで実行 / L0〜L3 は既存どおり]
     Pick -->|全候補が不可| Fail[理由つきで failed]
     Agent -->|L2 承認待ち| Wait[waiting_approval]

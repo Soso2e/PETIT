@@ -9,6 +9,35 @@ def list_coding_repositories():
     return {"repositories": jobs.roots(), "providers": ["codex", "antigravity_cli", "claude_code"]}
 
 
+@tool(name="add_coding_repository",
+      description="開発・調査対象のローカルGitリポジトリまたは作業フォルダをPETITに登録する。利用者が『このリポジトリ登録して』『PETITのパスこれ。登録できる？』と言ったときに使う。サーバー上の絶対パスを指定する。",
+      parameters={"type": "object", "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 1000, "description": "登録するフォルダの絶対パス（例: C:\\#Project\\Server\\PersonalAssistant_PETIT）"}
+      }, "required": ["path"], "additionalProperties": False},
+      risk="low_risk_write")
+def add_coding_repository(path: str):
+    import os
+    from pathlib import Path
+    from .. import setup_store as settings, development_pc
+
+    raw_path = str(path or "").strip()
+    p = Path(raw_path)
+    if not p.is_absolute():
+        raise ValueError("サーバーPC上の絶対パスを指定してください。")
+    safe_path = jobs.project_workspaces._safe_root(p)
+    development_pc.host_path(str(safe_path), directory=True)
+    resolved = str(safe_path)
+
+    with settings._guard():
+        paths = settings.load().get("coding_roots", [])
+        if os.path.normcase(resolved) in {os.path.normcase(item) for item in paths}:
+            return {"registered": True, "already_registered": True, "path": resolved, "repositories": jobs.roots()}
+        if len(paths) >= 8:
+            raise ValueError("登録できるフォルダは8件までです。")
+        settings.update({"coding_roots": [*paths, resolved]})
+    return {"registered": True, "already_registered": False, "path": resolved, "repositories": jobs.roots()}
+
+
 @tool(name="propose_development_job",
       description="開発・コード修正・リポジトリ調査・PCファイル作業の依頼を具体的な開発プロンプトに整え、利用者の開始確認待ちとして保存する。実行は始まらない。先に list_coding_repositories で対象を確認する。全PCが意図された場合は repository を空文字にする。軽量な読み取り調査だけ lightweight を true にする。",
       parameters={"type": "object", "properties": {

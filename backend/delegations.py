@@ -19,14 +19,14 @@ router = APIRouter(prefix="/api/delegations", tags=["delegations"])
 log = logging.getLogger(__name__)
 
 WORK_PREFIX = "delegate:"
-ELIGIBLE = ("claude_code", "codex")
-LABELS = {"claude_code": "Claude Code", "codex": "Codex"}
+ELIGIBLE = ("antigravity_cli", "claude_code", "codex")
+LABELS = {"antigravity_cli": "Antigravity CLI", "claude_code": "Claude Code", "codex": "Codex"}
 CLAUDE_MODEL_LABELS = {"sonnet": "Sonnet", "haiku": "Haiku"}
 TOOLS = {"delegate_to_agent", "get_delegation_status", "cancel_delegation"}
 # First-call schemas for the Front Brain. Approval Tools stay behind discover_tools.
-FRONT_DIRECT = {"get_work_status", "start_work_session", "update_work_session", "record_past_work",
+FRONT_DIRECT = {"get_work_status", "start_work_session", "update_work_session", "record_past_work", "delete_work_session",
                 "create_task", "complete_task", "create_reminder", "search_memory",
-                "delegate_to_agent", "get_delegation_status", "list_coding_repositories", "propose_development_job"}
+                "delegate_to_agent", "get_delegation_status", "list_coding_repositories", "add_coding_repository", "propose_development_job"}
 # Mail bodies stay away from the Front Brain; a delegated CLI can still read them.
 # Repository and Home-file work is delegated (FRONT_HINT), so its Tools stay out of the Front index too.
 FRONT_HIDDEN = {"gmail_get_message",
@@ -75,7 +75,11 @@ def front_enabled(data: dict) -> bool:
 def candidates(data: dict) -> list[str]:
     """CLIs that can actually run delegated work now, in the user's order."""
     from . import brain_priority
-    return [p for p in data.get("delegate_priority") or [] if p in ELIGIBLE and brain_priority.permitted(p, data)
+    configured_priority = list(data.get("delegate_priority") or [])
+    for p in ELIGIBLE:
+        if p not in configured_priority:
+            configured_priority.append(p)
+    return [p for p in configured_priority if p in ELIGIBLE and brain_priority.permitted(p, data)
             and brain_priority.target(p, data)["configured"]]
 
 
@@ -103,7 +107,7 @@ def tool_available(name: str, data: dict, *, local_only: bool) -> bool:
     if local_only or is_work_thread(thread_id) or not front_enabled(data):
         return False
     provider = _active_provider()
-    if provider is None or provider == "codex":
+    if provider is None or provider == "codex" or provider == "antigravity_cli":
         return False
     if provider == "claude_code":
         from . import claude_agent
@@ -119,7 +123,11 @@ def model_label(provider: str, model: str = "") -> str:
 
 
 def _planned(provider: str, data: dict) -> str:
-    return data.get("delegate_claude_model", "") if provider == "claude_code" else data.get("codex_model", "")
+    if provider == "claude_code":
+        return data.get("delegate_claude_model", "")
+    if provider == "antigravity_cli":
+        return data.get("antigravity_cli_model", "")
+    return data.get("codex_model", "")
 
 
 def _request(goal: str, context: str, original: str, recent: list[dict]) -> str:
@@ -151,7 +159,7 @@ def start(goal: str, context_summary: str = "") -> dict:
     data = setup_store.load()
     options = candidates(data)
     if not options:
-        raise ValueError("任せられるCLIがありません。設定でClaude CodeかCodexを接続してください。")
+        raise ValueError("任せられるCLIがありません。設定でAntigravity CLI、Codex、またはClaude Codeを接続してください。")
     # Inside the Tool's write transaction: the row, the Turn and the receipt commit together.
     with db.write_transaction() as connection:
         existing = connection.execute("SELECT id FROM delegations WHERE parent_request_id=?", (parent_request,)).fetchone()
