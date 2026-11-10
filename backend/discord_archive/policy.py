@@ -35,11 +35,19 @@ class ArchivePolicy:
         allowed = {str(c) for c in self.allow_guilds.get(g_id, {}).get("channels", [])}
         denied = set(str(c) for c in self.denials.get(g_id, []))
 
-        check_id = t_id if t_id is not None else c_id
-        if check_id in denied:
+        # Check explicit denials
+        if t_id and t_id in denied:
             return False
+        if not t_id and c_id in denied:
+            return False
+        if t_id and c_id in denied and t_id not in allowed:
+            return False
+
         if private:
+            # Private threads NEVER inherit parent channel consent; they require explicit consent on the thread itself.
             return t_id is not None and t_id in allowed
+
+        # Public threads inherit parent channel consent unless explicitly denied.
         return c_id in allowed or (t_id is not None and t_id in allowed)
 
     def allows_message(self, row: dict[str, Any]) -> bool:

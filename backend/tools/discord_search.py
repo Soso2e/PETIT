@@ -79,13 +79,15 @@ def search_discord_archive(query: str, limit: int = 5, **filters) -> dict[str, A
             }
         # In guild mode, force filter to caller guild
         filters["guild_id"] = str(current_guild_id)
-        # Guilds use their own zone or guild-isolated zone
         zone = f"guild_{current_guild_id}"
-
-    searcher = get_searcher(zone=zone)
-    if searcher is None and not is_guild:
-        # Fallback to personal zone for Owner/Web/Desktop/Voice
-        searcher = get_searcher(zone="personal")
+        searcher = get_searcher(zone=zone)
+    else:
+        req_gid = filters.get("guild_id")
+        if req_gid and get_searcher(zone=f"guild_{req_gid}") is not None:
+            zone = f"guild_{req_gid}"
+            searcher = get_searcher(zone=zone)
+        else:
+            searcher = get_searcher(zone="personal")
 
     if searcher is None:
         return {

@@ -32,6 +32,7 @@ def test_archive_api_register_and_event(client: TestClient):
         headers=headers,
         json={
             "guild_id": "999",
+            "author_id": "555",
             "channel_ids": ["111"],
             "enabled": True,
             "manage_guild": True,
@@ -64,7 +65,7 @@ def test_archive_api_register_and_event(client: TestClient):
     search_resp = client.get(
         "/api/channels/discord/archive/search",
         headers=headers,
-        params={"query": "テストメッセージ"},
+        params={"query": "テストメッセージ", "guild_id": "999"},
     )
     assert search_resp.status_code == 200
     data = search_resp.json()
@@ -89,7 +90,7 @@ def test_archive_api_register_and_event(client: TestClient):
     search_after_del = client.get(
         "/api/channels/discord/archive/search",
         headers=headers,
-        params={"query": "テストメッセージ"},
+        params={"query": "テストメッセージ", "guild_id": "999"},
     )
     assert search_after_del.status_code == 200
     assert search_after_del.json()["count"] == 0

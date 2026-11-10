@@ -6,7 +6,7 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
-- Nocord統合・Discord Knowledge Gateway（v0.53.0）: Nocord-BotのDiscordログ収集・FTS5/trigram全文検索・添付ファイルテキスト抽出（PDF/テキスト等）をPETITへ統合。Core API（`/api/channels/discord/archive/*`）、全入口共通の安全な新Tool `search_discord_archive`、Botの非同期ログ収集とスラッシュコマンド `/petit archive`、Nocord元DBからの無損失移行スクリプト `scripts/migrate_nocord.py` を実装。通常会話の遅延ゼロ、GuildモードとPersonal Zoneの厳格な分離（他サーバー・個人記憶の漏洩防止）を保証。関連pytest 42件全件成功。実Discord Gateway接続・実PDF抽出環境は未確認。
+- Nocord統合・Discord Knowledge Gateway（v0.53.0、PR #424）: Nocord-BotのDiscordログ収集・FTS5/trigram全文検索・添付ファイルテキスト抽出（PDF/Markdown/テキスト/JSON等）をPETITへ統合。Personal/Guild ZoneのDB保存先・検索先不一致を解消し、Owner指定サーバー/DMはPersonal Zone、他サーバーは自ギルドZoneに厳格分離。プライベートスレッドは親チャンネル許可を継承せず明示登録のみ許可する安全境界を徹底。Bot側に指数バックオフ再試行付き非同期キュー `ArchiveBuffer` を導入し、Core一時切断時の収集データ欠落を防止しつつCore側で重複メッセージの冪等な排除を保証。API登録権限（Snowflake author_id/Manage Server検証）を強化。全入口共通の安全な新Tool `search_discord_archive`、Botの非同期ログ収集とスラッシュコマンド `/petit archive`、Nocord元DBからの無損失移行スクリプト `scripts/migrate_nocord.py` を完備。関連pytest 47件全件成功。実Discord Gateway接続・実PDF抽出環境は未確認。
 
 - #418 開発ルート統合（v0.52.0）: Chat の開始確認と Develop の直接送信を同じ Coding Job 台帳へ接続。UI フォルダ登録、モデル・Effort と残量選択、Git の専用ブランチでの編集・検査・commit、PC の Everything IPC／走査・scratch コピー・元ファイル操作の承認、Claude 認証 UI と Codex 既存認証を実装。Windows の実 Codex Sol／Antigravity Argon・Flash で合成 Tool 往復、利用枠と Everything IPC、Claude の未ログイン状態を確認。合成 HTTP と Chromium で Develop からの直接送信・差分、Chat の提案カード復元・承認を確認。Claude の OAuth 完了・実 Opus 推論、実 DeepSeek の意図判定、実端末は未確認。Git のテスト・ビルドは信頼済みリポジトリのコードをホストで実行する。
 - #418 検証: 関連 pytest 225件、Node 契約テスト11件が成功。Windows の広範囲 pytest には別機能の失敗が残り、旧 API・パス表記等の19件は変更前の `origin/main` でも再現した。
