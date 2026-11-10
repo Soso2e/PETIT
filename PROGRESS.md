@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.52.0 (開発ブランチ)**
+**Current Version: v0.52.2 (開発ブランチ)**
 
 **Last Updated: 2026-11-09 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #372 ActivityジョブIDコピー（v0.52.2 開発PR）: Development Hubの背景Job一覧から数値IDのみをクリップボードへコピー可能にする。入力・結果本文や認証情報はコピーせず、Clipboard API失敗時はその場に表示。実ブラウザ/Windows/iPhoneの操作検証は未実施。
 
 - #418 開発ルート統合（v0.52.0）: Chat の開始確認と Develop の直接送信を同じ Coding Job 台帳へ接続。UI フォルダ登録、モデル・Effort と残量選択、Git の専用ブランチでの編集・検査・commit、PC の Everything IPC／走査・scratch コピー・元ファイル操作の承認、Claude 認証 UI と Codex 既存認証を実装。Windows の実 Codex Sol／Antigravity Argon・Flash で合成 Tool 往復、利用枠と Everything IPC、Claude の未ログイン状態を確認。合成 HTTP と Chromium で Develop からの直接送信・差分、Chat の提案カード復元・承認を確認。Claude の OAuth 完了・実 Opus 推論、実 DeepSeek の意図判定、実端末は未確認。Git のテスト・ビルドは信頼済みリポジトリのコードをホストで実行する。
 - #418 検証: 関連 pytest 225件、Node 契約テスト11件が成功。Windows の広範囲 pytest には別機能の失敗が残り、旧 API・パス表記等の19件は変更前の `origin/main` でも再現した。
