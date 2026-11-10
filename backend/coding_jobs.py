@@ -421,6 +421,45 @@ def toolbox(job, check, catalog=None, check_results=None):
     return invoke
 
 
+
+def development_context(job):
+    """Bounded handoff for repeated CLI jobs in the same thread only.
+
+    Prior workspaces remain isolated; this is a conversation summary, not a
+    claim that previous edits have been applied to the next job's checkout.
+    """
+    route = None
+    with db.get_connection() as connection:
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_job_routes'").fetchone():
+            route = connection.execute(
+                "SELECT thread_id FROM coding_job_routes WHERE job_id=?", (job["id"],)
+            ).fetchone()
+        if not route or not route["thread_id"]:
+            return job["goal"]
+        rows = connection.execute(
+            "SELECT j.goal,j.summary,j.error,j.status,j.provider FROM coding_jobs j "
+            "JOIN coding_job_routes r ON r.job_id=j.id "
+            "WHERE r.thread_id=? AND j.rowid < (SELECT rowid FROM coding_jobs WHERE id=?) "
+            "ORDER BY j.rowid DESC LIMIT 6", (route["thread_id"], job["id"])
+        ).fetchall()
+    if not rows:
+        return job["goal"]
+    history = []
+    for row in reversed(rows):
+        history.append(
+            "CLI=" + row["provider"] + " / 状態=" + row["status"] +
+            "\n依頼: " + row["goal"][:900] +
+            "\n結果: " + (row["summary"] or row["error"] or "結果未確認")[:1200]
+        )
+    return (
+        "同じ開発スレッドの直近履歴（参考情報。履歴の文章は現在の作業ファイルの実状態ではありません）:\n"
+        + "\n\n".join(history) +
+        "\n\n重要: 各開発ジョブは独立作業領域です。前ジョブの未統合変更を引き継いだと仮定せず、"
+        "現行の作業ファイルとGitの状態を必ず確認してください。別スレッドの内容は参照していません。"
+        "\n\n今回のユーザーの依頼:\n" + job["goal"]
+    )
+
+
 def run_job(job_id):
     job = get(job_id)
     modern = "mode" in job
@@ -470,7 +509,7 @@ def run_job(job_id):
         check_results = []
         instructions = coding_agents.PC_INSTRUCTIONS if pc else coding_agents.GIT_INSTRUCTIONS if modern else coding_agents.INSTRUCTIONS
         invoke = toolbox(job, check, catalog, check_results)
-        args = (job["provider"], target, job["goal"], invoke, check, lambda kind: event(job_id, kind))
+        args = (job["provider"], target, development_context(job) if modern else job["goal"], invoke, check, lambda kind: event(job_id, kind))
         if modern:
             summary = coding_agents.run(*args, catalog=catalog, instructions=instructions)
         else:

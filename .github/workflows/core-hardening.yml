@@ -6,6 +6,7 @@ on:
       - "backend/**"
       - "frontend/**"
       - "tests/test_core_hardening.py"
+      - "tests/test_development_threads.py"
       - "tests/test_chat_context_budget.py"
       - "tests/test_schedule_date_parsing.py"
       - "tests/test_notion_search.py"
@@ -40,10 +41,10 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --quiet --upgrade pip
-          python -m pip install --quiet fastapi uvicorn httpx pydantic chromadb timetree-exporter
+          python -m pip install --quiet fastapi uvicorn httpx pydantic chromadb timetree-exporter pytest jsonschema cryptography
 
       - name: Compile Python sources
-        run: python -m compileall backend tests/test_core_hardening.py tests/test_chat_context_budget.py tests/test_schedule_date_parsing.py tests/test_notion_search.py tests/test_life_map_assets.py tests/test_life_home_flow.py tests/test_task_child_api.py tests/test_unified_ui_system.py tests/test_motion_continuity.py tests/test_galactic_spatial_design.py tests/test_four_area_app_shell.py tests/test_core_home_universe.py
+        run: python -m compileall backend tests/test_core_hardening.py tests/test_chat_context_budget.py tests/test_schedule_date_parsing.py tests/test_notion_search.py tests/test_life_map_assets.py tests/test_life_home_flow.py tests/test_task_child_api.py tests/test_unified_ui_system.py tests/test_motion_continuity.py tests/test_galactic_spatial_design.py tests/test_four_area_app_shell.py tests/test_core_home_universe.py tests/test_development_threads.py
 
       - name: Check frontend syntax
         run: |
@@ -57,6 +58,9 @@ jobs:
           node --check frontend/petit-motion.js
           node --check frontend/petit-version.js
           node --check frontend/univ-space.js
+
+      - name: Run Develop workspace thread contracts
+        run: python -m pytest tests/test_development_threads.py -q
 
       - name: Run durable background read task regressions
         run: python -m unittest tests.test_durable_reads tests.test_activity_jobs -v

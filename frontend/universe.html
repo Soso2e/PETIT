@@ -215,40 +215,91 @@
       </section>
 
       <section class="view" data-view-panel="development" hidden aria-label="Development Hub">
-        <div class="development-head">
+        <header class="development-head">
           <div>
-            <span class="eyebrow">DEVELOPMENT HUB</span>
-            <h1>Develop / 開発プロジェクト</h1>
-            <p>開発の依頼、開始確認、進捗、差分レビュー</p>
+            <span class="eyebrow">DEVELOP</span>
+            <h1>開発ワークスペース</h1>
+            <p>チャットから開発を始め、リポジトリごとに続きを管理</p>
           </div>
-          <button id="development-refresh" type="button">状態を更新</button>
+          <button id="development-refresh" type="button">更新</button>
+        </header>
+
+        <div id="development-home" class="development-level">
+          <section class="development-hero">
+            <h2>何を開発する？</h2>
+            <p>リポジトリを決めずに始めても大丈夫。後から紐付けられます。</p>
+            <div id="development-home-compose">
+              <div id="development-composer" class="development-request">
+                <form id="development-request">
+                  <label class="development-prompt-label">開発内容
+                    <textarea name="goal" rows="3" required maxlength="8000" placeholder="調査、試作、実装、修正… 何でも相談してみよう"></textarea>
+                  </label>
+                  <div class="development-options">
+                    <label>作業場所<select name="repository"><option value="">指定なし（PC内の全ファイルを見る）</option></select></label>
+                    <label>CLI / モデル<select name="model_key"><option value="auto">自動（残量優先）</option></select></label>
+                    <label>Effort<select name="effort"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label>
+                  </div>
+                  <div class="development-submit-row">
+                    <label><input type="checkbox" name="lightweight"> 軽量な読み取り調査</label>
+                    <button type="submit">開発を始める</button>
+                  </div>
+                  <p class="development-muted">Gitは独立作業領域で進めます。PC元ファイルへの変更は操作時に確認します。</p>
+                </form>
+              </div>
+            </div>
+          </section>
+          <div class="development-section-title">
+            <h2>リポジトリ</h2><span id="development-repository-count"></span>
+          </div>
+          <div id="development-repositories" class="development-repository-grid" aria-live="polite"></div>
+          <div class="development-section-title"><h2>リポジトリなしの開発</h2></div>
+          <div id="development-loose-threads" class="development-thread-list"></div>
         </div>
-        <form id="development-request" class="development-request">
-          <div class="development-options">
-            <label>対象フォルダ<select name="repository"><option value="">指定なし（PC内の全ファイルを見る）</option></select></label>
-            <label>モデル<select name="model_key"><option value="auto">自動（残量優先）</option></select></label>
-            <label>Effort<select name="effort"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label>
+
+        <div id="development-repo-view" class="development-level" hidden>
+          <button id="development-back-home" type="button" class="development-back">← リポジトリ一覧</button>
+          <div class="development-section-title"><h2 id="development-repo-title"></h2></div>
+          <p id="development-repo-status" class="development-muted" role="status"></p>
+          <div id="development-repo-compose"></div>
+          <div class="development-section-title"><h2>開発チャット履歴</h2></div>
+          <div id="development-repo-threads" class="development-thread-list"></div>
+        </div>
+
+        <div id="development-thread-view" class="development-level" hidden>
+          <button id="development-back-thread" type="button" class="development-back">← 戻る</button>
+          <h2 id="development-thread-title"></h2>
+          <p id="development-thread-meta" class="development-muted"></p>
+          <div id="development-thread-history" class="development-thread-history" aria-live="polite"></div>
+          <div id="development-thread-attach" hidden>
+            <label>この開発をリポジトリに紐付ける <select id="development-thread-attach-repo"></select></label>
+            <button id="development-thread-attach-button" type="button">紐付け</button>
           </div>
-          <label><input type="checkbox" name="lightweight"> 軽量な読み取り調査</label>
-          <label>開発プロンプト<textarea name="goal" rows="3" required maxlength="8000" placeholder="目的・期待する結果・制約"></textarea></label>
-          <p>Gitは開始コミットの専用ブランチで作業します。PCファイルの直接操作は別途確認します。CLIに依頼内容と作業に必要なファイル内容が渡ります。</p>
-          <button type="submit">開発を依頼する</button>
-        </form>
-        <details class="development-request">
-          <summary>フォルダを管理</summary>
-          <form id="development-roots">
-            <label>サーバーPC上の絶対パス<input name="path" required maxlength="1000" placeholder="C:\Projects\example"></label>
-            <button type="submit">フォルダを追加</button>
-          </form>
-          <ul id="development-root-list"></ul>
-        </details>
+          <div id="development-thread-compose"></div>
+        </div>
+
         <p id="development-job-notice" role="status" aria-live="polite"></p>
-        <p id="development-usage" aria-live="polite"></p>
-        <section aria-label="開発ジョブ"><h2>開発ジョブ</h2><div id="development-jobs"></div></section>
-        <h2>ローカル観測</h2>
-        <p id="development-state" class="development-state" role="status" aria-live="polite">表示の準備中</p>
-        <div id="development-projects" class="development-projects"></div>
-        <p class="development-note">観測は登録フォルダのローカル状態です。ahead/behind は最後に保存した追跡 ref との差分です。</p>
+        <details id="development-advanced" class="development-advanced">
+          <summary>管理・旧ジョブ履歴・診断</summary>
+          <details class="development-request">
+            <summary>登録フォルダの管理</summary>
+            <form id="development-roots">
+              <label>サーバーPC上の絶対パス<input name="path" required maxlength="1000" placeholder="C:\\Projects\\example"></label>
+              <button type="submit">フォルダを追加</button>
+            </form>
+            <ul id="development-root-list"></ul>
+          </details>
+          <p id="development-usage" class="development-muted"></p>
+          <details class="development-request" id="development-legacy-jobs">
+            <summary>旧ジョブと未分類の実行履歴</summary>
+            <div id="development-jobs"></div>
+          </details>
+          <details class="development-request">
+            <summary>ローカル観測の詳細</summary>
+            <p id="development-state" class="development-state" role="status" aria-live="polite">表示の準備中</p>
+            <div id="development-projects" class="development-projects"></div>
+            <p class="development-note">観測は登録フォルダの状態です。ahead/behindは保存済みの追跡refに対する差分です。</p>
+          </details>
+        </details>
       </section>
 
       <section class="view" data-view-panel="reminders" hidden>
