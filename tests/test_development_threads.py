@@ -93,3 +93,34 @@ def test_legacy_jobs_remain_unassigned(repository, client, development_quota):
     assert old.status_code == 200
     assert client.get("/api/coding/threads", params={"repository": str(repository)}).json()["threads"] == []
     assert len(client.get("/api/coding/jobs").json()["jobs"]) == 1
+
+
+def test_cli_receives_only_same_thread_handoff_and_no_unmerged_checkout_claim(repository, client, development_quota):
+    admin(client)
+    root = str(repository)
+    for thread_id in ("handoff", "unrelated"):
+        response = client.post("/api/coding/threads", json={
+            "thread_id": thread_id, "repository": root, "title": thread_id
+        })
+        assert response.status_code == 200
+
+    def submit(thread_id, request_id, goal):
+        response = client.post("/api/coding/jobs/start", json={
+            "thread_id": thread_id, "request_id": request_id,
+            "repository": root, "goal": goal, "model_key": "codex_sol"
+        })
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    prior = submit("handoff", "handoff-first", "1回目の依頼")
+    other = submit("unrelated", "other-first", "OTHER_THREAD_SECRET_MARKER")
+    with db.get_connection() as connection:
+        connection.execute("UPDATE coding_jobs SET summary='変更案を作成した' WHERE id=?", (prior["id"],))
+        connection.execute("UPDATE coding_jobs SET summary='別スレッド' WHERE id=?", (other["id"],))
+
+    next_job = submit("handoff", "handoff-second", "前回の続き")
+    handoff = coding_jobs.development_context(coding_jobs.get(next_job["id"]))
+    assert "1回目の依頼" in handoff and "変更案を作成した" in handoff
+    assert "前回の続き" in handoff and "未統合変更" in handoff
+    assert "OTHER_THREAD_SECRET_MARKER" not in handoff
+    assert "別スレッド" not in handoff
