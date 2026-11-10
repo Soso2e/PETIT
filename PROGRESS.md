@@ -6,6 +6,8 @@
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- PR #421/#422/#425 統合: モバイルChat入力欄と下部ナビの重なりを解消（4タブ維持、キーボード追従）、Development Activityの数値Job IDだけを安全にコピー、PETITの口調を女性の個人秘書（一人称「私」）に変更。Nocord統合のv0.53.0を維持し、旧3タブ固定テストを4タブ期待へ更新。実スマホ端末での操作検証は未実施。
+
 - Nocord統合・Discord Knowledge Gateway（v0.53.0、PR #424）: Nocord-BotのDiscordログ収集・FTS5/trigram全文検索・添付ファイルテキスト抽出（PDF/Markdown/テキスト/JSON等）をPETITへ統合。Personal/Guild ZoneのDB保存先・検索先不一致を解消し、Owner指定サーバー/DMはPersonal Zone、他サーバーは自ギルドZoneに厳格分離。Guild内非公開チャンネルの閲覧権限認可（`permitted_channels`フィルタ）により一般ユーザーへの機密漏洩を防止。プライベートスレッドは親チャンネル許可を継承せず明示登録のみ許可する安全境界を徹底。Bot側にSQLite永続化キューを備えた `ArchiveBuffer` を導入し、Bot強制終了・再起動時も未送信イベントを欠落させず自動復旧・再送。破損・巨大PDF（最大50ページ制限、最大10万文字制限、例外シールド、セマフォ同時2件、10秒タイムアウト）によるBot停止・会話遅延を完全防御。メッセージ編集の即時反映（`on_message_edit`）、チャンネル登録解除時の即時除外、`/petit archive sync` を完備。全入口共通の安全な新Tool `search_discord_archive`、Nocord元DBからの無損失移行スクリプト `scripts/migrate_nocord.py` を実装。関連pytest 51件全件成功。実Discord Gateway接続・実PDF抽出環境は未確認。
 
 - #418 開発ルート統合（v0.52.0）: Chat の開始確認と Develop の直接送信を同じ Coding Job 台帳へ接続。UI フォルダ登録、モデル・Effort と残量選択、Git の専用ブランチでの編集・検査・commit、PC の Everything IPC／走査・scratch コピー・元ファイル操作の承認、Claude 認証 UI と Codex 既存認証を実装。Windows の実 Codex Sol／Antigravity Argon・Flash で合成 Tool 往復、利用枠と Everything IPC、Claude の未ログイン状態を確認。合成 HTTP と Chromium で Develop からの直接送信・差分、Chat の提案カード復元・承認を確認。Claude の OAuth 完了・実 Opus 推論、実 DeepSeek の意図判定、実端末は未確認。Git のテスト・ビルドは信頼済みリポジトリのコードをホストで実行する。

@@ -95,7 +95,21 @@
       badge.className = "development-activity__status";
       badge.dataset.status = job.status;
       badge.textContent = statuses[job.status] || statuses.unknown;
-      item.append(main, badge);
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "development-activity__copy";
+      copy.textContent = "IDをコピー";
+      copy.setAttribute("aria-label", "ジョブ " + job.id + " のIDをコピー");
+      copy.disabled = !job.id;
+      copy.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(String(job.id));
+          copy.textContent = "コピー済み";
+        } catch (_) {
+          copy.textContent = "コピー失敗";
+        }
+      });
+      item.append(main, badge, copy);
       list.append(item);
     }
     const n = data.jobs.length;

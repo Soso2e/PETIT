@@ -54,3 +54,8 @@
 @media (max-width: 520px) {
   .development-activity__item { align-items: start; flex-direction: column; }
 }
+
+/* Copy only the opaque numeric job identifier, never job input or output. */
+.development-activity__copy { border: 1px solid rgba(163,192,231,.25); border-radius: 8px; background: rgba(120,151,200,.14); color: inherit; padding: 6px 9px; cursor: pointer; font-size: .78rem; }
+.development-activity__copy:disabled { opacity: .45; cursor: not-allowed; }
+.development-activity__copy:focus-visible { outline: 2px solid #b7d5ff; outline-offset: 2px; }

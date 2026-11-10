@@ -31,6 +31,11 @@
       }, 50);
     });
     input.addEventListener("input", resize);
+    input.addEventListener("focus", () => {
+      setTimeout(() => {
+        form.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }, 300);
+    });
     input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
       if (event.shiftKey) return;
