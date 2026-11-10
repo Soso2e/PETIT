@@ -6,14 +6,14 @@ from pathlib import Path
 import subprocess
 from typing import Literal
 
-from . import coding_jobs as jobs, setup_store as settings, setup_api, db, development_models, development_pc
+from . import coding_jobs as jobs, setup_store as settings, setup_api, db, development_models, development_pc, development_threads
 
 router = APIRouter(prefix="/api/coding", tags=["coding"], dependencies=[Depends(setup_api._admin)])
 
 
 class Repositories(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    paths: list[str] = Field(max_length=8)
+    paths: list[str] = Field(max_length=64)
 
 
 class Repository(BaseModel):
@@ -40,6 +40,19 @@ class DevelopmentRequest(BaseModel):
     model_key: Literal["auto", "claude_opus", "codex_sol", "antigravity_argon", "gemini_flash"] = "auto"
     effort: Literal["low", "medium", "high"] = "medium"
     lightweight: bool = False
+    thread_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class DevelopThreadCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    thread_id: str | None = Field(default=None, min_length=1, max_length=200)
+    repository: str = Field(default="", max_length=1000)
+    title: str = Field(default="", max_length=160)
+
+
+class DevelopThreadAttach(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    repository: str = Field(min_length=1, max_length=1000)
 
 
 def call(function, *args, **kwargs):
@@ -80,8 +93,8 @@ def add_folder(payload: Repository):
     with settings._guard():
         paths = settings.load()["coding_roots"]
         if os.path.normcase(path) not in {os.path.normcase(item) for item in paths}:
-            if len(paths) >= 8:
-                raise HTTPException(400, "設定から登録できるフォルダは8件までです。")
+            if len(paths) >= 64:
+                raise HTTPException(400, "設定から登録できるフォルダは64件までです。")
             settings.update({"coding_roots": [*paths, path]})
     return config()
 
@@ -107,6 +120,31 @@ def activity(limit: int = 30):
     return jobs.activity_summary(limit)
 
 
+@router.get("/workspaces")
+def workspaces():
+    return {"repositories": call(development_threads.repositories)}
+
+
+@router.get("/threads")
+def threads(repository: str | None = None):
+    return {"threads": call(development_threads.list_threads, repository)}
+
+
+@router.post("/threads", dependencies=[Depends(setup_api._same_origin)])
+def create_thread(payload: DevelopThreadCreate):
+    return call(development_threads.create, **payload.model_dump())
+
+
+@router.get("/threads/{thread_id}")
+def thread_detail(thread_id: str):
+    return call(development_threads.detail, thread_id)
+
+
+@router.post("/threads/{thread_id}/repository", dependencies=[Depends(setup_api._same_origin)])
+def attach_thread(thread_id: str, payload: DevelopThreadAttach):
+    return call(development_threads.attach_repository, thread_id, payload.repository)
+
+
 @router.get("/jobs")
 def listing(thread_id: str | None = None):return {"jobs": jobs.list_jobs(thread_id)}
 
@@ -118,6 +156,8 @@ def propose(payload: Proposal):
 
 @router.post("/jobs/start", dependencies=[Depends(setup_api._same_origin)])
 def start(payload: DevelopmentRequest):
+    if payload.thread_id:
+        call(development_threads.verify, payload.thread_id, payload.repository)
     return call(jobs.create_development, **payload.model_dump(), direct=True)
 
 
