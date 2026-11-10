@@ -88,7 +88,7 @@ class UnivSpaceTests(unittest.TestCase):
         self.assertIn(".univ-webgl-label", css)
         self.assertIn("@media (max-width: 640px)", css)
         self.assertIn("@media (prefers-reduced-motion: reduce)", css)
-        self.assertIn('grid-template-columns: repeat(3, minmax(0, 1fr))', fallback)
+        self.assertIn('grid-template-columns: repeat(4, minmax(0, 1fr))', fallback)
         self.assertIn('.petit-univ-active #detail-panel', fallback)
 
 
