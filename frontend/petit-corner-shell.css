@@ -440,7 +440,7 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
   }
 
   .universe-main {
-    padding-bottom: 18px !important;
+    padding-bottom: calc(var(--petit-bottom-nav-height, 70px) + 24px) !important;
   }
 
   .petit-univ-active #detail-panel {
