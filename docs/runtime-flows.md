@@ -1,5 +1,18 @@
 # PETIT Runtime Flows
 
+## ActivityジョブIDのコピー（v0.52.2・#372）
+
+既存の管理者向け `GET /api/activity/jobs` の読み取り専用表示に、数値ジョブIDだけをコピーする操作を追加。Clipboard APIを使うのは明示クリック時のみで、ジョブの本文・結果・エラー・秘密情報はコピーしない。コピー失敗はボタンに表示し、Job状態やSQLiteは変更しない。
+
+```mermaid
+flowchart LR
+    API["GET /api/activity/jobs (管理者認証)"] --> Summary["summarize: id/status/typeのみ"]
+    Summary --> List["Development Activity一覧"]
+    List -->|ユーザーがIDをコピー| Clipboard["navigator.clipboard.writeText(String(id))"]
+    Clipboard -->|成功/失敗| Feedback["コピー済み / コピー失敗"]
+```
+
+
 ## 会話Turn進捗・応答ドラフトのストリーミング表示（v0.50.0・#410）
 
 体感待ち時間を減らすため、実行中Turnの**表示専用・揮発**の進捗（フェーズ・実行中Tool・返答ドラフト）を `turn_stream` に保持し、`GET /api/turns/{request_id}/stream`（SSE）で配信する。確定結果・承認・effect receipt・保存形式は従来どおり `/api/chat` / `/api/turns/{request_id}` のSQLite台帳を正とする。
