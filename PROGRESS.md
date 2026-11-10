@@ -397,3 +397,4 @@
 | 2026-11-09 | 08:37 | - | v0.50.1: システムプロンプトを縮小（人格・原則を短縮、Tool固有の規則をTool説明へ、FrontのCapability一覧からworktree・Coding Job・Home書込を除外）。未編集のPETIT Home AGENTS.mdは新しい既定へ自動更新。DeepSeek評価は変更前60/60・変更後98/100（`reports/prompt-slimming-evaluation.json`）、Front経路は未評価。 |
 | 2026-11-09 | 08:38 | #414 | v0.51.0: 設定UI・AI/サービス接続・接続ステータスを再設計（Settings最上部の状態/直通ハブ、setup画面の常設概要バー・状態/キー保存済みバッジ・TimeTree/Googleのカード内同期元切替、接続ステータスの色分けピルと設定直通リンク）。Playwright 1440/390/320pxと関連単体テスト確認済み、実アカウント手動受入は未確認。 |
 | 2026-11-09 | 10:01 | #418 | v0.52.0: Chat提案・Develop直接送信をCoding Jobへ統合し、利用枠ルーティング、CLI認証、Git作業とPC操作承認を実装。Codex/Antigravityの合成Tool往復とEverything IPCを実機確認。 |
+| 2026-11-10 | 17:21 | - | システムプロンプト（CORE_SYSTEM_PROMPT）の人格定義を女性の個人秘書（一人称「私」、落ち着いて丁寧かつ率直）へ更新。 |
