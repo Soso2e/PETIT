@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.53.0 (開発ブランチ)**
+**Current Version: v0.54.0 (開発ブランチ)**
 
 **Last Updated: 2026-11-10 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #429 CLI自由度向上とリポジトリ・作業記録ツールの拡充（v0.54.0）: チャットからGitリポジトリを安全に追加する `add_coding_repository` Tool、重複・誤記録した作業セッションを削除する `delete_work_session` Tool と REST API（`DELETE /api/work-sessions/{id}`）を追加。Front Brain からの一般作業委譲（`delegations.ELIGIBLE`）に `antigravity_cli` を追加し、`FRONT_DIRECT` へ両Toolを登録。新規単体テスト8件、関連テスト52件全件成功。実CLI（Antigravity CLI）での通し会話は受入確認が必要。
 
 - PR #421/#422/#425 統合: モバイルChat入力欄と下部ナビの重なりを解消（4タブ維持、キーボード追従）、Development Activityの数値Job IDだけを安全にコピー、PETITの口調を女性の個人秘書（一人称「私」）に変更。Nocord統合のv0.53.0を維持し、旧3タブ固定テストを4タブ期待へ更新。実スマホ端末での操作検証は未実施。
 
@@ -402,3 +404,4 @@
 | 2026-11-09 | 08:38 | #414 | v0.51.0: 設定UI・AI/サービス接続・接続ステータスを再設計（Settings最上部の状態/直通ハブ、setup画面の常設概要バー・状態/キー保存済みバッジ・TimeTree/Googleのカード内同期元切替、接続ステータスの色分けピルと設定直通リンク）。Playwright 1440/390/320pxと関連単体テスト確認済み、実アカウント手動受入は未確認。 |
 | 2026-11-09 | 10:01 | #418 | v0.52.0: Chat提案・Develop直接送信をCoding Jobへ統合し、利用枠ルーティング、CLI認証、Git作業とPC操作承認を実装。Codex/Antigravityの合成Tool往復とEverything IPCを実機確認。 |
 | 2026-11-10 | 15:00 | - | v0.53.0: Nocord統合・Discord Knowledge Gateway（FTS5/trigram全文検索、添付テキスト抽出、Core API、全入口共通Tool search_discord_archive、Bot非同期ログ収集、/petit archive、Nocord移行スクリプト）。Guild/Personal分離と通常会話の遅延ゼロを保証。pytest 42件全件成功。 |
+| 2026-11-10 | 17:50 | #429 | v0.54.0: CLI自由度向上・リポジトリ登録Tool（add_coding_repository）と作業セッション削除Tool（delete_work_session）を追加、委譲先にAntigravity CLIを追加。関連テスト60件全件成功。 |

@@ -353,6 +353,30 @@ def end_session(session_id: str, *, now: datetime | None = None, status: str = "
     return session_snapshot(_row(session_id), now=current) if changed else None
 
 
+def delete_session(session_id: str) -> dict[str, Any] | None:
+    """Delete a work session and its associated events. Returns snapshot of deleted session or None."""
+    ensure_schema()
+    session_id_str = str(session_id).strip()
+    if not session_id_str:
+        return None
+    with db.get_connection() as conn:
+        row = conn.execute("SELECT * FROM work_sessions WHERE session_id = ?", (session_id_str,)).fetchone()
+        if not row:
+            matches = conn.execute(
+                "SELECT * FROM work_sessions WHERE session_id LIKE ? OR session_id LIKE ?",
+                (f"%{session_id_str}%", f"{session_id_str}%"),
+            ).fetchall()
+            if len(matches) == 1:
+                row = matches[0]
+        if not row:
+            return None
+        target = dict(row)
+        real_id = target["session_id"]
+        conn.execute("DELETE FROM work_session_events WHERE session_id = ?", (real_id,))
+        conn.execute("DELETE FROM work_sessions WHERE session_id = ?", (real_id,))
+    return session_snapshot(target)
+
+
 def _event_overlap_seconds(
     events: list[dict[str, Any]],
     start: datetime,
@@ -736,3 +760,11 @@ def resume_work_session(session_id: str) -> JSONResponse:
 @router.post("/{session_id}/end")
 def end_work_session(session_id: str) -> JSONResponse:
     return _update_response(end_session(session_id))
+
+
+@router.delete("/{session_id}")
+def delete_work_session_endpoint(session_id: str) -> JSONResponse:
+    deleted = delete_session(session_id)
+    if not deleted:
+        return JSONResponse({"error": "削除対象の作業セッションが見つかりません。"}, status_code=404)
+    return JSONResponse({"deleted": True, "session": deleted})

@@ -270,3 +270,61 @@ def record_past_work(
         "matched_existing_task": resolved_task is not None,
     }
 
+
+@tool(
+    name="delete_work_session",
+    description=(
+        "誤って記録した作業セッションや重複したセッションを削除する。"
+        "『さっきの記録消して』『重複したセッションを削除して』『一本化したいので片方を消して』で使う。"
+        "session_id（完全IDまたは短縮ID）を指定するか、taskを指定して削除する。"
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "session_id": {
+                "type": "string",
+                "description": "削除する作業セッションID（完全IDまたはログに表示された短縮ID）。",
+            },
+            "task": {
+                "type": "string",
+                "description": "session_idが不明な場合の対象タスク名（例: 'TurfLab'）。",
+            },
+        },
+    },
+    risk="low_risk_write",
+)
+def delete_work_session(session_id: str | None = None, task: str | None = None) -> dict[str, Any]:
+    target_id = (session_id or "").strip()
+    if not target_id:
+        if not task or not task.strip():
+            return {"deleted": False, "error": "削除するsession_idまたはtaskを指定してください。"}
+        with db.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT session_id, task, started_at, ended_at FROM work_sessions "
+                "WHERE task LIKE ? ORDER BY started_at DESC LIMIT 5",
+                (f"%{task.strip()}%",),
+            ).fetchall()
+            if not rows:
+                return {"deleted": False, "error": f"タスク '{task}' の作業セッションが見つかりません。"}
+            if len(rows) > 1:
+                candidates = [
+                    {"session_id": r["session_id"], "task": r["task"], "started_at": r["started_at"], "ended_at": r["ended_at"]}
+                    for r in rows
+                ]
+                return {
+                    "deleted": False,
+                    "error": f"タスク '{task}' に複数の作業セッションがあります。削除したいsession_idを指定してください。",
+                    "candidates": candidates,
+                }
+            target_id = rows[0]["session_id"]
+
+    deleted = work_sessions.delete_session(target_id)
+    if not deleted:
+        return {"deleted": False, "error": f"作業セッション '{target_id}' が見つからないか、一意に特定できませんでした。"}
+    return {
+        "deleted": True,
+        "session_id": deleted.get("session_id"),
+        "task": deleted.get("task"),
+        "session": deleted,
+    }
+
