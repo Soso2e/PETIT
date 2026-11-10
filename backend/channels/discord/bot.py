@@ -5,16 +5,29 @@ Environment:
   PETIT_CORE_URL               e.g. http://127.0.0.1:8000
   PETIT_DISCORD_SERVICE_TOKEN  shared with Core (32+ chars)
   PETIT_DISCORD_POLL_SECONDS   notification poll interval (default 30)
+  PETIT_DISCORD_ARCHIVE_ENABLED enable message archiving (default 1)
 """
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import logging
 import os
+from typing import Any
 
 import httpx
 
-from .relay import (Incoming, approval_text, button_id, extract, notification_text, parse_button, parse_slash, payload, split)
+from .relay import (
+    Incoming,
+    approval_text,
+    button_id,
+    extract,
+    notification_text,
+    parse_button,
+    parse_slash,
+    payload,
+    split,
+)
 
 log = logging.getLogger("petit.discord")
 TIMEOUT = httpx.Timeout(connect=10, read=600, write=30, pool=10)
@@ -23,8 +36,12 @@ UNAVAILABLE = "いま PETIT 本体に繋がりません。PC が起動してい�
 
 class CoreClient:
     def __init__(self, base_url: str, token: str, transport: httpx.AsyncBaseTransport | None = None):
-        self._client = httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=TIMEOUT, transport=transport,
-                                         headers={"Authorization": "Bearer " + token})
+        self._client = httpx.AsyncClient(
+            base_url=base_url.rstrip("/"),
+            timeout=TIMEOUT,
+            transport=transport,
+            headers={"Authorization": "Bearer " + token},
+        )
 
     async def _call(self, method: str, path: str, **kwargs) -> dict | None:
         try:
@@ -53,6 +70,18 @@ class CoreClient:
     async def report(self, event_id: int, status: str, error: str | None = None) -> None:
         await self._call("POST", f"/api/channels/discord/notifications/{event_id}", json={"status": status, "error": error})
 
+    async def archive_event(self, body: dict) -> dict:
+        return await self._call("POST", "/api/channels/discord/archive/events", json=body) or {}
+
+    async def archive_delete(self, body: dict) -> dict:
+        return await self._call("POST", "/api/channels/discord/archive/delete", json=body) or {}
+
+    async def archive_register(self, body: dict) -> dict:
+        return await self._call("POST", "/api/channels/discord/archive/register", json=body) or {}
+
+    async def archive_allowlist(self, zone: str = "personal") -> dict:
+        return await self._call("GET", "/api/channels/discord/archive/allowlist", params={"zone": zone}) or {}
+
     async def close(self) -> None:
         await self._client.aclose()
 
@@ -74,16 +103,53 @@ async def deliver_notifications(core: CoreClient, fetch_user) -> int:
     return sent
 
 
-async def dispatch_slash_interaction(core: CoreClient, *, interaction_id: str, guild_id: str | None,
-                                     author_id: str, display_name: str, manage_guild: bool,
-                                     permissions: int | None, data: dict | None) -> str | None:
-    """Relay a `/petit` slash command to Core `/api/guild/*` and return the reply text."""
+async def dispatch_slash_interaction(
+    core: CoreClient,
+    *,
+    interaction_id: str,
+    guild_id: str | None,
+    author_id: str,
+    display_name: str,
+    manage_guild: bool,
+    permissions: int | None,
+    data: dict | None,
+) -> str | None:
+    """Relay a `/petit` slash command to Core and return the reply text."""
     parsed = parse_slash(data)
     if parsed is None:
         return None
     if not guild_id:
         return "このコマンドはサーバー内でのみ使えます。"
     sub, params = parsed
+
+    if sub == "archive":
+        action = str(params.get("action") or "list")
+        if action == "list":
+            allow_data = await core.archive_allowlist()
+            allowed = allow_data.get("allow_guilds", {}).get(guild_id, {}).get("channels", [])
+            if not allowed:
+                return "このサーバーには保存対象として登録されたチャンネルはありません。"
+            mentions = " ".join(f"<#{c}>" for c in allowed)
+            return f"保存対象チャンネル（{len(allowed)}件）:\n{mentions}"
+        elif action in {"register", "unregister"}:
+            has_perm = manage_guild or bool(permissions and (permissions & 0x20))
+            if not has_perm:
+                return "保存対象の変更にはサーバーの管理権限（Manage Server）が必要です。"
+            channel_id = params.get("channel")
+            channel_ids = [str(channel_id)] if channel_id else []
+            enable = (action == "register")
+            res = await core.archive_register({
+                "guild_id": guild_id,
+                "channel_ids": channel_ids,
+                "enabled": enable,
+                "manage_guild": manage_guild,
+                "permissions": permissions,
+            })
+            if res.get("status") == "ok":
+                action_str = "登録" if enable else "解除"
+                return f"チャンネルの保存対象{action_str}を更新しました（{len(channel_ids)}件）。"
+            return "保存設定の更新に失敗しました。"
+
     body: dict = {
         "interaction_id": interaction_id,
         "guild_id": guild_id,
@@ -113,15 +179,29 @@ def build_client(core: CoreClient):
     import discord  # optional dependency: requirements-discord.txt
     from discord import app_commands
 
-    intents = discord.Intents.default()  # no privileged Message Content Intent
+    intents = discord.Intents.default()
     intents.dm_messages = True
+    try:
+        intents.message_content = True
+    except AttributeError:
+        pass
 
     def approval_view(item: dict):
         view = discord.ui.View(timeout=None)
-        view.add_item(discord.ui.Button(label="承認する", style=discord.ButtonStyle.success,
-                                        custom_id=button_id(item["approval_id"], True)))
-        view.add_item(discord.ui.Button(label="やめる", style=discord.ButtonStyle.secondary,
-                                        custom_id=button_id(item["approval_id"], False)))
+        view.add_item(
+            discord.ui.Button(
+                label="承認する",
+                style=discord.ButtonStyle.success,
+                custom_id=button_id(item["approval_id"], True),
+            )
+        )
+        view.add_item(
+            discord.ui.Button(
+                label="やめる",
+                style=discord.ButtonStyle.secondary,
+                custom_id=button_id(item["approval_id"], False),
+            )
+        )
         return view
 
     async def send_result(channel, data: dict, first=None) -> None:
@@ -133,6 +213,43 @@ def build_client(core: CoreClient):
                 await channel.send(chunk)
         for item in data.get("approvals") or []:
             await channel.send(approval_text(item), view=approval_view(item))
+
+    async def handle_archive_message(message) -> None:
+        if not os.environ.get("PETIT_DISCORD_ARCHIVE_ENABLED", "1").strip().lower() in {"1", "true", "yes", "on"}:
+            return
+        if getattr(message.author, "bot", False) or not message.guild:
+            return
+        norm_att = [
+            {
+                "attachment_id": str(a.id),
+                "filename": a.filename,
+                "content_type": getattr(a, "content_type", "") or "",
+                "size": getattr(a, "size", 0) or 0,
+                "url": a.url,
+            }
+            for a in getattr(message, "attachments", [])
+        ]
+        created_at_val = message.created_at.astimezone(timezone.utc).isoformat()
+        edited_at_val = message.edited_at.astimezone(timezone.utc).isoformat() if message.edited_at else None
+        parent_id = getattr(message.channel, "parent_id", None)
+        dto = {
+            "message_id": str(message.id),
+            "guild_id": str(message.guild.id),
+            "guild_name": str(getattr(message.guild, "name", "") or ""),
+            "channel_id": str(parent_id or message.channel.id),
+            "channel_name": str(getattr(message.channel, "name", "") or ""),
+            "thread_id": str(message.channel.id) if parent_id else None,
+            "thread_name": str(getattr(message.channel, "name", "") or "") if parent_id else None,
+            "author_id": str(message.author.id),
+            "author_name": str(getattr(message.author, "display_name", "") or getattr(message.author, "name", "")),
+            "author_is_bot": bool(message.author.bot),
+            "content": str(message.content or ""),
+            "created_at": created_at_val,
+            "edited_at": edited_at_val,
+            "reply_to_message_id": str(message.reference.message_id) if getattr(message, "reference", None) and message.reference.message_id else None,
+            "attachments": norm_att,
+        }
+        await core.archive_event(dto)
 
     class PetitClient(discord.Client):
         def __init__(self, **kwargs):
@@ -176,6 +293,11 @@ def build_client(core: CoreClient):
     async def _cmd_forget_me(interaction: discord.Interaction):
         pass
 
+    @petit_group.command(name="archive", description="このサーバーのDiscordログ保存対象を設定・確認します（管理者のみ）")
+    async def _cmd_archive(interaction: discord.Interaction, action: str = "list",
+                           scope: str = "channel", channel: discord.TextChannel | None = None):
+        pass
+
     client.tree.add_command(petit_group)
 
     @client.event
@@ -186,18 +308,47 @@ def build_client(core: CoreClient):
     async def on_message(message):
         if client.user is None:
             return
+
+        # Background archival ingestion (never delays conversational reply)
+        asyncio.create_task(handle_archive_message(message))
+
         incoming = Incoming(
-            event_id=str(message.id), channel_id=str(message.channel.id),
-            guild_id=str(message.guild.id) if message.guild else None, author_id=str(message.author.id),
-            content=message.content or "", author_is_bot=bool(message.author.bot),
+            event_id=str(message.id),
+            channel_id=str(message.channel.id),
+            guild_id=str(message.guild.id) if message.guild else None,
+            author_id=str(message.author.id),
+            content=message.content or "",
+            author_is_bot=bool(message.author.bot),
             mentions_bot=client.user in message.mentions,
-            display_name=getattr(message.author, "display_name", "") or "")
+            display_name=getattr(message.author, "display_name", "") or "",
+        )
         text = extract(incoming, str(client.user.id))
         if text is None:
             return
         async with message.channel.typing():
             data = await core.relay(payload(incoming, text))
         await send_result(message.channel, data, first=lambda chunk: message.reply(chunk, mention_author=False))
+
+    @client.event
+    async def on_raw_message_delete(payload_del):
+        if payload_del.guild_id is None:
+            return
+        await core.archive_delete({
+            "message_id": str(payload_del.message_id),
+            "guild_id": str(payload_del.guild_id),
+            "channel_id": str(payload_del.channel_id),
+        })
+
+    @client.event
+    async def on_raw_bulk_message_delete(payload_bulk):
+        if payload_bulk.guild_id is None:
+            return
+        for mid in payload_bulk.message_ids:
+            await core.archive_delete({
+                "message_id": str(mid),
+                "guild_id": str(payload_bulk.guild_id),
+                "channel_id": str(payload_bulk.channel_id),
+            })
 
     @client.event
     async def on_interaction(interaction):
@@ -228,9 +379,13 @@ def build_client(core: CoreClient):
             return
         approval_id, approved = parsed
         await interaction.response.defer()
-        data = await core.decide({"interaction_id": str(interaction.id), "approval_id": approval_id,
-                                  "guild_id": str(interaction.guild_id) if interaction.guild_id else None,
-                                  "author_id": str(interaction.user.id), "approved": approved})
+        data = await core.decide({
+            "interaction_id": str(interaction.id),
+            "approval_id": approval_id,
+            "guild_id": str(interaction.guild_id) if interaction.guild_id else None,
+            "author_id": str(interaction.user.id),
+            "approved": approved,
+        })
         if interaction.message is not None and data.get("reply") != UNAVAILABLE:
             mark = "✅ 承認しました" if approved else "↩️ やめました"
             try:

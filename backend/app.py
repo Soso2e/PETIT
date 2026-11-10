@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from . import (
     agent_bridge,
+    archive_api,
     attachments,
     setup_api,
     coding_api,
@@ -43,7 +44,7 @@ def build_modules() -> tuple[ModuleDefinition, ...]:
         ModuleDefinition(id="delegations", routers=(delegations.router,)),
         ModuleDefinition(id="conversations", routers=(conversation_api.router,)),
         ModuleDefinition(id="agent-bridge", routers=(agent_bridge.router,), dependencies=("builtin-tools", "conversations")),
-        ModuleDefinition(id="discord", routers=(discord_api.router, guild_api.router), dependencies=("conversations",)),
+        ModuleDefinition(id="discord", routers=(discord_api.router, guild_api.router, archive_api.router), dependencies=("conversations",)),
         ModuleDefinition(id="model-routing", routers=(model_routing_api.router,)),
         ModuleDefinition(id="attachments", routers=(attachments.router,)),
         ModuleDefinition(id="vision", routers=(vision.router,)),

@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.52.0 (開発ブランチ)**
+**Current Version: v0.53.0 (開発ブランチ)**
 
-**Last Updated: 2026-11-09 UTC**
+**Last Updated: 2026-11-10 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- Nocord統合・Discord Knowledge Gateway（v0.53.0）: Nocord-BotのDiscordログ収集・FTS5/trigram全文検索・添付ファイルテキスト抽出（PDF/テキスト等）をPETITへ統合。Core API（`/api/channels/discord/archive/*`）、全入口共通の安全な新Tool `search_discord_archive`、Botの非同期ログ収集とスラッシュコマンド `/petit archive`、Nocord元DBからの無損失移行スクリプト `scripts/migrate_nocord.py` を実装。通常会話の遅延ゼロ、GuildモードとPersonal Zoneの厳格な分離（他サーバー・個人記憶の漏洩防止）を保証。関連pytest 42件全件成功。実Discord Gateway接続・実PDF抽出環境は未確認。
 
 - #418 開発ルート統合（v0.52.0）: Chat の開始確認と Develop の直接送信を同じ Coding Job 台帳へ接続。UI フォルダ登録、モデル・Effort と残量選択、Git の専用ブランチでの編集・検査・commit、PC の Everything IPC／走査・scratch コピー・元ファイル操作の承認、Claude 認証 UI と Codex 既存認証を実装。Windows の実 Codex Sol／Antigravity Argon・Flash で合成 Tool 往復、利用枠と Everything IPC、Claude の未ログイン状態を確認。合成 HTTP と Chromium で Develop からの直接送信・差分、Chat の提案カード復元・承認を確認。Claude の OAuth 完了・実 Opus 推論、実 DeepSeek の意図判定、実端末は未確認。Git のテスト・ビルドは信頼済みリポジトリのコードをホストで実行する。
 - #418 検証: 関連 pytest 225件、Node 契約テスト11件が成功。Windows の広範囲 pytest には別機能の失敗が残り、旧 API・パス表記等の19件は変更前の `origin/main` でも再現した。
@@ -397,3 +399,4 @@
 | 2026-11-09 | 08:37 | - | v0.50.1: システムプロンプトを縮小（人格・原則を短縮、Tool固有の規則をTool説明へ、FrontのCapability一覧からworktree・Coding Job・Home書込を除外）。未編集のPETIT Home AGENTS.mdは新しい既定へ自動更新。DeepSeek評価は変更前60/60・変更後98/100（`reports/prompt-slimming-evaluation.json`）、Front経路は未評価。 |
 | 2026-11-09 | 08:38 | #414 | v0.51.0: 設定UI・AI/サービス接続・接続ステータスを再設計（Settings最上部の状態/直通ハブ、setup画面の常設概要バー・状態/キー保存済みバッジ・TimeTree/Googleのカード内同期元切替、接続ステータスの色分けピルと設定直通リンク）。Playwright 1440/390/320pxと関連単体テスト確認済み、実アカウント手動受入は未確認。 |
 | 2026-11-09 | 10:01 | #418 | v0.52.0: Chat提案・Develop直接送信をCoding Jobへ統合し、利用枠ルーティング、CLI認証、Git作業とPC操作承認を実装。Codex/Antigravityの合成Tool往復とEverything IPCを実機確認。 |
+| 2026-11-10 | 15:00 | - | v0.53.0: Nocord統合・Discord Knowledge Gateway（FTS5/trigram全文検索、添付テキスト抽出、Core API、全入口共通Tool search_discord_archive、Bot非同期ログ収集、/petit archive、Nocord移行スクリプト）。Guild/Personal分離と通常会話の遅延ゼロを保証。pytest 42件全件成功。 |

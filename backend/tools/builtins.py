@@ -19,6 +19,7 @@ _BUILTIN_MODULES = (
     "backend.tools.durable_reads",
     "backend.tools.conversation_search",
     "backend.tools.current_time",
+    "backend.tools.discord_search",
     "backend.tools.github",
     "backend.tools.home_files",
     "backend.tools.gmail",
