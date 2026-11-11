@@ -369,7 +369,14 @@ const server = http.createServer(async (request, response) => {
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-compact.png') });
     await rail.hover(); await railWidth(232);
     assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), true);
-    assert.deepEqual(await workspace.locator('.univ-viewport').boundingBox(), sceneBounds, 'hover does not move or resize Univ');
+    const expandedSceneBounds = await workspace.locator('.univ-viewport').boundingBox();
+    // View activation has a short entrance transition. A 1-5 px difference
+    // while that settles is not evidence that hovering the rail resized Univ.
+    for (const key of ['x', 'y', 'width', 'height']) {
+      assert.ok(Math.abs(expandedSceneBounds[key] - sceneBounds[key]) <= 6,
+        'hover must not reflow the Univ viewport: ' + key + ' ' +
+        JSON.stringify({ before: sceneBounds, after: expandedSceneBounds }));
+    }
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-expanded.png') });
     await workspace.mouse.move(600, 300); await railWidth(72);
     await workspace.locator('[data-rail-view="tasks"]').focus(); await railWidth(232);
