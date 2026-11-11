@@ -31,10 +31,19 @@
       }, 50);
     });
     input.addEventListener("input", resize);
+    const messages = document.getElementById("messages");
+    const scrollMessages = () => {
+      if (messages) messages.scrollTop = messages.scrollHeight;
+    };
     input.addEventListener("focus", () => {
-      setTimeout(() => {
-        form.scrollIntoView({ block: "nearest", inline: "nearest" });
-      }, 300);
+      document.body.classList.add("petit-chat-input-focused");
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      setTimeout(scrollMessages, 100);
+      setTimeout(scrollMessages, 300);
+    });
+    input.addEventListener("blur", () => {
+      document.body.classList.remove("petit-chat-input-focused");
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     });
     input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;

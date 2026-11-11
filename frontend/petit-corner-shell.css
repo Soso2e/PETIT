@@ -4,6 +4,7 @@
   --petit-corner-inline: max(12px, env(safe-area-inset-left));
   --petit-corner-right: max(12px, env(safe-area-inset-right));
   --petit-corner-control: 48px;
+  --petit-bottom-nav-height: calc(72px + env(safe-area-inset-bottom));
 }
 
 @media (min-width: 960px) {
@@ -559,6 +560,13 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
     gap: 4px;
     padding: 6px;
     border-radius: 20px;
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease;
+  }
+  body.petit-chat-input-focused .universe-topbar .view-tabs.petit-corner-nav,
+  body.petit-keyboard-open .universe-topbar .view-tabs.petit-corner-nav {
+    transform: translateY(calc(100% + 24px));
+    opacity: 0;
+    pointer-events: none;
   }
   .universe-topbar .view-tab.petit-corner-nav__item {
     width: 100%;
