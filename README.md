@@ -123,7 +123,7 @@ Calendarは読み取り専用で、選択した外部サービスからSQLiteへ
 3. サーバー起動:
 
    ```bash
-   uvicorn backend.main:app --reload
+   uvicorn backend.main:app --reload --reload-dir backend
    # または
    python -m backend.main
    ```
