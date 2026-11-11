@@ -25,6 +25,10 @@ def ensure_schema():
     coding_jobs.ensure_schema()
     with db.get_connection() as connection:
         connection.executescript(SCHEMA)
+    try:
+        sync_chat_threads()
+    except Exception:
+        pass
 
 
 def _repository(path):
@@ -97,7 +101,12 @@ def attach_repository(thread_id, repository):
 def register_conversation_thread(thread_id: str, repository: str = "", title: str = ""):
     """Surface a chat-originated coding job thread in the Develop tab hierarchy."""
     ensure_schema()
-    repository = _repository(repository) if repository else ""
+    safe_repo = ""
+    if repository:
+        try:
+            safe_repo = _repository(repository)
+        except Exception:
+            safe_repo = ""
     with db.write_transaction() as connection:
         if title:
             connection.execute(
@@ -106,9 +115,48 @@ def register_conversation_thread(thread_id: str, repository: str = "", title: st
             )
         connection.execute(
             "INSERT OR IGNORE INTO coding_develop_threads(thread_id,repository,created_at) VALUES(?,?,?)",
-            (thread_id, repository, db.now_iso())
+            (thread_id, safe_repo, db.now_iso())
         )
     return _row(thread_id)
+
+
+def sync_chat_threads():
+    """Backfill missing develop threads for chat-originated coding jobs."""
+    with db.get_connection() as connection:
+        has_routes = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coding_job_routes'"
+        ).fetchone()
+        if not has_routes:
+            return
+        rows = connection.execute(
+            "SELECT r.thread_id, j.repository, j.goal, j.created_at "
+            "FROM coding_job_routes r "
+            "JOIN coding_jobs j ON j.id=r.job_id "
+            "JOIN threads t ON t.id=r.thread_id "
+            "LEFT JOIN coding_develop_threads d ON d.thread_id=r.thread_id "
+            "WHERE d.thread_id IS NULL AND r.thread_id IS NOT NULL AND r.thread_id != ''"
+        ).fetchall()
+    if not rows:
+        return
+    with db.write_transaction() as connection:
+        for row in rows:
+            thread_id = row["thread_id"]
+            safe_repo = ""
+            if row["repository"]:
+                try:
+                    safe_repo = _repository(row["repository"])
+                except Exception:
+                    safe_repo = ""
+            title = (row["goal"] or "").strip()[:120]
+            if title:
+                connection.execute(
+                    "UPDATE threads SET title=? WHERE id=? AND (title IS NULL OR title='')",
+                    (title[:160], thread_id)
+                )
+            connection.execute(
+                "INSERT OR IGNORE INTO coding_develop_threads(thread_id,repository,created_at) VALUES(?,?,?)",
+                (thread_id, safe_repo, row["created_at"] or db.now_iso())
+            )
 
 
 def _latest(connection, thread_id):

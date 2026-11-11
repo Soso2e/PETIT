@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.56.1**
+**Current Version: v0.56.2**
 
 **Last Updated: 2026-11-11 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- 開発タブへのチャット起票ジョブ自動同期と耐障害性向上（v0.56.2）: チャットから起票された開発ジョブ（`propose_development_job` / `delegate_coding_task`）が開発タブのスレッド階層（`coding_develop_threads`）へ漏れなく反映されるよう、`sync_chat_threads` による未投影ジョブの自動バックフィル機構を新設。未登録リポジトリ指定時の安全なフォールバックと例外ログ出力を追加。単体テスト全件成功。稼働中サーバープロセスの再起動要件を整理。
 
 - 開発スレッド自動投影とNotion同期競合残骸解消・Uvicorn監視除外（v0.56.1）: チャットから起票された開発ジョブ（`propose_development_job`）を開発タブのスレッド階層（`coding_develop_threads`）へ自動投影し、リポジトリ名解決（`PersonalAssistant_PETIT`）に対応。Uvicornのファイル監視を `--reload-dir backend` に限定して作業領域clone時のホットリロード誤発動を防止。3ヶ月前の古いキュー残骸（`status='conflict'` 8件）を解決済みに落とし、Notion同期運用アラートの誤検知を解消。単体テスト追加・全件成功。実画面確認済み。
 
@@ -426,3 +428,4 @@
 | 2026-11-11 | 07:45 | - | fix(backend): uvicornの監視対象をbackend/に限定しstorageクローン時の誤リロードを防止（PETIT-StartDev.bat / scripts / README）。実Antigravity CLIでのCoding Job完走を確認。 |
 | 2026-11-11 | 08:29 | #440 | v0.56.0: プティちゃんマスコットを新デザインのWeb/Desktop共通SVGモジュールへ刷新（表情・動作レジストリ、会話/音声状態連動、ブラウザ内歩行、サイズ/色/動き設定、Desktop散歩・おやすみ）。 |
 | 2026-11-11 | 10:52 | - | v0.56.1: チャット起票の開発ジョブを開発タブのスレッド階層へ自動投影し、リポジトリ名解決とNotion同期の古いconflict残骸8件を解消。 |
+| 2026-11-11 | 13:50 | - | v0.56.2: 開発タブへの未投影チャット開発ジョブ自動同期（sync_chat_threads）と未登録リポジトリ安全フォールバック、delegate_coding_task連携を追加。 |
