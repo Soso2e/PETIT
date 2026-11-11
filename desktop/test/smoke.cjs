@@ -101,7 +101,8 @@ const server = http.createServer(async (request, response) => {
   if (url.pathname === '/api/conversations') payload = { conversations: [] };
   if (url.pathname === '/api/proactive') payload = { message: '何から始めよう？' };
   if (url.pathname === '/api/jobs') payload = { jobs: [] };
-  if (url.pathname === '/api/chat' && data.message === 'こんにちは') payload = { request_id: data.request_id, reply: 'こんにちは。' };
+  if (url.pathname === '/api/chat' && data.message === '失敗時に保持する文章') payload = { request_id: data.request_id, reply: '未確認の依頼を再取得しました。' };
+  else if (url.pathname === '/api/chat' && data.message === 'こんにちは') payload = { request_id: data.request_id, reply: 'こんにちは。' };
   else if (url.pathname === '/api/chat') payload = { request_id: data.request_id, reply: 'テスト予定を追加しますか？', pending_actions: [{ name: 'add_schedule', approval_id: 'fixture-approval', arguments: { title: 'テスト予定' } }] };
   if (url.pathname === '/api/actions/fixture-approval') payload = { reply: data.approved ? '予定を追加しました。' : 'キャンセルしました。' };
   response.end(JSON.stringify(payload));
@@ -241,6 +242,15 @@ const server = http.createServer(async (request, response) => {
     assert.equal(await page.locator('#input').inputValue(), '失敗時に保持する文章');
     assert.equal(calls.filter(call => call.path === '/api/chat').length, beforeFailure);
     await page.unroute('**/api/chat');
+    // The failed POST is intentionally left in the durable pending ledger.
+    // Resolve it through the actual user-facing recovery action before testing
+    // a new voice turn; skipping this step must block duplicate submissions.
+    assert.ok(await page.evaluate(() => window.PETIT_SESSION.pending()));
+    const reloaded = page.waitForEvent('load');
+    await page.getByRole('button', { name: '依頼の結果を再取得' }).first().click();
+    await reloaded;
+    assert.equal(await page.evaluate(() => window.PETIT_SESSION.pending()), null);
+    assert.equal(calls.filter(call => call.path === '/api/chat').length, beforeFailure + 1);
     await page.locator('#input').fill('設定変更をまたぐ下書き');
     const settingsOpened = instance.waitForEvent('window');
     await page.locator('#desktop-settings').click();
