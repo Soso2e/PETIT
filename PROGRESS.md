@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.56.2**
+**Current Version: v0.56.3**
 
 **Last Updated: 2026-11-11 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #443 CLI開発ジョブ作成時のタスク（tasks_cache）自動登録を廃止（v0.56.3）: チャットやDevelop画面からCLI開発ジョブ（`propose_development_job` / `create_development` / `create`）を実行した際に、`tasks_cache` へ「CLI開発タスク」が自動登録されてタスク一覧やUniverse画面にタスクが増えてしまう挙動を廃止。`coding_jobs.task_id` を nullable に移行し、既存テーブルの NOT NULL 制約を安全にマイグレーション。明示的な既存 `task_id` 連携時のみ完了更新を行うよう整理。単体テスト全件成功。
 
 - 開発タブへのチャット起票ジョブ自動同期と耐障害性向上（v0.56.2）: チャットから起票された開発ジョブ（`propose_development_job` / `delegate_coding_task`）が開発タブのスレッド階層（`coding_develop_threads`）へ漏れなく反映されるよう、`sync_chat_threads` による未投影ジョブの自動バックフィル機構を新設。未登録リポジトリ指定時の安全なフォールバックと例外ログ出力を追加。単体テスト全件成功。稼働中サーバープロセスの再起動要件を整理。
 
@@ -429,3 +431,4 @@
 | 2026-11-11 | 08:29 | #440 | v0.56.0: プティちゃんマスコットを新デザインのWeb/Desktop共通SVGモジュールへ刷新（表情・動作レジストリ、会話/音声状態連動、ブラウザ内歩行、サイズ/色/動き設定、Desktop散歩・おやすみ）。 |
 | 2026-11-11 | 10:52 | - | v0.56.1: チャット起票の開発ジョブを開発タブのスレッド階層へ自動投影し、リポジトリ名解決とNotion同期の古いconflict残骸8件を解消。 |
 | 2026-11-11 | 13:50 | - | v0.56.2: 開発タブへの未投影チャット開発ジョブ自動同期（sync_chat_threads）と未登録リポジトリ安全フォールバック、delegate_coding_task連携を追加。 |
+| 2026-11-11 | 14:00 | #443 | v0.56.3: CLI開発ジョブ起票時のtasks_cache自動タスク作成を廃止し、coding_jobs.task_idのnullableマイグレーションと単体テストを追加。 |

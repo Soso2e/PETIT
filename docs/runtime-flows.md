@@ -369,7 +369,7 @@ flowchart TD
     Agent --> Scoped[CoreのJob限定Tool / list・read・SHA照合write・静的check]
     Scoped -->|結果| Agent
     Agent --> Done[ready_for_review または checks_failed / 実テストnot_run]
-    Done -->|利用者のレビュー完了| Complete[completed / 所有するローカルTaskのみ完了]
+    Done -->|利用者のレビュー完了| Complete[completed / 連携タスクがある場合のみ完了]
     Queue --> Status[Job状態・イベント・差分・未確認をWeb poll / 会話で照会]
     Claim --> Status
     Done --> Status

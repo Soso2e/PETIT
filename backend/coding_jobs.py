@@ -27,7 +27,7 @@ TERMINAL = {"completed", "failed", "cancelled", "interrupted", "ready_for_review
 _is_reserved = getattr(os.path, "isreserved", lambda value: Path(value).is_reserved())
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS coding_jobs (
- id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, input_hash TEXT NOT NULL, task_id INTEGER NOT NULL,
+ id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, input_hash TEXT NOT NULL, task_id INTEGER,
  project_id TEXT, repository TEXT NOT NULL, base_commit TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL,
  goal TEXT NOT NULL, status TEXT NOT NULL, workspace TEXT, branch TEXT, summary TEXT NOT NULL DEFAULT '',
  checks_json TEXT NOT NULL DEFAULT '{}', error TEXT, cancel_requested INTEGER NOT NULL DEFAULT 0,
@@ -46,11 +46,38 @@ CREATE INDEX IF NOT EXISTS coding_job_routes_thread ON coding_job_routes(thread_
 """
 
 
+def _migrate_task_id_nullable(connection):
+    if not connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='coding_jobs'").fetchone():
+        return
+    info = connection.execute("PRAGMA table_info(coding_jobs)").fetchall()
+    task_id_info = [col for col in info if col[1] == "task_id"]
+    if task_id_info and task_id_info[0][3] == 1:
+        connection.execute("PRAGMA foreign_keys = OFF")
+        connection.execute("""
+        CREATE TABLE coding_jobs_temp (
+         id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, input_hash TEXT NOT NULL, task_id INTEGER,
+         project_id TEXT, repository TEXT NOT NULL, base_commit TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL,
+         goal TEXT NOT NULL, status TEXT NOT NULL, workspace TEXT, branch TEXT, summary TEXT NOT NULL DEFAULT '',
+         checks_json TEXT NOT NULL DEFAULT '{}', error TEXT, cancel_requested INTEGER NOT NULL DEFAULT 0,
+         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )
+        """)
+        connection.execute("""
+        INSERT INTO coding_jobs_temp SELECT id, request_id, input_hash, task_id, project_id, repository, base_commit, provider, model, goal, status, workspace, branch, summary, checks_json, error, cancel_requested, created_at, updated_at FROM coding_jobs
+        """)
+        connection.execute("DROP TABLE coding_jobs")
+        connection.execute("ALTER TABLE coding_jobs_temp RENAME TO coding_jobs")
+        connection.execute("PRAGMA foreign_keys = ON")
+
+
 def ensure_schema():
     with _lock, db.get_connection() as connection:
-        if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_pc_actions'").fetchone():return
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_pc_actions'").fetchone():
+            _migrate_task_id_nullable(connection)
+            return
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_jobs'").fetchone():
             connection.executescript(SCHEMA + development_pc.ACTION_SCHEMA)
+            _migrate_task_id_nullable(connection)
             return
         if db._transaction.get() is not None:
             raise ValueError("開発タスク画面を開いて初期化してください。")
@@ -60,6 +87,7 @@ def ensure_schema():
                 connection.backup(destination)
                 if destination.execute("PRAGMA quick_check").fetchone()[0] != "ok":raise ValueError("backup_check_failed")
         connection.executescript(SCHEMA + development_pc.ACTION_SCHEMA)
+        _migrate_task_id_nullable(connection)
 
 
 def git(root, *args):
@@ -191,9 +219,6 @@ def create(request_id, repository, goal, provider, *, approved=False, task_id=No
         job_id, now = uuid4().hex, db.now_iso()
         head = git(root, "rev-parse", "HEAD").strip()
         if base_commit is not None and base_commit != head:raise ValueError("開始コミットが変わりました。対象を更新してください。")
-        if task_id is None:
-            task_id = connection.execute("INSERT INTO tasks_cache(source,title,status,priority,category,reason,external_id,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                ("local", goal.strip()[:200], "todo", "High", "development", "CLI開発タスク / " + job_id, "petit-coding:" + job_id, now)).lastrowid
         connection.execute("INSERT INTO coding_jobs(id,request_id,input_hash,task_id,project_id,repository,base_commit,provider,model,goal,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (job_id, request_id, digest, task_id, project_id, str(root), head, provider,
              brain_priority.target(provider).get("model") or "", goal, "queued" if approved else "proposed", now, now))
@@ -243,14 +268,10 @@ def create_development(request_id, repository, goal, model_key="auto", effort="m
         existing = previous(connection)
         if existing:
             return get(existing)
-        task_id = connection.execute(
-            "INSERT INTO tasks_cache(source,title,status,priority,category,reason,external_id,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-            ("local", goal[:200], "todo", "High", "development", "CLI開発タスク / " + job_id, "petit-coding:" + job_id, now)
-        ).lastrowid
         connection.execute(
             "INSERT INTO coding_jobs(id,request_id,input_hash,task_id,repository,base_commit,provider,model,goal,status,created_at,updated_at)"
             " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-            (job_id, request_id, digest, task_id, str(root) if root else "", head, provider, model, goal, status, now, now))
+            (job_id, request_id, digest, None, str(root) if root else "", head, provider, model, goal, status, now, now))
         connection.execute("INSERT INTO coding_job_routes VALUES(?,?,?,?,?)",
                            (job_id, thread_id, turn_id, mode, json.dumps(selection, ensure_ascii=False)))
         event(job_id, status)
