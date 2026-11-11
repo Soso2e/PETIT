@@ -416,3 +416,4 @@
 | 2026-11-10 | 15:00 | - | v0.53.0: Nocord統合・Discord Knowledge Gateway（FTS5/trigram全文検索、添付テキスト抽出、Core API、全入口共通Tool search_discord_archive、Bot非同期ログ収集、/petit archive、Nocord移行スクリプト）。Guild/Personal分離と通常会話の遅延ゼロを保証。pytest 42件全件成功。 |
 | 2026-11-10 | 17:50 | #429 | v0.54.0: CLI自由度向上・リポジトリ登録Tool（add_coding_repository）と作業セッション削除Tool（delete_work_session）を追加、委譲先にAntigravity CLIを追加。関連テスト60件全件成功。 |
 | 2026-11-11 | 05:45 | - | v0.54.4: iPhone/モバイルWebAppでチャット入力欄と下部ナビが重なる不具合を修正（セーフエリア・実高さ考慮の安全マージン確保、チャット入力フォーカス・仮想キーボード時の下部タブ退避とキーボード直上追従）。 |
+| 2026-11-11 | 07:45 | - | fix(backend): uvicornの監視対象をbackend/に限定しstorageクローン時の誤リロードを防止（PETIT-StartDev.bat / scripts / README）。実Antigravity CLIでのCoding Job完走を確認。 |
