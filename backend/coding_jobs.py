@@ -5,6 +5,7 @@ import ast
 from contextlib import closing
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import sqlite3
@@ -16,6 +17,8 @@ from uuid import uuid4
 
 from . import (config, db, setup_store as settings, project_workspaces, brain_priority, coding_agents,
                development_models, development_pc, development_roots)
+
+log = logging.getLogger(__name__)
 
 _lock = threading.RLock()
 _stop = threading.Event()
@@ -165,12 +168,12 @@ def list_jobs(thread_id=None):
     return [get(x) for x in ids]
 
 
-def create(request_id, repository, goal, provider, *, approved=False, task_id=None, project_id=None, base_commit=None):
+def create(request_id, repository, goal, provider, *, approved=False, task_id=None, project_id=None, base_commit=None, thread_id=None, turn_id=None):
     ensure_schema()
     if provider not in {"codex", "antigravity_cli", "claude_code"}:raise ValueError("開発用CLIを選択してください。")
     if not goal.strip() or len(goal) > 8000:raise ValueError("開発目的を1〜8000文字で指定してください。")
     root = validate_repository(require_repository(repository))
-    payload = json.dumps([str(root), goal, provider, task_id, project_id, base_commit], ensure_ascii=False)
+    payload = json.dumps([str(root), goal, provider, task_id, project_id, base_commit, thread_id, turn_id], ensure_ascii=False)
     digest = hashlib.sha256(payload.encode()).hexdigest()
     with db.write_transaction() as connection:
         previous = connection.execute("SELECT id,input_hash FROM coding_jobs WHERE request_id=?", (request_id,)).fetchone()
@@ -194,7 +197,16 @@ def create(request_id, repository, goal, provider, *, approved=False, task_id=No
         connection.execute("INSERT INTO coding_jobs(id,request_id,input_hash,task_id,project_id,repository,base_commit,provider,model,goal,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (job_id, request_id, digest, task_id, project_id, str(root), head, provider,
              brain_priority.target(provider).get("model") or "", goal, "queued" if approved else "proposed", now, now))
+        if thread_id:
+            connection.execute("INSERT INTO coding_job_routes VALUES(?,?,?,?,?)",
+                               (job_id, thread_id, turn_id, "git", json.dumps({"provider": provider, "direct": approved}, ensure_ascii=False)))
     event(job_id, "queued" if approved else "proposed", "元checkoutの未コミット変更を含めず、HEADの専用コピーで作業します。")
+    if thread_id:
+        from . import development_threads
+        try:
+            development_threads.register_conversation_thread(thread_id, str(root), title=goal[:120])
+        except Exception as exc:
+            log.warning("Failed to register develop thread for thread_id=%s: %s", thread_id, exc)
     return {"job_id": job_id, "task_id": task_id, "created": True, "started": approved, "status": "queued" if approved else "proposed"}
 
 
@@ -245,9 +257,9 @@ def create_development(request_id, repository, goal, model_key="auto", effort="m
     if thread_id:
         from . import development_threads
         try:
-            development_threads.register_conversation_thread(thread_id, repository or "", title=goal[:120])
-        except Exception:
-            pass
+            development_threads.register_conversation_thread(thread_id, str(root) if root else (repository or ""), title=goal[:120])
+        except Exception as exc:
+            log.warning("Failed to register develop thread for thread_id=%s: %s", thread_id, exc)
     return get(job_id)
 
 

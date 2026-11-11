@@ -54,6 +54,7 @@ flowchart TD
     Select --> Quota[CLI認証と利用枠のキャッシュからモデルを確定]
     Quota --> Entry{入口}
     Entry -->|Chat| Proposed[proposed を保存し返信と Develop に開始カード]
+    Proposed --> AutoThread[coding_develop_threads に自動投影 / 未投影ジョブは一覧時に自動同期]
     Proposed -->|承認| Queued[queued]
     Proposed -->|取消| Cancelled[cancelled]
     Entry -->|Develop| Queued

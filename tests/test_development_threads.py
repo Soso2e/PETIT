@@ -147,3 +147,65 @@ def test_chat_originated_job_surfaces_in_develop_threads(repository, client, dev
     target = next(t for t in threads if t["thread_id"] == "chat-thread-1")
     assert target["title"] == "Notion競合調査ジョブ"
     assert target["latest_job"]["id"] == job["id"]
+
+
+def test_sync_chat_threads_backfills_unprojected_jobs(repository, client, development_quota):
+    admin(client)
+    from backend import conversation_store, development_threads
+    root = str(repository)
+
+    conversation_store.create_thread("legacy-chat-thread", source="web", title="")
+    job = coding_jobs.create_development(
+        "legacy-req-1", "", "PC全体のTurfLab調査ジョブ", "codex_sol",
+        thread_id="legacy-chat-thread", turn_id="legacy-turn-1"
+    )
+    assert job["id"]
+
+    # Deliberately remove develop projection to simulate pre-existing un-backfilled state
+    with db.write_transaction() as connection:
+        connection.execute("DELETE FROM coding_develop_threads WHERE thread_id='legacy-chat-thread'")
+
+    # list_threads should automatically backfill via sync_chat_threads
+    loose = development_threads.list_threads(repository="")
+    assert any(t["thread_id"] == "legacy-chat-thread" for t in loose)
+    target = next(t for t in loose if t["thread_id"] == "legacy-chat-thread")
+    assert "TurfLab" in target["title"]
+
+
+def test_register_conversation_thread_safe_with_unregistered_repo(client):
+    admin(client)
+    from backend import conversation_store, development_threads
+    conversation_store.create_thread("unregistered-repo-thread", source="web", title="")
+
+    # Passing invalid repository path should not raise, but fallback safely
+    row = development_threads.register_conversation_thread(
+        "unregistered-repo-thread",
+        "C:\\NonExistent\\Arbitrary\\Path",
+        title="安全な登録テスト"
+    )
+    assert row["thread_id"] == "unregistered-repo-thread"
+    assert row["repository"] == ""
+
+
+def test_jobs_create_with_thread_id_surfaces_in_develop(repository, client, monkeypatch):
+    admin(client)
+    from backend import conversation_store, development_threads, setup_store
+    root = str(repository)
+
+    # Allow codex
+    cfg = setup_store.load()
+    cfg.setdefault("brain", {})["permitted_models"] = ["codex"]
+    setup_store.save(cfg)
+    monkeypatch.setattr("backend.brain_priority.target", lambda p: {"configured": True, "model": "test-model"})
+
+    conversation_store.create_thread("delegate-thread-1", source="web", title="")
+    res = coding_jobs.create(
+        "delegate-req-1", root, "直接委譲された開発ジョブ", "codex",
+        approved=True, thread_id="delegate-thread-1", turn_id="turn-del-1"
+    )
+    assert res["job_id"]
+
+    threads = development_threads.list_threads(repository=root)
+    assert any(t["thread_id"] == "delegate-thread-1" for t in threads)
+    target = next(t for t in threads if t["thread_id"] == "delegate-thread-1")
+    assert target["title"] == "直接委譲された開発ジョブ"

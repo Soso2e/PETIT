@@ -67,9 +67,11 @@ def propose_development_job(repository: str, goal: str, model_key="auto", effort
 def delegate_coding_task(repository: str, goal: str, provider: str, base_commit: str, task_id: int | None = None, project_id: str | None = None):
     if request_context.local_only():
         raise ValueError("ローカル専用Threadから外部CLIへ開発依頼を送信しません。")
-    request_id, _ = request_context.current_ids()
+    request_id, thread_id = request_context.current_ids()
     if not request_id:raise ValueError("request_id_required")
-    return jobs.create("coding:" + request_id, repository, goal, provider, approved=True, task_id=task_id, project_id=project_id, base_commit=base_commit)
+    return jobs.create("coding:" + request_id, repository, goal, provider, approved=True,
+                       task_id=task_id, project_id=project_id, base_commit=base_commit,
+                       thread_id=thread_id, turn_id=request_id)
 
 
 @tool(name="get_coding_task_status", description="開発CLIのタスク状態・変更・静的チェックと、実テストや実機の未確認を取得する。",
