@@ -95,6 +95,11 @@ def is_git_root(root):
 
 
 def require_repository(path):
+    raw = str(path or "").strip()
+    for configured, _ in development_roots.configured():
+        if raw == Path(configured).name or os.path.normcase(raw) == os.path.normcase(configured):
+            path = configured
+            break
     root = project_workspaces._safe_root(Path(path))
     allowed = []
     for configured, _ in development_roots.configured():
@@ -237,6 +242,12 @@ def create_development(request_id, repository, goal, model_key="auto", effort="m
         connection.execute("INSERT INTO coding_job_routes VALUES(?,?,?,?,?)",
                            (job_id, thread_id, turn_id, mode, json.dumps(selection, ensure_ascii=False)))
         event(job_id, status)
+    if thread_id:
+        from . import development_threads
+        try:
+            development_threads.register_conversation_thread(thread_id, repository or "", title=goal[:120])
+        except Exception:
+            pass
     return get(job_id)
 
 
