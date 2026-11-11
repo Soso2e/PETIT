@@ -1242,7 +1242,13 @@
     const item = document.createElement("div");
     item.className = `message message--${role}`;
     const copy = document.createElement("div");
-    copy.textContent = message;
+    copy.className = "message-body";
+    if (role === "assistant" && window.PetitMarkdown && message) {
+      copy.classList.add("petit-markdown");
+      copy.innerHTML = window.PetitMarkdown.render(message);
+    } else {
+      copy.textContent = message;
+    }
     item.appendChild(copy);
 
     for (const action of actions) {
@@ -1337,7 +1343,15 @@
         request_id: requestId, conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }, requestJson,
         (progress) => {
           const copy = pending.firstElementChild;
-          if (copy) copy.textContent = progress.text || progress.label;
+          if (copy) {
+            if (progress.text && window.PetitMarkdown) {
+              copy.classList.add("petit-markdown");
+              copy.innerHTML = window.PetitMarkdown.render(progress.text);
+            } else {
+              copy.classList.remove("petit-markdown");
+              copy.textContent = progress.text || progress.label;
+            }
+          }
           pending.classList.toggle("is-loading", !progress.text);
           pending.classList.toggle("is-streaming", Boolean(progress.text));
           messagesEl.scrollTop = messagesEl.scrollHeight;
