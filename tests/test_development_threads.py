@@ -124,3 +124,26 @@ def test_cli_receives_only_same_thread_handoff_and_no_unmerged_checkout_claim(re
     assert "前回の続き" in handoff and "未統合変更" in handoff
     assert "OTHER_THREAD_SECRET_MARKER" not in handoff
     assert "UNRELATED_SUMMARY_SENTINEL" not in handoff
+
+
+def test_chat_originated_job_surfaces_in_develop_threads(repository, client, development_quota):
+    admin(client)
+    from backend import conversation_store, development_threads
+    root = str(repository)
+
+    # Simulate normal chat thread (source: "desktop")
+    conversation_store.create_thread("chat-thread-1", source="desktop", title="")
+
+    # Create development job originating from chat
+    job = coding_jobs.create_development(
+        "chat-req-1", root, "Notion競合調査ジョブ", "codex_sol",
+        thread_id="chat-thread-1", turn_id="turn-1"
+    )
+    assert job["id"]
+
+    # Thread should be projected into develop threads
+    threads = development_threads.list_threads(repository=root)
+    assert any(t["thread_id"] == "chat-thread-1" for t in threads)
+    target = next(t for t in threads if t["thread_id"] == "chat-thread-1")
+    assert target["title"] == "Notion競合調査ジョブ"
+    assert target["latest_job"]["id"] == job["id"]

@@ -94,6 +94,23 @@ def attach_repository(thread_id, repository):
     return _row(thread_id)
 
 
+def register_conversation_thread(thread_id: str, repository: str = "", title: str = ""):
+    """Surface a chat-originated coding job thread in the Develop tab hierarchy."""
+    ensure_schema()
+    repository = _repository(repository) if repository else ""
+    with db.write_transaction() as connection:
+        if title:
+            connection.execute(
+                "UPDATE threads SET title=? WHERE id=? AND (title IS NULL OR title='')",
+                (title[:160], thread_id)
+            )
+        connection.execute(
+            "INSERT OR IGNORE INTO coding_develop_threads(thread_id,repository,created_at) VALUES(?,?,?)",
+            (thread_id, repository, db.now_iso())
+        )
+    return _row(thread_id)
+
+
 def _latest(connection, thread_id):
     row = connection.execute(
         "SELECT j.id,j.goal,j.summary,j.error,j.provider,j.status,j.updated_at,j.created_at "
