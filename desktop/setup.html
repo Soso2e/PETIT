@@ -1,4 +1,4 @@
-<!doctype html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>PETIT 設定</title><link rel="stylesheet" href="setup.css"></head>
+<!doctype html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>PETIT 設定</title><link rel="stylesheet" href="mascot/petit-mascot.css"><link rel="stylesheet" href="setup.css"></head>
 <body><main><p class="eyebrow">PETIT DESKTOP <span id="version"></span></p><h1>いつものPETITを、すぐそばに。</h1><p>起動済みのPETITサーバーへ接続します。トレイ、または <kbd>Ctrl / ⌘ + Shift + Space</kbd> で呼び出せます。</p>
 <form id="settings">
 <label>PETITサーバーURL<input id="serverUrl" type="url" required placeholder="http://127.0.0.1:8000"></label>
@@ -16,9 +16,17 @@
 <label class="check"><input id="wakeEnabled" type="checkbox">小型画面を閉じたときに、マイクで呼びかけを待つ</label>
 <p class="help">待機音声は端末内で処理し、保存・サーバー送信しません。小型画面・設定の表示中、ロック中、スリープ中は停止します。アプリ終了中は呼び出せません。</p></section>
 <label class="check"><input id="login" type="checkbox">ログイン時にバックグラウンドで起動（インストール版のみ）</label>
-<section><h2>画面上のPETITマスコット</h2>
-<label class="check"><input id="petEnabled" type="checkbox">軽量SVGマスコットをデスクトップに表示する</label>
-<p class="help">小さなキャラクターが画面のすみに常駐します。上のつまみで移動、クリックで会話画面を開けます。表示はトレイからも切り替えられます。既定OFFで、AIの実行プロセスは増やしません。</p></section>
+<section><h2>画面上のプティちゃん</h2>
+<label class="check"><input id="petEnabled" type="checkbox">プティちゃん（軽量SVGマスコット）をデスクトップに表示する</label>
+<p class="help">小さなキャラクターが画面のすみに常駐します。上のつまみで移動、クリックで会話画面を開けます。表示はトレイからも切り替えられます。既定OFFで、AIの実行プロセスは増やしません。</p>
+<div class="pet-look"><div id="pet-preview" aria-hidden="true"></div><div class="pet-look-fields">
+<label>大きさ <output id="petSizeOut"></output><input id="petSize" type="range" min="56" max="200" step="4" value="96"></label>
+<label>カラー<select id="petPreset"></select></label>
+<div class="pet-colors"><label>本体<input id="petBodyPick" type="color"></label><label>輪<input id="petRingPick" type="color"></label><button id="petColorReset" type="button">カラーを戻す</button></div>
+<label>動き<select id="petMotion"><option value="auto">OSの「動きを減らす」に従う</option><option value="full">常に動かす</option><option value="reduced">止める</option></select></label>
+</div></div>
+<label class="check"><input id="petRoam" type="checkbox">ときどき画面の下を少しだけ散歩する（会話中・操作中は止まります）</label>
+<p class="help">5分ほど操作がないと眠ります。表情と動きは会話・音声の状態に合わせて変わります。</p></section>
 <section><h2>作業を邪魔しない声かけ</h2>
 <label class="check"><input id="notifications" type="checkbox">Desktopで通知を受け取る</label>
 <label>通知の出し方<select id="notificationMode"><option value="gentle">画面のすみに声かけ</option><option value="native">OSの通知</option></select></label>
@@ -29,4 +37,4 @@
 <label class="check"><input id="updates" type="checkbox">GitHub Releasesを起動時・24時間ごとに確認して更新を通知</label>
 <p class="help">Windows x64のインストール版は、更新ボタンからダウンロード・検証・installer起動まで進められます。最後はinstallerの画面で確認します。macOSはReleasesからDMGを取得してください。接続先サーバーの更新は別途必要です。</p>
 <div class="actions"><button id="updates-check" type="button">更新を確認</button><button type="submit" class="primary">保存してPETITを開く</button></div><p id="result" role="status"></p>
-</form></main><script src="setup.js"></script></body></html>
+</form></main><script src="mascot/petit-mascot.js"></script><script src="setup.js"></script></body></html>

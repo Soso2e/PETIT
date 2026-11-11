@@ -7,7 +7,8 @@ const { installerAsset, downloadVerified } = require('./update-download.cjs');
 const { pathToFileURL } = require('node:url');
 const { serviceUrl, isOverlay, isWorkspace, isCoreSetup, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
 const { windowState } = require('./window-state.cjs');
-const { visualState } = require('./pet-state.cjs');
+const { visualState, isPetActivity, isPetEvent } = require('./pet-state.cjs');
+const { PET_DEFAULTS, normalizePet, petAppearance, petWindowSize, nextRoamX, roamStep } = require('./pet-config.cjs');
 const { nativeNotifications, deliveryMessage } = require('./native-notifications.cjs');
 const nativeDelivery = nativeNotifications({ Notification, open: () => showWorkspace() });
 const { notificationFeed } = require('./notification-feed.cjs');
@@ -16,7 +17,7 @@ const { wakeError } = require('./wake-setup.cjs');
 const { prepareWakeEnvironment } = require('./wake-auto-setup.cjs');
 const SHORTCUT = 'CommandOrControl+Shift+Space';
 let overlay, settingsWindow, tray, wakeProcess, config, configFile, wakeSetupController;
-let petWindow, overlayActivity = 'active';
+let petWindow, overlayActivity = 'active', petSystemIdle = false, petIdleTimer, petRoamTimer, petRoamTick, petRoamX = null;
 ipcMain.handle('core-setup:open-web', (event) => {
   const owner = [overlay, workspace].find(win => win && !win.isDestroyed() && win.webContents === event.sender);
   if (!owner || event.senderFrame !== event.sender.mainFrame || !isCoreSetup(event.senderFrame.url, config.serverUrl)) throw new Error('Invalid setup sender');
@@ -36,7 +37,7 @@ const petUrl = pathToFileURL(path.join(__dirname, 'pet.html')).href;
 const defaults = { serverUrl: 'http://127.0.0.1:8000', sttUrl: '', sttModel: 'whisper-1',
   wakeEnabled: false, modelPath: '', backbonePath: '', wakePythonPath: '',
   wakeThreshold: 0.45, login: false, updates: true, notifications: false, notificationMode: 'gentle', notificationSound: false,
-  petEnabled: false };
+  petEnabled: false, ...PET_DEFAULTS };
 function persistConfig(next) {
   fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
   fs.renameSync(`${configFile}.tmp`, configFile);
@@ -64,6 +65,7 @@ function readConfig() {
       notificationMode: raw.notificationMode === 'native' ? 'native' : 'gentle',
       notificationSound: raw.notificationSound === true,
       petEnabled: raw.petEnabled === true,
+      ...normalizePet(raw),
     };
     const hadLegacyWakeConfig = ['encryptedKey', 'keywordPath', 'wakeAuto', 'wakeRuntimePath'].some((key) => Object.hasOwn(raw, key));
     if (hadLegacyWakeConfig) persistConfig(value);
@@ -110,33 +112,111 @@ async function startWake() {
   child.on('spawn', () => child.postMessage({ type: 'start', modelPath: config.modelPath, backbonePath: config.backbonePath,
     pythonPath: config.wakePythonPath || undefined, threshold: config.wakeThreshold }));
 }
-function publishPetState() {
-  if (!petWindow || petWindow.isDestroyed() || petWindow.webContents.isDestroyed()) return;
-  petWindow.webContents.send('pet:mode', visualState({
+const petAlive = () => Boolean(petWindow && !petWindow.isDestroyed() && !petWindow.webContents.isDestroyed());
+function currentPetMode() {
+  return visualState({
     overlayVisible: Boolean(overlay && !overlay.isDestroyed() && overlay.isVisible()),
-    activity: overlayActivity, wakeReady, wakeFailed,
-  }));
+    activity: overlayActivity, wakeReady, wakeFailed, systemIdle: petSystemIdle,
+  });
+}
+function publishPetState() {
+  if (!petAlive()) return;
+  const mode = currentPetMode();
+  if (mode !== 'idle' && mode !== 'wake' && petRoamTick) stopPetRoam();
+  petWindow.webContents.send('pet:mode', mode);
+}
+function publishPetAppearance() {
+  if (petAlive()) petWindow.webContents.send('pet:appearance', petAppearance(config));
+}
+// 見た目のサイズが変わったら、足元（下辺中央）を保ったまま窓を合わせる。
+function fitPetWindow() {
+  if (!petAlive()) return;
+  const b = petWindow.getBounds(), size = petWindowSize(config.petSize);
+  if (b.width === size.width && b.height === size.height) return;
+  const area = screen.getDisplayMatching(b).workArea;
+  const x = Math.round(Math.min(Math.max(area.x, b.x + (b.width - size.width) / 2), area.x + area.width - size.width));
+  const y = Math.round(Math.min(Math.max(area.y, b.y + b.height - size.height), area.y + area.height - size.height));
+  petWindow.setBounds({ x, y, ...size });
+}
+// OSの無操作時間が長いと寝る。表示中だけ30秒ごとに確認する（常駐負荷を増やさない）。
+function syncPetIdleWatch() {
+  const want = petAlive() && !suspended;
+  if (want && !petIdleTimer) {
+    petIdleTimer = setInterval(() => {
+      const idle = powerMonitor.getSystemIdleTime() >= 300;
+      if (idle !== petSystemIdle) { petSystemIdle = idle; publishPetState(); }
+    }, 30000);
+    petIdleTimer.unref?.();
+  } else if (!want && petIdleTimer) { clearInterval(petIdleTimer); petIdleTimer = null; petSystemIdle = false; }
+}
+// 任意（既定OFF）の小さな散歩。会話中・スリープ中・ユーザーが動かしたときは止める。
+function canPetRoam() {
+  return Boolean(config?.petRoam && petAlive() && petWindow.isVisible() && !suspended &&
+    ['idle', 'wake'].includes(currentPetMode()));
+}
+function schedulePetRoam() {
+  clearTimeout(petRoamTimer);
+  if (!config?.petRoam || !petAlive()) return;
+  petRoamTimer = setTimeout(startPetRoam, 20000 + Math.random() * 40000);
+}
+function startPetRoam() {
+  if (!canPetRoam() || petRoamTick) { schedulePetRoam(); return; }
+  const bounds = petWindow.getBounds();
+  const target = nextRoamX(bounds, screen.getDisplayMatching(bounds).workArea);
+  if (target === bounds.x) { schedulePetRoam(); return; }
+  const speed = Math.max(2, Math.round(config.petSize / 32));
+  petRoamX = bounds.x;
+  petWindow.webContents.send('pet:walk', { walking: true, dir: Math.sign(target - bounds.x) });
+  petRoamTick = setInterval(() => {
+    if (!canPetRoam()) { stopPetRoam(); return; }
+    const now = petWindow.getBounds();
+    if (Math.abs(now.x - petRoamX) > 3) { stopPetRoam(); return; } // ユーザーがつまんで動かした
+    petRoamX = roamStep(now.x, target, speed);
+    petWindow.setPosition(petRoamX, now.y);
+    if (petRoamX === target) stopPetRoam();
+  }, 33);
+}
+function stopPetRoam() {
+  if (petRoamTick) {
+    clearInterval(petRoamTick); petRoamTick = null; petRoamX = null;
+    if (petAlive()) petWindow.webContents.send('pet:walk', { walking: false });
+  }
+  schedulePetRoam();
+}
+function clearPetRoam() {
+  clearTimeout(petRoamTimer);
+  if (petRoamTick) { clearInterval(petRoamTick); petRoamTick = null; petRoamX = null; }
 }
 function syncPetWindow() {
   if (!config?.petEnabled || quitting) {
+    clearPetRoam();
     if (petWindow && !petWindow.isDestroyed()) {
       geometry.remember('pet', petWindow.getBounds());
       petWindow.destroy(); // OFF frees the renderer instead of leaving a hidden process.
     }
+    syncPetIdleWatch();
     return;
   }
   if (suspended) {
+    clearPetRoam();
     if (petWindow && !petWindow.isDestroyed()) petWindow.hide();
+    syncPetIdleWatch();
     return;
   }
-  if (petWindow && !petWindow.isDestroyed()) { petWindow.showInactive(); publishPetState(); return; }
+  if (petWindow && !petWindow.isDestroyed()) {
+    fitPetWindow(); petWindow.showInactive(); publishPetAppearance(); publishPetState();
+    syncPetIdleWatch(); schedulePetRoam(); return;
+  }
   const active = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const areas = [active, ...screen.getAllDisplays().filter(display => display.id !== active.id)]
     .map(display => display.workArea);
   const area = active.workArea;
-  const fallback = { x: area.x + area.width - 148, y: area.y + area.height - 164, width: 132, height: 152 };
+  const size = petWindowSize(config.petSize);
+  const fallback = { x: area.x + area.width - size.width - 16, y: area.y + area.height - size.height - 12, ...size };
+  const saved = geometry.get('pet', fallback, areas, { minWidth: 100, minHeight: 80 });
+  // 以前の大きさで保存された位置でも、足元（下辺中央）を基準に新しい大きさへ合わせる。
   const win = petWindow = new BrowserWindow({
-    ...geometry.get('pet', fallback, areas, { minWidth: 110, minHeight: 120 }),
+    ...size, x: Math.round(saved.x + (saved.width - size.width) / 2), y: Math.round(saved.y + saved.height - size.height),
     frame: false, transparent: true, resizable: false, alwaysOnTop: true,
     skipTaskbar: true, show: false, title: 'PETIT マスコット',
     webPreferences: { preload: path.join(__dirname, 'pet-preload.cjs'),
@@ -144,10 +224,15 @@ function syncPetWindow() {
   });
   lockNavigation(win, (url) => url === petUrl);
   rememberWindow(win, 'pet');
-  win.on('closed', () => { if (petWindow === win) petWindow = null; });
-  win.webContents.on('did-finish-load', publishPetState);
+  win.on('closed', () => {
+    if (petWindow !== win) return;
+    petWindow = null;
+    clearPetRoam(); syncPetIdleWatch();
+  });
+  win.webContents.on('did-finish-load', () => { publishPetAppearance(); publishPetState(); });
   void win.loadURL(petUrl).catch(() => { if (!win.isDestroyed()) win.destroy(); });
   win.showInactive();
+  syncPetIdleWatch(); schedulePetRoam();
 }
 function setPetEnabled(enabled) {
   if (typeof enabled !== 'boolean') throw new Error('マスコット設定が不正です。');
@@ -420,7 +505,8 @@ function installIpc() {
   on('pet:open', 'pet', () => showOverlay(false));
   on('pet:hide', 'pet', () => setPetEnabled(false));
   on('desktop:pet-activity', 'overlay', (activity) => {
-    if (!['active', 'listening', 'thinking'].includes(activity)) throw new Error('マスコット状態が不正です。');
+    if (isPetEvent(activity)) { if (petAlive()) petWindow.webContents.send('pet:event', activity); return; }
+    if (!isPetActivity(activity)) throw new Error('マスコット状態が不正です。');
     overlayActivity = activity; publishPetState();
   });
   on('desktop:hide', 'overlay', () => hideOverlay());
@@ -495,6 +581,7 @@ function installIpc() {
       notifications: values.notifications === true, notificationMode: values.notificationMode === 'native' ? 'native' : 'gentle',
       notificationSound: values.notificationSound === true,
       petEnabled: values.petEnabled === true,
+      ...normalizePet(values),
       wakeThreshold: threshold };
     if (next.modelPath && (!path.isAbsolute(next.modelPath) || path.extname(next.modelPath).toLowerCase() !== '.onnx' || !fs.statSync(next.modelPath).isFile())) throw new Error('ONNXモデルを選択してください。');
     if (next.backbonePath && (!path.isAbsolute(next.backbonePath) || !fs.statSync(next.backbonePath).isDirectory())) throw new Error('特徴抽出モデルのフォルダを選択してください。');
