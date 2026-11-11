@@ -379,8 +379,8 @@ const server = http.createServer(async (request, response) => {
     }
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-expanded.png') });
     await workspace.mouse.move(600, 300); await railWidth(72);
-    await workspace.locator('[data-rail-view="tasks"]').focus(); await railWidth(232);
-    await workspace.locator('[data-rail-view="tasks"]').evaluate(el => el.blur()); await railWidth(72);
+    await workspace.locator('[data-shell-target="tasks"]').focus(); await railWidth(232);
+    await workspace.locator('[data-shell-target="tasks"]').evaluate(el => el.blur()); await railWidth(72);
     await workspace.locator('.petit-area-rail__pin').click();
     await workspace.waitForFunction(() => document.body.dataset.petitRailMode === 'pinned');
     await workspace.reload();
