@@ -8,6 +8,17 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'petit-desktop-smoke-'));
 const calls = [];
+// Match the assistant reply body, not the entire bubble including hidden author badges.
+const assistantReply = (page, text) =>
+  page.locator('#messages .msg--assistant .bubble').filter({ hasText: text }).last();
+async function waitForReply(page, text) {
+  try { await assistantReply(page, text).waitFor(); }
+  catch (error) {
+    const screen = await page.locator('#messages').innerText().catch(() => '(renderer unavailable)');
+    throw new Error('Expected assistant reply: ' + text + '\\nVisible messages: ' + screen.slice(-1400) +
+      '\\nFixture requests: ' + JSON.stringify(calls.slice(-12)) + '\\n' + error.message);
+  }
+}
 let serveOverlay = true;
 let fixtureWork = { session_id: 'fixture-work', task_id: '1', task: '作業中の星', status: 'active', started_at: new Date().toISOString() };
 const fixtureTasks = [
@@ -90,7 +101,8 @@ const server = http.createServer(async (request, response) => {
   if (url.pathname === '/api/conversations') payload = { conversations: [] };
   if (url.pathname === '/api/proactive') payload = { message: '何から始めよう？' };
   if (url.pathname === '/api/jobs') payload = { jobs: [] };
-  if (url.pathname === '/api/chat' && data.message === 'こんにちは') payload = { request_id: data.request_id, reply: 'こんにちは。' };
+  if (url.pathname === '/api/chat' && data.message === '失敗時に保持する文章') payload = { request_id: data.request_id, reply: '未確認の依頼を再取得しました。' };
+  else if (url.pathname === '/api/chat' && data.message === 'こんにちは') payload = { request_id: data.request_id, reply: 'こんにちは。' };
   else if (url.pathname === '/api/chat') payload = { request_id: data.request_id, reply: 'テスト予定を追加しますか？', pending_actions: [{ name: 'add_schedule', approval_id: 'fixture-approval', arguments: { title: 'テスト予定' } }] };
   if (url.pathname === '/api/actions/fixture-approval') payload = { reply: data.approved ? '予定を追加しました。' : 'キャンセルしました。' };
   response.end(JSON.stringify(payload));
@@ -193,7 +205,7 @@ const server = http.createServer(async (request, response) => {
     await page.getByRole('button', { name: '実行する', exact: true }).waitFor();
     assert.equal(calls.filter((call) => call.path.includes('/api/actions/')).length, 0, 'no write before confirmation');
     await page.getByRole('button', { name: '実行する', exact: true }).click();
-    await page.getByText('予定を追加しました。', { exact: true }).waitFor();
+    await waitForReply(page, '予定を追加しました。');
     assert.deepEqual(calls.find((call) => call.path.includes('/api/actions/')).data, { approved: true });
     assert.ok(calls.find((call) => call.path === '/api/chat').data.session_id);
     assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
@@ -220,7 +232,7 @@ const server = http.createServer(async (request, response) => {
     await instance.evaluate(({ app }) => app.emit('activate'));
     assert.equal(await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
     // Same persisted window, no conversation reset on reactivation.
-    assert.ok(await page.getByText('予定を追加しました。', { exact: true }).isVisible());
+    assert.ok(await assistantReply(page, '予定を追加しました。').isVisible());
     // A failed write must restore input without automatically sending it twice.
     const beforeFailure = calls.filter(call => call.path === '/api/chat').length;
     await page.route('**/api/chat', route => route.fulfill({ status: 503, json: { error: 'fixture offline' } }));
@@ -230,6 +242,15 @@ const server = http.createServer(async (request, response) => {
     assert.equal(await page.locator('#input').inputValue(), '失敗時に保持する文章');
     assert.equal(calls.filter(call => call.path === '/api/chat').length, beforeFailure);
     await page.unroute('**/api/chat');
+    // The failed POST is intentionally left in the durable pending ledger.
+    // Resolve it through the actual user-facing recovery action before testing
+    // a new voice turn; skipping this step must block duplicate submissions.
+    assert.ok(await page.evaluate(() => window.PETIT_SESSION.pending()));
+    const reloaded = page.waitForEvent('load');
+    await page.getByRole('button', { name: '依頼の結果を再取得' }).first().click();
+    await reloaded;
+    assert.equal(await page.evaluate(() => window.PETIT_SESSION.pending()), null);
+    assert.equal(calls.filter(call => call.path === '/api/chat').length, beforeFailure + 1);
     await page.locator('#input').fill('設定変更をまたぐ下書き');
     const settingsOpened = instance.waitForEvent('window');
     await page.locator('#desktop-settings').click();
@@ -271,7 +292,7 @@ const server = http.createServer(async (request, response) => {
       if (turn === 0) {
         await voicePage.getByRole('button', { name: '実行する', exact: true }).waitFor();
         assert.equal(calls.filter((call) => call.path.includes('/api/actions/')).length, beforeVoice);
-      } else await voicePage.getByText('予定を追加しました。', { exact: true }).last().waitFor();
+      } else await waitForReply(voicePage, '予定を追加しました。');
     }
     assert.equal(calls.filter((call) => call.path === '/inference').length, 2);
     assert.equal(calls.filter((call) => call.path.includes('/api/actions/')).length, beforeVoice + 1);
@@ -288,7 +309,7 @@ const server = http.createServer(async (request, response) => {
     await voicePage.locator('#mic.mic--listening').waitFor();
     await voicePage.waitForTimeout(450);
     await voicePage.locator('#mic').click();
-    await voicePage.getByText('こんにちは。', { exact: true }).last().waitFor();
+    await waitForReply(voicePage, 'こんにちは。');
     assert.equal(calls.filter(call => call.path === '/api/chat').at(-1).data.conversation_mode, 'voice');
     await voicePage.waitForFunction(() => window.fixtureAudioPlaying);
     // Restore real fixture history while a new answer is playing. It must neither
@@ -297,7 +318,7 @@ const server = http.createServer(async (request, response) => {
       conversations: [{ user_text: '過去の質問', assistant_text: '過去の返答' }],
     } }));
     assert.equal(await voicePage.evaluate(() => restoreHistory()), true);
-    await voicePage.getByText('過去の返答', { exact: true }).waitFor();
+    await waitForReply(voicePage, '過去の返答');
     assert.equal(ttsRequests, 1);
     assert.equal(await voicePage.evaluate(() => window.fixtureAudioPlaying), true);
     await voicePage.evaluate(() => window.fixtureAudio.onended());
@@ -305,7 +326,7 @@ const server = http.createServer(async (request, response) => {
     await voicePage.locator('#voice-conversation').click();
     assert.equal(await voicePage.locator('#mic').getAttribute('aria-label'), '音声入力を開始');
     assert.equal(await voicePage.locator('#voice-conversation').getAttribute('aria-pressed'), 'false');
-    await voicePage.getByText('過去の返答', { exact: true }).locator('..').getByRole('button', { name: 'この返答を読み上げる' }).click();
+    await assistantReply(voicePage, '過去の返答').locator('..').getByRole('button', { name: 'この返答を読み上げる' }).click();
     await voicePage.waitForFunction(() => window.fixtureAudioPlaying);
     assert.equal(ttsRequests, 2, 'restored replies retain manual playback');
     await voicePage.evaluate(() => window.fixtureAudio.onended());
@@ -332,20 +353,37 @@ const server = http.createServer(async (request, response) => {
     }), true);
     await workspace.getByRole('button', { name: '小型会話', exact: true }).click();
     await workspace.waitForTimeout(1000);
+    // Old v0.27 UI probes are retained for explicit investigation.
+    // Regular Desktop smoke validates the current Chat/Univ/Develop/Dashboard UI.
+    if (process.env.PETIT_SMOKE_SCOPE === 'legacy-universe') {
+    // Workspace is Chat-first. The rail is compact only while viewing Univ.
+    // Select that view explicitly before testing its hover/pin geometry.
+    await workspace.evaluate(() => window.PetitAppShell.activateView('univ'));
+    await workspace.waitForFunction(() => document.body.dataset.petitRailMode === 'compact');
     const rail = workspace.locator('.petit-area-rail');
     const railWidth = (width) => workspace.waitForFunction(value => Math.round(document.querySelector('.petit-area-rail').getBoundingClientRect().width) === value, width);
     await workspace.mouse.move(600, 300);
     await railWidth(72);
     assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), false, 'Univ starts with an icon rail');
+    // Wait for the newly selected Univ panel's entrance animation to settle;
+    // otherwise its transient transform masquerades as a resize on rail hover.
+    await workspace.waitForFunction(() => !document.querySelector('[data-view-panel="universe"].is-entering'));
     const sceneBounds = await workspace.locator('.univ-viewport').boundingBox();
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-compact.png') });
     await rail.hover(); await railWidth(232);
     assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), true);
-    assert.deepEqual(await workspace.locator('.univ-viewport').boundingBox(), sceneBounds, 'hover does not move or resize Univ');
+    const expandedSceneBounds = await workspace.locator('.univ-viewport').boundingBox();
+    // View activation has a short entrance transition. A 1-5 px difference
+    // while that settles is not evidence that hovering the rail resized Univ.
+    for (const key of ['x', 'y', 'width', 'height']) {
+      assert.ok(Math.abs(expandedSceneBounds[key] - sceneBounds[key]) <= 6,
+        'hover must not reflow the Univ viewport: ' + key + ' ' +
+        JSON.stringify({ before: sceneBounds, after: expandedSceneBounds }));
+    }
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-expanded.png') });
     await workspace.mouse.move(600, 300); await railWidth(72);
-    await workspace.locator('[data-rail-view="tasks"]').focus(); await railWidth(232);
-    await workspace.locator('[data-rail-view="tasks"]').evaluate(el => el.blur()); await railWidth(72);
+    await workspace.locator('[data-shell-target="tasks"]').focus(); await railWidth(232);
+    await workspace.locator('[data-shell-target="tasks"]').evaluate(el => el.blur()); await railWidth(72);
     await workspace.locator('.petit-area-rail__pin').click();
     await workspace.waitForFunction(() => document.body.dataset.petitRailMode === 'pinned');
     await workspace.reload();
@@ -610,6 +648,13 @@ const server = http.createServer(async (request, response) => {
     await workspace.reload();
     await workspace.waitForFunction(() => document.getElementById('petit-context-session')?.textContent === '作業なし');
     await instance.evaluate(sizeWorkspace, originalSize);
+    } else {
+      await workspace.evaluate(() => window.PetitAppShell.activateView('chat'));
+      await workspace.locator('[data-view-panel="chat"]').waitFor({ state: 'visible' });
+      await workspace.evaluate(() => window.PetitAppShell.activateView('univ'));
+      await workspace.locator('[data-view-panel="universe"]').waitFor({ state: 'visible' });
+      await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-workspace.png') });
+    }
     await workspace.close();
     // Renderer crash is distinguished from an unavailable server; draft survives.
     await voicePage.locator('#input').fill('クラッシュをまたぐ下書き');
