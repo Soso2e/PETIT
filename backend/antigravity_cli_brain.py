@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 import signal
@@ -11,6 +12,8 @@ import time
 from uuid import uuid4
 
 from . import antigravity_cli as cli, lmstudio_client, conversation_store as store, db
+
+log = logging.getLogger(__name__)
 
 AGENT = "petit-core-brain"
 AGENT_SOURCE = '''---
@@ -162,7 +165,8 @@ def completion(target: dict, messages: list, catalog: list, check):
             command += ["--model", target["model"]]
         try:
             code, output, error = invoke(command, root, prompt, check, timeout=target.get("timeout_seconds", 90))
-        except OSError:
+        except OSError as exc:
+            log.warning("Antigravity CLI invoke failed: %s (%s)", type(exc).__name__, exc)
             raise CLIError("cli_start_failed", "Antigravity CLIを起動できません。実行ユーザーと配置を確認してください。") from None
     if code:
         reason = cli.error_category(error)

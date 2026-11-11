@@ -76,8 +76,8 @@ $uvicornArgs = @(
     "--host", "127.0.0.1", "--port", $Port
 )
 if ($mode -eq "1") {
-    $uvicornArgs += "--reload"
-    Write-Host "Mode: DEVELOPMENT / reload ON"
+    $uvicornArgs += @("--reload", "--reload-dir", "backend")
+    Write-Host "Mode: DEVELOPMENT / reload ON (watch backend/ only)"
 }
 else {
     Write-Host "Mode: NORMAL / reload OFF"
