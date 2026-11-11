@@ -10,6 +10,22 @@
 
   if (!messagesEl || !formEl || !inputEl || !sendEl || !micEl || !voiceStateEl) return;
 
+  // Display-only hints for the mascot. No text or audio leaves this file.
+  let mascotSpeaking = false;
+  let mascotListening = false;
+  let mascotIdleTimer = 0;
+  const mascotSignal = (state) => { try { document.dispatchEvent(new CustomEvent("petit:mascot", { detail: { state } })); } catch { /* display only */ } };
+  const mascotSpeak = (on) => {
+    window.clearTimeout(mascotIdleTimer);
+    if (on) {
+      if (!mascotSpeaking) { mascotSpeaking = true; mascotSignal("speaking"); }
+      return;
+    }
+    if (!mascotSpeaking) return;
+    // TTS is chunked; wait briefly so the mascot does not flicker between chunks.
+    mascotIdleTimer = window.setTimeout(() => { mascotSpeaking = false; mascotSignal("idle"); }, 450);
+  };
+
   let SpeechRecognitionApi = window.PetitDesktopSpeechRecognition || window.SpeechRecognition || window.webkitSpeechRecognition;
   let speechRecognitionSupported = Boolean(SpeechRecognitionApi);
   const browserSpeechSupported = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
@@ -333,6 +349,7 @@
     releaseAudio();
     if (browserSpeechSupported) window.speechSynthesis.cancel();
     setVoiceState("");
+    mascotSpeak(false);
   }
 
   function speakWithBrowser(text, { reason = "端末の音声で再生しています…" } = {}) {
@@ -343,7 +360,7 @@
     utterance.pitch = 1.0;
     const voice = findJapaneseVoice();
     if (voice) utterance.voice = voice;
-    utterance.onstart = () => setVoiceState(reason);
+    utterance.onstart = () => { setVoiceState(reason); mascotSpeak(true); };
     const token = conversation?.generation;
     const playbackGeneration = browserPlaybackGeneration;
     const finish = success => {
@@ -351,6 +368,7 @@
       browserPlaybackGeneration++;
       window.clearTimeout(browserPlaybackTimer); browserPlaybackTimer = null;
       if (!success) window.speechSynthesis.cancel();
+      mascotSpeak(false);
       setVoiceState(success ? "" : "音声を再生できませんでした。", { error: !success });
       conversation?.finishAudio(token, success);
     };
@@ -425,6 +443,7 @@
         settled = true;
         window.clearTimeout(playbackTimer);
         controller.signal.removeEventListener("abort", handleAbort);
+        mascotSpeak(false);
         if (currentAudio === audio) releaseAudio();
         if (error) reject(error);
         else resolve();
@@ -434,6 +453,7 @@
       controller.signal.addEventListener("abort", handleAbort, { once: true });
       audio.onplay = () => {
         if (currentTtsRequest === controller) setVoiceState("PETITが話しています…");
+        mascotSpeak(true);
       };
       audio.onended = () => finish();
       audio.onerror = () => finish(new Error("AivisSpeech音声の再生に失敗しました。"));
@@ -544,6 +564,7 @@
   function setListeningState(on) {
     listening = on;
     micEl.classList.toggle("mic--listening", on);
+    if (on !== mascotListening) { mascotListening = on; mascotSignal(on ? "listening" : "idle"); }
     micEl.setAttribute("aria-label", on ? "音声入力を停止" : "音声入力を開始");
     micEl.textContent = on ? "■" : "🎤";
     if (on) setVoiceState("聞き取り中… もう一度押すと停止します");

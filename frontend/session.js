@@ -58,6 +58,9 @@
     source.onerror = () => { if (source.readyState === window.EventSource.CLOSED) stop(); };
     return stop;
   }
+  // Display-only hint for the mascot; never carries message text.
+  const mascot = (state) => { try { document.dispatchEvent(new CustomEvent('petit:mascot', { detail: { state } })); } catch { /* display only */ } };
+  const mascotResult = (data) => mascot(data?.error ? 'error' : data?.pending_actions?.length ? 'approval' : 'success');
   async function send(payload, transport = json, onProgress = null) {
     stopped = false;
     // The legacy adapter also uses the same durable ledger, including images.
@@ -68,12 +71,19 @@
     localStorage.setItem(pendingKey() + ':last', request.request_id);
     remember(request);
     const stopWatching = watch(request.request_id, onProgress);
+    mascot('thinking');
     try {
       const data = await transport('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(request) });
-      if (['queued', 'running'].includes(data.status)) return await waitFor(request.request_id, transport);
+      if (['queued', 'running'].includes(data.status)) {
+        const final = await waitFor(request.request_id, transport);
+        mascotResult(final);
+        return final;
+      }
       remember(null);
+      mascotResult(data);
       return data;
     } catch (error) {
+      mascot('error');
       document.dispatchEvent(new Event("petit:turn-pending"));
       // An HTTP response may be lost after commit. Keep the same request ID.
       throw error;

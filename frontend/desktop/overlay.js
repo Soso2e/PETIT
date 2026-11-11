@@ -29,12 +29,20 @@
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !event.isComposing) void bridge.hide(); });
   const send = document.getElementById('send');
   let reportedActivity = '';
+  let speaking = false;
   const syncPetActivity = () => {
     const listening = mic.classList.contains('mic--listening');
     document.body.dataset.listening = String(listening);
-    const activity = listening ? 'listening' : send.disabled ? 'thinking' : 'active';
+    const activity = listening ? 'listening' : send.disabled ? 'thinking' : speaking ? 'speaking' : 'active';
     if (activity !== reportedActivity) { reportedActivity = activity; void bridge.petActivity?.(activity); }
   };
+  // session.js / voice.js からの表示用ヒント。発話中は状態として、成功・失敗・確認待ちは一回きりの反応として渡す。
+  const PET_EVENTS = { success: 'success', error: 'failed', approval: 'approval' };
+  document.addEventListener('petit:mascot', (event) => {
+    const state = event.detail?.state;
+    if (state === 'speaking' || state === 'idle') { speaking = state === 'speaking'; syncPetActivity(); }
+    else if (Object.hasOwn(PET_EVENTS, state)) void bridge.petActivity?.(PET_EVENTS[state]);
+  });
   const activityObserver = new MutationObserver(syncPetActivity);
   activityObserver.observe(mic, { attributes: true, attributeFilter: ['class'] });
   activityObserver.observe(send, { attributes: true, attributeFilter: ['disabled'] });
