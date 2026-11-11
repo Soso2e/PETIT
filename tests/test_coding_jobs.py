@@ -1,7 +1,9 @@
 """Local fixture repositories/DB only; mock agents are not live CLI acceptance."""
 import hashlib
 import json
+from contextlib import closing
 from pathlib import Path
+import sqlite3
 from unittest.mock import Mock
 
 from fastapi import FastAPI
@@ -65,8 +67,9 @@ def test_approval_once_isolated_copy_and_source_dirty_preserved(repository, monk
     assert (Path(result["workspace"]) / "main.py").read_text() == "VALUE = 2\n"
     assert not jobs.git(result["workspace"], "remote").strip()
     assert jobs.create("request", str(repository), "変更してください", provider, base_commit=head)["job_id"] == job_id
+    assert result["task_id"] is None
     with db.get_connection() as connection:
-        assert connection.execute("SELECT status FROM tasks_cache WHERE id=?", (result["task_id"],)).fetchone()[0] != "done"
+        assert connection.execute("SELECT count(*) FROM tasks_cache").fetchone()[0] == 0
 
 
 def test_input_hash_conflict_and_allowlist_revalidation(repository, monkeypatch):
@@ -140,8 +143,9 @@ def test_api_auth_proposal_diff_and_manual_completion(repository, client, monkey
     assert diff["files"] == ["main.py"] and "+VALUE = 2" in diff["diff"]
     completed=client.post(f"/api/coding/jobs/{job_id}/complete").json()
     assert completed["status"] == "completed" and completed["tests"] == "not_run"
+    assert completed["task_id"] is None
     with db.get_connection() as connection:
-        assert connection.execute("SELECT status FROM tasks_cache WHERE id=?",(completed["task_id"],)).fetchone()[0] == "done"
+        assert connection.execute("SELECT count(*) FROM tasks_cache").fetchone()[0] == 0
 
 
 @pytest.fixture
@@ -248,3 +252,91 @@ def test_local_only_thread_cannot_delegate_private_context(repository):
         with pytest.raises(ValueError,match="ローカル専用"):
             delegate_coding_task(str(repository),"private-goal","codex",jobs.git(repository,"rev-parse","HEAD").strip())
     assert not jobs.list_jobs()
+
+
+def test_job_creation_does_not_add_to_tasks_cache(repository, development_quota):
+    # jobs.create should not insert into tasks_cache
+    created = jobs.create("req-no-task", str(repository), "タスクを作らない開発依頼", "codex")
+    assert created["task_id"] is None
+    job = jobs.get(created["job_id"])
+    assert job["task_id"] is None
+
+    # jobs.create_development should not insert into tasks_cache
+    dev_job = jobs.create_development("dev-req-no-task", str(repository), "開発ジョブでもタスクは作らない", "codex_sol")
+    assert dev_job["task_id"] is None
+
+    with db.get_connection() as connection:
+        assert connection.execute("SELECT count(*) FROM tasks_cache").fetchone()[0] == 0
+
+
+def test_job_explicit_task_id_links_and_completes(repository, client, monkeypatch):
+    monkeypatch.setattr(coding_agents, "run", synthetic_agent)
+    admin(client)
+
+    # Insert an existing user task
+    with db.get_connection() as connection:
+        tid = connection.execute(
+            "INSERT INTO tasks_cache(source,title,status,priority,category,reason,external_id,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+            ("local", "既存タスク", "todo", "High", "life", "手動登録", "ext-1", db.now_iso())
+        ).lastrowid
+
+    # Create job with explicit task_id
+    payload = {"request_id": "web-explicit-task", "repository": str(repository), "provider": "codex", "goal": "既存タスク連携", "task_id": tid}
+    job_id = client.post("/api/coding/jobs", json=payload).json()["job_id"]
+    job = jobs.get(job_id)
+    assert job["task_id"] == tid
+
+    # Set external_id to petit-coding:job_id to test completion link
+    with db.get_connection() as connection:
+        connection.execute("UPDATE tasks_cache SET external_id=? WHERE id=?", ("petit-coding:" + job_id, tid))
+
+    assert client.post(f"/api/coding/jobs/{job_id}/approve").status_code == 200
+    jobs.pump()
+    completed = client.post(f"/api/coding/jobs/{job_id}/complete").json()
+    assert completed["status"] == "completed"
+    assert completed["task_id"] == tid
+
+    with db.get_connection() as connection:
+        assert connection.execute("SELECT status FROM tasks_cache WHERE id=?", (tid,)).fetchone()[0] == "done"
+
+
+def test_schema_migration_task_id_nullable(tmp_path, monkeypatch):
+    test_db = tmp_path / "test_migration.db"
+    monkeypatch.setattr(config, "DB_PATH", test_db)
+
+    # Initialize a database with the old NOT NULL constraint
+    with closing(sqlite3.connect(test_db)) as conn:
+        conn.execute("""
+        CREATE TABLE coding_jobs (
+         id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, input_hash TEXT NOT NULL, task_id INTEGER NOT NULL,
+         project_id TEXT, repository TEXT NOT NULL, base_commit TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL,
+         goal TEXT NOT NULL, status TEXT NOT NULL, workspace TEXT, branch TEXT, summary TEXT NOT NULL DEFAULT '',
+         checks_json TEXT NOT NULL DEFAULT '{}', error TEXT, cancel_requested INTEGER NOT NULL DEFAULT 0,
+         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )
+        """)
+        conn.execute("INSERT INTO coding_jobs VALUES ('job-old', 'req-old', 'hash', 123, NULL, 'repo', 'commit', 'codex', 'model', 'goal', 'queued', NULL, NULL, '', '{}', NULL, 0, '2026-01-01', '2026-01-01')")
+        conn.commit()
+
+        info_before = conn.execute("PRAGMA table_info(coding_jobs)").fetchall()
+        task_id_before = [col for col in info_before if col[1] == "task_id"][0]
+        assert task_id_before[3] == 1  # notnull is True
+
+    # Call ensure_schema which runs _migrate_task_id_nullable
+    jobs.ensure_schema()
+
+    with closing(sqlite3.connect(test_db)) as conn:
+        info_after = conn.execute("PRAGMA table_info(coding_jobs)").fetchall()
+        task_id_after = [col for col in info_after if col[1] == "task_id"][0]
+        assert task_id_after[3] == 0  # notnull is now False
+
+        # Verify old row is intact
+        old_row = conn.execute("SELECT id, task_id FROM coding_jobs WHERE id='job-old'").fetchone()
+        assert old_row == ("job-old", 123)
+
+        # Verify new insert with NULL task_id succeeds
+        conn.execute("INSERT INTO coding_jobs (id, request_id, input_hash, task_id, repository, base_commit, provider, model, goal, status, created_at, updated_at) VALUES ('job-new', 'req-new', 'hash2', NULL, 'repo', 'commit', 'codex', 'model', 'goal', 'queued', '2026-01-02', '2026-01-02')")
+        new_row = conn.execute("SELECT id, task_id FROM coding_jobs WHERE id='job-new'").fetchone()
+        assert new_row == ("job-new", None)
+
+

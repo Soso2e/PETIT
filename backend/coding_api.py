@@ -217,7 +217,8 @@ def complete(job_id: str):
                       "tests": job["tests"]}
     if not validation["ok"]:raise HTTPException(409, "現在の差分に静的チェックの失敗があります。")
     jobs.finish(job_id, "completed", summary=job["summary"], checks=validation)
-    with db.get_connection() as connection:
-        connection.execute("UPDATE tasks_cache SET status='done',done_date=?,updated_at=? WHERE id=? AND source='local' AND external_id=?",
-            (db.now_iso(), db.now_iso(), job["task_id"], "petit-coding:" + job_id))
+    if job.get("task_id"):
+        with db.get_connection() as connection:
+            connection.execute("UPDATE tasks_cache SET status='done',done_date=?,updated_at=? WHERE id=? AND source='local' AND external_id=?",
+                (db.now_iso(), db.now_iso(), job["task_id"], "petit-coding:" + job_id))
     return jobs.get(job_id)
