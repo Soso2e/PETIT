@@ -1,11 +1,37 @@
 (async () => {
   const api = window.petitSettings;
   const byId = (id) => document.getElementById(id);
-  const fields = ['serverUrl', 'sttUrl', 'sttModel', 'modelPath', 'backbonePath', 'wakeThreshold', 'notificationMode'];
-  const flags = ['wakeEnabled', 'login', 'updates', 'notifications', 'notificationSound', 'petEnabled'];
+  // プティちゃんの見た目設定と、その場で確認できる小さなプレビュー。
+  function installPetPreview(state) {
+    const M = window.PetitMascot;
+    const preset = byId('petPreset');
+    let body = state.petBody || '', ring = state.petRing || '';
+    if (M) for (const [key, value] of Object.entries(M.PRESETS)) preset.append(new Option(value.label, key));
+    preset.value = state.petPreset || 'pear';
+    const preview = M ? M.create(byId('pet-preview'), { size: 84 }) : null;
+    if (preview && M.startIdleLife) M.startIdleLife(preview, { minMs: 2500, maxMs: 6000 });
+    const sync = () => {
+      byId('petSizeOut').textContent = `${byId('petSize').value}px`;
+      const colors = M ? M.resolveColors({ preset: preset.value, body: body || undefined, ring: ring || undefined }) : null;
+      if (colors) { byId('petBodyPick').value = colors.body; byId('petRingPick').value = colors.ring; }
+      preview?.setColors({ preset: preset.value, body: body || undefined, ring: ring || undefined });
+      preview?.setMotion(byId('petMotion').value);
+    };
+    byId('petSize').oninput = sync;
+    byId('petMotion').onchange = sync;
+    preset.onchange = () => { body = ''; ring = ''; sync(); };
+    byId('petBodyPick').oninput = (event) => { body = event.target.value; sync(); };
+    byId('petRingPick').oninput = (event) => { ring = event.target.value; sync(); };
+    byId('petColorReset').onclick = () => { body = ''; ring = ''; sync(); };
+    sync();
+    return { colors: () => ({ petBody: body, petRing: ring }) };
+  }
+  const fields = ['serverUrl', 'sttUrl', 'sttModel', 'modelPath', 'backbonePath', 'wakeThreshold', 'notificationMode', 'petSize', 'petPreset', 'petMotion'];
+  const flags = ['wakeEnabled', 'login', 'updates', 'notifications', 'notificationSound', 'petEnabled', 'petRoam'];
   const state = await api.read();
   for (const name of fields) if (state[name] !== undefined && state[name] !== '') byId(name).value = state[name];
   for (const name of flags) byId(name).checked = Boolean(state[name]);
+  const pet = installPetPreview(state);
   byId('version').textContent = `v${state.version}`;
   byId('wake-platform').textContent = `${state.platform} / ${state.arch}`;
   byId('wake-result').textContent = state.lastWakeError || '自動設定、または手動でONNXモデルとbackboneを選択してください。';
@@ -52,6 +78,7 @@
     try {
       const values = Object.fromEntries(fields.map((name) => [name, byId(name).value.trim()]));
       for (const name of flags) values[name] = byId(name).checked;
+      Object.assign(values, pet.colors());
       await api.save(values);
     } catch (error) { byId('result').textContent = error.message; }
   };

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>プティちゃん ギャラリー</title>
+  <link rel="stylesheet" href="petit-mascot.css">
+  <style>
+    :root { color-scheme: light dark; --bg: #f6f3ee; --fg: #2a2f3d; --card: #fff; --line: #0001; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #11131a; --fg: #e9ebf2; --card: #1a1d27; --line: #fff1; } }
+    body { margin: 0; padding: 20px 16px 60px; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+    h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 28px 0 10px; }
+    .bar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; position: sticky; top: 0; padding: 10px 0; background: var(--bg); z-index: 2; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+    .cell { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 6px 6px; display: grid; justify-items: center; gap: 4px; cursor: pointer; }
+    .cell code { font-size: 11px; opacity: .75; }
+    button { font: inherit; }
+    .hero { display: grid; place-items: center; height: 220px; }
+  </style>
+</head>
+<body>
+  <h1>プティちゃん ギャラリー</h1>
+  <p>表情（EMOTIONS）・動作（ACTIONS）・PETIT状態（STATES）の確認用。セルをクリックすると上の大きいプティちゃんに反映します。</p>
+  <div class="bar">
+    <label>サイズ <input id="size" type="range" min="48" max="200" value="88"></label>
+    <label>プリセット <select id="preset"></select></label>
+    <label>本体 <input id="body" type="color"></label>
+    <label>輪 <input id="ring" type="color"></label>
+    <label>動き <select id="motion"><option value="full">常に動かす</option><option value="auto">OSの設定に従う</option><option value="reduced">止める</option></select></label>
+    <button id="static" type="button">静的SVGを書き出し</button>
+  </div>
+  <div class="hero" id="hero"></div>
+  <h2>表情 EMOTIONS</h2><div class="grid" id="emotions"></div>
+  <h2>動作 ACTIONS</h2><div class="grid" id="actions"></div>
+  <h2>PETIT状態 STATES</h2><div class="grid" id="states"></div>
+  <script src="petit-mascot.js"></script>
+  <script>
+    (() => {
+      const M = window.PetitMascot;
+      const all = [];
+      const hero = M.create(document.getElementById('hero'), { size: 180 });
+      all.push(hero);
+      const colors = { preset: 'pear' };
+      const cell = (parent, label, setup, onClick) => {
+        const div = document.createElement('div'); div.className = 'cell';
+        const m = M.create(div, { size: Number(document.getElementById('size').value), colors });
+        setup(m); all.push(m);
+        const code = document.createElement('code'); code.textContent = label; div.append(code);
+        div.onclick = onClick; parent.append(div);
+      };
+      for (const name of Object.keys(M.EMOTIONS))
+        cell(document.getElementById('emotions'), name, (m) => m.setEmotion(name), () => hero.setEmotion(name));
+      for (const name of Object.keys(M.ACTIONS))
+        cell(document.getElementById('actions'), name, (m) => m.setAction(name), () => hero.react(hero.emotion(), name, M.ACTIONS[name].ms || 2400));
+      for (const name of Object.keys(M.STATES))
+        cell(document.getElementById('states'), name, (m) => { m.setState(name); if (M.STATES[name].transient) { m.setEmotion(M.STATES[name].emotion); m.setAction(M.STATES[name].action); } }, () => hero.setState(name));
+      const preset = document.getElementById('preset');
+      for (const [key, p] of Object.entries(M.PRESETS)) preset.append(new Option(p.label, key));
+      const apply = () => all.forEach((m) => m.setColors(colors));
+      preset.onchange = () => { colors.preset = preset.value; delete colors.body; delete colors.ring;
+        document.getElementById('body').value = M.PRESETS[preset.value].body; document.getElementById('ring').value = M.PRESETS[preset.value].ring; apply(); };
+      document.getElementById('body').value = M.PRESETS.pear.body; document.getElementById('ring').value = M.PRESETS.pear.ring;
+      document.getElementById('body').oninput = (e) => { colors.body = e.target.value; apply(); };
+      document.getElementById('ring').oninput = (e) => { colors.ring = e.target.value; apply(); };
+      const motion = document.getElementById('motion');
+      motion.onchange = () => all.forEach((m) => m.setMotion(motion.value));
+      motion.onchange();
+      document.getElementById('size').oninput =(e) => all.slice(1).forEach((m) => m.setSize(e.target.value));
+      document.getElementById('static').onclick = () => {
+        const blob = new Blob([M.toStaticSVG({ emotion: hero.emotion(), colors })], { type: 'image/svg+xml' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `petit-${hero.emotion()}.svg`; a.click();
+      };
+    })();
+  </script>
+</body>
+</html>

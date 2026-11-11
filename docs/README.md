@@ -112,6 +112,7 @@ Electron版、配布、PC観測
 画面構成、Universe、モーション
 
 - [agent_first_ui.md](ui/agent_first_ui.md) — Agent-first会話とWeb UI操作面
+- [mascot.md](ui/mascot.md) — プティちゃん（Web/Desktop共通マスコット）
 - [galactic-spatial-design.md](ui/galactic-spatial-design.md) — PETIT Galactic Spatial Design v0.9.0
 - [motion-continuity.md](ui/motion-continuity.md) — PETIT Motion Continuity v0.8.0
 - [ui-chat-first-dashboard.md](ui/ui-chat-first-dashboard.md) — PETIT v0.41.0 — Chat-first UI / Dashboard
