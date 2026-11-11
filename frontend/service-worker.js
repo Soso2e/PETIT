@@ -19,6 +19,8 @@ const SHELL = [
   "/static/setup.js",
   "/static/setup.css",
   "/static/setup-gate.js",
+  "/static/markdown.js",
+  "/static/markdown.css",
   "/static/chat_attachments.js",
   "/static/chat_attachments.css",
   "/static/delegations.js",

@@ -285,9 +285,13 @@ body.petit-chat-screen .chat-voice-options > select {
   body:has(#petit-desktop-toolbar) { --petit-work-top: calc(120px + env(safe-area-inset-top)); }
   body.petit-chat-screen [data-view-panel="chat"] {
     position: fixed;
-    inset: calc(var(--petit-work-top) + 54px) 12px calc(var(--petit-bottom-nav-height, 70px) + 10px) 12px;
+    inset: calc(var(--petit-work-top) + 54px) 12px calc(var(--petit-bottom-nav-height, calc(72px + env(safe-area-inset-bottom))) + 12px) 12px;
     width: auto;
     max-width: none;
+    transition: bottom 0.2s ease;
+  }
+  body.petit-chat-screen:is(.petit-chat-input-focused, .petit-keyboard-open) [data-view-panel="chat"] {
+    bottom: calc(var(--petit-keyboard-inset, 0px) + max(10px, env(safe-area-inset-bottom)));
   }
   body.petit-chat-screen .petit-utility-dock {
     top: calc(var(--petit-work-top) + 52px); bottom: auto; left: 16px;
@@ -297,7 +301,10 @@ body.petit-chat-screen .chat-voice-options > select {
 
 @media (max-width: 640px) {
   body.petit-chat-screen [data-view-panel="chat"] {
-    inset: calc(var(--petit-work-top) + 50px) 8px calc(var(--petit-bottom-nav-height, 70px) + 8px) 8px;
+    inset: calc(var(--petit-work-top) + 50px) 8px calc(var(--petit-bottom-nav-height, calc(72px + env(safe-area-inset-bottom))) + 10px) 8px;
+  }
+  body.petit-chat-screen:is(.petit-chat-input-focused, .petit-keyboard-open) [data-view-panel="chat"] {
+    bottom: calc(var(--petit-keyboard-inset, 0px) + max(8px, env(safe-area-inset-bottom)));
   }
   body.petit-chat-screen .chat-composer {
     margin: 4px 0 0;

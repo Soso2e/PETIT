@@ -58,7 +58,12 @@ function addMessage(role, text, { tools, error, actions, modelRoute, development
 
   const bubble = document.createElement("div");
   bubble.className = "bubble" + (error ? " bubble--error" : "");
-  bubble.textContent = text;
+  if (role === "assistant" && !error && window.PetitMarkdown && text) {
+    bubble.classList.add("petit-markdown");
+    bubble.innerHTML = window.PetitMarkdown.render(text);
+  } else {
+    bubble.textContent = text;
+  }
   wrap.appendChild(bubble);
   if (developmentJobId) window.PetitDevelopment?.attachProposal(bubble, developmentJobId);
 
@@ -236,7 +241,15 @@ function setTyping(on, text = "考え中…") {
       messagesEl.appendChild(el);
     }
     const bubble = el.querySelector(".bubble");
-    if (bubble) bubble.textContent = text || "考え中…";
+    if (bubble) {
+      if (window.PetitMarkdown && text && text !== "考え中…") {
+        bubble.classList.add("petit-markdown");
+        bubble.innerHTML = window.PetitMarkdown.render(text);
+      } else {
+        bubble.classList.remove("petit-markdown");
+        bubble.textContent = text || "考え中…";
+      }
+    }
     messagesEl.scrollTop = messagesEl.scrollHeight;
   } else if (el) {
     el.remove();
