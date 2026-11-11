@@ -353,6 +353,10 @@ const server = http.createServer(async (request, response) => {
     }), true);
     await workspace.getByRole('button', { name: '小型会話', exact: true }).click();
     await workspace.waitForTimeout(1000);
+    // Workspace is Chat-first. The rail is compact only while viewing Univ.
+    // Select that view explicitly before testing its hover/pin geometry.
+    await workspace.evaluate(() => window.PetitAppShell.activateView('univ'));
+    await workspace.waitForFunction(() => document.body.dataset.petitRailMode === 'compact');
     const rail = workspace.locator('.petit-area-rail');
     const railWidth = (width) => workspace.waitForFunction(value => Math.round(document.querySelector('.petit-area-rail').getBoundingClientRect().width) === value, width);
     await workspace.mouse.move(600, 300);
