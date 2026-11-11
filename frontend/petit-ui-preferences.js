@@ -179,6 +179,7 @@
     const keyboardInset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
     root.style.setProperty("--petit-keyboard-inset", `${Math.round(keyboardInset)}px`);
     root.style.setProperty("--petit-visual-viewport-height", `${Math.round(viewport.height)}px`);
+    document.body.classList.toggle("petit-keyboard-open", keyboardInset > 80);
   };
 
   const installViewportTracking = () => {
