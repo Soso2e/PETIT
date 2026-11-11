@@ -362,6 +362,9 @@ const server = http.createServer(async (request, response) => {
     await workspace.mouse.move(600, 300);
     await railWidth(72);
     assert.equal(await workspace.locator('.petit-area-rail__nav button > span:last-child').first().isVisible(), false, 'Univ starts with an icon rail');
+    // Wait for the newly selected Univ panel's entrance animation to settle;
+    // otherwise its transient transform masquerades as a resize on rail hover.
+    await workspace.waitForFunction(() => !document.querySelector('[data-view-panel="universe"].is-entering'));
     const sceneBounds = await workspace.locator('.univ-viewport').boundingBox();
     await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-rail-compact.png') });
     await rail.hover(); await railWidth(232);
