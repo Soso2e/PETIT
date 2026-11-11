@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PETIT マスコット</title>
+  <link rel="stylesheet" href="pet.css">
+</head>
+<body data-mode="idle">
+  <div id="pet-drag" title="ここをドラッグして移動" aria-hidden="true"></div>
+  <button id="pet-hide" type="button" aria-label="マスコットを隠す" title="マスコットを隠す">×</button>
+  <button id="pet-open" type="button" aria-label="PETITを開く" title="PETITを開く">
+    <svg id="pet-art" viewBox="0 0 132 116" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="pet-fill" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0" stop-color="#f2fff8"/>
+          <stop offset=".56" stop-color="#c6f7e7"/>
+          <stop offset="1" stop-color="#abcfe9"/>
+        </linearGradient>
+        <radialGradient id="pet-shine">
+          <stop offset="0" stop-color="#dbfff4" stop-opacity=".68"/>
+          <stop offset="1" stop-color="#b4f8df" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <ellipse class="pet-aura" cx="66" cy="67" rx="61" ry="44" fill="url(#pet-shine)"/>
+      <ellipse class="pet-shadow" cx="66" cy="107" rx="38" ry="5" fill="#0f2635" opacity=".2"/>
+      <g class="pet-character">
+        <path class="pet-antenna" d="M65 31 Q63 18 73 13" stroke="#c4f5e8" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <path class="pet-spark" d="M73 4 L76 10 L82 13 L76 16 L73 22 L70 16 L64 13 L70 10 Z" fill="#d9fbe9"/>
+        <path class="pet-body" d="M66 26 C36 24 21 45 22 72 C22 93 38 103 52 98 C61 96 67 96 77 99 C94 105 111 92 111 72 C111 44 94 26 66 26 Z"
+          fill="url(#pet-fill)" stroke="#9bc7d0" stroke-width="2"/>
+        <path d="M38 47 Q55 29 77 36" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linecap="round"/>
+        <g class="pet-face">
+          <ellipse class="pet-eye pet-eye-left" cx="51" cy="66" rx="5" ry="7" fill="#263e4a"/>
+          <ellipse class="pet-eye pet-eye-right" cx="81" cy="66" rx="5" ry="7" fill="#263e4a"/>
+          <circle cx="39" cy="79" r="5" fill="#ffadbd" opacity=".48"/>
+          <circle cx="93" cy="79" r="5" fill="#ffadbd" opacity=".48"/>
+          <path class="pet-mouth" d="M61 79 Q66 84 71 79" fill="none" stroke="#41565b" stroke-width="2.5" stroke-linecap="round"/>
+        </g>
+      </g>
+    </svg>
+    <span class="pet-caption" id="pet-status">そばにいるよ</span>
+  </button>
+  <script src="pet.js"></script>
+</body>
+</html>

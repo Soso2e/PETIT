@@ -27,8 +27,18 @@
   document.getElementById('open-workspace').onclick = () => bridge.workspace();
   document.getElementById('desktop-settings').onclick = () => bridge.settings();
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !event.isComposing) void bridge.hide(); });
-  new MutationObserver(() => { document.body.dataset.listening = String(mic.classList.contains('mic--listening')); })
-    .observe(mic, { attributes: true, attributeFilter: ['class'] });
+  const send = document.getElementById('send');
+  let reportedActivity = '';
+  const syncPetActivity = () => {
+    const listening = mic.classList.contains('mic--listening');
+    document.body.dataset.listening = String(listening);
+    const activity = listening ? 'listening' : send.disabled ? 'thinking' : 'active';
+    if (activity !== reportedActivity) { reportedActivity = activity; void bridge.petActivity?.(activity); }
+  };
+  const activityObserver = new MutationObserver(syncPetActivity);
+  activityObserver.observe(mic, { attributes: true, attributeFilter: ['class'] });
+  activityObserver.observe(send, { attributes: true, attributeFilter: ['disabled'] });
+  syncPetActivity();
   bridge.ready().then((state) => {
     document.getElementById('desktop-version').textContent = `v${state.version}`;
     if (!state.sttConfigured) {

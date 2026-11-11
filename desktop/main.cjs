@@ -7,6 +7,7 @@ const { installerAsset, downloadVerified } = require('./update-download.cjs');
 const { pathToFileURL } = require('node:url');
 const { serviceUrl, isOverlay, isWorkspace, isCoreSetup, desktopRelease, RELEASES_URL, RELEASES_API } = require('./policy.cjs');
 const { windowState } = require('./window-state.cjs');
+const { visualState } = require('./pet-state.cjs');
 const { nativeNotifications, deliveryMessage } = require('./native-notifications.cjs');
 const nativeDelivery = nativeNotifications({ Notification, open: () => showWorkspace() });
 const { notificationFeed } = require('./notification-feed.cjs');
@@ -15,6 +16,7 @@ const { wakeError } = require('./wake-setup.cjs');
 const { prepareWakeEnvironment } = require('./wake-auto-setup.cjs');
 const SHORTCUT = 'CommandOrControl+Shift+Space';
 let overlay, settingsWindow, tray, wakeProcess, config, configFile, wakeSetupController;
+let petWindow, overlayActivity = 'active';
 ipcMain.handle('core-setup:open-web', (event) => {
   const owner = [overlay, workspace].find(win => win && !win.isDestroyed() && win.webContents === event.sender);
   if (!owner || event.senderFrame !== event.sender.mainFrame || !isCoreSetup(event.senderFrame.url, config.serverUrl)) throw new Error('Invalid setup sender');
@@ -30,9 +32,11 @@ let nudgeWindow, nudgeEvent, nudgeTimer, feed, cursorFile, cursors = {}, notific
 const nudgeUrl = pathToFileURL(path.join(__dirname, 'nudge.html')).href;
 const settingsUrl = pathToFileURL(path.join(__dirname, 'setup.html')).href;
 const recoveryUrl = pathToFileURL(path.join(__dirname, 'recovery.html')).href;
+const petUrl = pathToFileURL(path.join(__dirname, 'pet.html')).href;
 const defaults = { serverUrl: 'http://127.0.0.1:8000', sttUrl: '', sttModel: 'whisper-1',
   wakeEnabled: false, modelPath: '', backbonePath: '', wakePythonPath: '',
-  wakeThreshold: 0.45, login: false, updates: true, notifications: false, notificationMode: 'gentle', notificationSound: false };
+  wakeThreshold: 0.45, login: false, updates: true, notifications: false, notificationMode: 'gentle', notificationSound: false,
+  petEnabled: false };
 function persistConfig(next) {
   fs.writeFileSync(`${configFile}.tmp`, JSON.stringify(next, null, 2), { mode: 0o600 });
   fs.renameSync(`${configFile}.tmp`, configFile);
@@ -59,6 +63,7 @@ function readConfig() {
       notifications: raw.notifications === true,
       notificationMode: raw.notificationMode === 'native' ? 'native' : 'gentle',
       notificationSound: raw.notificationSound === true,
+      petEnabled: raw.petEnabled === true,
     };
     const hadLegacyWakeConfig = ['encryptedKey', 'keywordPath', 'wakeAuto', 'wakeRuntimePath'].some((key) => Object.hasOwn(raw, key));
     if (hadLegacyWakeConfig) persistConfig(value);
@@ -105,6 +110,51 @@ async function startWake() {
   child.on('spawn', () => child.postMessage({ type: 'start', modelPath: config.modelPath, backbonePath: config.backbonePath,
     pythonPath: config.wakePythonPath || undefined, threshold: config.wakeThreshold }));
 }
+function publishPetState() {
+  if (!petWindow || petWindow.isDestroyed() || petWindow.webContents.isDestroyed()) return;
+  petWindow.webContents.send('pet:mode', visualState({
+    overlayVisible: Boolean(overlay && !overlay.isDestroyed() && overlay.isVisible()),
+    activity: overlayActivity, wakeReady, wakeFailed,
+  }));
+}
+function syncPetWindow() {
+  if (!config?.petEnabled || quitting) {
+    if (petWindow && !petWindow.isDestroyed()) {
+      geometry.remember('pet', petWindow.getBounds());
+      petWindow.destroy(); // OFF frees the renderer instead of leaving a hidden process.
+    }
+    return;
+  }
+  if (suspended) {
+    if (petWindow && !petWindow.isDestroyed()) petWindow.hide();
+    return;
+  }
+  if (petWindow && !petWindow.isDestroyed()) { petWindow.showInactive(); publishPetState(); return; }
+  const active = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const areas = [active, ...screen.getAllDisplays().filter(display => display.id !== active.id)]
+    .map(display => display.workArea);
+  const area = active.workArea;
+  const fallback = { x: area.x + area.width - 148, y: area.y + area.height - 164, width: 132, height: 152 };
+  const win = petWindow = new BrowserWindow({
+    ...geometry.get('pet', fallback, areas, { minWidth: 110, minHeight: 120 }),
+    frame: false, transparent: true, resizable: false, alwaysOnTop: true,
+    skipTaskbar: true, show: false, title: 'PETIT マスコット',
+    webPreferences: { preload: path.join(__dirname, 'pet-preload.cjs'),
+      sandbox: true, contextIsolation: true, nodeIntegration: false },
+  });
+  lockNavigation(win, (url) => url === petUrl);
+  rememberWindow(win, 'pet');
+  win.on('closed', () => { if (petWindow === win) petWindow = null; });
+  win.webContents.on('did-finish-load', publishPetState);
+  void win.loadURL(petUrl).catch(() => { if (!win.isDestroyed()) win.destroy(); });
+  win.showInactive();
+}
+function setPetEnabled(enabled) {
+  if (typeof enabled !== 'boolean') throw new Error('マスコット設定が不正です。');
+  persistConfig({ ...config, petEnabled: enabled });
+  syncPetWindow(); refreshTray();
+  return enabled;
+}
 function refreshTray() {
   if (!tray || !config) return;
   const wakeLabel = !config.wakeEnabled ? '音声待機 OFF' : wakeFailed ? '音声待機 エラー（設定を確認）' :
@@ -116,12 +166,14 @@ function refreshTray() {
     { label: shortcutOK ? '呼び出し: Ctrl / ⌘ + Shift + Space' : 'ショートカット登録失敗・トレイで呼び出せます', enabled: false },
     { type: 'separator' },
     { label: 'ワークスペースを開く', click: () => showWorkspace() },
+    { label: config.petEnabled ? 'マスコットを隠す' : 'マスコットを表示', click: () => setPetEnabled(!config.petEnabled) },
     { label: 'Web版を開く', click: () => void shell.openExternal(config.serverUrl) },
     { label: '設定', click: () => showSettings() },
     { label: 'アップデートを確認', click: () => void checkUpdates(true) },
     { type: 'separator' },
     { label: 'PETITを終了', click: () => app.quit() },
   ]));
+  publishPetState();
 }
 function closeNudge() {
   clearTimeout(nudgeTimer);
@@ -276,6 +328,7 @@ function showOverlay(voice = false) {
     win.loadURL(`${config.serverUrl}/static/desktop/index.html`).catch(() => connectionFailed());
   }
   overlay.show(); overlay.focus();
+  overlayActivity = 'active'; publishPetState();
   if (overlayReady) {
     overlay.webContents.send('desktop:activate', { voice: pendingActivation });
     pendingActivation = false;
@@ -285,13 +338,14 @@ function cancelStt() { sttRequest?.abort(); sttRequest = null; }
 function hideOverlay(resume = true) {
   cancelStt(); pendingActivation = false;
   if (overlay && !overlay.isDestroyed()) { overlay.webContents.send('desktop:hidden'); overlay.hide(); }
+  overlayActivity = 'active'; publishPetState();
   if (resume) void startWake();
 }
 function assertSender(event, kind) {
-  const win = kind === 'nudge' ? nudgeWindow : kind === 'settings' ? settingsWindow : kind === 'workspace' ? workspace : kind === 'recovery' ? recoveryWindow : overlay;
+  const win = kind === 'nudge' ? nudgeWindow : kind === 'settings' ? settingsWindow : kind === 'workspace' ? workspace : kind === 'recovery' ? recoveryWindow : kind === 'pet' ? petWindow : overlay;
   const allowed = kind === 'nudge' ? event.senderFrame?.url === nudgeUrl : kind === 'settings' ? event.senderFrame?.url === settingsUrl :
     kind === 'workspace' ? isWorkspace(event.senderFrame?.url, config.serverUrl) :
-    kind === 'recovery' ? event.senderFrame?.url === recoveryUrl : isOverlay(event.senderFrame?.url, config.serverUrl);
+    kind === 'recovery' ? event.senderFrame?.url === recoveryUrl : kind === 'pet' ? event.senderFrame?.url === petUrl : isOverlay(event.senderFrame?.url, config.serverUrl);
   if (!win || event.sender !== win.webContents || event.senderFrame !== event.sender.mainFrame ||
       !allowed)
     throw new Error('許可されていない呼び出しです。');
@@ -363,6 +417,12 @@ function installIpc() {
   on('nudge:dismiss', 'nudge', closeNudge);
   on('nudge:open', 'nudge', () => { closeNudge(); showWorkspace(); });
   on('nudge:hover', 'nudge', (hover) => { if (hover === true) clearTimeout(nudgeTimer); else dismissNudgeLater(); });
+  on('pet:open', 'pet', () => showOverlay(false));
+  on('pet:hide', 'pet', () => setPetEnabled(false));
+  on('desktop:pet-activity', 'overlay', (activity) => {
+    if (!['active', 'listening', 'thinking'].includes(activity)) throw new Error('マスコット状態が不正です。');
+    overlayActivity = activity; publishPetState();
+  });
   on('desktop:hide', 'overlay', () => hideOverlay());
   on('desktop:open-web', 'overlay', () => shell.openExternal(config.serverUrl));
   on('desktop:workspace', 'overlay', () => showWorkspace());
@@ -434,6 +494,7 @@ function installIpc() {
       wakeEnabled: values.wakeEnabled === true, login: values.login === true, updates: values.updates === true,
       notifications: values.notifications === true, notificationMode: values.notificationMode === 'native' ? 'native' : 'gentle',
       notificationSound: values.notificationSound === true,
+      petEnabled: values.petEnabled === true,
       wakeThreshold: threshold };
     if (next.modelPath && (!path.isAbsolute(next.modelPath) || path.extname(next.modelPath).toLowerCase() !== '.onnx' || !fs.statSync(next.modelPath).isFile())) throw new Error('ONNXモデルを選択してください。');
     if (next.backbonePath && (!path.isAbsolute(next.backbonePath) || !fs.statSync(next.backbonePath).isDirectory())) throw new Error('特徴抽出モデルのフォルダを選択してください。');
@@ -447,7 +508,7 @@ function installIpc() {
     if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: config.login, args: ['--background'] });
     if (workspace && !workspace.isDestroyed() && changedServer) workspace.destroy();
     if (overlay && !overlay.isDestroyed()) overlay.destroy(); overlay = null;
-    settingsWindow.close(); showOverlay(false); refreshTray();
+    settingsWindow.close(); showOverlay(false); refreshTray(); syncPetWindow();
     return true;
   });
 }
@@ -483,10 +544,11 @@ else {
     const icon = nativeImage.createFromPath(iconPath).resize({ width: 18, height: 18 });
     tray = new Tray(icon); tray.on('click', () => showOverlay(true));
     shortcutOK = globalShortcut.register(SHORTCUT, () => showOverlay(true));
-    installIpc(); refreshTray();
+    installIpc(); refreshTray(); syncPetWindow();
     const syncPower = () => {
       suspended = sleeping || locked;
       if (suspended) { closeNudge(); cancelWakeSetup(); stopWake(); hideOverlay(false); } else { void startWake(); void pollNotifications(); }
+      syncPetWindow();
     };
     powerMonitor.on('suspend', () => { sleeping = true; syncPower(); });
     powerMonitor.on('lock-screen', () => { locked = true; syncPower(); });
