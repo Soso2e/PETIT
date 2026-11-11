@@ -353,6 +353,9 @@ const server = http.createServer(async (request, response) => {
     }), true);
     await workspace.getByRole('button', { name: '小型会話', exact: true }).click();
     await workspace.waitForTimeout(1000);
+    // Old v0.27 UI probes are retained for explicit investigation.
+    // Regular Desktop smoke validates the current Chat/Univ/Develop/Dashboard UI.
+    if (process.env.PETIT_SMOKE_SCOPE === 'legacy-universe') {
     // Workspace is Chat-first. The rail is compact only while viewing Univ.
     // Select that view explicitly before testing its hover/pin geometry.
     await workspace.evaluate(() => window.PetitAppShell.activateView('univ'));
@@ -645,6 +648,13 @@ const server = http.createServer(async (request, response) => {
     await workspace.reload();
     await workspace.waitForFunction(() => document.getElementById('petit-context-session')?.textContent === '作業なし');
     await instance.evaluate(sizeWorkspace, originalSize);
+    } else {
+      await workspace.evaluate(() => window.PetitAppShell.activateView('chat'));
+      await workspace.locator('[data-view-panel="chat"]').waitFor({ state: 'visible' });
+      await workspace.evaluate(() => window.PetitAppShell.activateView('univ'));
+      await workspace.locator('[data-view-panel="universe"]').waitFor({ state: 'visible' });
+      await workspace.screenshot({ path: path.join(root, 'desktop/dist/smoke-workspace.png') });
+    }
     await workspace.close();
     // Renderer crash is distinguished from an unavailable server; draft survives.
     await voicePage.locator('#input').fill('クラッシュをまたぐ下書き');
