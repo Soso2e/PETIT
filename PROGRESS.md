@@ -1,10 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.54.3**
+**Current Version: v0.55.0**
 
 **Last Updated: 2026-11-11 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #438 チャット応答のMarkdownレンダリング表示対応（v0.55.0）: PETITのチャットUI（universe.html / legacy.html / desktop/index.html）において、AIアシスタントの返答メッセージ（通常応答およびストリーミング応答）を安全にMarkdownレンダリングする共通モジュール（frontend/markdown.js、frontend/markdown.css）を新設。生HTMLのXSSエスケープ・javascript:リンクの無害化、見出し（h1〜h6）・太字・斜体・取り消し線・インラインコード・フェンスコードブロック（言語バッジ＋ワンクリックコピー）・タスクチェックボックス・引用・水平線・GFMテーブルを綺麗に装飾。ユーザー側のメッセージはプレーンテキストを維持し、Service Workerにも静的アセットを登録。Node契約テスト・単体テスト追加。実端末・実ブラウザでの描画確認は未完了。
+
+- iPhone・モバイルWebAppでのチャット入力欄と下部タブ重なり解消（v0.54.4）: iPhoneなどのモバイルWebApp/Safariにおいてチャット入力欄と下部タブバーが重なって入力できない不具合を修正。通常時はセーフエリア（`env(safe-area-inset-bottom)`）とタブバーの実高さを考慮した十分な安全マージン（`--petit-bottom-nav-height`）を確保し、入力フォーカス時および仮想キーボード表示時（`window.visualViewport` / `petit-chat-input-focused` / `petit-keyboard-open`）は下部タブバーを画面外へ滑らかに退避させて入力欄をキーボード直上へ追従。回帰テスト追加。実iPhone端末（Safari/ホーム画面追加PWA）での手動受入は未完了。
 
 - #436 Desktop E2E確認の改善（v0.54.3）: v0.54.2 のWin/Mac実Electron Smokeは初期挨拶を通過し、承認後の返答で完全一致のDOM検索が失敗した。回答者バッジ付きバブルでも返答本文を検出できるロケータへ変更し、失敗時に画面・fixture通信の診断を出力。任意のPRタイトル [desktop-smoke] に限り、タグ発行前にWin/Mac実Electron Smokeを実施する。既存タグは移動しない。実installer・実端末の検証は未完了。
 
@@ -413,3 +417,5 @@
 | 2026-11-09 | 10:01 | #418 | v0.52.0: Chat提案・Develop直接送信をCoding Jobへ統合し、利用枠ルーティング、CLI認証、Git作業とPC操作承認を実装。Codex/Antigravityの合成Tool往復とEverything IPCを実機確認。 |
 | 2026-11-10 | 15:00 | - | v0.53.0: Nocord統合・Discord Knowledge Gateway（FTS5/trigram全文検索、添付テキスト抽出、Core API、全入口共通Tool search_discord_archive、Bot非同期ログ収集、/petit archive、Nocord移行スクリプト）。Guild/Personal分離と通常会話の遅延ゼロを保証。pytest 42件全件成功。 |
 | 2026-11-10 | 17:50 | #429 | v0.54.0: CLI自由度向上・リポジトリ登録Tool（add_coding_repository）と作業セッション削除Tool（delete_work_session）を追加、委譲先にAntigravity CLIを追加。関連テスト60件全件成功。 |
+| 2026-11-11 | 05:45 | - | v0.54.4: iPhone/モバイルWebAppでチャット入力欄と下部ナビが重なる不具合を修正（セーフエリア・実高さ考慮の安全マージン確保、チャット入力フォーカス・仮想キーボード時の下部タブ退避とキーボード直上追従）。 |
+| 2026-11-11 | 07:25 | #438 | v0.55.0: チャット応答の安全なMarkdownレンダリング表示対応（見出し・太字・インラインコード・コードブロックコピー・テーブル・引用・リスト、ストリーミング対応、XSSサニタイズ）。 |

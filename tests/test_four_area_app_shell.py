@@ -111,6 +111,25 @@ class FourAreaAppShellTests(unittest.TestCase):
         self.assertNotIn('grid-template-columns: repeat(3, minmax(0, 1fr))', univ_style)
         self.assertIn('grid-template-columns: repeat(4, minmax(0, 1fr))', univ_style)
 
+    def test_mobile_chat_input_focus_and_keyboard_evacuates_bottom_tabs(self):
+        polish_style = (FRONTEND / "petit-ui-polish.css").read_text(encoding="utf-8")
+        corner_style = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
+        chat_input_js = (FRONTEND / "chat_input.js").read_text(encoding="utf-8")
+        ui_prefs_js = (FRONTEND / "petit-ui-preferences.js").read_text(encoding="utf-8")
+
+        # Bottom nav tabs must evacuate when chat input is focused or virtual keyboard is open
+        self.assertIn('body.petit-chat-input-focused .universe-topbar .view-tabs.petit-corner-nav', corner_style)
+        self.assertIn('body.petit-keyboard-open .universe-topbar .view-tabs.petit-corner-nav', corner_style)
+        self.assertIn('transform: translateY(calc(100% + 24px));', corner_style)
+
+        # Chat panel adapts to keyboard inset when focused or open
+        self.assertIn('body.petit-chat-screen:is(.petit-chat-input-focused, .petit-keyboard-open) [data-view-panel="chat"]', polish_style)
+        self.assertIn('--petit-keyboard-inset', polish_style)
+
+        # JS hooks must manage focus and keyboard state
+        self.assertIn('petit-chat-input-focused', chat_input_js)
+        self.assertIn('petit-keyboard-open', ui_prefs_js)
+
 
 if __name__ == "__main__":
     unittest.main()
