@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.54.3**
+**Current Version: v0.56.0**
 
 **Last Updated: 2026-11-11 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #440 プティちゃんマスコット刷新（v0.56.0）: 梨＋土星の輪の新デザインをWeb/Desktop共通の軽量SVGモジュール（`frontend/mascot/`）に統一。表情18種・動作21種をレジストリ化し、会話（考え中/成功/確認待ち/エラー）・音声（聞き取り/発話）・入力中・無操作のおやすみに連動。Web（Universe）では操作を妨げずチャット欄の上を歩き、クリック/ドラッグ/カーソル追従に反応、Settingsで表示・大きさ・色・動きを変更（既定はデスクトップ幅でON、モバイルOFF）。Desktopは大きさ・色・動き・散歩（既定OFF）を設定可能。`desktop/mascot/` は複製で `npm run sync:mascot` で更新（テストで差分検出）。Windows/macOS実機の常駐負荷・散歩・実音声同期、モバイル実機は未確認。トレイ/メニューバー画像化とアプリアイコン差し替えは後続（`toStaticSVG` を用意）。
 
 - #436 Desktop E2E確認の改善（v0.54.3）: v0.54.2 のWin/Mac実Electron Smokeは初期挨拶を通過し、承認後の返答で完全一致のDOM検索が失敗した。回答者バッジ付きバブルでも返答本文を検出できるロケータへ変更し、失敗時に画面・fixture通信の診断を出力。任意のPRタイトル [desktop-smoke] に限り、タグ発行前にWin/Mac実Electron Smokeを実施する。既存タグは移動しない。実installer・実端末の検証は未完了。
 
@@ -413,3 +415,4 @@
 | 2026-11-09 | 10:01 | #418 | v0.52.0: Chat提案・Develop直接送信をCoding Jobへ統合し、利用枠ルーティング、CLI認証、Git作業とPC操作承認を実装。Codex/Antigravityの合成Tool往復とEverything IPCを実機確認。 |
 | 2026-11-10 | 15:00 | - | v0.53.0: Nocord統合・Discord Knowledge Gateway（FTS5/trigram全文検索、添付テキスト抽出、Core API、全入口共通Tool search_discord_archive、Bot非同期ログ収集、/petit archive、Nocord移行スクリプト）。Guild/Personal分離と通常会話の遅延ゼロを保証。pytest 42件全件成功。 |
 | 2026-11-10 | 17:50 | #429 | v0.54.0: CLI自由度向上・リポジトリ登録Tool（add_coding_repository）と作業セッション削除Tool（delete_work_session）を追加、委譲先にAntigravity CLIを追加。関連テスト60件全件成功。 |
+| 2026-11-11 | 08:29 | #440 | v0.56.0: プティちゃんマスコットを新デザインのWeb/Desktop共通SVGモジュールへ刷新（表情・動作レジストリ、会話/音声状態連動、ブラウザ内歩行、サイズ/色/動き設定、Desktop散歩・おやすみ）。 |
