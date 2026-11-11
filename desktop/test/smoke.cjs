@@ -8,6 +8,17 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'petit-desktop-smoke-'));
 const calls = [];
+// Match the assistant reply body, not the entire bubble including hidden author badges.
+const assistantReply = (page, text) =>
+  page.locator('#messages .msg--assistant .bubble').filter({ hasText: text }).last();
+async function waitForReply(page, text) {
+  try { await assistantReply(page, text).waitFor(); }
+  catch (error) {
+    const screen = await page.locator('#messages').innerText().catch(() => '(renderer unavailable)');
+    throw new Error('Expected assistant reply: ' + text + '\\nVisible messages: ' + screen.slice(-1400) +
+      '\\nFixture requests: ' + JSON.stringify(calls.slice(-12)) + '\\n' + error.message);
+  }
+}
 let serveOverlay = true;
 let fixtureWork = { session_id: 'fixture-work', task_id: '1', task: '作業中の星', status: 'active', started_at: new Date().toISOString() };
 const fixtureTasks = [
@@ -193,7 +204,7 @@ const server = http.createServer(async (request, response) => {
     await page.getByRole('button', { name: '実行する', exact: true }).waitFor();
     assert.equal(calls.filter((call) => call.path.includes('/api/actions/')).length, 0, 'no write before confirmation');
     await page.getByRole('button', { name: '実行する', exact: true }).click();
-    await page.getByText('予定を追加しました。', { exact: true }).waitFor();
+    await waitForReply(page, '予定を追加しました。');
     assert.deepEqual(calls.find((call) => call.path.includes('/api/actions/')).data, { approved: true });
     assert.ok(calls.find((call) => call.path === '/api/chat').data.session_id);
     assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
@@ -220,7 +231,7 @@ const server = http.createServer(async (request, response) => {
     await instance.evaluate(({ app }) => app.emit('activate'));
     assert.equal(await instance.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
     // Same persisted window, no conversation reset on reactivation.
-    assert.ok(await page.getByText('予定を追加しました。', { exact: true }).isVisible());
+    assert.ok(await assistantReply(page, '予定を追加しました。').isVisible());
     // A failed write must restore input without automatically sending it twice.
     const beforeFailure = calls.filter(call => call.path === '/api/chat').length;
     await page.route('**/api/chat', route => route.fulfill({ status: 503, json: { error: 'fixture offline' } }));
@@ -271,7 +282,7 @@ const server = http.createServer(async (request, response) => {
       if (turn === 0) {
         await voicePage.getByRole('button', { name: '実行する', exact: true }).waitFor();
         assert.equal(calls.filter((call) => call.path.includes('/api/actions/')).length, beforeVoice);
-      } else await voicePage.getByText('予定を追加しました。', { exact: true }).last().waitFor();
+      } else await waitForReply(voicePage, '予定を追加しました。');
     }
     assert.equal(calls.filter((call) => call.path === '/inference').length, 2);
     assert.equal(calls.filter((call) => call.path.includes('/api/actions/')).length, beforeVoice + 1);
@@ -288,7 +299,7 @@ const server = http.createServer(async (request, response) => {
     await voicePage.locator('#mic.mic--listening').waitFor();
     await voicePage.waitForTimeout(450);
     await voicePage.locator('#mic').click();
-    await voicePage.getByText('こんにちは。', { exact: true }).last().waitFor();
+    await waitForReply(voicePage, 'こんにちは。');
     assert.equal(calls.filter(call => call.path === '/api/chat').at(-1).data.conversation_mode, 'voice');
     await voicePage.waitForFunction(() => window.fixtureAudioPlaying);
     // Restore real fixture history while a new answer is playing. It must neither
@@ -297,7 +308,7 @@ const server = http.createServer(async (request, response) => {
       conversations: [{ user_text: '過去の質問', assistant_text: '過去の返答' }],
     } }));
     assert.equal(await voicePage.evaluate(() => restoreHistory()), true);
-    await voicePage.getByText('過去の返答', { exact: true }).waitFor();
+    await waitForReply(voicePage, '過去の返答');
     assert.equal(ttsRequests, 1);
     assert.equal(await voicePage.evaluate(() => window.fixtureAudioPlaying), true);
     await voicePage.evaluate(() => window.fixtureAudio.onended());
@@ -305,7 +316,7 @@ const server = http.createServer(async (request, response) => {
     await voicePage.locator('#voice-conversation').click();
     assert.equal(await voicePage.locator('#mic').getAttribute('aria-label'), '音声入力を開始');
     assert.equal(await voicePage.locator('#voice-conversation').getAttribute('aria-pressed'), 'false');
-    await voicePage.getByText('過去の返答', { exact: true }).locator('..').getByRole('button', { name: 'この返答を読み上げる' }).click();
+    await assistantReply(voicePage, '過去の返答').locator('..').getByRole('button', { name: 'この返答を読み上げる' }).click();
     await voicePage.waitForFunction(() => window.fixtureAudioPlaying);
     assert.equal(ttsRequests, 2, 'restored replies retain manual playback');
     await voicePage.evaluate(() => window.fixtureAudio.onended());

@@ -1,10 +1,13 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.54.2**
+**Current Version: v0.54.3**
 
 **Last Updated: 2026-11-11 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #436 Desktop E2E確認の改善（v0.54.3）: v0.54.2 のWin/Mac実Electron Smokeは初期挨拶を通過し、承認後の返答で完全一致のDOM検索が失敗した。回答者バッジ付きバブルでも返答本文を検出できるロケータへ変更し、失敗時に画面・fixture通信の診断を出力。任意のPRタイトル [desktop-smoke] に限り、タグ発行前にWin/Mac実Electron Smokeを実施する。既存タグは移動しない。実installer・実端末の検証は未完了。
+
 
 - #434 Desktop Releaseの初期挨拶修正（v0.54.2）: 空履歴でも初期挨拶を消していたためMac/Windowsのスモークでタイムアウト。空履歴なら初期挨拶を保持、保存履歴・保留承認・履歴取得エラーでは削除する。回帰テスト追加。タグv0.54.1は移動せず、新バージョンで再リリース。実配布・実端末は未確認。
 

@@ -67,6 +67,30 @@ jobs:
             exit 1
           fi
 
+  # Explicit opt-in only for release-blocking PRs: test real Electron on both OSes
+  # before assigning an immutable release tag. Normal PRs keep the cheap Node job.
+  smoke-pr:
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[desktop-smoke]')
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run test:smoke
+
   package:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
     needs: test
