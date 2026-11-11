@@ -515,7 +515,8 @@ async function restoreHistory() {
     const data = await chatJson(`/api/conversations?limit=10&session_id=${encodeURIComponent(sessionId)}`);
     const rows = data.conversations || [];
 
-    removeStaticGreeting();
+    // A first-run greeting must survive empty history so loadOpener() can update it.
+    if (rows.length > 0) removeStaticGreeting();
     for (const row of rows) {
       if (row.user_text) {
         addMessage("user", row.user_text, { silent: true });
@@ -539,11 +540,15 @@ async function restoreHistory() {
     }
     try {
       const snapshot = await chatJson('/api/threads/' + encodeURIComponent(sessionId) + '/snapshot');
-      if (snapshot.pending_actions?.length) addMessage('assistant', '', { actions: snapshot.pending_actions, silent: true });
+      if (snapshot.pending_actions?.length) {
+        removeStaticGreeting();
+        addMessage('assistant', '', { actions: snapshot.pending_actions, silent: true });
+      }
       return rows.length > 0 || snapshot.pending_actions?.length > 0;
     } catch { return rows.length > 0; }
   } catch (e) {
     if (desktopChatState) {
+      removeStaticGreeting();
       addMessage('assistant', '会話履歴を取得できませんでした。接続を確認して画面を開き直してください。', { error: true, silent: true });
       return null;
     }
