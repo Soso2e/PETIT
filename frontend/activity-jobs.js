@@ -14,7 +14,8 @@
     }));
     return { jobs, counts: payload?.counts || {}, excludesCoding: payload?.coding_jobs_included === false };
   };
-  window.PetitActivityJobs = { summarize };
+  const matchesJobId = (job, query) => !query || String(job.id) === query;
+  window.PetitActivityJobs = { summarize, matchesJobId };
   const panel = document.querySelector('[data-view-panel="development"]');
   if (!panel) return;
   const section = document.createElement("section");
@@ -33,7 +34,13 @@
   for (const [value, label] of [["all", "すべて"], ["active", "待機・実行中"], ["failed", "失敗"], ["done", "完了"]]) {
     filter.add(new Option(label, value));
   }
-  header.append(title, filter, refresh);
+  const jobLookup = document.createElement("input");
+  jobLookup.type = "search";
+  jobLookup.inputMode = "numeric";
+  jobLookup.placeholder = "ジョブIDで検索";
+  jobLookup.setAttribute("aria-label", "背景ジョブの数値IDを検索");
+  jobLookup.maxLength = 16;
+  header.append(title, filter, jobLookup, refresh);
   const state = document.createElement("p");
   state.className = "development-state";
   state.setAttribute("role", "status");
@@ -69,14 +76,15 @@
   const render = (payload) => {
     lastPayload = payload;
     const data = summarize(payload);
-    const visible = data.jobs.filter((job) => filter.value === "all"
+    const query = jobLookup.value.trim();
+    const visible = data.jobs.filter((job) => matchesJobId(job, query) && (filter.value === "all"
       || (filter.value === "active" && (job.status === "queued" || job.status === "running"))
-      || job.status === filter.value);
+      || job.status === filter.value));
     list.replaceChildren();
     if (!visible.length) {
       const item = document.createElement("li");
       item.className = "development-activity__empty";
-      item.textContent = data.jobs.length ? "該当する状態のジョブはありません。" : "最近のバックグラウンドジョブはありません。";
+      item.textContent = data.jobs.length ? "該当するジョブはありません（取得済みの最近30件が検索対象です）。" : "最近のバックグラウンドジョブはありません。";
       list.append(item);
       state.textContent = data.jobs.length ? "表示 0件 / 最近 " + data.jobs.length + "件" : "0件";
       return;
@@ -164,6 +172,7 @@
   document.addEventListener("visibilitychange", poll);
   refresh.addEventListener("click", () => void load(true));
   filter.addEventListener("change", () => { if (lastPayload) render(lastPayload); });
+  jobLookup.addEventListener("input", () => { if (lastPayload) render(lastPayload); });
   window.addEventListener("petit:area-change", (event) => {
     if (event.detail?.area === "development") void load();
   });
