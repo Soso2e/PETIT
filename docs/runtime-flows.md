@@ -1,5 +1,17 @@
 # PETIT Runtime Flows
 
+## ActivityのジョブID検索（v0.56.4）
+
+```mermaid
+flowchart LR
+  API["既存 GET /api/activity/jobs?limit=30"] --> Safe["id/type/statusのみを投影"]
+  Safe --> Local["状態フィルターと数値ID完全一致検索"]
+  Local --> List["Development Activity表示"]
+```
+
+検索は既取得データ内のみで追加API・SQLite操作を行わない。30件より古いIDは検索できないため、見つからなくても存在しないとは断定しない。
+
+
 ## ActivityジョブIDのコピー（v0.52.2・#372）
 
 既存の管理者向け `GET /api/activity/jobs` の読み取り専用表示に、数値ジョブIDだけをコピーする操作を追加。Clipboard APIを使うのは明示クリック時のみで、ジョブの本文・結果・エラー・秘密情報はコピーしない。コピー失敗はボタンに表示し、Job状態やSQLiteは変更しない。
