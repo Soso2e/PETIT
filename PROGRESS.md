@@ -1,10 +1,13 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.56.3**
+**Current Version: v0.56.4 (PR中)**
 
 **Last Updated: 2026-11-11 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- v0.56.4 ActivityジョブID検索（開発PR）: Development Hubの背景Activityに数値IDの完全一致検索を追加。既存GET /api/activity/jobsの取得済み直近30件だけをクライアントで絞り込み、入力による追加通信・秘密本文表示・DB変更はしない。状態フィルターと併用可能。Node契約テスト追加。実ブラウザ/Windows/iPhone受入は未実施。
+
 
 - #443 CLI開発ジョブ作成時のタスク（tasks_cache）自動登録を廃止（v0.56.3）: チャットやDevelop画面からCLI開発ジョブ（`propose_development_job` / `create_development` / `create`）を実行した際に、`tasks_cache` へ「CLI開発タスク」が自動登録されてタスク一覧やUniverse画面にタスクが増えてしまう挙動を廃止。`coding_jobs.task_id` を nullable に移行し、既存テーブルの NOT NULL 制約を安全にマイグレーション。明示的な既存 `task_id` 連携時のみ完了更新を行うよう整理。単体テスト全件成功。
 
