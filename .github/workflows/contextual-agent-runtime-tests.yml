@@ -6,6 +6,8 @@ on:
       - "backend/dialogue_state.py"
       - "backend/conversation_state.py"
       - "backend/brain.py"
+      - "backend/ambient.py"
+      - "tests/test_ambient_context.py"
       - "backend/setup_api.py"
       - "backend/setup_store.py"
       - "backend/service_sync.py"
@@ -105,7 +107,7 @@ jobs:
           node --check frontend/chat_attachments.js
       - name: Run Renaissance Core and Thread client contracts
         run: |
-          python -m pytest tests/test_setup_integrations.py tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_provider_runtime.py tests/test_agent_workspace.py tests/test_antigravity_cli.py -q
+          python -m pytest tests/test_setup_integrations.py tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_provider_runtime.py tests/test_agent_workspace.py tests/test_antigravity_cli.py tests/test_ambient_context.py -q
           node --test scripts/test-thread-client.cjs
       - name: Run image intake and Vision regressions
         run: python -m pytest tests/test_vision.py tests/test_vision_calculations.py tests/test_chat_router.py tests/test_module_registry.py -q
