@@ -1,10 +1,14 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.56.4 (PR中)**
+**Current Version: v0.57.0 (PR中)**
 
-**Last Updated: 2026-11-11 UTC**
+**Last Updated: 2026-11-13 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #445 Ambient Context（v0.57.0、`feat/fable-based-develop`・PR中）: owner のTurn開始時に、計測中の作業・今日と明日の予定・優先度Highの未完了タスク・期限が近いタスク・タスク同期の未解決件数を、Coreが参考データとして全Brainへ渡す（`backend/ambient.py`）。ローカルSQLiteの読み取りだけで、ゲスト・Guild・委譲先の作業Threadには渡さない。履歴には保存せず、`turn_events` には件数だけ残す。`PETIT_AMBIENT_CONTEXT=0` で無効。背景: 最初のToolが0.02〜0.05秒のローカル読み取りなのに、そのためにモデルを1往復（DeepSeek 約1.4秒、Antigravity CLI 約15秒）余分に呼んでいた。単体テスト11件成功、全体pytestは変更前と同じ失敗27件（Windows既存）＋順序依存の既存1件。**実Providerで往復数・応答時間が減るかは未計測。** 詳細 docs/core/ambient-context.md。
+- #446 記憶の質（未着手・判断待ち）: 有効な記憶の約9割がエピソード要約の自動抽出で、多くが「その時点の状態」（時刻・当日の予定・件数・同期状態・操作記録）。`search_memory` は直近300Turnで0回。自動想起を実データのコピーで試したが、古い状態メモが上位に出るため #445 には入れていない。次: 記憶へ書く内容を「長く使える知識」に限定し、既存データの整理案を本人確認のうえ適用、その後に自動想起。
+- テストの順序依存（既存）: `tests/test_core_hardening.py::test_successful_notion_task_sync_replaces_removed_rows` は、先に `get_tasks` を呼ぶテスト（例: `tests/test_renaissance_core.py`）と同じプロセスで走ると失敗する（`task_sync_queue.install_sync_guard` がプロセス全体で `upsert_tasks` を差し替えるため）。単独では成功。CIはファイル単位で実行しており影響なし。
 
 - v0.56.4 ActivityジョブID検索（開発PR）: Development Hubの背景Activityに数値IDの完全一致検索を追加。既存GET /api/activity/jobsの取得済み直近30件だけをクライアントで絞り込み、入力による追加通信・秘密本文表示・DB変更はしない。状態フィルターと併用可能。Node契約テスト追加。実ブラウザ/Windows/iPhone受入は未実施。
 
@@ -435,3 +439,4 @@
 | 2026-11-11 | 10:52 | - | v0.56.1: チャット起票の開発ジョブを開発タブのスレッド階層へ自動投影し、リポジトリ名解決とNotion同期の古いconflict残骸8件を解消。 |
 | 2026-11-11 | 13:50 | - | v0.56.2: 開発タブへの未投影チャット開発ジョブ自動同期（sync_chat_threads）と未登録リポジトリ安全フォールバック、delegate_coding_task連携を追加。 |
 | 2026-11-11 | 14:00 | #443 | v0.56.3: CLI開発ジョブ起票時のtasks_cache自動タスク作成を廃止し、coding_jobs.task_idのnullableマイグレーションと単体テストを追加。 |
+| 2026-11-13 | 18:10 | #445 | v0.57.0: Ambient Context。owner のTurn開始時に作業・今日と明日の予定・優先度Highのタスクを全Brainへ参考データとして渡し、状況確認だけのTool往復を不要にする。記憶の自動想起は実データ検証で見送り、#446へ。 |

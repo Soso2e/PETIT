@@ -33,6 +33,7 @@
 Thread/Turn、Context Broker、会話状態、記憶、バックグラウンド処理
 
 - [ai-first-agent-design.md](core/ai-first-agent-design.md) — AI-First Agent Architecture — 調査・比較PoC（#338）（DeepSeek中心の比較PoC。現行方針は ../Concept.md §4）
+- [ambient-context.md](core/ambient-context.md) — Ambient Context：Turn開始時にCoreが渡す現在状況（v0.57.0・#445）
 - [assistant-architecture.md](core/assistant-architecture.md) — PETIT Assistant Architecture
 - [conversation-action-reliability.md](core/conversation-action-reliability.md) — Conversation-to-Action Reliability — 初回修正（#335）
 - [conversation-state.md](core/conversation-state.md) — Conversation State
