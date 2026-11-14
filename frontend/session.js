@@ -33,6 +33,9 @@
   const progressLabel = (data) => {
     if (data.phase === 'queued') return '受付済み…';
     if (data.phase === 'vision') return '画像を確認中…';
+    if (data.phase === 'cli_initialized') return 'CLIが応答を考えています…';
+    if (data.phase === 'cli_responding') return 'CLIから応答を受信中…';
+    if (data.phase === 'cli_validating') return 'CLIの応答を確認中…';
     if (data.phase === 'tool') return data.tool ? 'ツールを実行中…（' + data.tool + '）' : 'ツールを実行中…';
     if (data.phase === 'thinking' && data.round > 1) return '結果をまとめ中…';
     return '考え中…';

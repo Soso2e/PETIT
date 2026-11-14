@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, HTTPException
 import json
 import logging
+from pathlib import Path
 import threading
 from uuid import uuid4
 
@@ -34,12 +35,14 @@ FRONT_HIDDEN = {"gmail_get_message",
                 "push_worktree", "create_worktree_pull_request", "close_worktree",
                 "delegate_coding_task", "get_coding_task_status", "cancel_coding_task",
                 "write_home_file", "edit_home_file"}
+_HANDOFF_SKILL = (Path(__file__).parent / "skills" / "compact-cli-handoff" / "SKILL.md")
 FRONT_HINT = ("\n開発・コード修正・リポジトリ調査・PCファイル作業は list_coding_repositories で対象を確認し、"
               "具体的な目的と制約を整理して propose_development_job で提案する。利用者の開始確認を待つ。"
               "その他の複数ステップの作業（PETIT Home内の作業、メール本文の確認）は"
               "delegate_to_agentでCLIに任せる。「できない」と答える前に、任せられないか確かめる。"
               "雑談・予定・タスク・作業記録は任せず自分で処理する。Web調査は委譲しない。"
-              "任せた作業を完了と言わない。進み具合はget_delegation_statusで確認する。")
+              "任せた作業を完了と言わない。進み具合はget_delegation_statusで確認する。\n"
+              + _HANDOFF_SKILL.read_text(encoding="utf-8").split("---", 2)[2].strip())
 REPORTABLE = ("waiting_approval", "completed", "failed", "cancelled", "interrupted")
 ACTIVE = ("queued", "running")
 MAX_ACTIVE = 3

@@ -10,6 +10,8 @@
 - #446 記憶の入口（v0.58.0、`feat/fable-based-develop`・PR中）: エピソード要約が記憶へ書くのを、モデルが `durable_knowledge`（好み・プロフィール・長く続く決定や事実）としてラベルを付けたものだけに変更（`source=auto_knowledge`、1エピソード最大5件）。`decisions` / `facts` / `work_in_progress` はエピソードに残り、従来どおり検索できる。以前の自動抽出（`source=auto_episode`）は自動では変更せず、`scripts/memory_review.py`（export → 本人がCSVを編集 → apply --yes、バックアップ・監査ファイル・restoreつき、削除なし）で整理する。実DBからの確認用CSVは出力済み（`storage/audit/memory-review/review.csv`、Git管理外）で、**適用はしていない**。**実モデルが指示どおりに分けられるかは未計測。** 残り: 本人によるCSVの確認と適用、好みなど狭い範囲を確認カードなしで保存するかの判断、その後に自動想起。詳細 docs/core/renaissance-memory.md。
 - #446 の調査結果（2026-11-13）: 有効な記憶の約9割がエピソード要約の自動抽出で、多くが「その時点の状態」（時刻・当日の予定・件数・同期状態・操作記録）。`search_memory` は直近300Turnで0回。自動想起を実データのコピーで試したが、古い状態メモが上位に出るため #445 には入れていない。次: 記憶へ書く内容を「長く使える知識」に限定し、既存データの整理案を本人確認のうえ適用、その後に自動想起。
 - テストの順序依存（既存）: `tests/test_core_hardening.py::test_successful_notion_task_sync_replaces_removed_rows` は、先に `get_tasks` を呼ぶテスト（例: `tests/test_renaissance_core.py`）と同じプロセスで走ると失敗する（`task_sync_queue.install_sync_guard` がプロセス全体で `upsert_tasks` を差し替えるため）。単独では成功。CIはファイル単位で実行しており影響なし。
+- #448 CLI開発ジョブ（v0.57.1、PR中）: Antigravity CLIの構造化応答に公式JSON Schemaを使い、タイムアウト・一時起動失敗・応答未完了などは失敗したモデルの呼び出しだけを再試行する。ChatカードとDevelopに実行段階をSSE配信し、DeepSeekには委譲指示を短くするスキルを渡す。実CLIで短文とCore経由の読み取り往復、Chromeで合成SSEのChatカード表示、実DeepSeekで合成依頼の77文字の委譲目的を確認。実Chatからの長時間ジョブ完走率は未確認。
+
 - #449 Chat・Develop UIのモダン化（v0.57.0）: スマホ版Claude/ChatGPT風の見た目専用レイヤ `frontend/petit-modern.css` を `petit-ui-polish.css` の後に追加。Chatは返答の吹き出しなし全幅表示・ユーザー右寄せ吹き出し・角丸入力カード（＋画像/マイク/送信アイコン）、スレッド操作をチップ列化。Developは依頼カード統合・選択肢チップ化・開始ボタン強調。960px未満は上部をアプリバー風、下部タブを平らに。DOM順・API・挙動は不変。Playwright（iPhone 13相当/1440px、ダーク/ライト）で表示確認。実iPhone・Desktop(Electron)・実会話での受入は未実施。
 
 - v0.56.4 ActivityジョブID検索（開発PR）: Development Hubの背景Activityに数値IDの完全一致検索を追加。既存GET /api/activity/jobsの取得済み直近30件だけをクライアントで絞り込み、入力による追加通信・秘密本文表示・DB変更はしない。状態フィルターと併用可能。Node契約テスト追加。実ブラウザ/Windows/iPhone受入は未実施。
@@ -444,3 +446,4 @@
 | 2026-11-13 | 18:10 | #445 | v0.58.0: Ambient Context。owner のTurn開始時に作業・今日と明日の予定・優先度Highのタスクを全Brainへ参考データとして渡し、状況確認だけのTool往復を不要にする。記憶の自動想起は実データ検証で見送り、#446へ。 |
 | 2026-11-14 | 06:35 | #446 | v0.58.0: エピソード要約から記憶への自動昇格を、長く使える知識（durable_knowledge）だけに限定。以前の自動抽出を本人確認のうえ期限切れにする整理ツール（scripts/memory_review.py、削除なし・取り消し可）を追加。既存データへの適用は未実施。 |
 | 2026-11-14 | 15:30 | #449 | v0.57.0: Chat・DevelopのUIをスマホ版Claude/ChatGPT風に刷新（petit-modern.css追加、入力欄アイコン化、スレッド操作チップ化、Develop依頼カード整理、モバイル上部/下部ナビ軽量化）。 |
+| 2026-11-14 | 14:52 | #448 | ChatからのCLI開発で応答の構造化・再試行・失敗理由の記録と進捗配信を実装し、DeepSeekへ短い委譲指示のスキルを追加。 |

@@ -122,6 +122,16 @@ flowchart TD
     Proposed -->|取消| Cancelled[cancelled]
     Entry -->|Develop| Queued
     Queued -->|条件付き取得| Run[running]
+    Chat -.-> Compact[Front Brainは委譲スキルで目的・制約・完了条件を短く渡す]
+    Run --> Model[Antigravity CLI / NDJSONを実行中に読み取り・JSON Schemaで応答検証]
+    Model -->|復旧可能なエラー| Retry[同一モデル応答だけを再試行 / 一段につき1回・ジョブ内で2回まで]
+    Retry --> Model
+    Model -->|検証済みのTool要求| JobTool[CoreがジョブのToolを実行]
+    JobTool --> Model
+    Model -->|完了応答| Check
+    Model -->|復旧できないエラー| Error[failed / 安全な理由コード]
+    Model -.-> Progress[開始・応答・検証・再試行の段階を記録]
+    Progress -.-> SSE[管理者用 Job SSE / Chatカード・Develop]
     Run --> Mode{対象モード}
     Mode -->|Git| Git[開始コミットの clone と専用ブランチ]
     Git --> GitTool[Core Tool で編集・静的検査・テスト・ビルド・commit]

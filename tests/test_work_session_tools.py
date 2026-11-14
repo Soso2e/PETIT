@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import tempfile
 import unittest
@@ -94,7 +95,10 @@ class WorkSessionToolTests(unittest.TestCase):
 
     def test_record_past_work_with_matched_task(self) -> None:
         task_id = self.add_task("PETIT開発を爆速で進める")
-        res = self.dispatch("record_past_work", {"task": "PETIT開発", "duration_minutes": 60})
+        # Keep the hour-long fixture within one JST day.
+        now = datetime(2026, 11, 14, 3, tzinfo=timezone.utc)
+        with patch.object(work_sessions, "_now", return_value=now):
+            res = self.dispatch("record_past_work", {"task": "PETIT開発", "duration_minutes": 60})
         self.assertTrue(res["recorded"])
         self.assertTrue(res["matched_existing_task"])
         self.assertEqual(res["task"], "PETIT開発を爆速で進める")
@@ -103,7 +107,7 @@ class WorkSessionToolTests(unittest.TestCase):
         self.assertEqual(res["session"]["elapsed_seconds"], 3600)
 
         # today_summary check
-        summary = work_sessions.today_summary()
+        summary = work_sessions.today_summary(now=now)
         self.assertEqual(summary["total_seconds"], 3600)
         self.assertEqual(len(summary["sessions"]), 1)
 

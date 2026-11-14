@@ -1,5 +1,9 @@
 """Authenticated Web entrypoints for approved local coding jobs."""
-from fastapi import APIRouter, Depends, HTTPException
+import asyncio
+import json
+import time
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
 import os
 from pathlib import Path
@@ -163,6 +167,40 @@ def start(payload: DevelopmentRequest):
 
 @router.get("/jobs/{job_id}")
 def detail(job_id: str):return call(jobs.get, job_id)
+
+
+@router.get("/jobs/{job_id}/stream")
+async def stream(job_id: str, request: Request):
+    initial = await asyncio.to_thread(jobs.progress_snapshot, job_id)
+    if initial is None:
+        raise HTTPException(404, "開発ジョブが見つかりません。")
+
+    async def events():
+        snapshot = initial
+        previous_status = None
+        cursor = 0
+        last_sent = time.monotonic()
+        yield "retry: 3000\n\n"
+        while not await request.is_disconnected():
+            if snapshot is None:
+                return
+            status, changes = snapshot
+            for seq, phase in changes or ([(cursor, None)] if status != previous_status else []):
+                cursor = seq
+                data = json.dumps({"status": status, "phase": phase}, ensure_ascii=False)
+                yield f"event: progress\ndata: {data}\n\n"
+                last_sent = time.monotonic()
+            if status not in {"queued", "running"}:
+                return
+            previous_status = status
+            if time.monotonic() - last_sent > 15:
+                yield ": keepalive\n\n"
+                last_sent = time.monotonic()
+            await asyncio.sleep(0.5)
+            snapshot = await asyncio.to_thread(jobs.progress_snapshot, job_id, cursor)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
 @router.post("/jobs/{job_id}/approve", dependencies=[Depends(setup_api._same_origin)])

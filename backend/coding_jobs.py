@@ -146,6 +146,24 @@ def event(job_id, kind, detail=""):
             (job_id, kind, detail[:2000], db.now_iso()))
 
 
+def progress_snapshot(job_id, after=None):
+    """Project phase names only. Job details and Tool output stay off the stream."""
+    with db.get_connection() as connection:
+        job = connection.execute("SELECT status FROM coding_jobs WHERE id=?", (job_id,)).fetchone()
+        if job is None:
+            return None
+        if after is None:
+            events = connection.execute(
+                "SELECT seq, kind FROM coding_job_events WHERE job_id=? ORDER BY seq DESC LIMIT 1", (job_id,)
+            ).fetchall()
+        else:
+            events = connection.execute(
+                "SELECT seq, kind FROM coding_job_events WHERE job_id=? AND seq>? ORDER BY seq LIMIT 80",
+                (job_id, after),
+            ).fetchall()
+    return job["status"], [(row["seq"], row["kind"]) for row in events]
+
+
 def get(job_id):
     ensure_schema()
     with db.get_connection() as connection:
@@ -570,6 +588,9 @@ def run_job(job_id):
     except Exception as exc:
         # Never expose CLI raw diagnostics, secret URLs or traceback content.
         from .lmstudio_client import LMStudioError
+        from .antigravity_cli_brain import CLIError
+        if isinstance(exc, CLIError):
+            event(job_id, "cli_failure", exc.reason)
         if job["provider"] == "claude_code" and getattr(exc, "reason", None) == "usage_limit":
             event(job_id, "usage_limit")
             development_models.invalidate()

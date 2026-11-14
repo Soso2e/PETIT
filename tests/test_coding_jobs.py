@@ -43,6 +43,20 @@ def synthetic_agent(provider, target, goal, invoke, check, progress):
     return "合成Agentで変更しました。実テストは未実施です。"
 
 
+def test_job_progress_stream_requires_admin_and_omits_job_details(repository, client):
+    job_id = jobs.create("progress", str(repository), "private goal", "antigravity_cli")["job_id"]
+    route = f"/api/coding/jobs/{job_id}/stream"
+    assert client.get(route).status_code in {401, 403}
+    admin(client)
+    assert client.get("/api/coding/jobs/missing/stream").status_code == 404
+    jobs.event(job_id, "cli_responding", "private output")
+    response = client.get(route)
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"phase": "cli_responding"' in response.text
+    assert "private" not in response.text
+
+
 @pytest.fixture
 def client():
     app = FastAPI();app.include_router(setup_api.router);app.include_router(coding_api.router);setup_api.install(app)
