@@ -64,6 +64,8 @@ def error_category(value: str) -> str:
         return "timeout"
     if "cancel" in text:
         return "cancelled"
+    if any(x in text for x in ("service unavailable", "temporarily unavailable", "connection reset", "deadline_exceeded")):
+        return "temporarily_unavailable"
     return "cli_error"
 
 
@@ -160,6 +162,8 @@ class Protocol:
                        "status": terminal, "response": response if terminal == "SUCCESS" else "",
                        "usage": usage, "quota_remaining": "unknown",
                        "error": None if terminal == "SUCCESS" else error_category(str(payload.get("error", terminal)))}
+        if terminal == "SUCCESS" and "structured_output" in payload:
+            self.result["structured_output"] = payload["structured_output"]
         return self.result
 
     def finish(self):

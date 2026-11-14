@@ -30,14 +30,41 @@ def test_codex_coding_cancel_closes_client(monkeypatch):
     assert FakeRPC.clients[0].closed
 
 
-def test_antigravity_coding_uses_scoped_catalog_and_saved_results(monkeypatch):
-    responses=iter([({"role":"assistant","content":"","tool_calls":[{"id":"call","type":"function","function":{"name":"list_files","arguments":"{}"}}]},{}),
-                    ({"role":"assistant","content":"完了候補です。実テスト未実施。","tool_calls":[]},{})])
+@pytest.mark.parametrize("reason", [
+    "timeout", "invalid_cli_response", "cli_start_transient", "temporarily_unavailable", "cli_incomplete",
+])
+def test_antigravity_coding_retries_model_step_without_replaying_tools(monkeypatch, reason):
+    responses = iter([
+        ({"role":"assistant","content":"","tool_calls":[{"id":"call","type":"function","function":{"name":"list_files","arguments":"{}"}}]}, {}),
+        coding_agents.antigravity_cli_brain.CLIError(reason, "synthetic failure"),
+        ({"role":"assistant","content":"完了候補です。実テスト未実施。","tool_calls":[]}, {}),
+    ])
     captured=[]
-    def completion(target,messages,catalog,check):
+    def completion(target,messages,catalog,check,*,on_progress):
         captured.append(list(messages))
         assert {x["function"]["name"] for x in catalog} == {"list_files","read_file","write_file","run_static_checks"}
-        return next(responses)
+        on_progress("cli_initialized")
+        response = next(responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
     monkeypatch.setattr(coding_agents.antigravity_cli_brain,"completion",completion)
-    result=coding_agents.run("antigravity_cli",{},"合成開発",lambda *a:{"files":["answer.py"]},lambda:None,lambda kind:None)
+    invoke = Mock(return_value={"files":["answer.py"]})
+    progress = Mock()
+    result = coding_agents.run("antigravity_cli",{},"合成開発",invoke,lambda:None,progress)
     assert "実テスト未実施" in result and captured[1][-1]["role"] == "tool"
+    assert captured[1] == captured[2]
+    invoke.assert_called_once_with("list_files", {})
+    assert ("model_retry_" + reason,) in [call.args for call in progress.call_args_list]
+
+
+@pytest.mark.parametrize(("reason", "calls"), [("timeout", 2), ("authentication_required", 1), ("cli_start_failed", 1)])
+def test_antigravity_coding_stops_on_unrecoverable_or_repeated_error(monkeypatch, reason, calls):
+    error = coding_agents.antigravity_cli_brain.CLIError(reason, "synthetic failure")
+    completion = Mock(side_effect=error)
+    monkeypatch.setattr(coding_agents.antigravity_cli_brain, "completion", completion)
+    invoke = Mock()
+    with pytest.raises(coding_agents.antigravity_cli_brain.CLIError, match="synthetic failure"):
+        coding_agents.run("antigravity_cli", {}, "合成開発", invoke, lambda: None, lambda kind: None)
+    assert completion.call_count == calls
+    invoke.assert_not_called()

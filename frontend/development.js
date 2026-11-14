@@ -9,6 +9,59 @@
   const operations = { write: "書き込み", move: "移動", delete: "削除", command: "コマンド実行" };
   const active = new Set(["queued", "running"]);
   const $ = (id) => document.getElementById(id);
+  const phases = {
+    workspace_ready: "作業場所を準備しました",
+    model_request: "CLIに応答を依頼中…",
+    cli_initialized: "CLIが応答を考えています…",
+    cli_responding: "CLIから応答を受信中…",
+    cli_validating: "CLIの応答を確認中…",
+    model_response: "CLIの応答を受け取りました",
+    read_file: "ファイルを読み取りました",
+    write_file: "作業場所に書き込みました",
+    repository_check: "テスト・検査結果を受け取りました",
+  };
+  const retryPhases = {
+    model_retry_timeout: "CLIが時間内に終了せず、応答を再試行中…",
+    model_retry_temporarily_unavailable: "CLIの接続エラーから復旧中…",
+    model_retry_invalid_cli_response: "CLIの応答形式を修正して再試行中…",
+    model_retry_invalid_cli_protocol: "CLIの応答を再取得中…",
+    model_retry_cli_incomplete: "CLIの応答が途中で終了したため、再試行中…",
+    model_retry_cli_start_transient: "CLIの起動を再試行中…",
+  };
+
+  const progressStreams = new Map();
+  function closeProgress(element) {
+    progressStreams.get(element)?.close();
+    progressStreams.delete(element);
+  }
+
+  if (typeof MutationObserver === "function") {
+    new MutationObserver(() => {
+      for (const element of progressStreams.keys()) {
+        if (!element.isConnected) closeProgress(element);
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  function watchProgress(element, job, refresh) {
+    element.setAttribute("aria-live", "polite");
+    const update = ({ status, phase }) => {
+      const next = (status === "running" && (retryPhases[phase] || phases[phase])) || states[status] || "";
+      if (element.textContent !== next) element.textContent = next;
+    };
+    update({ status: job.status, phase: job.events?.at(-1)?.kind });
+    if (!active.has(job.status) || typeof EventSource !== "function") return;
+    const stream = new EventSource("/api/coding/jobs/" + encodeURIComponent(job.id) + "/stream");
+    progressStreams.set(element, stream);
+    stream.addEventListener("progress", (event) => {
+      const value = JSON.parse(event.data);
+      if (value) update(value);
+      if (!value || !active.has(value.status)) {
+        closeProgress(element);
+        void refresh();
+      }
+    });
+  }
 
   async function api(path, method = "GET", body) {
     const response = await fetch("/api/coding" + path, {
@@ -55,6 +108,7 @@
     const route = "/jobs/" + encodeURIComponent(job.id);
     const info = append(box, "p", states[job.status] || job.status);
     info.className = "job-status";
+    if (compact || !box.closest(".development-thread-turn")) watchProgress(info, job, refresh);
     append(box, "h3", job.goal);
     const selection = job.selection;
     append(box, "p", [job.repository || "PC全体", selection?.label || job.provider, job.model,
@@ -320,7 +374,10 @@
       const reply = append(entry, "div", "");
       reply.className = "development-thread-reply";
       append(reply, "strong", [job.provider || "CLI", statusLabel(job.status)].join(" · "));
-      append(reply, "p", job.summary || (job.error ? "エラー: " + job.error : "CLIの結果を確認中です。"));
+      const message = append(reply, "p", job.summary || (job.error ? "エラー: " + job.error : states[job.status]));
+      if (active.has(job.status)) watchProgress(message, job, () => {
+        if (currentView === "thread" && currentThread) return openThread(currentThread.thread_id);
+      });
       append(reply, "small", timestamp(job.updated_at)).className = "development-muted";
       const detail = append(entry, "details", "");
       append(detail, "summary", "ジョブの詳細・差分・承認");
