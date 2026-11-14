@@ -1,5 +1,56 @@
 # PETIT Runtime Flows
 
+## エピソード要約から記憶への昇格（v0.58.0・#446）
+
+会話のTurn処理とは別の、既存のバックグラウンド要約の経路。記憶へ書くのは、モデルが長く使える知識としてラベルを付けたものだけ。
+
+```mermaid
+flowchart TD
+    Idle[未整理の会話 / 一定件数または無操作] --> Summarize[summarizer: 1エピソードを要約]
+    Summarize -->|JSON不正 / 空の要約| Pending[会話は未整理のまま再試行]
+    Summarize --> Episode[conversation_episodes: decisions / facts / work_in_progress / next_action]
+    Summarize --> Durable{durable_knowledge}
+    Durable -->|kind付き・8〜300文字・最大5件| Memory[memory: source=auto_knowledge]
+    Durable -->|ラベルなし / 未知のkind / 無し| Skip[記憶へは書かない]
+    Episode --> Search[search_memoryのエピソード検索]
+    Memory --> Search
+    Legacy[以前の自動抽出 source=auto_episode] --> Review[scripts/memory_review.py export: 確認用CSV]
+    Review -->|本人が action を編集し apply --yes| Expire[バックアップ後に valid_until を設定 / 削除しない / restoreで戻せる]
+```
+
+詳細: [core/renaissance-memory.md](core/renaissance-memory.md)。
+
+## Ambient Context: Turn開始時の現在状況（v0.58.0・#445）
+
+Coreが取得済みの作業・予定・タスクを、Brainの最初の呼び出しの前に参考データとして渡す。Tool・承認・receipt・停止条件（8 rounds / 12 calls）は変えない。
+詳細: [core/ambient-context.md](core/ambient-context.md)。
+
+```mermaid
+flowchart TD
+    Turn[Turn開始 / messages未保存] --> Gate{owner のTurnか}
+    Gate -->|ゲスト / Guild / 委譲先の作業Thread / PETIT_AMBIENT_CONTEXT=0| None[ブロックなし・従来どおり]
+    Gate -->|owner| Build[ambient.build / ローカルSQLiteの読み取りだけ]
+    Build --> Work[作業: active_session]
+    Build --> Schedule[予定: 今日・明日のキャッシュ / 同期はしない]
+    Build --> Tasks[タスク: get_tasksの既定 + 期限3日以内・超過 + 同期の未解決件数]
+    Work --> Budget[節ごとに丸ごと採否 / 上限1800文字 / 失敗した節は落とす]
+    Schedule --> Budget
+    Tasks --> Budget
+    Budget -->|何もない| None
+    Budget --> Event[turn_events ambient_context: 文字数・所要時間・件数だけ]
+    Event --> Native[native / Antigravity CLI / Claude Code round: 履歴の後ろ・依頼の直前に参考データ1件]
+    Event --> External[Codex / Claude Code エージェント: 参考データJSONの known_situation]
+    Native --> Brain[Brainが判断]
+    External --> Brain
+    None --> Brain
+    Brain -->|足りる| Reply[Toolなしで回答]
+    Brain -->|他の日付・最新確認・書き込み| Tools[従来のTool経路 / 承認 / receipt]
+    Approval[承認後の再開] -->|保存済みmessagesをそのまま使う| Brain
+```
+
+- ブロックは会話履歴へ保存しない。次のTurnで作り直す。
+- 記憶は含めない（[#446](https://github.com/Soso2e/PETIT/issues/446)）。`search_memory` は従来どおり。
+
 ## ActivityのジョブID検索（v0.56.4）
 
 ```mermaid

@@ -66,6 +66,12 @@ WORKSPACE_CONTEXT_MAX_AGE_SECONDS = max(15.0, float(os.getenv("PETIT_WORKSPACE_C
 # validated final reply in the Turn ledger is unchanged. Set 0 to disable.
 STREAM_REPLIES = os.getenv("PETIT_STREAM_REPLIES", "1") not in ("0", "false", "False")
 
+# Ambient context: Core hands the Brain the current work, today's schedule, open
+# tasks and related memories before its first call (backend/ambient.py). Local
+# reads only. Set 0 to return to the Tool-only behaviour.
+AMBIENT_CONTEXT = os.getenv("PETIT_AMBIENT_CONTEXT", "1") not in ("0", "false", "False")
+AMBIENT_MAX_CHARS = int(os.getenv("PETIT_AMBIENT_MAX_CHARS", "1800"))
+
 
 # Existing Obsidian vaults that PETIT can use as its Markdown brain.
 # Windows uses ';' as the separator: C:\VaultA;D:\VaultB
