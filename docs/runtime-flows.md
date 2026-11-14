@@ -1,5 +1,25 @@
 # PETIT Runtime Flows
 
+## エピソード要約から記憶への昇格（v0.58.0・#446）
+
+会話のTurn処理とは別の、既存のバックグラウンド要約の経路。記憶へ書くのは、モデルが長く使える知識としてラベルを付けたものだけ。
+
+```mermaid
+flowchart TD
+    Idle[未整理の会話 / 一定件数または無操作] --> Summarize[summarizer: 1エピソードを要約]
+    Summarize -->|JSON不正 / 空の要約| Pending[会話は未整理のまま再試行]
+    Summarize --> Episode[conversation_episodes: decisions / facts / work_in_progress / next_action]
+    Summarize --> Durable{durable_knowledge}
+    Durable -->|kind付き・8〜300文字・最大5件| Memory[memory: source=auto_knowledge]
+    Durable -->|ラベルなし / 未知のkind / 無し| Skip[記憶へは書かない]
+    Episode --> Search[search_memoryのエピソード検索]
+    Memory --> Search
+    Legacy[以前の自動抽出 source=auto_episode] --> Review[scripts/memory_review.py export: 確認用CSV]
+    Review -->|本人が action を編集し apply --yes| Expire[バックアップ後に valid_until を設定 / 削除しない / restoreで戻せる]
+```
+
+詳細: [core/renaissance-memory.md](core/renaissance-memory.md)。
+
 ## Ambient Context: Turn開始時の現在状況（v0.57.0・#445）
 
 Coreが取得済みの作業・予定・タスクを、Brainの最初の呼び出しの前に参考データとして渡す。Tool・承認・receipt・停止条件（8 rounds / 12 calls）は変えない。
