@@ -566,7 +566,8 @@
     micEl.classList.toggle("mic--listening", on);
     if (on !== mascotListening) { mascotListening = on; mascotSignal(on ? "listening" : "idle"); }
     micEl.setAttribute("aria-label", on ? "音声入力を停止" : "音声入力を開始");
-    micEl.textContent = on ? "■" : "🎤";
+    // Icon buttons swap their SVG via the .mic--listening class instead of text.
+    if (micEl.dataset?.iconButton !== "true") micEl.textContent = on ? "■" : "🎤";
     if (on) setVoiceState("聞き取り中… もう一度押すと停止します");
   }
 

@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.56.4 (PR中)**
+**Current Version: v0.57.0**
 
-**Last Updated: 2026-11-11 UTC**
+**Last Updated: 2026-11-14 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #449 Chat・Develop UIのモダン化（v0.57.0）: スマホ版Claude/ChatGPT風の見た目専用レイヤ `frontend/petit-modern.css` を `petit-ui-polish.css` の後に追加。Chatは返答の吹き出しなし全幅表示・ユーザー右寄せ吹き出し・角丸入力カード（＋画像/マイク/送信アイコン）、スレッド操作をチップ列化。Developは依頼カード統合・選択肢チップ化・開始ボタン強調。960px未満は上部をアプリバー風、下部タブを平らに。DOM順・API・挙動は不変。Playwright（iPhone 13相当/1440px、ダーク/ライト）で表示確認。実iPhone・Desktop(Electron)・実会話での受入は未実施。
 
 - v0.56.4 ActivityジョブID検索（開発PR）: Development Hubの背景Activityに数値IDの完全一致検索を追加。既存GET /api/activity/jobsの取得済み直近30件だけをクライアントで絞り込み、入力による追加通信・秘密本文表示・DB変更はしない。状態フィルターと併用可能。Node契約テスト追加。実ブラウザ/Windows/iPhone受入は未実施。
 
@@ -435,3 +437,4 @@
 | 2026-11-11 | 10:52 | - | v0.56.1: チャット起票の開発ジョブを開発タブのスレッド階層へ自動投影し、リポジトリ名解決とNotion同期の古いconflict残骸8件を解消。 |
 | 2026-11-11 | 13:50 | - | v0.56.2: 開発タブへの未投影チャット開発ジョブ自動同期（sync_chat_threads）と未登録リポジトリ安全フォールバック、delegate_coding_task連携を追加。 |
 | 2026-11-11 | 14:00 | #443 | v0.56.3: CLI開発ジョブ起票時のtasks_cache自動タスク作成を廃止し、coding_jobs.task_idのnullableマイグレーションと単体テストを追加。 |
+| 2026-11-14 | 15:30 | #449 | v0.57.0: Chat・DevelopのUIをスマホ版Claude/ChatGPT風に刷新（petit-modern.css追加、入力欄アイコン化、スレッド操作チップ化、Develop依頼カード整理、モバイル上部/下部ナビ軽量化）。 |

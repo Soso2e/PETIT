@@ -53,6 +53,7 @@
     for (const [name, marker] of [
       ["petit-corner-shell.css", "corner-shell-style"],
       ["petit-ui-polish.css", "ui-polish-style"],
+      ["petit-modern.css", "modern-style"],
     ]) {
       if (document.querySelector(`link[data-petit-module="${marker}"]`)) continue;
       const link = document.createElement("link");
