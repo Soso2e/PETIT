@@ -15,8 +15,31 @@ log = logging.getLogger(__name__)
 
 _SYSTEM = """あなたはPETITの会話エピソード整理機能です。会話に明記されたことだけを抽出し、推測を加えないでください。
 必ず次のJSONだけを返してください:
-{"title":"","summary":"","decisions":[],"facts":[],"work_in_progress":[],"next_action":[]}
-雑談だけなら summary は空文字にしてください。長期的に再利用できない一時的な発言は facts に入れません。"""
+{"title":"","summary":"","decisions":[],"facts":[],"work_in_progress":[],"next_action":[],"durable_knowledge":[]}
+雑談だけなら summary は空文字にしてください。長期的に再利用できない一時的な発言は facts に入れません。
+
+durable_knowledge には、数か月後の別の会話でもそのまま正しい、ユーザー本人についての知識だけを入れます。
+各要素は {"kind":"preference|profile|decision|fact","text":"..."} です。text は主語と対象が分かる、それだけで読める一文にします。
+入れるもの: ユーザー本人が述べた好み・習慣、本人や身近な人・物・プロジェクトの名前と関係、PETITへの継続的な頼み方、長く続く方針。
+入れないもの: 時刻や日付そのもの、その日の予定、タスクや予定の件数・一覧、同期や接続の状態、PETITが実行・確認した操作、作業の途中経過、PETIT自身の機能や不具合、PETITの発言だけに出てくる内容。
+迷ったら入れません。該当がなければ空配列にします。"""
+
+# Episode facts, decisions and work in progress describe that conversation and stay in the
+# episode. Only knowledge the model marks as durable becomes a standing memory.
+DURABLE_SOURCE = "auto_knowledge"
+DURABLE_KINDS = {"preference", "profile", "decision", "fact"}
+MAX_DURABLE_PER_EPISODE = 5
+
+
+def _durable(value: Any) -> list[tuple[str, str]]:
+    found = []
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, dict):
+            continue  # an unlabelled string is the old free-form shape; do not promote it
+        text, kind = str(item.get("text") or "").strip(), str(item.get("kind") or "").strip().lower()
+        if len(text) >= 8 and len(text) <= 300 and kind in DURABLE_KINDS:
+            found.append((text, kind))
+    return found[:MAX_DURABLE_PER_EPISODE]
 
 
 def _transcript(rows: list[dict[str, Any]]) -> str:
@@ -93,10 +116,8 @@ def summarize_pending(kind: str = "interval", min_conversations: int | None = No
     markdown_export.append_episode({**data, "episode_id": episode_id})
     saved = 0
     # Automatic promotion is intentionally narrow. Explicit save_memory remains separate.
-    for item, mem_type in [(x, "decision") for x in _items(parsed.get("decisions"))] + [(x, "fact") for x in _items(parsed.get("facts"))] + [(x, "project") for x in _items(parsed.get("work_in_progress"))]:
-        if len(item) < 8:
-            continue
-        memory_id, created = db.save_memory_item(item, mem_type, "auto_episode")
+    for item, mem_type in _durable(parsed.get("durable_knowledge")):
+        memory_id, created = db.save_memory_item(item, mem_type, DURABLE_SOURCE)
         if created:
             saved += 1
     chroma_client.sync_structured_data(db.all_memory(), db.all_episodes())

@@ -35,6 +35,44 @@ class ConversationEpisodeTests(unittest.TestCase):
         self.assertFalse(second["summarized"])
         self.assertEqual(len(db.recent_episodes()), 1)
 
+    def _memories(self):
+        return [(row["type"], row["source"], row["content"]) for row in db.all_memory()]
+
+    def _with_durable(self, durable):
+        return {"content": self._valid()["content"][:-1] + ',"durable_knowledge":' + durable + "}"}
+
+    def test_episode_state_stays_in_the_episode_and_is_not_promoted(self):
+        self._turns(3)
+        with patch.object(summarizer, "chat_completion", return_value=self._valid()), patch.object(chroma_client, "sync_structured_data", return_value={}):
+            result = summarizer.summarize_pending(force=True)
+        self.assertEqual(result["memories_saved"], 0)
+        self.assertEqual(self._memories(), [])
+        episode = db.recent_episodes()[0]
+        self.assertIn("SQLiteを正本にする", episode["facts"])
+        self.assertIn("増分Embeddingを実装中", episode["work_in_progress"])
+
+    def test_only_labelled_durable_knowledge_becomes_memory(self):
+        self._turns(3)
+        reply = self._with_durable(
+            '[{"kind":"preference","text":"ユーザーはコーヒーは浅煎りが好き"},'
+            '{"kind":"profile","text":"ユーザーの猫の名前はもなか"},'
+            '"今日のタスクは11件ある",'
+            '{"kind":"state","text":"Notion同期は正常で競合はない"},'
+            '{"kind":"fact","text":"短い"}]')
+        with patch.object(summarizer, "chat_completion", return_value=reply), patch.object(chroma_client, "sync_structured_data", return_value={}):
+            result = summarizer.summarize_pending(force=True)
+        self.assertEqual(result["memories_saved"], 2)
+        self.assertEqual(self._memories(), [("preference", "auto_knowledge", "ユーザーはコーヒーは浅煎りが好き"),
+                                            ("profile", "auto_knowledge", "ユーザーの猫の名前はもなか")])
+
+    def test_durable_knowledge_is_capped_per_episode(self):
+        self._turns(3)
+        reply = self._with_durable(
+            "[" + ",".join('{"kind":"fact","text":"ユーザーの長く続く事実その%d"}' % i for i in range(9)) + "]")
+        with patch.object(summarizer, "chat_completion", return_value=reply), patch.object(chroma_client, "sync_structured_data", return_value={}):
+            result = summarizer.summarize_pending(force=True)
+        self.assertEqual(result["memories_saved"], summarizer.MAX_DURABLE_PER_EPISODE)
+
     def test_llm_or_json_failure_keeps_turns_pending(self):
         self._turns()
         with patch.object(summarizer, "chat_completion", return_value={"content": "not json"}):
