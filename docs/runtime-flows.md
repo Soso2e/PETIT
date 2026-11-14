@@ -20,7 +20,7 @@ flowchart TD
 
 詳細: [core/renaissance-memory.md](core/renaissance-memory.md)。
 
-## Ambient Context: Turn開始時の現在状況（v0.57.0・#445）
+## Ambient Context: Turn開始時の現在状況（v0.58.0・#445）
 
 Coreが取得済みの作業・予定・タスクを、Brainの最初の呼び出しの前に参考データとして渡す。Tool・承認・receipt・停止条件（8 rounds / 12 calls）は変えない。
 詳細: [core/ambient-context.md](core/ambient-context.md)。

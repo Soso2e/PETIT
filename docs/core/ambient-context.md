@@ -1,6 +1,6 @@
 # Ambient Context — Turn開始時にCoreが渡す現在状況
 
-> Status: **現行**（v0.57.0） / 関連Issue: #445（本機能）、#446（記憶の質と自動想起）、#372
+> Status: **現行**（v0.58.0） / 関連Issue: #445（本機能）、#446（記憶の質と自動想起）、#372
 >
 > 実装フローの正本は [../runtime-flows.md](../runtime-flows.md) の「Ambient Context」。本書は目的・境界・判断理由を書く。
 

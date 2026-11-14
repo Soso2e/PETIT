@@ -12,7 +12,7 @@ def test_develop_starts_jobs_inside_the_main_tab():
     universe = read("universe.html")
     assert 'data-view-panel="development"' in universe and 'id="development-request"' in universe
     assert 'name="repository"' in universe and 'name="model_key"' in universe
-    assert '<option value="medium" selected>Medium</option>' in universe
+    assert '<option value="medium" selected>Effort: Medium</option>' in universe
     assert "指定なし（PC内の全ファイルを見る）" in universe
     assert '/static/development.html' not in universe
     script = read("development.js")

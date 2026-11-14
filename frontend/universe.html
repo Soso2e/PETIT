@@ -234,13 +234,13 @@
             <div id="development-home-compose">
               <div id="development-composer" class="development-request">
                 <form id="development-request">
-                  <label class="development-prompt-label">開発内容
+                  <label class="development-prompt-label"><span class="development-field-label">開発内容</span>
                     <textarea name="goal" rows="3" required maxlength="8000" placeholder="調査、試作、実装、修正… 何でも相談してみよう"></textarea>
                   </label>
                   <div class="development-options">
-                    <label>作業場所<select name="repository"><option value="">指定なし（PC内の全ファイルを見る）</option></select></label>
-                    <label>CLI / モデル<select name="model_key"><option value="auto">自動（残量優先）</option></select></label>
-                    <label>Effort<select name="effort"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></label>
+                    <label><span class="development-field-label">作業場所</span><select name="repository" title="作業場所"><option value="">指定なし（PC内の全ファイルを見る）</option></select></label>
+                    <label><span class="development-field-label">CLI / モデル</span><select name="model_key" title="CLI / モデル"><option value="auto">自動（残量優先）</option></select></label>
+                    <label><span class="development-field-label">Effort</span><select name="effort" title="Effort"><option value="low">Effort: Low</option><option value="medium" selected>Effort: Medium</option><option value="high">Effort: High</option></select></label>
                   </div>
                   <div class="development-submit-row">
                     <label><input type="checkbox" name="lightweight"> 軽量な読み取り調査</label>
@@ -368,10 +368,10 @@
             <div id="messages" class="messages" aria-live="polite">
               <div class="message message--assistant">いま必要なことを一緒に整理しよう。</div>
             </div>
-            <form id="chat-form" class="chat-composer">
-              <button id="mic" type="button" class="mic" aria-label="音声入力を開始" title="押して話す">音声</button>
+            <form id="chat-form" class="chat-composer" data-attach-inline="true">
+              <button id="mic" type="button" class="mic" aria-label="音声入力を開始" title="押して話す" data-icon-button="true"><svg class="mic-icon mic-icon--idle" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg><svg class="mic-icon mic-icon--stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"></rect></svg></button>
               <textarea id="chat-input" rows="1" placeholder="PETITに話しかける"></textarea>
-              <button type="submit">送信</button>
+              <button type="submit" class="chat-send" aria-label="送信" title="送信"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg><span class="sr-only">送信</span></button>
             </form>
           </section>
         </div>
