@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.57.0**
+**Current Version: v0.57.1 (PR中)**
 
 **Last Updated: 2026-11-14 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- #448 CLI開発ジョブ（v0.57.1、PR中）: Antigravity CLIの構造化応答に公式JSON Schemaを使い、タイムアウト・一時起動失敗・応答未完了などは失敗したモデルの呼び出しだけを再試行する。ChatカードとDevelopに実行段階をSSE配信し、DeepSeekには委譲指示を短くするスキルを渡す。実CLIで短文とCore経由の読み取り往復、Chromeで合成SSEのChatカード表示、実DeepSeekで合成依頼の77文字の委譲目的を確認。実Chatからの長時間ジョブ完走率は未確認。
 
 - #449 Chat・Develop UIのモダン化（v0.57.0）: スマホ版Claude/ChatGPT風の見た目専用レイヤ `frontend/petit-modern.css` を `petit-ui-polish.css` の後に追加。Chatは返答の吹き出しなし全幅表示・ユーザー右寄せ吹き出し・角丸入力カード（＋画像/マイク/送信アイコン）、スレッド操作をチップ列化。Developは依頼カード統合・選択肢チップ化・開始ボタン強調。960px未満は上部をアプリバー風、下部タブを平らに。DOM順・API・挙動は不変。Playwright（iPhone 13相当/1440px、ダーク/ライト）で表示確認。実iPhone・Desktop(Electron)・実会話での受入は未実施。
 
@@ -438,3 +440,4 @@
 | 2026-11-11 | 13:50 | - | v0.56.2: 開発タブへの未投影チャット開発ジョブ自動同期（sync_chat_threads）と未登録リポジトリ安全フォールバック、delegate_coding_task連携を追加。 |
 | 2026-11-11 | 14:00 | #443 | v0.56.3: CLI開発ジョブ起票時のtasks_cache自動タスク作成を廃止し、coding_jobs.task_idのnullableマイグレーションと単体テストを追加。 |
 | 2026-11-14 | 15:30 | #449 | v0.57.0: Chat・DevelopのUIをスマホ版Claude/ChatGPT風に刷新（petit-modern.css追加、入力欄アイコン化、スレッド操作チップ化、Develop依頼カード整理、モバイル上部/下部ナビ軽量化）。 |
+| 2026-11-14 | 14:52 | #448 | ChatからのCLI開発で応答の構造化・再試行・失敗理由の記録と進捗配信を実装し、DeepSeekへ短い委譲指示のスキルを追加。 |

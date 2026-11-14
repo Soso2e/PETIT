@@ -5,6 +5,9 @@
 ## 依頼と実行
 
 - Chat は `list_coding_repositories` で対象を確認し、`propose_development_job` に整えたプロンプト、対象、モデルと Effort を渡す。同じジョブの `proposed` カードが返信内と Develop に表示される。開始操作で `queued` に進む。
+- DeepSeekのFront Brainは[委譲スキル](../../backend/skills/compact-cli-handoff/SKILL.md)を読み、目的、必須の制約、完了条件に絞って依頼する。
+- Antigravityの開発ジョブはCLI応答1回に120秒を確保する。タイムアウト、一時的な起動・通信エラー、構造化応答の検証失敗は同じステップだけを1回再試行する。再試行は1ジョブに最大2回、実行全体は15分まで。認証・権限・利用枠は原因を表示する。
+- Chatの開発カードとDevelopは、管理者向けSSEでCLIの受信・検証・再試行などの進捗文を表示する。保存済みの結果・差分・承認はジョブ詳細から取得する。CLIの内部思考、CLIの生出力、ツール引数は進捗配信の対象外。
 - Develop のフォームは管理者の送信で `queued` を作る。以降はどちらも同じ Coding Job Worker が処理する。
 - request ID と入力のハッシュで再送を判定し、状態の更新条件で承認と Worker の取得を一度に限る。実行中の Core 再起動は `interrupted` とし、作業コピーを保持する。
 - 旧ジョブの記録と API は残す。旧開発ページの URL は Develop タブへ移動する。通常の会話カタログでは、旧 `delegate_coding_task` と worktree 変更 Tool に代わって開発提案を公開する。
