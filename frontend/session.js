@@ -111,9 +111,7 @@
     if (!form) return;
     const controls = document.createElement('div');
     controls.className = 'petit-thread-controls';
-    controls.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;padding:6px 0;font-size:12px;align-items:center';
     const select = document.createElement('select'); select.setAttribute('aria-label', '会話スレッド');
-    select.style.maxWidth = '200px';
     const current = document.createElement('option'); current.value = id; current.textContent = '現在の会話'; select.append(current);
     select.onchange = () => open(select.value);
     const refresh = document.createElement('button'); refresh.type = 'button'; refresh.textContent = '会話一覧';

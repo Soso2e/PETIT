@@ -15,13 +15,23 @@
   const status = document.createElement("span");
   const choose = document.createElement("button");
   choose.type = "button";
-  choose.textContent = "画像を添付";
+  choose.className = "chat-attachments__add";
+  choose.textContent = "＋ 画像";
+  // The rules stay discoverable on hover/long-press; the status line only shows real feedback.
+  choose.title = "画像を添付: 4枚まで・各8MiB / 24時間で削除。クラウド送信は設定で許可が必要です。";
+  choose.setAttribute("aria-label", "画像を添付（4枚まで・各8MiB。24時間で削除。クラウド送信は設定で許可が必要）");
   choose.addEventListener("click", () => picker.click());
   status.setAttribute("role", "status");
-  status.textContent = "画像: 4枚まで・各8MiB / 24時間で削除。クラウド送信は設定で許可が必要です。";
+  status.className = "chat-attachments__status";
   const list = document.createElement("div");
   panel.append(choose, picker, status, list);
   form.before(panel);
+  // Universe Chat opts in to a "+" button inside the composer, like mobile chat apps.
+  if (form.dataset.attachInline === "true") {
+    choose.classList.add("chat-composer__attach");
+    choose.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>';
+    form.prepend(choose);
+  }
   const session = () => localStorage.getItem("petit_session_id");
   const render = () => {
     list.replaceChildren();
