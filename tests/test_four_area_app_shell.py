@@ -42,13 +42,16 @@ class FourAreaAppShellTests(unittest.TestCase):
         self.assertIn('.petit-corner-nav__label', style)
         self.assertIn('env(safe-area-inset-bottom)', style)
 
-    def test_desktop_uses_adaptive_workspace_rail(self):
-        source = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
-        self.assertIn('.petit-area-rail', source)
-        self.assertIn('display: flex !important', source)
-        self.assertIn('@media (max-width: 959px)', source)
-        self.assertIn('.petit-corner-status', source)
-        self.assertIn('.petit-utility-dock', source)
+    def test_desktop_and_mobile_use_unified_rubber_dock(self):
+        corner_css = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
+        dock_js = (FRONTEND / "petit-rubber-dock.js").read_text(encoding="utf-8")
+        dock_css = (FRONTEND / "petit-rubber-dock.css").read_text(encoding="utf-8")
+        self.assertIn('.petit-area-rail { display: none !important; }', corner_css)
+        self.assertIn('.petit-rubber-dock-stage', dock_css)
+        self.assertIn('petit-rubber-dock-ready', dock_js)
+        self.assertIn('data-dock-target="tasks"', dock_js)
+        self.assertIn('data-dock-target="reminders"', dock_js)
+        self.assertIn('data-dock-target="settings"', dock_js)
 
     def test_workspace_has_command_palette_and_keyboard_shortcuts(self):
         source = (FRONTEND / "app_shell.js").read_text(encoding="utf-8")

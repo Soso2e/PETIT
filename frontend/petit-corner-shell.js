@@ -190,7 +190,6 @@
   const initialize = () => {
     ensureStylesheet();
     installStatus();
-    installUtilityDock();
     decorateNavigation();
     syncState();
     observeShell();

@@ -48,20 +48,20 @@ class UnifiedUiSystemTests(unittest.TestCase):
     def test_corner_shell_exposes_three_primary_icons_and_utilities(self) -> None:
         source = (FRONTEND / "petit-corner-shell.js").read_text(encoding="utf-8")
         style = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
+        dock_js = (FRONTEND / "petit-rubber-dock.js").read_text(encoding="utf-8")
+        dock_css = (FRONTEND / "petit-rubber-dock.css").read_text(encoding="utf-8")
         self.assertIn('planet:', source)
         self.assertIn('check:', source)
         self.assertIn('chat:', source)
-        self.assertIn('data-corner-reminders', source)
-        self.assertIn('data-corner-menu-settings', source)
-        self.assertIn('dock.querySelector("[data-corner-settings]")?.addEventListener("click", () => activate("settings"))', source)
-        self.assertIn('<circle cx="12" cy="12" r="3"></circle>', source)
-        self.assertNotIn('transform="translate(2 0)', source)
+        self.assertIn('data-dock-target="reminders"', dock_js)
+        self.assertIn('data-dock-target="settings"', dock_js)
+        self.assertIn('<circle cx="12" cy="12" r="3"/>', dock_js)
         self.assertNotIn('/static/legacy.html?view=settings', source)
         self.assertIn('.petit-corner-status', style)
         self.assertIn('.petit-corner-nav', style)
-        self.assertIn('.petit-utility-dock', style)
+        self.assertIn('.petit-rubber-dock', dock_css)
         self.assertIn('env(safe-area-inset-top)', style)
-        self.assertIn('env(safe-area-inset-bottom)', style)
+        self.assertIn('env(safe-area-inset-bottom)', dock_css)
 
     def test_service_worker_uses_asset_version_for_cache_generation(self) -> None:
         source = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
@@ -77,6 +77,8 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertIn('/static/universe-webgl-bridge.js', source)
         self.assertIn('/static/petit-corner-shell.js', source)
         self.assertIn('/static/petit-corner-shell.css', source)
+        self.assertIn('/static/petit-rubber-dock.js', source)
+        self.assertIn('/static/petit-rubber-dock.css', source)
 
     def test_universe_static_assets_use_shared_asset_version(self) -> None:
         source = (FRONTEND / "universe.html").read_text(encoding="utf-8")
