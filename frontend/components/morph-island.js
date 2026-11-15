@@ -291,7 +291,8 @@
     root.addEventListener?.('click', onClick);
     root.addEventListener?.('keydown', onKeyDown);
 
-    function onMotionChange() { applyState(state); }
+    // Turning reduced motion on mid-morph must land on the target right away.
+    function onMotionChange() { if (reduced.matches) scheduleFrame(); }
     reduced.addEventListener?.('change', onMotionChange);
 
     paintLayer(slots[activeSlot], first);

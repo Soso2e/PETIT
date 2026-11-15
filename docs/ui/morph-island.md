@@ -12,6 +12,8 @@
   - max radius: `32px`（`min(height / 2, 32)`）
   - volume give: `width * (1 + clamp(-H.v / 7000, -0.05, 0.05))`
   - コンテンツ切替: 2レイヤーによるブラー付きクロスフェード（`0.09s` 遅延）
+- `tests/test_morph_island.cjs` は上流の積分器（dt上限 1/30 秒・1フレーム4サブステップ）を別に実装し、伸長・縮小の両方で幅・高さ・角丸・スケールを毎フレーム比較して一致を確認している。
+- reduced motion では、モーフの途中で設定が変わった場合も含めて目標値へ即座に移る（上流は臨界減衰のスプリングで動き続ける。PETITの意図的な差分）。
 - 色・フォント・影は PETIT の `petit-ui-system.css`（`--ui-surface-solid`, `--ui-text`, `--ui-muted`, `--ui-ok`, `--ui-warn`, `--ui-danger`, ダーク/ライト両テーマ）に従う。
 
 ## Placement & Live Status Integration
