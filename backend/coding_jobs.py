@@ -387,7 +387,10 @@ def files(workspace):
 def checks(workspace, base="HEAD"):
     result = []
     for name in changed(workspace, base):
-        path = path_for(workspace, name)
+        try:
+            path = path_for(workspace, name)
+        except (ValueError, OSError):
+            continue
         if not path.exists():
             continue
         if path.suffix == ".py":
@@ -612,14 +615,16 @@ def run_job(job_id):
             event(job_id, kind)
 
         if modern and not pc:
+            from . import coding_stream
             resume = continued["session_id"] if continued else None
 
             def native(session):
                 if session:
                     event(job_id, "session_resumed")
-                return coding_agents.run_git(
-                    job["provider"], target, development_context(job, continued, bool(session)), workspace,
-                    check, progress, resume=session, on_session=lambda value: remember_session(job_id, value))
+                with coding_stream.bind(job_id):
+                    return coding_agents.run_git(
+                        job["provider"], target, development_context(job, continued, bool(session)), workspace,
+                        check, progress, resume=session, on_session=lambda value: remember_session(job_id, value))
 
             try:
                 summary = native(resume)
@@ -658,6 +663,9 @@ def run_job(job_id):
             development_models.invalidate()
         message = str(exc) if isinstance(exc, (ValueError, LMStudioError)) else "開発タスクが停止しました（" + type(exc).__name__ + "）。接続・権限を確認してください。"
         finish(job_id, "failed", error=message[:1000])
+    finally:
+        from . import coding_stream
+        coding_stream.clear(job_id)
 
 
 def pump():

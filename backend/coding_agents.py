@@ -5,7 +5,7 @@ import queue
 import tempfile
 import time
 
-from . import antigravity_cli, antigravity_cli_brain, claude_code_brain, codex_brain
+from . import antigravity_cli, antigravity_cli_brain, claude_code_brain, codex_brain, coding_stream
 
 CATALOG = [{"type": "function", "function": {"name": name, "description": description, "parameters": schema}}
     for name, description, schema in [
@@ -138,6 +138,18 @@ def _run_claude_git(target, prompt, workspace, check, progress, resume=None, on_
         elif kind == "result":
             result = event
             progress("cli_validating")
+        if kind == "content_block_delta":
+            delta = event.get("delta") or {}
+            if delta.get("type") == "text_delta" and isinstance(delta.get("text"), str):
+                coding_stream.append_delta_current(delta["text"])
+        elif kind == "assistant":
+            for block in (event.get("message") or {}).get("content") or []:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "text" and isinstance(block.get("text"), str):
+                    coding_stream.append_delta_current(block["text"])
+                elif block.get("type") == "tool_use" and isinstance(block.get("name"), str):
+                    coding_stream.publish_tool_current(block["name"])
 
     check()
     progress("model_request")
@@ -198,6 +210,11 @@ def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None
         if next_phase and next_phase != phase:
             phase = next_phase
             progress(phase)
+        if event["kind"] == "step":
+            if event.get("text_delta"):
+                coding_stream.append_delta_current(event["text_delta"])
+            if event.get("tool"):
+                coding_stream.publish_tool_current(event["tool"])
 
     check()
     progress("model_request")
@@ -334,7 +351,12 @@ def _run_codex(client, target, goal, invoke, check, progress, catalog, instructi
             client.send({"id": item["id"], "error": {"code": -32601, "message": "PETIT coding tools only"}})
         elif development and method == "item/started" and params.get("item", {}).get("type") in {"commandExecution", "fileChange"}:
             progress("cli_responding")
-        elif method == "item/agentMessage/delta":reply += params.get("delta", "")
+            coding_stream.publish_tool_current(params.get("item", {}).get("type", ""))
+        elif method == "item/agentMessage/delta":
+            delta = params.get("delta", "")
+            reply += delta
+            if development and delta:
+                coding_stream.append_delta_current(delta)
         elif method == "item/completed" and params.get("item", {}).get("type") == "agentMessage":
             if params["item"].get("phase") in (None, "final_answer"):final = params["item"].get("text", "")
         elif method == "turn/completed":

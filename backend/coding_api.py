@@ -171,6 +171,7 @@ def detail(job_id: str):return call(jobs.get, job_id)
 
 @router.get("/jobs/{job_id}/stream")
 async def stream(job_id: str, request: Request):
+    from . import coding_stream
     initial = await asyncio.to_thread(jobs.progress_snapshot, job_id)
     if initial is None:
         raise HTTPException(404, "開発ジョブが見つかりません。")
@@ -178,7 +179,9 @@ async def stream(job_id: str, request: Request):
     async def events():
         snapshot = initial
         previous_status = None
+        last_phase = None
         cursor = 0
+        draft_cursor = 0
         last_sent = time.monotonic()
         yield "retry: 3000\n\n"
         while not await request.is_disconnected():
@@ -187,8 +190,21 @@ async def stream(job_id: str, request: Request):
             status, changes = snapshot
             for seq, phase in changes or ([(cursor, None)] if status != previous_status else []):
                 cursor = seq
+                if phase:
+                    last_phase = phase
                 data = json.dumps({"status": status, "phase": phase}, ensure_ascii=False)
                 yield f"event: progress\ndata: {data}\n\n"
+                last_sent = time.monotonic()
+            draft_snap = coding_stream.snapshot(job_id)
+            if draft_snap["seq"] != draft_cursor:
+                draft_cursor = draft_snap["seq"]
+                payload = json.dumps({
+                    "status": status,
+                    "phase": last_phase,
+                    "tool": draft_snap["tool"],
+                    "draft": draft_snap["draft"],
+                }, ensure_ascii=False)
+                yield f"event: draft\ndata: {payload}\n\n"
                 last_sent = time.monotonic()
             if status not in {"queued", "running"}:
                 return
@@ -196,7 +212,7 @@ async def stream(job_id: str, request: Request):
             if time.monotonic() - last_sent > 15:
                 yield ": keepalive\n\n"
                 last_sent = time.monotonic()
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.15)
             snapshot = await asyncio.to_thread(jobs.progress_snapshot, job_id, cursor)
 
     return StreamingResponse(events(), media_type="text/event-stream",
@@ -234,15 +250,20 @@ def diff(job_id: str):
     base = job["base_commit"] if job.get("mode") == "git" else "HEAD"
     changed = call(jobs.changed, job["workspace"], base)
     pieces = []
+    visible_files = []
     for name in changed:
-        path = call(jobs.path_for, job["workspace"], name)
+        try:
+            path = jobs.path_for(job["workspace"], name)
+        except (ValueError, OSError):
+            continue
+        visible_files.append(name)
         tracked = jobs.git(job["workspace"], "ls-files", "--", name).strip()
         if tracked or not path.exists():
             pieces.append(jobs.git(job["workspace"], "diff", "--no-ext-diff", "--no-textconv", base, "--", name))
         else:
             pieces.append("New file: " + name + "\n" + path.read_bytes()[:50000].decode("utf-8", "replace") + "\n")
     text = "\n".join(pieces)
-    return {"files": changed, "diff": text[:100000], "truncated": len(text) > 100000}
+    return {"files": visible_files, "diff": text[:100000], "truncated": len(text) > 100000}
 
 
 @router.post("/jobs/{job_id}/complete", dependencies=[Depends(setup_api._same_origin)])

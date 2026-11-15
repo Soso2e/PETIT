@@ -1,10 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.65.0**
+**Current Version: v0.66.0**
 
 **Last Updated: 2026-11-15 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
+
+- 開発タブのストリーミング・Markdown・会話UI化とMorph Island統一（v0.66.0）: `backend/coding_jobs.py` / `coding_api.py` の `checks()`・`diff()` が未追跡の `storage/` 等で `protected_path` 停止する不具合を修正。`backend/coding_stream.py` と SSE `event: draft` により CLI（Antigravity / Claude Code / Codex）の応答増分とツール実行状況をリアルタイム配信し、`frontend/development.js` へ Streaming Reply・`PetitMarkdown.renderTo`・会話形式UIを統合。`frontend/petit-ui-system.js` の「作業なし / 作業中」バーを撤去して `Morph Island` へ統一（開発ジョブは件数非表示・状態名表示、作業セッションはタスク名＋経過時間表示）。関連 pytest 59件・Nodeテスト10件成功。稼働サーバー・実ブラウザでの目視確認は未実施。
 
 - 設定画面のアニメーション付きスイッチ（v0.65.0）: DesignBookmark の Toggle Switch を共有コンポーネント `frontend/components/toggle-switch.{js,css}` として移植（元と同じスプリング 320/18・300/20）。`setup.html` の `.check` 7項目をスイッチ化し、チェックボックスと保存処理はそのまま。単体テストと隔離サーバーでの実ブラウザ確認済み。実サーバー・Desktop(Electron)・iPhone での受入は未確認。詳細は `docs/ui/toggle-switch.md`。
 - #458 Morph Island の実状態連携と上部中央フローティング配置（v0.64.0）: `frontend/components/morph-island.js` / `.css` を DesignBookmark の実スプリング定数（幅 `380/24`・高さ `300/22`・押下 `520/18`・volume give・2レイヤーブラークロスフェード）で再構築し、`frontend/components/petit-island-status.js` を追加。`universe.html` の画面上部中央へ自動マウントし、会話/音声・開発ジョブ・通知・作業セッションを優先度順に表示（タップで該当画面へ遷移）。Node単体・統合テスト38件成功。実サーバー・実ブラウザでの目視確認は未実施。
@@ -256,6 +258,7 @@
 
 | 日付 | 時間 | 回数 | 変更内容 |
 |------|------|------|----------|
+| 2026-11-15 | 18:45 | #develop-stream-island | v0.66.0: 開発タブのprotected_path修正、CLI応答ストリーミング・Markdown・会話UI化、Morph Islandへの作業表示統一（件数非表示） |
 | 2026-11-15 | 17:45 | #toggle-switch | v0.65.0: 設定画面のオン/オフ7項目をアニメーション付きスイッチ（共有コンポーネント、元のスプリング値を維持）へ置換 |
 | 2026-11-15 | 17:38 | #chat-motion | v0.63.0としてChat・Develop欄にPrompt box（スプリング伸縮・ステータス行・送信/停止モーフ）とStreaming reply（バブル伸縮・チャンク出現）を実装 |
 | 2026-11-15 | 17:26 | #rubber-dock-unify | v0.62.0としてPC・スマホのタブ操作を下部5タブRubber Dock（Utilityカード展開付き）へ統一し、左サイドバーを廃止 |

@@ -434,3 +434,44 @@ def test_schema_migration_task_id_nullable(tmp_path, monkeypatch):
         assert new_row == ("job-new", None)
 
 
+def test_checks_and_diff_skip_protected_untracked_paths(repository, client):
+    admin(client)
+    head = jobs.git(repository, "rev-parse", "HEAD").strip()
+    (repository / "storage").mkdir(exist_ok=True)
+    (repository / "storage" / "uvicorn.log").write_text("runtime log\n", encoding="utf-8")
+    (repository / ".gemini").mkdir(exist_ok=True)
+    (repository / ".gemini" / "tmp.txt").write_text("scratch\n", encoding="utf-8")
+    (repository / "main.py").write_text("VALUE = 42\n", encoding="utf-8")
+
+    result = jobs.checks(str(repository), head)
+    assert result["ok"] is True
+    assert [item["path"] for item in result["static"] if "path" in item] == ["main.py"]
+
+    job = jobs.create("diff-protected", str(repository), "確認", "antigravity_cli", base_commit=head)
+    with db.get_connection() as connection:
+        connection.execute("UPDATE coding_jobs SET workspace=?, status='ready_for_review' WHERE id=?",
+                           (str(repository), job["job_id"]))
+    response = client.get(f"/api/coding/jobs/{job['job_id']}/diff")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["files"] == ["main.py"]
+    assert "VALUE = 42" in payload["diff"]
+
+
+def test_coding_stream_emits_draft_and_tool_events(repository, client):
+    from backend import coding_stream
+    admin(client)
+    job_id = jobs.create("draft-stream", str(repository), "進捗確認", "antigravity_cli")["job_id"]
+    coding_stream.append_delta(job_id, "ファイルを解析しています。")
+    coding_stream.publish_tool(job_id, "read_file")
+    coding_stream.append_delta(job_id, "完了しました。")
+    try:
+        response = client.get(f"/api/coding/jobs/{job_id}/stream")
+        assert response.status_code == 200
+        assert "event: draft" in response.text
+        assert "ファイルを解析しています。完了しました。" in response.text
+    finally:
+        coding_stream.clear(job_id)
+
+
+

@@ -58,22 +58,23 @@
     const runningJob = store.codingJobs.find((j) => j.status === 'running' || j.status === 'queued')
       || store.codingJobs[0];
     if (runningJob) {
-      const provider = runningJob.provider || 'CLI';
       const statusText = runningJob.status === 'running'
-        ? `${provider} 開発中`
+        ? '開発中'
         : runningJob.status === 'queued'
-          ? `${provider} 待機中`
+          ? '開発待機中'
           : runningJob.status === 'ready_for_review'
-            ? `${provider} 確認待ち`
-            : `${provider} 開発提案`;
+            ? '完了しました'
+            : '開発提案';
       const detail = runningJob.summary
         ? String(runningJob.summary).slice(0, 28)
-        : (runningJob.taskId ? `Task #${runningJob.taskId}` : 'Developで確認できます');
+        : runningJob.status === 'ready_for_review'
+          ? 'タップして確認'
+          : 'Developで確認できます';
       return {
         state: 'develop',
         label: statusText,
         detail,
-        badge: store.codingJobs.length > 1 ? `${store.codingJobs.length}件` : '',
+        badge: '',
         view: 'development',
       };
     }
@@ -91,7 +92,7 @@
     }
 
     if (store.activeSession && ['active', 'paused'].includes(store.activeSession.status)) {
-      const taskName = store.activeSession.task_title || store.activeSession.title || '作業セッション中';
+      const taskName = store.activeSession.task_title || store.activeSession.task || store.activeSession.title || '作業中';
       const paused = store.activeSession.status === 'paused';
       return {
         state: 'session',

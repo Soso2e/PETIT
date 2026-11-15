@@ -147,7 +147,8 @@ body .chat-composer button[type="submit"].petit-send-morph:disabled {
   will-change: transform, opacity;
 }
 
-body .messages .message--assistant.petit-stream-bubble {
+body .messages .message--assistant.petit-stream-bubble,
+body .development-thread-stream.petit-stream-bubble {
   position: relative;
   align-self: flex-start;
   overflow: hidden;
@@ -161,7 +162,8 @@ body .messages .message--assistant.petit-stream-bubble {
   transition: background 0.22s ease, border-color 0.22s ease;
 }
 
-html[data-petit-theme="light"] body .messages .message--assistant.petit-stream-bubble {
+html[data-petit-theme="light"] body .messages .message--assistant.petit-stream-bubble,
+html[data-petit-theme="light"] body .development-thread-stream.petit-stream-bubble {
   background: var(--ui-bg-2);
 }
 

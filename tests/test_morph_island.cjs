@@ -191,12 +191,28 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
   const dock = body.children[0];
   const islandEl = dock.children[0];
   assert.equal(islandEl.dataset.state, 'session');
+  const sessionLayer = islandEl.children[0].children.find((l) => l.classList.contains('is-on'));
+  assert.equal(sessionLayer.children[1].children[0].textContent, '設計レビュー');
+  assert.match(sessionLayer.children[2].textContent, /^01:0[4-9]$/);
 
   mockFetchData['/api/coding/activity?limit=10'] = {
-    jobs: [{ id: 'job1', provider: 'Codex', status: 'running', summary: 'UI実装中' }],
+    jobs: [
+      { id: 'job1', provider: 'Codex', status: 'running', summary: 'UI実装中' },
+      { id: 'job2', provider: 'Antigravity CLI', status: 'queued', summary: '' },
+    ],
   };
   await ctx.window.PetitIslandStatus.refresh();
   assert.equal(islandEl.dataset.state, 'develop');
+  const devLayer = islandEl.children[0].children.find((l) => l.classList.contains('is-on'));
+  assert.equal(devLayer.children[1].children[0].textContent, '開発中');
+  assert.equal(devLayer.children[2].hidden, true);
+
+  mockFetchData['/api/coding/activity?limit=10'] = {
+    jobs: [{ id: 'job1', provider: 'Antigravity CLI', status: 'ready_for_review', summary: '' }],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  const doneLayer = islandEl.children[0].children.find((l) => l.classList.contains('is-on'));
+  assert.equal(doneLayer.children[1].children[0].textContent, '完了しました');
 
   docListeners.get('petit:mascot')({ detail: { state: 'thinking' } });
   assert.equal(islandEl.dataset.state, 'working');

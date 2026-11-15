@@ -46,26 +46,56 @@
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
-  function watchProgress(element, job, refresh) {
+  function watchProgress(element, job, refresh, options = {}) {
     element.setAttribute("aria-live", "polite");
-    const replyBox = element.closest(".development-thread-reply");
-    const update = ({ status, phase }) => {
-      const next = (status === "running" && (retryPhases[phase] || phases[phase])) || states[status] || "";
-      if (element.textContent !== next) element.textContent = next;
-      if (replyBox) replyBox.classList.toggle("is-streaming-status", active.has(status));
+    const replyBox = options.replyBox || element.closest(".development-thread-reply");
+    const useStreaming = Boolean(options.streamReply && replyBox && window.PetitChatMotion?.createStreamingController);
+    const labelFor = ({ status, phase, tool }) => {
+      if (status === "running" && tool) return "ツール実行中: " + tool + "…";
+      return (status === "running" && (retryPhases[phase] || phases[phase])) || states[status] || "";
     };
-    update({ status: job.status, phase: job.events?.at(-1)?.kind });
+    const initialLabel = labelFor({ status: job.status, phase: job.events?.at(-1)?.kind });
+    const streamCtrl = (useStreaming && active.has(job.status))
+      ? window.PetitChatMotion.createStreamingController(replyBox, initialLabel || "CLIに応答を依頼中…")
+      : null;
+    const update = (payload) => {
+      const next = labelFor(payload);
+      if (streamCtrl) {
+        if (payload.draft) {
+          streamCtrl.updateDraft(payload.draft);
+        } else if (next) {
+          streamCtrl.setPhase(next);
+        }
+      } else {
+        if (element.textContent !== next) element.textContent = next;
+      }
+      if (replyBox && !streamCtrl) replyBox.classList.toggle("is-streaming-status", active.has(payload.status));
+    };
+    if (!streamCtrl) update({ status: job.status, phase: job.events?.at(-1)?.kind });
     if (!active.has(job.status) || typeof EventSource !== "function") return;
+    closeProgress(element);
     const stream = new EventSource("/api/coding/jobs/" + encodeURIComponent(job.id) + "/stream");
     progressStreams.set(element, stream);
-    stream.addEventListener("progress", (event) => {
-      const value = JSON.parse(event.data);
-      if (value) update(value);
-      if (!value || !active.has(value.status)) {
+    const finishIfDone = (status) => {
+      if (!active.has(status)) {
+        streamCtrl?.finish();
         if (replyBox) replyBox.classList.remove("is-streaming-status");
         closeProgress(element);
         void refresh();
+        return true;
       }
+      return false;
+    };
+    stream.addEventListener("progress", (event) => {
+      const value = JSON.parse(event.data);
+      if (value) update(value);
+      if (!value) return;
+      finishIfDone(value.status);
+    });
+    stream.addEventListener("draft", (event) => {
+      const value = JSON.parse(event.data);
+      if (value) update(value);
+      if (value) finishIfDone(value.status);
     });
   }
 
@@ -379,39 +409,109 @@
     catch (error) { report(error.message); }
   }
 
+  function renderReplyBody(message, job) {
+    if (job.summary) {
+      if (window.PetitMarkdown?.renderTo) {
+        window.PetitMarkdown.renderTo(message, job.summary);
+      } else {
+        message.textContent = job.summary;
+      }
+      return;
+    }
+    if (job.error) {
+      message.classList.add("development-thread-error");
+      message.textContent = "エラー: " + job.error;
+      return;
+    }
+    message.textContent = states[job.status] || "";
+  }
+
+  function buildTurnElement(job) {
+    const entry = document.createElement("article");
+    entry.className = "development-thread-turn";
+    entry.dataset.jobId = job.id;
+    entry.dataset.jobStatus = job.status;
+    entry.dataset.jobSig = JSON.stringify([
+      job.status, job.summary || "", job.error || "", job.updated_at || "",
+      (job.actions || []).map((a) => a.status),
+    ]);
+    append(entry, "p", job.goal).className = "development-thread-user";
+    const reply = append(entry, "div", "");
+    reply.className = "development-thread-reply";
+    const metaRow = append(reply, "div", "");
+    metaRow.className = "development-thread-reply-meta";
+    append(metaRow, "strong", [job.provider || "CLI", statusLabel(job.status)].join(" · "));
+    append(metaRow, "small", timestamp(job.updated_at)).className = "development-muted";
+    const streamHost = append(reply, "div", "");
+    streamHost.className = "development-thread-stream";
+    const message = append(streamHost, "div", "");
+    message.className = "message-body development-thread-body";
+    if (active.has(job.status)) {
+      watchProgress(message, job, () => {
+        if (currentView === "thread" && currentThread) return openThread(currentThread.thread_id);
+      }, { replyBox: streamHost, streamReply: true });
+    } else {
+      renderReplyBody(message, job);
+    }
+    const detail = append(entry, "details", "");
+    detail.className = "development-thread-details";
+    if (job.status === "ready_for_review" || job.status === "waiting_approval") {
+      detail.dataset.attention = "true";
+    }
+    append(detail, "summary", job.status === "ready_for_review"
+      ? "変更差分を確認・レビュー完了"
+      : job.status === "waiting_approval"
+        ? "PC操作の承認が必要です"
+        : "詳細・差分・承認");
+    const area = append(detail, "div", "");
+    card(area, job, () => openThread(currentThread.thread_id), false);
+    return entry;
+  }
+
   function renderJobHistory(items) {
     const list = $("development-thread-history");
-    list.replaceChildren();
     if (!items.length) {
+      list.replaceChildren();
       empty(list, "まだ開発依頼がありません。");
       return;
     }
-    for (const job of items) {
-      const entry = append(list, "article", "");
-      entry.className = "development-thread-turn";
-      append(entry, "p", job.goal).className = "development-thread-user";
-      const reply = append(entry, "div", "");
-      reply.className = "development-thread-reply";
-      append(reply, "strong", [job.provider || "CLI", statusLabel(job.status)].join(" · "));
-      const message = append(reply, "p", job.summary || (job.error ? "エラー: " + job.error : states[job.status]));
-      if (active.has(job.status)) watchProgress(message, job, () => {
-        if (currentView === "thread" && currentThread) return openThread(currentThread.thread_id);
-      });
-      append(reply, "small", timestamp(job.updated_at)).className = "development-muted";
-      const detail = append(entry, "details", "");
-      append(detail, "summary", "ジョブの詳細・差分・承認");
-      const area = append(detail, "div", "");
-      card(area, job, () => openThread(currentThread.thread_id), false);
+    const existingById = new Map(
+      Array.from(list.children)
+        .filter((el) => el.dataset?.jobId)
+        .map((el) => [el.dataset.jobId, el])
+    );
+    const sameOrder =
+      existingById.size === items.length &&
+      items.every((job, idx) => list.children[idx]?.dataset?.jobId === job.id);
+
+    if (sameOrder) {
+      for (const job of items) {
+        const currentEl = existingById.get(job.id);
+        const nextSig = JSON.stringify([
+          job.status, job.summary || "", job.error || "", job.updated_at || "",
+          (job.actions || []).map((a) => a.status),
+        ]);
+        const isStreamingNow = active.has(job.status) && progressStreams.has(currentEl?.querySelector(".development-thread-body"));
+        if (isStreamingNow || currentEl?.dataset.jobSig === nextSig) {
+          continue;
+        }
+        const replacement = buildTurnElement(job);
+        currentEl.replaceWith(replacement);
+      }
+    } else {
+      list.replaceChildren(...items.map(buildTurnElement));
     }
-    if (justSubmittedThreadId && justSubmittedThreadId === currentThread?.thread_id && window.PetitChatMotion) {
+
+    if (justSubmittedThreadId && justSubmittedThreadId === currentThread?.thread_id) {
       justSubmittedThreadId = null;
       const lastTurn = list.lastElementChild;
-      if (lastTurn) {
+      if (lastTurn && window.PetitChatMotion) {
         const userEl = lastTurn.querySelector(".development-thread-user");
         const replyEl = lastTurn.querySelector(".development-thread-reply");
         if (userEl) window.PetitChatMotion.animateMessageIn(userEl, true);
         if (replyEl) window.PetitChatMotion.animateMessageIn(replyEl, false);
       }
+      lastTurn?.scrollIntoView?.({ behavior: "smooth", block: "end" });
     }
   }
 

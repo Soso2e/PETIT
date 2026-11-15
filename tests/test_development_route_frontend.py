@@ -27,6 +27,9 @@ def test_chat_and_develop_share_the_proposal_and_host_action_controls():
     assert 'decide("/cancel", "キャンセル")' in script
     assert 'item.status === "proposed" && job.status === "waiting_approval"' in script
     assert 'textContent = value' in script and 'innerHTML' not in script
+    assert 'PetitMarkdown?.renderTo' in script
+    assert 'PetitChatMotion?.createStreamingController' in script
+    assert 'addEventListener("draft"' in script
 
 
 def test_claude_auth_actions_and_update_guidance_are_present():

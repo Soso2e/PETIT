@@ -366,8 +366,15 @@
     }
   }
 
+  function renderTo(element, text) {
+    if (!element) return;
+    element.classList.add("petit-markdown");
+    element.innerHTML = render(text);
+  }
+
   var PetitMarkdown = {
     render: render,
+    renderTo: renderTo,
     escapeHtml: escapeHtml,
     sanitizeUrl: sanitizeUrl,
   };

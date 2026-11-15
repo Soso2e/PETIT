@@ -270,11 +270,15 @@ body .development-thread-preview { font-size: 13px; color: var(--ui-muted); }
 body .development-muted { color: var(--ui-muted); }
 
 /* Development thread reads like the main Chat. */
+body .development-thread-history { gap: 1.25rem; }
+body .development-thread-turn { gap: .45rem; }
 body .development-thread-user {
   padding: 10px 16px; border-radius: 20px; border: 1px solid var(--ui-line);
   background: var(--ui-surface); line-height: 1.7; max-width: min(85%, 620px);
 }
-body .development-thread-reply { padding: 0 2px; border-left: 0; line-height: 1.75; }
+body .development-thread-reply { padding: 2px 2px; border-left: 0; line-height: 1.75; }
+body .development-thread-reply-meta strong { font-size: 13px; font-weight: 600; color: var(--ui-muted); }
+body .development-thread-reply-meta small { font-size: 12px; }
 body .development-advanced > summary { font-size: 13px; color: var(--ui-dim); padding: 8px 0; }
 
 /* ---------- Mobile chrome ---------- */
