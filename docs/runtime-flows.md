@@ -280,6 +280,18 @@ flowchart TD
     WA --> Approve[承認 → conversation_api.decide → 同じセッションで --resume]
 ```
 
+## Develop会話表示の更新
+
+```mermaid
+flowchart TD
+    Poll["Developの表示中に12秒ごと"] --> Thread["会話表示中は openThread() で会話を再取得"]
+    Thread --> Show["show() で会話ビューを表示"]
+    Thread --> History["ジョブ履歴を描画"]
+    Show --> Slot{"入力フォームの配置先が同じか"}
+    Slot -->|はい| Keep["フォームを現在の位置に保つ"]
+    Slot -->|いいえ| Move["フォームを新しいビューの配置先へ移す"]
+```
+
 ## Development Job UI更新（v0.48.3）
 
 ```mermaid
