@@ -230,6 +230,13 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         alert = service_sync.warning()
         if alert:
             messages.append({"role": "system", "content": "運用アラートはCoreが末尾に表示する。本文には重ねて書かない。未解決の事実: " + alert})
+        # After the history, so the stable prefix (persona + past turns) stays cacheable.
+        from . import ambient
+        known = ambient.build(row["thread_id"])
+        if known["text"]:
+            messages.append({"role": "user", "content": known["text"]})
+            with db.get_connection() as c:
+                ambient.record(c, row["thread_id"], request_id, known)
         messages.append({"role": "user", "content": payload["message"]})
     from . import service_sync
     with db.get_connection() as c:

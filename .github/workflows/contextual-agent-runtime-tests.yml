@@ -6,6 +6,8 @@ on:
       - "backend/dialogue_state.py"
       - "backend/conversation_state.py"
       - "backend/brain.py"
+      - "backend/ambient.py"
+      - "tests/test_ambient_context.py"
       - "backend/setup_api.py"
       - "backend/setup_store.py"
       - "backend/service_sync.py"
@@ -56,6 +58,10 @@ on:
       - "backend/conversation_search.py"
       - "backend/tools/conversation_search.py"
       - "tests/test_renaissance_memory.py"
+      - "backend/summarizer.py"
+      - "backend/memory_review.py"
+      - "tests/test_conversation_episodes.py"
+      - "tests/test_memory_review.py"
       - "tests/test_workspace_context.py"
       - "tests/test_local_development.py"
       - "backend/project_workspaces.py"
@@ -105,7 +111,7 @@ jobs:
           node --check frontend/chat_attachments.js
       - name: Run Renaissance Core and Thread client contracts
         run: |
-          python -m pytest tests/test_setup_integrations.py tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_provider_runtime.py tests/test_agent_workspace.py tests/test_antigravity_cli.py -q
+          python -m pytest tests/test_setup_integrations.py tests/test_renaissance_core.py tests/test_pending_actions_router.py tests/test_provider_runtime.py tests/test_agent_workspace.py tests/test_antigravity_cli.py tests/test_ambient_context.py -q
           node --test scripts/test-thread-client.cjs
       - name: Run image intake and Vision regressions
         run: python -m pytest tests/test_vision.py tests/test_vision_calculations.py tests/test_chat_router.py tests/test_module_registry.py -q
@@ -124,7 +130,7 @@ jobs:
         run: python -m unittest tests.test_workspace_context tests.test_local_development tests.test_project_workspaces -v
       # Sona Core adapter tests need the private Sona-Agent-Core dependency and run locally.
       - name: Run original utterance and durable memory tests
-        run: python -m pytest tests/test_renaissance_memory.py tests/test_conversation_episodes.py tests/test_daily_life_index.py -q
+        run: python -m pytest tests/test_renaissance_memory.py tests/test_conversation_episodes.py tests/test_memory_review.py tests/test_daily_life_index.py -q
       - name: Run calendar keyword regression tests
         run: |
           python -m unittest \
