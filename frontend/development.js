@@ -21,6 +21,11 @@
     model_response: "CLIの応答を受け取りました",
     read_file: "ファイルを読み取りました",
     write_file: "作業場所に書き込みました",
+    list_pc_dir: "PCフォルダを確認しました",
+    search_pc_files: "PCファイルを検索しました",
+    read_pc_file: "PCファイルを読み取りました",
+    copy_pc_file_to_workspace: "作業場所へコピーしました",
+    tool_result: "ツール実行が完了しました",
     repository_check: "テスト・検査結果を受け取りました",
   };
   const retryPhases = {
@@ -46,9 +51,29 @@
     }).observe(document.documentElement, { childList: true, subtree: true });
   }
 
+  function formatEventLine(event) {
+    const label = retryPhases[event.kind] || phases[event.kind] || states[event.kind] || event.kind;
+    return [event.created_at, label, event.detail].filter(Boolean).join(" · ");
+  }
+
+  function renderTrace(traceBox, thought, activity) {
+    if (!traceBox) return;
+    const lines = [];
+    if (thought) lines.push("思考中:\n" + thought);
+    if (Array.isArray(activity) && activity.length) lines.push(...activity);
+    if (!lines.length) {
+      traceBox.hidden = true;
+      traceBox.textContent = "";
+      return;
+    }
+    traceBox.hidden = false;
+    traceBox.textContent = lines.join("\n");
+  }
+
   function watchProgress(element, job, refresh, options = {}) {
     element.setAttribute("aria-live", "polite");
     const replyBox = options.replyBox || element.closest(".development-thread-reply");
+    const traceBox = options.traceBox || null;
     const useStreaming = Boolean(options.streamReply && replyBox && window.PetitChatMotion?.createStreamingController);
     const labelFor = ({ status, phase, tool }) => {
       if (status === "running" && tool) return "ツール実行中: " + tool + "…";
@@ -68,6 +93,9 @@
         }
       } else {
         if (element.textContent !== next) element.textContent = next;
+      }
+      if (traceBox && (payload.thought !== undefined || payload.activity !== undefined)) {
+        renderTrace(traceBox, payload.thought, payload.activity);
       }
       if (replyBox && !streamCtrl) replyBox.classList.toggle("is-streaming-status", active.has(payload.status));
     };
@@ -186,8 +214,7 @@
       }
       const details = append(box, "details", "");
       append(details, "summary", "進捗・チェック結果");
-      append(details, "pre", job.events.map((event) =>
-        [event.created_at, event.kind, event.detail].filter(Boolean).join(" ")).join("\n") +
+      append(details, "pre", job.events.map(formatEventLine).join("\n") +
         "\n" + JSON.stringify(job.checks, null, 2));
     }
     for (const item of job.actions || []) {
@@ -446,12 +473,25 @@
     streamHost.className = "development-thread-stream";
     const message = append(streamHost, "div", "");
     message.className = "message-body development-thread-body";
+    const traceBox = append(reply, "pre", "");
+    traceBox.className = "development-thread-trace";
+    traceBox.hidden = true;
     if (active.has(job.status)) {
       watchProgress(message, job, () => {
         if (currentView === "thread" && currentThread) return openThread(currentThread.thread_id);
-      }, { replyBox: streamHost, streamReply: true });
+      }, { replyBox: streamHost, traceBox, streamReply: true });
     } else {
       renderReplyBody(message, job);
+      const traces = (job.events || []).filter((ev) => ev.detail && ev.kind !== "cli_failure");
+      if (traces.length) {
+        const traceDetails = append(reply, "details", "");
+        traceDetails.className = "development-thread-trace-details";
+        append(traceDetails, "summary", "実行過程・途中応答（" + traces.length + "件）");
+        append(traceDetails, "pre", traces.map((ev) => {
+          const label = retryPhases[ev.kind] || phases[ev.kind] || ev.kind;
+          return label + ": " + ev.detail;
+        }).join("\n")).className = "development-thread-trace";
+      }
     }
     const detail = append(entry, "details", "");
     detail.className = "development-thread-details";
