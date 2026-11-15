@@ -281,11 +281,15 @@
 
 @media (min-width: 960px) {
   .universe-shell {
-    padding-left: var(--petit-rail-width);
+    padding-left: 0;
   }
 
   .universe-topbar {
-    left: var(--petit-rail-width);
+    left: 0;
+  }
+
+  .universe-main {
+    padding-bottom: calc(var(--petit-bottom-nav-height) + 18px);
   }
 
   .universe-topbar .brand,

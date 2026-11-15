@@ -41,6 +41,7 @@
   };
 
   const installIndicator = () => {
+    if (document.body.classList.contains("petit-rubber-dock-ready") || document.querySelector(".petit-rubber-dock-stage")) return;
     const nav = document.querySelector(".view-tabs");
     if (!nav) return;
 

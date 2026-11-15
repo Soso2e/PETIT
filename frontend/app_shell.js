@@ -54,7 +54,7 @@
       }
     });
 
-    if (panelView === "chat") {
+    if (panelView === "chat" && window.innerWidth >= 960) {
       window.requestAnimationFrame(() => document.querySelector("#chat-input")?.focus?.());
     }
 
@@ -314,6 +314,7 @@
     };
 
     document.querySelector("[data-command-open]")?.addEventListener("click", open);
+    if (window.PetitAppShell) window.PetitAppShell.openCommandPalette = open;
     commands.forEach((button) => button.addEventListener("click", () => closeAndActivate(button.dataset.commandView)));
     input.addEventListener("input", () => {
       const query = input.value.trim().toLocaleLowerCase("ja");
@@ -422,9 +423,7 @@
 
     relabelNavigation(nav);
     installUniverseModules();
-    createDesktopRail();
     installCommandPalette();
-    syncRailStatus();
     // Main Chat stays uncluttered; the old disabled sub-navigation is not mounted.
     installPanelObserver();
 
@@ -450,7 +449,15 @@
   });
   window.addEventListener("petit:navigate", (event) => activateView(event.detail?.view || HOME_VIEW, event.detail || {}));
 
-  window.PetitAppShell = { initialize, activateView, homeView: HOME_VIEW, initialized: true };
+  window.PetitAppShell = {
+    initialize,
+    activateView,
+    openCommandPalette: () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }));
+    },
+    homeView: HOME_VIEW,
+    initialized: true,
+  };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initialize, { once: true });
   } else {

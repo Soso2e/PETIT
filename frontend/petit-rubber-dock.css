@@ -1,0 +1,357 @@
+/* PETIT Rubber Dock Navigation (PC & Mobile unified) */
+:root {
+  --dock-lead: 640 38;
+  --dock-trail: 150 16;
+  --dock-drag-lead: 1100 56;
+  --dock-drag-trail: 320 26;
+  --dock-open-w: 340 21;
+  --dock-open-h: 230 21;
+  --dock-close: 420 30;
+  --dock-pop: 520 16;
+  --dock-expanded-w: 360;
+  --petit-bottom-nav-height: calc(78px + env(safe-area-inset-bottom));
+}
+
+body.petit-rubber-dock-ready .universe-topbar .view-tabs,
+body.petit-rubber-dock-ready .petit-utility-dock,
+body.petit-rubber-dock-ready .petit-area-rail {
+  display: none !important;
+}
+
+.petit-rubber-dock-stage {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  z-index: 220;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+}
+
+@media (max-width: 959px) {
+  body.petit-chat-input-focused .petit-rubber-dock-stage,
+  body.petit-keyboard-open .petit-rubber-dock-stage {
+    transform: translateY(calc(100% + 28px));
+    opacity: 0;
+  }
+}
+
+.petit-rubber-dock {
+  position: relative;
+  width: 68px;
+  height: 64px;
+  border-radius: 32px;
+  background: color-mix(in srgb, var(--ui-surface-solid, #1b1d24) 90%, transparent);
+  border: 1px solid var(--ui-line-strong, rgba(255, 255, 255, 0.14));
+  box-shadow: 0 18px 44px -12px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(22px) saturate(1.35);
+  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  overflow: hidden;
+  pointer-events: auto;
+  will-change: width, height, transform;
+}
+
+html[data-petit-theme="light"] .petit-rubber-dock,
+html[data-theme="light"] .petit-rubber-dock {
+  background: color-mix(in srgb, var(--ui-surface-solid, #ffffff) 92%, transparent);
+  box-shadow: 0 14px 36px -10px rgba(15, 23, 42, 0.18);
+}
+
+.petit-dock-tabs {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  height: 54px;
+  transform: translateX(-50%);
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.petit-dock-tabs.dragging {
+  cursor: grabbing;
+}
+
+.petit-dock-icons {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 4px;
+}
+
+.petit-dock-icons > * {
+  width: var(--dock-tab-w, 60px);
+  height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  outline: none;
+}
+
+.petit-dock-icons.base button {
+  color: var(--ui-muted, #9a9a9a);
+  cursor: inherit;
+  border-radius: 27px;
+}
+
+.petit-dock-icons.base button:focus-visible {
+  outline: 2px solid var(--ui-focus, #60a5fa);
+  outline-offset: -2px;
+}
+
+.petit-dock-icons.top {
+  pointer-events: none;
+  color: var(--ui-bg, #07090f);
+}
+
+.petit-dock-icons svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+.petit-dock-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.petit-dock-ind {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--dock-tab-w, 60px);
+  height: 54px;
+  border-radius: 27px;
+  background: var(--ui-text, #ffffff);
+  pointer-events: none;
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.35);
+}
+
+/* Expanded Utility Card */
+.petit-dock-panels {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 100%;
+  max-width: calc(var(--dock-expanded-w) * 1px);
+  transform: translateX(-50%);
+}
+
+.petit-dock-panel {
+  padding: 18px 18px 8px;
+  pointer-events: none;
+}
+
+.petit-dock-panel.on {
+  pointer-events: auto;
+}
+
+.petit-dock-it {
+  opacity: 0;
+  filter: blur(5px);
+  transform: translate3d(0, 10px, 0) scale(0.98);
+  transition: opacity 0.16s ease, transform 0.24s ease, filter 0.16s ease;
+}
+
+.petit-dock-panel.on .petit-dock-it {
+  opacity: 1;
+  filter: none;
+  transform: none;
+  transition:
+    opacity 0.38s ease calc(var(--i, 0) * 45ms + 60ms),
+    transform 0.65s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i, 0) * 45ms + 60ms),
+    filter 0.38s ease calc(var(--i, 0) * 45ms + 60ms);
+}
+
+.petit-dock-panel.prep .petit-dock-it {
+  transition: none !important;
+}
+
+.petit-dock-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.petit-dock-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ui-text);
+}
+
+.petit-dock-head small {
+  font-size: 11px;
+  font-family: "DM Mono", monospace;
+  color: var(--ui-muted);
+}
+
+.petit-dock-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.petit-dock-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 11px 10px;
+  border: 1px solid var(--ui-line, rgba(255, 255, 255, 0.1));
+  border-radius: 14px;
+  background: var(--ui-soft, rgba(255, 255, 255, 0.05));
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.petit-dock-tile:hover,
+.petit-dock-tile:focus-visible {
+  background: var(--ui-bg-2);
+  border-color: var(--ui-line-strong);
+}
+
+.petit-dock-tile:active {
+  transform: scale(0.97);
+}
+
+.petit-dock-tile.is-active {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.petit-dock-tile svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: var(--ui-text);
+}
+
+.petit-dock-tile strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.petit-dock-tile small {
+  font-size: 10px;
+  color: var(--ui-muted);
+  line-height: 1.2;
+}
+
+.petit-dock-rows {
+  display: grid;
+  gap: 4px;
+}
+
+.petit-dock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.petit-dock-row:hover,
+.petit-dock-row:focus-visible {
+  background: var(--ui-soft, rgba(255, 255, 255, 0.06));
+}
+
+.petit-dock-row__left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.petit-dock-row__left svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.85;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: var(--ui-muted);
+  flex: none;
+}
+
+.petit-dock-row__meta {
+  font-size: 11.5px;
+  color: var(--ui-muted);
+  white-space: nowrap;
+}
+
+.petit-dock-row kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--ui-line);
+  border-radius: 6px;
+  background: var(--ui-bg-2);
+  color: var(--ui-muted);
+  font: 10px/1.3 "DM Mono", monospace;
+}
+
+.petit-dock-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ui-dim, #828282);
+  flex: none;
+}
+
+.petit-dock-dot[data-state="ready"] {
+  background: var(--ui-ok, #34d17a);
+}
+
+.petit-dock-dot[data-state="error"] {
+  background: var(--ui-danger, #ff5a5f);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .petit-rubber-dock-stage,
+  .petit-dock-it,
+  .petit-dock-tile,
+  .petit-dock-row {
+    transition: none !important;
+    filter: none !important;
+  }
+}

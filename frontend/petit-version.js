@@ -119,7 +119,9 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
 
     const loadPostShellAssets = () => {
       loadStylesheet("/static/universe-3d-foundation.css", "universe-3d-foundation");
+      loadStylesheet("/static/petit-rubber-dock.css", "rubber-dock-style");
       loadScript("/static/petit-corner-shell.js", "corner-shell");
+      loadScript("/static/petit-rubber-dock.js", "rubber-dock");
       installDeferredWebGL();
     };
 

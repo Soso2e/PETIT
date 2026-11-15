@@ -8,14 +8,15 @@
 }
 
 @media (min-width: 960px) {
-  .petit-area-rail { display: flex !important; }
-  .universe-shell { padding-left: var(--petit-rail-width) !important; }
-  .universe-topbar .petit-corner-status,
-  .universe-topbar .view-tabs.petit-corner-nav,
+  .petit-area-rail { display: none !important; }
+  .universe-shell { padding-left: 0 !important; }
   .petit-utility-dock { display: none !important; }
   .universe-main,
-  .petit-univ-active .universe-main { padding-top: 18px; }
-  .petit-univ-active .univ-viewport { min-height: calc(100dvh - 18px); }
+  .petit-univ-active .universe-main {
+    padding-top: 18px;
+    padding-bottom: calc(var(--petit-bottom-nav-height) + 18px);
+  }
+  .petit-univ-active .univ-viewport { min-height: calc(100dvh - var(--petit-bottom-nav-height) - 18px); }
 }
 
 .universe-topbar {
