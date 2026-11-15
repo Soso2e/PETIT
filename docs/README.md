@@ -8,7 +8,7 @@
 | いまどう実装されているか（概要） | [architecture.md](architecture.md) |
 | 会話処理・Tool実行の実装フロー | [runtime-flows.md](runtime-flows.md)（Mermaid。実装を変えたら同じ変更で更新する） |
 | 用語の意味 | [terminology.md](terminology.md) |
-| 現在地・未確認・変更履歴 | [../PROGRESS.md](../PROGRESS.md) |
+| 次に着手すること・重要な未確認事項 | [../PROGRESS.md](../PROGRESS.md) |
 | 開発ルール | [../AGENTS.md](../AGENTS.md) |
 
 ## 配置ルール
@@ -153,3 +153,4 @@ iPhone / PWA、Discord、画像、Web Push、接続ステータス
 - [desktop-v27-experience.md](archive/desktop-v27-experience.md) — Desktop / Web v0.27.0
 - [desktop-v28-ux.md](archive/desktop-v28-ux.md) — Desktop / Web v0.28.0：作業開始と振り返り
 - [v27-ux-followup.md](archive/v27-ux-followup.md) — v27 実操作でのUX課題
+- [development-log-legacy.md](archive/development-log-legacy.md) — 旧 `PROGRESS.md` の全文へのリンクと再開時の参照先

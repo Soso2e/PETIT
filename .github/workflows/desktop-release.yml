@@ -56,11 +56,6 @@ jobs:
             echo "frontend/petit-version.js does not match $tag."
             exit 1
           fi
-          if ! grep -Fq "**Current Version: $tag**" PROGRESS.md; then
-            echo "PROGRESS.md does not match $tag."
-            exit 1
-          fi
-
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "target=$target" >> "$GITHUB_OUTPUT"

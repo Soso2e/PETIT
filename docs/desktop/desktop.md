@@ -85,6 +85,7 @@ Wakeまたは「音声会話」で連続会話を開始する。Chat完了とTTS
 - 個人利用向けmacOS ReleaseはDeveloper ID・Apple公証を要求せず、アプリ全体を明示的にad-hoc署名してDMG化する。署名後/DMG内の署名・リソース整合性検証に失敗した場合は公開しない。
 - `main`の履歴上にある`v*`タグをpushすると、`desktop/package.json`とのバージョン一致を検証した上で両OSをビルドし、ad-hoc署名DMG / Windows EXEを同名タグのGitHub Releaseへ自動添付する。Desktopビルドworkflow自身はタグを作成しない。
 - リリースを明示的に要求する場合のみ、`VERSION`を更新するPRのマージコミットメッセージに`[desktop-release]`を含めると、`Create PETIT Desktop Release` Actionsがタグ作成とDesktop workflowの手動dispatchを行う。**通常のmainマージではリリースしない**。Actions画面からの従来の手動`workflow_dispatch`も引き続き利用できる。GitHub ActionsのGITHUB_TOKENで作ったタグpushは新たなworkflowを通常起動しないため、明示的なworkflow dispatchを残す。
+- `Create PETIT Desktop Release` は、タグを作る前に `VERSION`、`desktop/package.json`、`frontend/petit-version.js` の一致を検証する。
 - 安定版SemVer、同じOS/CPU用の`PETIT-<version>-mac-arm64.dmg`、`mac-x64.dmg`、`win-x64.exe`があるReleaseだけ候補にする。WebのみのRelease、draft/prerelease、旧版は除外。
 - 起動10秒後と24時間ごと（設定でOFF可能）、またはトレイ/設定から確認。ネットワーク失敗はアプリ起動を妨げない。自動確認は同一バージョンをプロセス内で重複通知しない。
 - Windows x64インストール版では更新ボタンからダウンロード・サイズ/SHA-256検証・installer起動まで進む。最後のインストール確認はinstallerで行う。macOS・開発起動・検証metadata不足では公式Releaseページから取得する。初回公開前や対応assetがないときは「利用可能なDesktop更新なし」となる。

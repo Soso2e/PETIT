@@ -44,6 +44,11 @@ Codex は OS 標準の CLI 認証を参照する。明示的に分離する場�
 - Git 以外の登録フォルダではそのフォルダを、指定なしでは Windows の論理ドライブ全体を対象にする。Everything の Windows IPC または `es.exe` で問い合わせ、利用できない場合は件数・時間を制限してファイル名を走査する。機密性の高い名前や認証領域、PETIT ストレージ、リンク経由のパスは Core で除外する。
 - PC の検索・テキスト読み取りと、ジョブ専用の `storage/coding-scratch/` へのコピー・作業は開始確認の範囲に含む。読み取った本文は選択した CLI に渡り得る。
 - 元ファイルへの書き込み・移動・削除、元フォルダでのコマンド実行は L2 の操作カードを作る。承認対象は登録済みのパス、引数と書き込み元のハッシュに固定する。元ファイルが変わった場合は適用しない。操作の承認は30分有効で、取消や不明結果からの自動再実行は行わない。コマンドは承認した argv をホストで実行する。
-- Git開発はCodexのフルアクセス、Claude Codeの承認スキップ、AntigravityのAutoモードを使う。CodexとClaude Codeのプロセスはホスト上の実行ユーザーの権限で動く。CLIへの指示では作業クローン内での実行と、Push・PR作成・mergeの別途許可を求める。CLIで実行した検査は最終報告で読み、Coreは静的検査結果とGit差分を記録する。PC操作はCore Toolと承認を使う。
+- Git開発はCodexのフルアクセス、Claude Codeの承認スキップ、AntigravityのAutoモードを使う。CodexとClaude Codeのプロセスはホスト上の実行ユーザーの権限で動く。CLIへの指示では指定のリポジトリ内での実行と、Push・PR作成・mergeの別途許可を求める。CLIで実行した検査は最終報告で読み、Coreは静的検査結果とGit差分を記録する。PC操作はCore Toolと承認を使う。
 
 公式 CLI の認証を使用し、PETIT の API キーや認証トークンを抽出しない。個人契約を外部アプリから使う条件については各提供元の利用条件を参照する。[Claude Code の利用条件](https://code.claude.com/docs/en/legal-and-compliance)・[Antigravity CLI の接続条件](../brain/antigravity-cli.md)
+
+## Develop の受入
+
+- [#428](https://github.com/Soso2e/PETIT/issues/428) の受入では、稼働中のPETITから登録リポジトリを選び、実CLIで直接編集、応答のストリーミング、差分レビュー、同じ開発スレッドでの再開まで確認する。個別の自動テストは [旧ログ](../archive/development-log-legacy.md) を参照する。
+- [#452](https://github.com/Soso2e/PETIT/issues/452) の入力欄修正は、Windows Chromeと模擬APIで、12秒周期の定期更新後もフォーカス・下書き・選択範囲が残ることを確認済み。実サーバー接続時と日本語IMEの変換中は受入時に確認する。
