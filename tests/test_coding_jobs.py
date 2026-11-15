@@ -217,7 +217,7 @@ def test_develop_direct_reviews_committed_native_cli_changes(repository, client,
     assert detail["status"] == "ready_for_review" and detail["tests"] == "not_verified", detail["error"]
     result = client.get(f"/api/coding/jobs/{job['id']}/diff").json()
     assert result["files"] == ["main.py"] and "+VALUE = 2" in result["diff"]
-    assert (repository / "main.py").read_text(encoding="utf-8") == "VALUE = 1\n"
+    assert (repository / "main.py").read_text(encoding="utf-8") == "VALUE = 2\n"
 
 
 def _native_recorder(calls, sessions, *, refuse=()):
@@ -257,7 +257,8 @@ def test_same_thread_continues_checkout_and_cli_session(repository, client, deve
     with db.get_connection() as connection:
         saved = dict(connection.execute("SELECT job_id,session_id FROM coding_job_sessions").fetchall())
     assert saved == {first["id"]: "session-1", second["id"]: "session-2"}
-    assert (repository / "main.py").read_text(encoding="utf-8") == "VALUE = 1\n"
+    content = (repository / "main.py").read_text(encoding="utf-8")
+    assert "# run 1" in content and "# run 2" in content
 
 
 def test_refused_session_restarts_once_with_thread_summary(repository, development_quota, monkeypatch):
@@ -272,18 +273,18 @@ def test_refused_session_restarts_once_with_thread_summary(repository, developme
     assert "session_restarted" in [item["kind"] for item in second["events"]]
 
 
-def test_other_thread_or_moved_repository_starts_fresh_clone(repository, development_quota, monkeypatch):
+def test_other_thread_or_moved_repository_does_not_share_cli_session(repository, development_quota, monkeypatch):
     calls = []
     monkeypatch.setattr(coding_agents, "run_git", _native_recorder(calls, ["a", "b", "c"]))
     first = _thread_job("first", repository, "最初の依頼")
     other = _thread_job("other", repository, "別スレッド", thread_id="another-thread")
-    assert other["workspace"] != first["workspace"] and calls[1]["resume"] is None
+    assert other["workspace"] == first["workspace"] and calls[1]["resume"] is None
     (repository / "main.py").write_text("VALUE = 3\n", encoding="utf-8")
     jobs.git(repository, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qam", "move")
     moved = _thread_job("moved", repository, "続きの依頼")
     assert moved["status"] == "ready_for_review", moved["error"]
-    assert moved["workspace"] not in {first["workspace"], other["workspace"]} and calls[2]["resume"] is None
-    assert "新しいclone" in calls[2]["goal"]
+    assert moved["workspace"] == first["workspace"] and calls[2]["resume"] is None
+    assert "前ジョブの未統合変更を引き継いだと仮定しないでください" in calls[2]["goal"]
     assert "workspace_ready" in [item["kind"] for item in moved["events"]]
 
 
@@ -296,6 +297,8 @@ def test_session_is_not_offered_to_another_cli(repository, development_quota, mo
     second = _thread_job("second", repository, "続きの依頼")
     assert second["workspace"] == first["workspace"] and calls[1]["resume"] is None
     assert "引き継いでいます" in calls[1]["goal"]
+
+
 
 
 def test_pc_scope_copy_and_approval_for_original(repository, client, development_quota, monkeypatch, tmp_path):

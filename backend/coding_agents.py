@@ -61,9 +61,9 @@ ANTIGRAVITY_RETRYABLE = {
 
 
 GIT_NATIVE_INSTRUCTIONS = (
-    "Carry out the development request in the current job checkout. Follow the repository's instructions. "
+    "Carry out the development request directly in this repository. Follow the repository's instructions. "
     "Use your native tools to inspect, edit, run checks or builds, and commit locally when appropriate. "
-    "Keep work in this checkout. Push, PR creation and merging require separate user authorization. "
+    "Push, PR creation and remote operations require separate user authorization. "
     "Report changes, actual check results and anything still unverified in Japanese.\n\n"
 )
 

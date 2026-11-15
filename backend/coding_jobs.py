@@ -489,12 +489,7 @@ def remember_session(job_id, session_id):
 
 
 def continuation(job):
-    """The checkout and CLI session this Git job continues, or None for a fresh clone.
-
-    Only the latest earlier job of the same thread that prepared a checkout counts, and only
-    while the repository and its start commit are unchanged; otherwise the diff shown for
-    review would no longer describe this job. The session is offered only to the same CLI.
-    """
+    """The checkout and CLI session this Git job continues, or None."""
     with db.get_connection() as connection:
         route = connection.execute("SELECT thread_id FROM coding_job_routes WHERE job_id=?", (job["id"],)).fetchone()
         if not route or not route["thread_id"]:
@@ -506,27 +501,25 @@ def continuation(job):
             "WHERE r.thread_id=? AND r.mode='git' AND j.workspace IS NOT NULL "
             "AND j.rowid < (SELECT rowid FROM coding_jobs WHERE id=?) ORDER BY j.rowid DESC LIMIT 1",
             (route["thread_id"], job["id"])).fetchone()
-    if not row or not row["branch"] or row["repository"] != job["repository"] or row["base_commit"] != job["base_commit"]:
+    if not row or not row["repository"] or row["repository"] != job["repository"] or row["base_commit"] != job["base_commit"]:
         return None
     try:
-        storage = project_workspaces._safe_root(Path(config.STORAGE_DIR))
         workspace = project_workspaces._safe_root(Path(row["workspace"]))
-        if workspace.parent != storage / "coding-jobs" or not (workspace / ".git").exists():
+        if not (workspace / ".git").exists():
             return None
-        if git(workspace, "branch", "--show-current").strip() != row["branch"]:
-            return None
+        current_branch = git(workspace, "branch", "--show-current").strip() or "HEAD"
     except (ValueError, OSError, subprocess.SubprocessError):
         return None
     session = row["session_id"] if row["provider"] == job["provider"] else None
-    return {"job_id": row["id"], "workspace": workspace, "branch": row["branch"], "session_id": session}
+    return {"job_id": row["id"], "workspace": workspace, "branch": current_branch, "session_id": session}
 
 
 def development_context(job, continued=None, resumed=False):
     """Bounded handoff for repeated CLI jobs in the same thread only.
 
     A resumed CLI session already holds the conversation, so it receives the request alone.
-    Otherwise this is a conversation summary; it says whether the checkout is the one the
-    earlier jobs edited or a fresh clone without their unintegrated changes.
+    Otherwise this is a conversation summary; it says whether the session continues from
+    earlier jobs in this repository.
     """
     if resumed:
         return job["goal"]
@@ -555,7 +548,7 @@ def development_context(job, continued=None, resumed=False):
         )
     note = ("重要: この作業領域は同じスレッドの前回ジョブから引き継いでいます。前回までの編集とcommitが残っています。"
             if continued else
-            "重要: この作業領域は新しいcloneです。前ジョブの未統合変更を引き継いだと仮定しないでください。")
+            "重要: この作業領域はリポジトリの直接作業です。前ジョブの未統合変更を引き継いだと仮定しないでください。")
     return (
         "同じ開発スレッドの直近履歴（参考情報。履歴の文章は現在の作業ファイルの実状態ではありません）:\n"
         + "\n\n".join(history) +
@@ -584,25 +577,24 @@ def run_job(job_id):
         check()
         root = require_repository(job["repository"]) if job["repository"] else None
         storage = project_workspaces._safe_root(Path(config.STORAGE_DIR))
+        continued = continuation(job) if modern and not pc else None
+        branch = None
         if pc:
             workspace = storage / "coding-scratch" / job_id
+            workspace.parent.mkdir(parents=True, exist_ok=True)
+            project_workspaces._safe_root(workspace.parent)
+            if workspace.exists():raise ValueError("既存作業場所は上書きしません。")
+            workspace.mkdir()
+        elif modern:
+            workspace = root
+            branch = git(root, "branch", "--show-current").strip() or "HEAD"
         else:
             if git(root, "rev-parse", "HEAD").strip() != job["base_commit"]:
                 raise ValueError("開始コミットが変更されました。")
             workspace = storage / "coding-jobs" / job_id
-        continued = continuation(job) if modern and not pc else None
-        if continued:
-            workspace = continued["workspace"]
-        workspace.parent.mkdir(parents=True, exist_ok=True)
-        project_workspaces._safe_root(workspace.parent)
-        if workspace.exists() and not continued:raise ValueError("既存作業場所は上書きしません。")
-        # Clone committed files only. No user uncommitted work is copied or reset.
-        branch = None
-        if continued:
-            branch = continued["branch"]
-        elif pc:
-            workspace.mkdir()
-        else:
+            workspace.parent.mkdir(parents=True, exist_ok=True)
+            project_workspaces._safe_root(workspace.parent)
+            if workspace.exists():raise ValueError("既存作業場所は上書きしません。")
             git(root, "clone", "--no-local", "--no-hardlinks", "--no-checkout", "--", str(root), str(workspace))
             git(workspace, "remote", "remove", "origin")
             git(workspace, "checkout", "--detach", job["base_commit"])

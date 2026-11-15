@@ -134,15 +134,15 @@ flowchart TD
     Progress -.-> SSE[管理者用 Job SSE / Chatカード・Develop]
     Run --> Mode{対象モード}
     Mode -->|Git| Continue{同じスレッドの前回ジョブと<br/>リポジトリ・開始コミットが同じ}
-    Continue -->|いいえ| Git[開始コミットの clone と専用ブランチ]
-    Continue -->|はい| Reuse[前回の clone とブランチを引き継ぐ]
+    Continue -->|いいえ| Git[元リポジトリを作業場所に設定]
+    Continue -->|はい| Reuse[同じリポジトリ作業場所を引き継ぐ]
     Reuse --> SameCLI{同じCLIのセッションIDがある}
     SameCLI -->|はい| Resume[CLIのセッションを再開し依頼文だけ渡す]
     SameCLI -->|いいえ| Executor
     Resume -->|作業開始前に再開を拒否| Executor
     Resume --> Native
     Git --> Executor{実行方式}
-    Executor --> Native[Codex / Antigravity / Claude Codeが専用cloneで調査・編集・検査・commit]
+    Executor --> Native[Codex / Antigravity / Claude Codeがリポジトリで直接調査・編集・検査・commit]
     Native -->|自然文の終了応答| Check{検査結果}
     Native -->|失敗した場合は差分を保持| Error
     Native -.-> Progress
