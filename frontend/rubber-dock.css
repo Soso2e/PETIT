@@ -1,0 +1,63 @@
+/* PETIT shared Rubber Dock — adapted from DesignBookmark's spring dynamics. */
+:root {
+  --dock-lead: 640 38; --dock-trail: 150 16;
+  --dock-drag-lead: 1100 56; --dock-drag-trail: 320 26;
+  --dock-open-w: 340 21; --dock-open-h: 230 21;
+  --dock-close: 420 30; --dock-pop: 520 16;
+}
+.petit-rubber-dock {
+  position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom));
+  width: 248px; height: 68px; border-radius: 34px;
+  z-index: 80; overflow: hidden; background: var(--bg-surface, #0c0e18);
+  border: 1px solid var(--line-mid, #ffffff20);
+  box-shadow: 0 14px 40px #0007;
+  transform: translateX(-50%);
+  font-family: 'Inter', -apple-system, sans-serif;
+  color: var(--text, #dde1ec);
+  touch-action: pan-y;
+}
+.petit-rubber-dock[hidden] { display: none; }
+.petit-rubber-dock__content {
+  position: absolute; left: 0; right: 0; top: 0; bottom: 66px;
+  overflow: hidden; padding: 17px 19px; opacity: 0; pointer-events: none;
+  transition: opacity .18s ease;
+}
+.petit-rubber-dock[data-expanded="true"] .petit-rubber-dock__content { opacity: 1; pointer-events: auto; }
+.petit-rubber-dock__heading { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.petit-rubber-dock__description { color: var(--text-sub, #8c93a8); font-size: 12px; margin: 0 0 13px; line-height: 1.5; }
+.petit-rubber-dock__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.petit-rubber-dock__action {
+  min-height: 42px; padding: 8px; background: #ffffff0d; border: 1px solid var(--line, #ffffff16);
+  border-radius: 12px; font-size: 12px; text-align: center;
+}
+.petit-rubber-dock__action:focus-visible, .petit-rubber-dock__tab:focus-visible { outline: 2px solid var(--accent, #a8b4d0); outline-offset: -3px; }
+.petit-rubber-dock__tabs {
+  position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+  width: 236px; height: 56px; display: flex; gap: 4px;
+  touch-action: none;
+}
+.petit-rubber-dock__indicator {
+  position: absolute; top: 0; left: 0; width: 56px; height: 56px;
+  border-radius: 28px; background: var(--text, #dde1ec); pointer-events: none;
+  will-change: transform, width;
+}
+.petit-rubber-dock__tab {
+  position: relative; width: 56px; height: 56px; display: grid; place-items: center;
+  flex: none; border-radius: 28px; background: transparent; border: 0;
+  color: var(--text-sub, #8c93a8); cursor: pointer; z-index: 1;
+}
+.petit-rubber-dock__tab[aria-selected="true"] { color: var(--bg, #05060d); }
+.petit-rubber-dock__tab svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.petit-rubber-dock__tab span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.petit-rubber-dock__tabs.is-dragging { cursor: grabbing; }
+body.petit-has-rubber-dock .universe-main { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+@media (max-width: 900px) {
+  body.petit-has-rubber-dock .view-tabs { display: none; }
+  body.petit-has-rubber-dock .universe-main { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 640px) {
+  body.petit-has-rubber-dock:has(input:focus, textarea:focus, [contenteditable="true"]:focus) .petit-rubber-dock { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .petit-rubber-dock__content { transition: none; }
+}
