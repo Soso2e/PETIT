@@ -402,7 +402,7 @@ def changed(workspace, base="HEAD"):
     return sorted({x for x in tracked + untracked if x})
 
 
-def toolbox(job, check, catalog=None, check_results=None):
+def toolbox(job, check, catalog=None):
     workspace = job["workspace"]
     pc = job.get("mode") == "pc"
     root = job.get("repository") or None
@@ -433,18 +433,6 @@ def toolbox(job, check, catalog=None, check_results=None):
                 return development_pc.copy_to_scratch(source, scratch_path(arguments["destination"]))
             if name in coding_agents.PC_ACTIONS:
                 return development_pc.propose(job, coding_agents.PC_ACTIONS[name], arguments, scratch_path)
-            if name == "run_repository_check":
-                from . import worktrees
-                argv = worktrees.validate_job_check_command(arguments["argv"])
-                result = worktrees.run_check_in(workspace, argv, check=check)
-                check_results.append({key: value for key, value in result.items() if key != "output"})
-                event(job["id"], "repository_check", "passed" if result["passed"] else "failed")
-                return result
-            if name == "commit_repository":
-                from . import worktrees
-                for name_to_commit in changed(workspace):
-                    path_for(workspace, name_to_commit)
-                return worktrees.commit_in(Path(workspace), arguments["message"], run_git=git)
             if name == "list_files":
                 if pc:
                     from itertools import islice
@@ -567,22 +555,27 @@ def run_job(job_id):
         target = brain_priority.target(job["provider"])
         if modern:
             target.update(model=job["model"], effort=job["selection"]["effort"])
-        catalog = coding_agents.PC_CATALOG if pc else coding_agents.GIT_CATALOG if modern else coding_agents.CATALOG
-        check_results = []
-        instructions = coding_agents.PC_INSTRUCTIONS if pc else coding_agents.GIT_INSTRUCTIONS if modern else coding_agents.INSTRUCTIONS
-        invoke = toolbox(job, check, catalog, check_results)
-        args = (job["provider"], target, development_context(job) if modern else job["goal"], invoke, check, lambda kind: event(job_id, kind))
-        if modern:
-            summary = coding_agents.run(*args, catalog=catalog, instructions=instructions)
+        goal = development_context(job) if modern else job["goal"]
+
+        def progress(kind):
+            event(job_id, kind)
+
+        if modern and not pc:
+            summary = coding_agents.run_git(job["provider"], target, goal, workspace, check, progress)
         else:
-            summary = coding_agents.run(*args)
+            catalog = coding_agents.PC_CATALOG if pc else coding_agents.CATALOG
+            invoke = toolbox(job, check, catalog)
+            args = (job["provider"], target, goal, invoke, check, progress)
+            if pc:
+                summary = coding_agents.run(*args, catalog=catalog, instructions=coding_agents.PC_INSTRUCTIONS)
+            else:
+                summary = coding_agents.run(*args)
         check()
         validation = {"ok": True, "tests": "not_run"} if pc else checks(workspace, job["base_commit"]) if modern else checks(workspace)
-        if check_results:
-            validation["tests"] = "passed" if all(result["passed"] for result in check_results) else "failed"
-            validation["commands"] = check_results
+        if modern and not pc:
+            validation["tests"] = "not_verified"
         pending = pc and any(action["status"] == "proposed" for action in get(job_id)["actions"])
-        status = "waiting_approval" if pending else "ready_for_review" if validation["ok"] and validation["tests"] != "failed" else "checks_failed"
+        status = "waiting_approval" if pending else "ready_for_review" if validation["ok"] else "checks_failed"
         finish(job_id, status, summary=summary, checks=validation)
     except InterruptedError as exc:finish(job_id, "cancelled", error=str(exc))
     except Exception as exc:

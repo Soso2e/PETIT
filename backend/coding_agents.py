@@ -1,11 +1,11 @@
-"""CLI development agents use only the Job-scoped Core file/check catalog."""
+"""Run development agents in the job workspace or through the Core tools."""
 import json
 from pathlib import Path
 import queue
 import tempfile
 import time
 
-from . import antigravity_cli_brain, claude_code_brain, codex_brain, lmstudio_client
+from . import antigravity_cli, antigravity_cli_brain, claude_code_brain, codex_brain
 
 CATALOG = [{"type": "function", "function": {"name": name, "description": description, "parameters": schema}}
     for name, description, schema in [
@@ -36,10 +36,6 @@ def _tool(name, description, **properties):
 
 PATH = {"type": "string", "minLength": 1, "maxLength": 1000}
 ARGV = {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 2000}, "minItems": 1, "maxItems": 40}
-GIT_CATALOG = CATALOG + [
-    _tool("run_repository_check", "Run a registered test, build or lint runner in the job's branch.", argv=ARGV),
-    _tool("commit_repository", "Commit changes on the job's branch.", message={"type": "string", "maxLength": 2000}),
-]
 PC_ACTIONS = {"write_pc_file": "write", "move_pc_file": "move", "delete_pc_file": "delete", "run_pc_command": "command"}
 PC_CATALOG = CATALOG[:3] + [
     _tool("search_pc_files", "Search for a literal filename fragment on PC drives or within the selected folder.",
@@ -51,11 +47,6 @@ PC_CATALOG = CATALOG[:3] + [
     _tool("delete_pc_file", "Propose deleting one PC file; waits for approval.", path=PATH),
     _tool("run_pc_command", "Propose a command in an absolute PC folder; waits for approval.", path=PATH, argv=ARGV),
 ]
-GIT_INSTRUCTIONS = """Work on the job's isolated Git branch exclusively through PETIT tools.
-Read applicable AGENTS.md and relevant project docs. Use the repository check tool for needed tests and builds.
-Request independent file reads together when you already know which files are needed.
-Commit the requested changes when appropriate. There are no push, PR, merge or general shell tools.
-Report actual check results and unverified behavior in Japanese. Leave review completion to the user."""
 PC_INSTRUCTIONS = """Use PETIT tools to search and read the PC scope selected by the user.
 Copy necessary files into job scratch and work there. list_files, read_file and write_file refer only to scratch.
 Any direct write, move, deletion or command on the PC must be proposed with its exact paths and arguments.
@@ -67,6 +58,136 @@ ANTIGRAVITY_RETRYABLE = {
     "timeout", "temporarily_unavailable", "cli_incomplete", "invalid_cli_response", "invalid_cli_protocol",
     "cli_start_transient",
 }
+
+
+GIT_NATIVE_INSTRUCTIONS = (
+    "Carry out the development request in the current job checkout. Follow the repository's instructions. "
+    "Use your native tools to inspect, edit, run checks or builds, and commit locally when appropriate. "
+    "Keep work in this checkout. Push, PR creation and merging require separate user authorization. "
+    "Report changes, actual check results and anything still unverified in Japanese.\n\n"
+)
+
+
+def run_git(provider, target, goal, workspace, check, progress):
+    prompt = GIT_NATIVE_INSTRUCTIONS + goal
+    if provider == "antigravity_cli":
+        return _run_antigravity_git(target, prompt, workspace, check, progress)
+    if provider == "claude_code":
+        return _run_claude_git(target, prompt, workspace, check, progress)
+    if provider == "codex":
+        check()
+        client = codex_brain.RPC(workspace=workspace, development=True)
+        try:
+            return _run_codex(client, target, prompt, None, check, progress, (), "", development=True)
+        finally:
+            client.close()
+    raise ValueError("unsupported_coding_provider")
+
+
+def _run_claude_git(target, prompt, workspace, check, progress):
+    binary = claude_code_brain.executable()
+    label = claude_code_brain.LABEL
+    if not binary:
+        raise antigravity_cli_brain.CLIError("not_configured", label + "が見つかりません。")
+    command = [binary, "-p", "--output-format", "stream-json", "--verbose",
+               "--permission-mode", "bypassPermissions", "--no-session-persistence"]
+    if target.get("model"):
+        command += ["--model", target["model"]]
+    if target.get("effort"):
+        command += ["--effort", target["effort"]]
+    result = None
+    responding = False
+
+    def observe(line):
+        nonlocal result, responding
+        try:
+            event = json.loads(line)
+            if not isinstance(event, dict):
+                raise ValueError("invalid_cli_event")
+        except ValueError:
+            raise antigravity_cli_brain.CLIError("invalid_cli_protocol", label + "の出力を検証できませんでした。") from None
+        kind = event.get("type")
+        if kind == "system" and event.get("subtype") == "init":
+            progress("cli_initialized")
+        elif kind in {"assistant", "user", "stream_event"} and not responding:
+            responding = True
+            progress("cli_responding")
+        elif kind == "result":
+            result = event
+            progress("cli_validating")
+
+    check()
+    progress("model_request")
+    try:
+        code, _, error = antigravity_cli_brain.invoke(
+            command, workspace, prompt, check, timeout=900, raw_stdin=True,
+            env=claude_code_brain.environment(), label=label, on_line=observe,
+        )
+    except UnicodeError:
+        raise antigravity_cli_brain.CLIError("invalid_cli_protocol", label + "の出力を検証できませんでした。") from None
+    if result and result.get("permission_denials"):
+        raise antigravity_cli_brain.CLIError("permission_denied", label + "がToolの実行を許可しませんでした。")
+    if code or result is None or result.get("is_error") or result.get("subtype") != "success":
+        reason = claude_code_brain.error_category(error + " " + str(result or {}))
+        raise antigravity_cli_brain.CLIError(reason, label + "が応答を完了できませんでした。")
+    summary = result.get("result")
+    if not isinstance(summary, str) or not summary.strip():
+        raise antigravity_cli_brain.CLIError("invalid_cli_response", label + "の最終応答がありません。")
+    progress("model_response")
+    return summary.strip()
+
+
+def _run_antigravity_git(target, prompt, workspace, check, progress):
+    binary = antigravity_cli.executable()
+    if not binary:
+        raise antigravity_cli_brain.CLIError("not_configured", "公式Antigravity CLIが見つかりません。")
+
+    command = [binary, "--input-format", "stream-json", "--output-format", "stream-json", "--mode=auto"]
+    if target.get("model"):
+        command += ["--model", target["model"]]
+    if target.get("effort"):
+        command += ["--effort", target["effort"]]
+
+    protocol = antigravity_cli.Protocol()
+    phase = None
+
+    def observe(line):
+        nonlocal phase
+        try:
+            event = protocol.feed(line)
+        except ValueError:
+            raise antigravity_cli_brain.result_error("invalid_cli_protocol") from None
+        next_phase = {
+            "init": "cli_initialized",
+            "step": "cli_responding",
+            "result": "cli_validating",
+        }.get(event["kind"])
+        if next_phase and next_phase != phase:
+            phase = next_phase
+            progress(phase)
+
+    check()
+    progress("model_request")
+    try:
+        code, _, error = antigravity_cli_brain.invoke(
+            command, workspace, prompt, check, timeout=900, on_line=observe,
+        )
+    except UnicodeError:
+        raise antigravity_cli_brain.result_error("invalid_cli_protocol") from None
+    result = protocol.result
+    if result is None:
+        reason = antigravity_cli.error_category(error) if code else "invalid_cli_protocol"
+        raise antigravity_cli_brain.result_error(reason)
+    if code or result["status"] != "SUCCESS":
+        reason = result["error"] or "cli_error"
+        if reason == "cli_error":
+            reason = antigravity_cli.error_category(error)
+        raise antigravity_cli_brain.result_error(reason if reason != "cli_error" else "cli_incomplete")
+    summary = result["response"].strip()
+    if not summary:
+        raise antigravity_cli_brain.result_error("invalid_cli_response")
+    progress("model_response")
+    return summary
 
 
 def run(provider, target, goal, invoke, check, progress, *, catalog=CATALOG, instructions=INSTRUCTIONS):
@@ -113,7 +234,7 @@ def run(provider, target, goal, invoke, check, progress, *, catalog=CATALOG, ins
             client.close()
 
 
-def _run_codex(client, target, goal, invoke, check, progress, catalog, instructions):
+def _run_codex(client, target, goal, invoke, check, progress, catalog, instructions, *, development=False):
     reply, final = "", ""
     seen = {}
     if (client.request("account/read", {"refreshToken": False}).get("account") or {}).get("type") != "chatgpt":
@@ -124,13 +245,18 @@ def _run_codex(client, target, goal, invoke, check, progress, catalog, instructi
         "dynamicTools": [{"name": "petit_coding_tool", "description": "Job-scoped PETIT coding tools",
             "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "arguments_json": {"type": "string"}},
                 "required": ["name", "arguments_json"], "additionalProperties": False}}]}
+    if development:
+        params = {"cwd": str(client.workspace), "sandbox": "danger-full-access",
+                  "approvalPolicy": "never", "ephemeral": True}
     if target.get("model"):params["model"] = target["model"]
     started = client.request("thread/start", params)
-    if any(not path.is_relative_to(Path(client.workspace).resolve()) for path in codex_brain.instruction_sources(started)):
+    if not development and any(not path.is_relative_to(Path(client.workspace).resolve()) for path in codex_brain.instruction_sources(started)):
         raise ValueError("Codexがジョブ外の指示ファイルを参照しました。")
     thread = started["thread"]["id"]
     progress("model_request")
-    turn = {"threadId": thread, "input": [{"type": "text", "text": goal}], "permissions": codex_brain.PERMISSIONS}
+    turn = {"threadId": thread, "input": [{"type": "text", "text": goal}]}
+    if not development:
+        turn["permissions"] = codex_brain.PERMISSIONS
     if target.get("effort"):
         turn["effort"] = target["effort"]
     client.request("turn/start", turn)
@@ -141,7 +267,7 @@ def _run_codex(client, target, goal, invoke, check, progress, catalog, instructi
         except queue.Empty:continue
         if item.get("_closed"):raise ValueError("codex_disconnected")
         method, params = item.get("method"), item.get("params", {})
-        if method == "item/tool/call":
+        if method == "item/tool/call" and not development:
             key = params.get("callId", item["id"])
             signature = json.dumps(params, sort_keys=True)
             if key in seen:
@@ -158,11 +284,15 @@ def _run_codex(client, target, goal, invoke, check, progress, catalog, instructi
             client.send({"id": item["id"], "result": result})
         elif method and "id" in item:
             client.send({"id": item["id"], "error": {"code": -32601, "message": "PETIT coding tools only"}})
+        elif development and method == "item/started" and params.get("item", {}).get("type") in {"commandExecution", "fileChange"}:
+            progress("cli_responding")
         elif method == "item/agentMessage/delta":reply += params.get("delta", "")
         elif method == "item/completed" and params.get("item", {}).get("type") == "agentMessage":
             if params["item"].get("phase") in (None, "final_answer"):final = params["item"].get("text", "")
         elif method == "turn/completed":
             if params.get("turn", {}).get("status") != "completed" or not (final or reply).strip():
                 raise ValueError("codex_turn_failed")
+            if development:
+                progress("model_response")
             return (final or reply).strip()
     raise ValueError("coding_agent_timeout")

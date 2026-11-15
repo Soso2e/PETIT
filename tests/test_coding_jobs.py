@@ -185,7 +185,7 @@ def test_chat_development_proposal_uses_receipt_and_waits_for_owner(repository, 
         assert connection.execute("SELECT count(*) FROM effect_receipts WHERE tool='propose_development_job'").fetchone()[0] == 1
 
 
-def test_develop_direct_runs_checks_and_reviews_committed_changes(repository, client, development_quota, monkeypatch):
+def test_develop_direct_reviews_committed_native_cli_changes(repository, client, development_quota, monkeypatch):
     admin(client)
     (repository / "test_main.py").write_text(
         "import unittest\nfrom main import VALUE\n\n"
@@ -196,15 +196,17 @@ def test_develop_direct_runs_checks_and_reviews_committed_changes(repository, cl
     jobs.git(repository, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "add test")
     observed = {}
 
-    def agent(provider, target, goal, invoke, check, progress, **kwargs):
+    def agent(provider, target, goal, workspace, check, progress):
+        assert provider == "codex"
+        check()
         observed["target"] = (target["model"], target["effort"])
-        synthetic_agent(provider, target, goal, invoke, check, progress)
-        observed["check"] = invoke("run_repository_check", {"argv": ["python", "-m", "unittest", "discover"]})
-        observed["commit"] = invoke("commit_repository", {"message": "Update fixture value"})
-        observed["push"] = invoke("push_repository", {})
+        (workspace / "main.py").write_text("VALUE = 2\n", encoding="utf-8")
+        jobs.git(workspace, "add", "main.py")
+        jobs.git(workspace, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "Update fixture")
+        assert not jobs.git(workspace, "remote").strip()
         return "fixture"
 
-    monkeypatch.setattr(coding_agents, "run", agent)
+    monkeypatch.setattr(coding_agents, "run_git", agent)
     payload = {"request_id": "direct", "repository": str(repository), "goal": "合成変更", "effort": "high"}
     job = client.post("/api/coding/jobs/start", json=payload).json()
     assert job["status"] == "queued"
@@ -212,10 +214,7 @@ def test_develop_direct_runs_checks_and_reviews_committed_changes(repository, cl
     assert jobs.pump()
     detail = jobs.get(job["id"])
     assert observed["target"] == ("gpt-6.1-sol", "high")
-    assert observed["check"].get("passed"), observed["check"]
-    assert observed["commit"].get("committed"), observed["commit"]
-    assert observed["push"]["error"] == "invalid_tool_arguments"
-    assert detail["status"] == "ready_for_review" and detail["tests"] == "passed", detail["error"]
+    assert detail["status"] == "ready_for_review" and detail["tests"] == "not_verified", detail["error"]
     result = client.get(f"/api/coding/jobs/{job['id']}/diff").json()
     assert result["files"] == ["main.py"] and "+VALUE = 2" in result["diff"]
     assert (repository / "main.py").read_text(encoding="utf-8") == "VALUE = 1\n"
