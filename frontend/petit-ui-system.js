@@ -75,7 +75,7 @@
         } else if (!spatial && detailHome && detail.parentElement !== detailHome) {
           detailHome.appendChild(detail);
         }
-        detail.hidden = !spatial;
+        if (detail.hidden !== !spatial) detail.hidden = !spatial;
       }
       document.body.classList.toggle("petit-chat-screen", view === "chat");
       scheduleContextUpdate();
@@ -84,7 +84,9 @@
     // Covers direct navigation from the original tabs and restored URLs too.
     const main = document.querySelector(".universe-main");
     if (main) {
-      new MutationObserver(placeDetail).observe(main, {
+      new MutationObserver((records) => {
+        if (records.some((record) => record.target !== detail)) placeDetail();
+      }).observe(main, {
         subtree: true, attributes: true, attributeFilter: ["hidden"],
       });
     }
