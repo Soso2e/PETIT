@@ -1,6 +1,6 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.57.1 (PR中)**
+**Current Version: v0.57.2**
 
 **Last Updated: 2026-11-15 UTC**
 
