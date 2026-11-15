@@ -13,7 +13,7 @@ from . import antigravity_cli, antigravity_cli_brain, brain_priority, claude_cod
 MODELS = {
     "claude_opus": ("claude_code", "opus", "Claude Opus 5.5"),
     "codex_sol": ("codex", "gpt-6.1-sol", "Codex Sol 6.1"),
-    "antigravity_argon": ("antigravity_cli", "gemini-4-argon", "Antigravity Argon"),
+    "antigravity_hydrogen": ("antigravity_cli", "gemini-4-hydrogen", "Antigravity Hydrogen"),
     "gemini_flash": ("antigravity_cli", "gemini-3.8-flash", "Gemini 3.8 Flash"),
 }
 EFFORTS = ("low", "medium", "high")
@@ -38,7 +38,7 @@ def parse_agy(raw):
             windows[fields[0], fields[1]] = remaining
     five = windows.get(("Gemini Models", "Five Hour Limit Remaining"))
     return {
-        "antigravity_argon": (five, windows.get(("Gemini 4 Argon", "Gemini 4 Argon Weekly Limit"))),
+        "antigravity_hydrogen": (five, windows.get(("Gemini Models", "Weekly Limit Remaining"))),
         "gemini_flash": (five, windows.get(("Gemini Models", "Weekly Limit Remaining"))),
     }
 
@@ -130,7 +130,9 @@ def select(key, effort, lightweight=False):
         raise ValueError("開発モデル・Effortを選択してください。")
     quotas = usage()
     if key == "auto":
-        if lightweight and quotas["gemini_flash"]["available"]:
+        if quotas["antigravity_hydrogen"]["available"]:
+            key = "antigravity_hydrogen"
+        elif lightweight and quotas["gemini_flash"]["available"]:
             key = "gemini_flash"
         else:
             candidates = [k for k in MODELS if k != "gemini_flash" and quotas[k]["available"]]
