@@ -1,0 +1,73 @@
+/* PETIT shared Toggle Switch. Reuses the page's theme variables; opt-in.
+ * Size and shape follow the DesignBookmark original (52x32 pill, 26px knob,
+ * 3px inset). Colours come from PETIT: the track fills with the page accent. */
+.petit-switch {
+  --petit-switch-on: var(--accent, #7b84ff);
+  --petit-switch-off: var(--line-strong, rgba(255, 255, 255, 0.14));
+  --petit-switch-knob: #fff;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 60px;
+  color: var(--text, #f4f6fb);
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.petit-switch--inline {
+  display: inline-flex;
+  min-height: 0;
+  flex: none;
+  vertical-align: middle;
+}
+.petit-switch__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.petit-switch__label { font-size: 15px; font-weight: 500; line-height: 1.35; }
+.petit-switch__description { font-size: 12px; line-height: 1.4; color: var(--muted, var(--text-muted, #929bad)); }
+
+/* The real checkbox stays in the page for keyboard and screen readers. */
+.petit-switch__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.petit-switch__track {
+  --petit-switch-fill: 0%;
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  border-radius: 16px;
+  background: var(--petit-switch-off);
+  background: color-mix(in srgb, var(--petit-switch-on) var(--petit-switch-fill), var(--petit-switch-off));
+}
+/* Before the script runs (or without color-mix), show the end state. */
+.petit-switch[data-checked="true"] .petit-switch__track:not([style]) { background: var(--petit-switch-on); }
+
+.petit-switch__knob {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--petit-switch-knob);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  will-change: transform, width;
+}
+
+.petit-switch__input:focus-visible + .petit-switch__track {
+  outline: 2px solid var(--petit-switch-on);
+  outline-offset: 2px;
+}
+.petit-switch__input:disabled + .petit-switch__track { opacity: 0.45; }
+.petit-switch:has(.petit-switch__input:disabled) { cursor: not-allowed; }
+
+html[data-theme="light"] .petit-switch {
+  --petit-switch-off: rgba(23, 24, 26, 0.14);
+}

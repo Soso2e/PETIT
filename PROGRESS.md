@@ -1,11 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.62.0**
+**Current Version: v0.63.0**
 
 **Last Updated: 2026-11-15 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- 設定画面のアニメーション付きスイッチ（v0.63.0）: DesignBookmark の Toggle Switch を共有コンポーネント `frontend/components/toggle-switch.{js,css}` として移植（元と同じスプリング 320/18・300/20）。`setup.html` の `.check` 7項目をスイッチ化し、チェックボックスと保存処理はそのまま。単体テストと隔離サーバーでの実ブラウザ確認済み。実サーバー・Desktop(Electron)・iPhone での受入は未確認。詳細は `docs/ui/toggle-switch.md`。
 - Rubber Dock ナビゲーション統一（v0.62.0）: PC版の左サイドバー（`.petit-area-rail`）および右上ユーティリティドックを廃止し、PC・スマホ共通で下部中央フローティングの5タブ Rubber Dock（`Chat` / `Univ` / `Develop` / `Dashboard` ＋ `More`、`frontend/petit-rubber-dock.js` / `frontend/petit-rubber-dock.css`）へ統一。スプリング物理によるピルの伸縮・ドラッグスクラブ・`clip-path` 反転・`More` タブからのカードモーフ展開（`Tasks` / `Remind` / `Settings`・コマンドパレット・テーマ切替・接続ステータス）を実装。関連UIテスト56件とPlaywright（デスクトップ1440×900 / モバイル390×844、模擬API）を確認済み。実サーバー・実iPhone/Desktop(Electron)の受入は未確認。
 - #456 CLI開発ジョブのリポジトリ直接編集（ダイレクト作業方式、v0.61.0）: 登録Gitリポジトリを対象とするCLI開発ジョブにおいて、`storage/coding-jobs/<job_id>` への専用クローン作成を廃止し、登録リポジトリのルート（`root`）そのものを作業ディレクトリとして直接作業する方式へ移行。クローン・専用ブランチ切替のオーバーヘッドをなくし、カレントブランチの作業ツリーをそのままCLI（Codex / Claude Code / Antigravity CLI）が直接編集・テスト・commit可能とした。同じ開発スレッドでのセッション継続（`continuation`）も直接作業に合わせて調整。単体テスト全件成功。実CLIでの直接編集・差分レビュー・完了フローは実機受入確認が必要。
 - #428 開発スレッドの継続（v0.60.0、PR前）: 同じ開発スレッドのGit開発ジョブは、リポジトリのHEADが前回の開始コミットから変わっていなければ、前回の作業クローンとブランチを引き継ぐ。CLIのセッションIDを `coding_job_sessions` に保存し、同じCLIなら再開して依頼文だけを渡す（`claude --resume` / `agy --conversation` / Codex `thread/resume`）。別のCLIへ切り替えた場合は作業場所だけ引き継ぎ、履歴の要約を渡す。作業開始前に再開を拒否された場合だけ、同じジョブ内で1回新しいセッションを始める。差分レビューは開始コミットからの累積になる。Windowsの実CLI3種で、合成リポジトリでの2往復の再開と、存在しないセッションIDの拒否検出を確認。**稼働中のPETITのDevelop画面からの継続、HEADが進んだ後の新規clone、PCモード（対象外）は実機未確認。** #428 の残り: 実行状況のリアルタイム表示、Chat発の開始確認の削減、Developの返答のMarkdown描画。
@@ -253,6 +254,7 @@
 
 | 日付 | 時間 | 回数 | 変更内容 |
 |------|------|------|----------|
+| 2026-11-15 | 17:45 | #toggle-switch | v0.63.0: 設定画面のオン/オフ7項目をアニメーション付きスイッチ（共有コンポーネント、元のスプリング値を維持）へ置換 |
 | 2026-11-15 | 17:26 | #rubber-dock-unify | v0.62.0としてPC・スマホのタブ操作を下部5タブRubber Dock（Utilityカード展開付き）へ統一し、左サイドバーを廃止 |
 | 2026-09-10 | 16:42 | #conflict-resolution | origin/mainへfast-forward後、未コミット変更を復帰。競合マーカーなし。対象テストはvenvにpytestがなく未実行。 |
 | 2026-08-02 | 08:54 | #1 | v0.1.0としてバージョン管理ルール、PROGRESS表記、Web UI表示を追加 |

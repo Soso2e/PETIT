@@ -823,5 +823,10 @@
       applyHashNavigation();
     }
   }
+  // On/off settings use the shared animated switch (frontend/components/toggle-switch.js).
+  // The checkbox itself stays, so loading and saving settings below is unchanged.
+  if (window.PetitToggleSwitch) {
+    document.querySelectorAll('.check input[type="checkbox"]').forEach(input => window.PetitToggleSwitch.enhance(input));
+  }
   start().catch(error => notice(error.message, true));
 })();

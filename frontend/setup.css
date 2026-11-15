@@ -683,3 +683,9 @@ footer {
     transition: none !important;
   }
 }
+
+/* Animated on/off switch (components/toggle-switch.css) sits on the right of the row. */
+.check:has(.petit-switch) { align-items: center; justify-content: space-between; gap: 16px; }
+.check > .petit-switch { order: 2; }
+.check:has(.petit-switch__input:focus-visible) { border-color: var(--border-strong); }
+.check input[type="checkbox"].petit-switch__input { width: 1px; height: 1px; min-height: 0; margin: 0; }
