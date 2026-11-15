@@ -12,6 +12,8 @@ python -m unittest discover -s tests -v
 node --check frontend/app.js
 ```
 
+既知の順序依存として、`tests/test_renaissance_core.py` の後に `tests/test_core_hardening.py::PersistenceHardeningTests::test_successful_notion_task_sync_replaces_removed_rows` を同じpytestプロセスで実行すると、削除済みNotionタスクが残るアサーション失敗を再現できる。後者だけを別プロセスで実行すると成功する。
+
 ### 2. 1モデル構成
 
 ChatとAgentを同じLM Studio endpoint・同じモデルに設定して、次を順番に確認する。

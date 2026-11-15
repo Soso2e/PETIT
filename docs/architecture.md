@@ -143,7 +143,7 @@ PETIT/
   docs/           設計・仕様（配置は docs/README.md）
   Concept.md      目標（北極星）
   AGENTS.md       開発ルールの正本
-  PROGRESS.md     現在地と変更履歴
+  PROGRESS.md     再開時の優先事項と重要な未確認事項
 ```
 
 ---

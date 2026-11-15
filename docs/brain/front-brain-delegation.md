@@ -317,7 +317,7 @@ CLIの報告（未検証）: ……
 | **P3 委譲（L1・L2）** | worktree 開発、親 Thread での承認、`continue_delegation`、Discord、`delegate_coding_task` の整理 | 「Issue → ブランチ → テスト → PR（承認）」が親 Thread から通る |
 | **P4 既定の変更** | `POLICY_ORDER` と文書の更新。本番利用の結果を見て判断 | 本人の継続利用で問題がない |
 
-実装の各段で `docs/runtime-flows.md` の図、`docs/architecture.md`、`PROGRESS.md` を同じ変更で更新する。
+実装の各段で、処理フローや構成を変えた箇所に対応する `docs/runtime-flows.md` の図と `docs/architecture.md` を同じ変更で更新する。
 
 ---
 

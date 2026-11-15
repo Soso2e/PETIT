@@ -10,7 +10,7 @@ PETIT Core（FastAPI + SQLite）が会話・記憶・権限・承認・実行記
 | いまの構成と、目標との差 | [docs/architecture.md](docs/architecture.md) |
 | 会話処理・Tool実行のフロー | [docs/runtime-flows.md](docs/runtime-flows.md) |
 | 文書の一覧 | [docs/README.md](docs/README.md) |
-| 現在地・未確認・変更履歴 | [PROGRESS.md](PROGRESS.md) |
+| 次に着手すること・重要な未確認事項 | [PROGRESS.md](PROGRESS.md) |
 | 開発ルール | [AGENTS.md](AGENTS.md) |
 
 セットアップ手順は下の「[セットアップ](#セットアップ)」を参照してください。以下には、バージョンごとの変更メモ（新しい順）が続きます。
@@ -445,5 +445,5 @@ PETITが自動追記するMarkdownは、既定では最初のvault内の`PETIT/D
 - AivisSpeech診断CLI確認: `python scripts/diagnose_aivis_speech.py --help`
 - AivisSpeechテスト: `python -m unittest tests.test_aivis_speech -v`
 - 全Python構文確認: `python -m compileall backend tests scripts`
-- 変更のたびに`PROGRESS.md`へ追記する。
+- 次の一手や重要な確認状況が変わったときは [PROGRESS.md](PROGRESS.md) の該当項目を更新する。
 - ルール詳細は[`CLAUDE.md`](CLAUDE.md)。
