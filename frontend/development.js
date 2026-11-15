@@ -239,7 +239,9 @@
   let threadLoading = false;
 
   function moveComposer(slot, repo = "") {
-    slot.append(composer);
+    if (composer.parentElement !== slot) {
+      slot.append(composer);
+    }
     form.elements.repository.value = repo;
     form.elements.repository.disabled = currentView === "thread" || currentView === "repo";
     if (currentView === "thread") {
