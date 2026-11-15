@@ -154,6 +154,44 @@ def search(query, root, check):
     return {"files": result, "source": "filesystem", "truncated": bool(pending)}
 
 
+def list_dir(path, root, check):
+    """List direct subdirectories and files under an allowed PC directory."""
+    check()
+    cleaned = (path or "").strip()
+    if not cleaned:
+        roots = _search_roots(root)
+        return {
+            "path": root or "",
+            "directories": [str(item) for item in roots],
+            "files": [],
+            "truncated": False,
+        }
+    target = host_path(cleaned, root, directory=True)
+    directories, files = [], []
+    truncated = False
+    with os.scandir(target) as entries:
+        for entry in entries:
+            check()
+            entry_path = Path(entry.path)
+            if not permitted_path(entry_path):
+                continue
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    host_path(str(entry_path), root, directory=True)
+                    directories.append(entry.name)
+                elif entry.is_file(follow_symlinks=False):
+                    host_path(str(entry_path), root)
+                    files.append(entry.name)
+            except (OSError, ValueError):
+                continue
+            if len(directories) + len(files) >= 200:
+                truncated = True
+                break
+    directories.sort(key=str.casefold)
+    files.sort(key=str.casefold)
+    return {"path": str(target), "directories": directories, "files": files, "truncated": truncated}
+
+
 def read_bytes(path, limit):
     with path.open("rb") as stream:
         data = stream.read(limit + 1)

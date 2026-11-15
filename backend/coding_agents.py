@@ -38,6 +38,8 @@ PATH = {"type": "string", "minLength": 1, "maxLength": 1000}
 ARGV = {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 2000}, "minItems": 1, "maxItems": 40}
 PC_ACTIONS = {"write_pc_file": "write", "move_pc_file": "move", "delete_pc_file": "delete", "run_pc_command": "command"}
 PC_CATALOG = CATALOG[:3] + [
+    _tool("list_pc_dir", "List immediate subdirectories and files in an absolute PC folder (empty string lists drives/root).",
+          path={"type": "string", "maxLength": 1000}),
     _tool("search_pc_files", "Search for a literal filename fragment on PC drives or within the selected folder.",
           query={"type": "string", "minLength": 2, "maxLength": 150}),
     _tool("read_pc_file", "Read a bounded UTF-8 file at an absolute PC path.", path=PATH),
@@ -47,7 +49,8 @@ PC_CATALOG = CATALOG[:3] + [
     _tool("delete_pc_file", "Propose deleting one PC file; waits for approval.", path=PATH),
     _tool("run_pc_command", "Propose a command in an absolute PC folder; waits for approval.", path=PATH, argv=ARGV),
 ]
-PC_INSTRUCTIONS = """Use PETIT tools to search and read the PC scope selected by the user.
+PC_INSTRUCTIONS = """Use PETIT tools to search, list and read the PC scope selected by the user.
+Use list_pc_dir (with "" for drives/root or an absolute path) to inspect folder contents; do not propose run_pc_command just to list files or directories.
 Copy necessary files into job scratch and work there. list_files, read_file and write_file refer only to scratch.
 Any direct write, move, deletion or command on the PC must be proposed with its exact paths and arguments.
 A proposal has no effect until approved. Do not claim that pending actions ran. Report the results in Japanese.

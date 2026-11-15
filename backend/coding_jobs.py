@@ -433,6 +433,8 @@ def toolbox(job, check, catalog=None):
         try:
             from jsonschema import Draft202012Validator
             if name not in schemas or not Draft202012Validator(schemas[name]).is_valid(arguments):raise ValueError("invalid_tool_arguments")
+            if name == "list_pc_dir":
+                return development_pc.list_dir(arguments["path"], root, check)
             if name == "search_pc_files":
                 return development_pc.search(arguments["query"], root, check)
             if name == "read_pc_file":
