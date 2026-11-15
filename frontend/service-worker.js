@@ -83,6 +83,8 @@ const SHELL = [
   "/static/components/morph-island.css",
   "/static/components/morph-island.js",
   "/static/components/petit-island-status.js",
+  "/static/components/toggle-switch.css",
+  "/static/components/toggle-switch.js",
   "/static/reminders.js",
   "/static/legacy.html",
   "/static/style.css",

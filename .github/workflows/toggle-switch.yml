@@ -1,0 +1,29 @@
+name: Toggle Switch component tests
+on:
+  pull_request:
+    paths:
+      - 'frontend/components/toggle-switch.js'
+      - 'frontend/components/toggle-switch.css'
+      - 'tests/test_toggle_switch.cjs'
+      - '.github/workflows/toggle-switch.yml'
+  push:
+    branches:
+      - claude/elegant-carson-vyx7gj
+    paths:
+      - 'frontend/components/toggle-switch.js'
+      - 'frontend/components/toggle-switch.css'
+      - 'tests/test_toggle_switch.cjs'
+      - '.github/workflows/toggle-switch.yml'
+jobs:
+  component-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: node --check frontend/components/toggle-switch.js
+      - name: Run Toggle Switch tests
+        run: node --test tests/test_toggle_switch.cjs

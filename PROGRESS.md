@@ -1,11 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.64.1**
+**Current Version: v0.65.0**
 
 **Last Updated: 2026-11-15 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- 設定画面のアニメーション付きスイッチ（v0.65.0）: DesignBookmark の Toggle Switch を共有コンポーネント `frontend/components/toggle-switch.{js,css}` として移植（元と同じスプリング 320/18・300/20）。`setup.html` の `.check` 7項目をスイッチ化し、チェックボックスと保存処理はそのまま。単体テストと隔離サーバーでの実ブラウザ確認済み。実サーバー・Desktop(Electron)・iPhone での受入は未確認。詳細は `docs/ui/toggle-switch.md`。
 - #458 Morph Island の実状態連携と上部中央フローティング配置（v0.64.0）: `frontend/components/morph-island.js` / `.css` を DesignBookmark の実スプリング定数（幅 `380/24`・高さ `300/22`・押下 `520/18`・volume give・2レイヤーブラークロスフェード）で再構築し、`frontend/components/petit-island-status.js` を追加。`universe.html` の画面上部中央へ自動マウントし、会話/音声・開発ジョブ・通知・作業セッションを優先度順に表示（タップで該当画面へ遷移）。Node単体・統合テスト38件成功。実サーバー・実ブラウザでの目視確認は未実施。
 - Chat・Develop欄のモーション改善（v0.63.0）: `frontend/petit-chat-motion.js` / `frontend/petit-chat-motion.css` を新設し、DesignBookmark の「Prompt box」（スプリング入力伸縮 `420/34`・ステータス行開閉 `380/30`・送信↔Stopモーフ `520/30`）と「Streaming reply」（メッセージ出現 `300/22`・バブルサイズモーフ `260/26`・考え中フェード `300/30`・チャンク出現 `340/26`）を Chat 画面および Develop 画面へ適用。単体・契約テスト62件およびPlaywright（1440×900 / 390×844、模擬API）でコンソールエラー0件を確認済み。実サーバー・実LLM/CLI・実iPhone/Desktopでの受入は未確認。
 - Rubber Dock ナビゲーション統一（v0.62.0）: PC版の左サイドバー（`.petit-area-rail`）および右上ユーティリティドックを廃止し、PC・スマホ共通で下部中央フローティングの5タブ Rubber Dock（`Chat` / `Univ` / `Develop` / `Dashboard` ＋ `More`、`frontend/petit-rubber-dock.js` / `frontend/petit-rubber-dock.css`）へ統一。スプリング物理によるピルの伸縮・ドラッグスクラブ・`clip-path` 反転・`More` タブからのカードモーフ展開（`Tasks` / `Remind` / `Settings`・コマンドパレット・テーマ切替・接続ステータス）を実装。関連UIテスト56件とPlaywright（デスクトップ1440×900 / モバイル390×844、模擬API）を確認済み。実サーバー・実iPhone/Desktop(Electron)の受入は未確認。
@@ -255,6 +256,7 @@
 
 | 日付 | 時間 | 回数 | 変更内容 |
 |------|------|------|----------|
+| 2026-11-15 | 17:45 | #toggle-switch | v0.65.0: 設定画面のオン/オフ7項目をアニメーション付きスイッチ（共有コンポーネント、元のスプリング値を維持）へ置換 |
 | 2026-11-15 | 17:38 | #chat-motion | v0.63.0としてChat・Develop欄にPrompt box（スプリング伸縮・ステータス行・送信/停止モーフ）とStreaming reply（バブル伸縮・チャンク出現）を実装 |
 | 2026-11-15 | 17:26 | #rubber-dock-unify | v0.62.0としてPC・スマホのタブ操作を下部5タブRubber Dock（Utilityカード展開付き）へ統一し、左サイドバーを廃止 |
 | 2026-09-10 | 16:42 | #conflict-resolution | origin/mainへfast-forward後、未コミット変更を復帰。競合マーカーなし。対象テストはvenvにpytestがなく未実行。 |

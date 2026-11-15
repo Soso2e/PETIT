@@ -117,6 +117,7 @@ Electron版、配布、PC観測
 - [galactic-spatial-design.md](ui/galactic-spatial-design.md) — PETIT Galactic Spatial Design v0.9.0
 - [motion-continuity.md](ui/motion-continuity.md) — PETIT Motion Continuity v0.8.0
 - [ui-chat-first-dashboard.md](ui/ui-chat-first-dashboard.md) — PETIT v0.41.0 — Chat-first UI / Dashboard
+- [toggle-switch.md](ui/toggle-switch.md) — 共有 Toggle Switch（設定画面のオン/オフ）
 - [ui-system.md](ui/ui-system.md) — PETIT UI System v0.25.0
 - [universe-motion.md](ui/universe-motion.md) — UnivのThree.jsアニメーション
 - [universe_focus_orbit.md](ui/universe_focus_orbit.md) — PETIT Universe — Life / Task / Child Task
