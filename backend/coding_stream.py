@@ -27,6 +27,18 @@ def append_delta_current(text: str) -> None:
         append_delta(job_id, text)
 
 
+def append_thought_current(text: str) -> None:
+    job_id = getattr(_LOCAL, "job_id", None)
+    if job_id:
+        append_thought(job_id, text)
+
+
+def add_activity_current(text: str) -> None:
+    job_id = getattr(_LOCAL, "job_id", None)
+    if job_id:
+        add_activity(job_id, text)
+
+
 def publish_tool_current(tool_name: str) -> None:
     job_id = getattr(_LOCAL, "job_id", None)
     if job_id:
@@ -36,7 +48,7 @@ def publish_tool_current(tool_name: str) -> None:
 def _entry(job_id: str) -> dict:
     item = _STREAMS.get(job_id)
     if item is None:
-        item = {"seq": 0, "draft": "", "tool": "", "updated_at": time.monotonic()}
+        item = {"seq": 0, "draft": "", "thought": "", "tool": "", "activity": [], "updated_at": time.monotonic()}
         _STREAMS[job_id] = item
     return item
 
@@ -48,6 +60,26 @@ def append_delta(job_id: str, text: str) -> None:
         item = _entry(job_id)
         item["draft"] = (item["draft"] + text)[-MAX_DRAFT_CHARS:]
         item["tool"] = ""
+        item["seq"] += 1
+        item["updated_at"] = time.monotonic()
+
+
+def append_thought(job_id: str, text: str) -> None:
+    if not job_id or not isinstance(text, str) or not text:
+        return
+    with _LOCK:
+        item = _entry(job_id)
+        item["thought"] = (item["thought"] + text)[-MAX_DRAFT_CHARS:]
+        item["seq"] += 1
+        item["updated_at"] = time.monotonic()
+
+
+def add_activity(job_id: str, text: str) -> None:
+    if not job_id or not isinstance(text, str) or not text.strip():
+        return
+    with _LOCK:
+        item = _entry(job_id)
+        item["activity"] = (item["activity"] + [text.strip()[:300]])[-20:]
         item["seq"] += 1
         item["updated_at"] = time.monotonic()
 
@@ -66,8 +98,14 @@ def snapshot(job_id: str) -> dict:
     with _LOCK:
         item = _STREAMS.get(job_id)
         if not item:
-            return {"seq": 0, "draft": "", "tool": ""}
-        return {"seq": item["seq"], "draft": item["draft"], "tool": item["tool"]}
+            return {"seq": 0, "draft": "", "thought": "", "tool": "", "activity": []}
+        return {
+            "seq": item["seq"],
+            "draft": item["draft"],
+            "thought": item["thought"],
+            "tool": item["tool"],
+            "activity": list(item["activity"]),
+        }
 
 
 def clear(job_id: str) -> None:

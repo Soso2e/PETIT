@@ -203,6 +203,8 @@ async def stream(job_id: str, request: Request):
                     "phase": last_phase,
                     "tool": draft_snap["tool"],
                     "draft": draft_snap["draft"],
+                    "thought": draft_snap["thought"],
+                    "activity": draft_snap["activity"],
                 }, ensure_ascii=False)
                 yield f"event: draft\ndata: {payload}\n\n"
                 last_sent = time.monotonic()

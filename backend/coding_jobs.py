@@ -434,15 +434,23 @@ def toolbox(job, check, catalog=None):
             from jsonschema import Draft202012Validator
             if name not in schemas or not Draft202012Validator(schemas[name]).is_valid(arguments):raise ValueError("invalid_tool_arguments")
             if name == "list_pc_dir":
-                return development_pc.list_dir(arguments["path"], root, check)
+                result = development_pc.list_dir(arguments["path"], root, check)
+                event(job["id"], name, arguments["path"] or "(root)")
+                return result
             if name == "search_pc_files":
-                return development_pc.search(arguments["query"], root, check)
+                result = development_pc.search(arguments["query"], root, check)
+                event(job["id"], name, arguments["query"])
+                return result
             if name == "read_pc_file":
                 source = development_pc.host_path(arguments["path"], root)
-                return {"content": development_pc.read_bytes(source, 256000).decode("utf-8-sig")}
+                result = {"content": development_pc.read_bytes(source, 256000).decode("utf-8-sig")}
+                event(job["id"], name, str(source))
+                return result
             if name == "copy_pc_file_to_workspace":
                 source = development_pc.host_path(arguments["path"], root)
-                return development_pc.copy_to_scratch(source, scratch_path(arguments["destination"]))
+                result = development_pc.copy_to_scratch(source, scratch_path(arguments["destination"]))
+                event(job["id"], name, str(source))
+                return result
             if name in coding_agents.PC_ACTIONS:
                 return development_pc.propose(job, coding_agents.PC_ACTIONS[name], arguments, scratch_path)
             if name == "list_files":
@@ -613,11 +621,11 @@ def run_job(job_id):
         if modern:
             target.update(model=job["model"], effort=job["selection"]["effort"])
 
-        def progress(kind):
-            event(job_id, kind)
+        def progress(kind, detail=""):
+            event(job_id, kind, detail)
 
+        from . import coding_stream
         if modern and not pc:
-            from . import coding_stream
             resume = continued["session_id"] if continued else None
 
             def native(session):
@@ -642,10 +650,11 @@ def run_job(job_id):
             catalog = coding_agents.PC_CATALOG if pc else coding_agents.CATALOG
             invoke = toolbox(job, check, catalog)
             args = (job["provider"], target, goal, invoke, check, progress)
-            if pc:
-                summary = coding_agents.run(*args, catalog=catalog, instructions=coding_agents.PC_INSTRUCTIONS)
-            else:
-                summary = coding_agents.run(*args)
+            with coding_stream.bind(job_id):
+                if pc:
+                    summary = coding_agents.run(*args, catalog=catalog, instructions=coding_agents.PC_INSTRUCTIONS)
+                else:
+                    summary = coding_agents.run(*args)
         check()
         validation = {"ok": True, "tests": "not_run"} if pc else checks(workspace, job["base_commit"]) if modern else checks(workspace)
         if modern and not pc:

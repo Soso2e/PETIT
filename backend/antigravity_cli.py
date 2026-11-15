@@ -133,6 +133,11 @@ class Protocol:
                 if not isinstance(text, str):
                     raise ValueError("invalid_cli_text")
                 update["text_delta"] = text
+            elif step in {"thinking", "thought", "reasoning"}:
+                text = payload.get("text_delta", payload.get("text", ""))
+                if not isinstance(text, str):
+                    raise ValueError("invalid_cli_text")
+                update["thought_delta"] = text
             elif step == "tool":
                 name = payload.get("tool_name")
                 if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,99}", name):

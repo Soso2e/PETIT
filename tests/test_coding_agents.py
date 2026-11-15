@@ -228,3 +228,32 @@ def test_codex_git_persists_and_resumes_thread(monkeypatch, tmp_path):
     with pytest.raises(coding_agents.antigravity_cli_brain.CLIError) as exc:
         coding_agents.run_git(*args, resume="gone")
     assert exc.value.reason == "resume_unavailable" and FakeRPC.clients[2].closed
+
+
+def test_structured_run_publishes_stream_activity_and_progress_details(monkeypatch):
+    from backend import coding_stream
+    turns = iter([
+        ({"role": "assistant", "content": "Serverを確認します", "tool_calls": [
+            {"id": "1", "type": "function", "function": {"name": "list_pc_dir", "arguments": '{"path": "C:\\\\#Project"}'}}
+        ]}, {}),
+        ({"role": "assistant", "content": "フォルダ一覧です", "tool_calls": []}, {}),
+    ])
+    monkeypatch.setattr(coding_agents.antigravity_cli_brain, "completion", lambda *a, **kw: next(turns))
+    recorded = []
+    job_id = "stream-test-job"
+    try:
+        with coding_stream.bind(job_id):
+            reply = coding_agents.run(
+                "antigravity_cli", {"model": "gemini-test"}, "一覧教えて",
+                lambda name, args: {"path": args["path"], "directories": ["Server"], "files": []},
+                lambda: None, lambda kind, detail="": recorded.append((kind, detail)),
+                catalog=coding_agents.PC_CATALOG, instructions=coding_agents.PC_INSTRUCTIONS,
+            )
+            snap = coding_stream.snapshot(job_id)
+    finally:
+        coding_stream.clear(job_id)
+    assert reply == "フォルダ一覧です"
+    assert ("model_response", "Serverを確認します") in recorded
+    assert ("tool_result", "list_pc_dir: フォルダ 1件 / ファイル 0件") in recorded
+    assert "Serverを確認します" in snap["draft"] and "フォルダ一覧です" in snap["draft"]
+    assert any("list_pc_dir" in item for item in snap["activity"])

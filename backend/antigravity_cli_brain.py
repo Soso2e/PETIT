@@ -225,6 +225,10 @@ def completion(target: dict, messages: list, catalog: list, check, *, on_progres
             phase = "cli_initialized"
         elif event["kind"] == "result":
             phase = "cli_validating"
+        elif event.get("thought_delta"):
+            from . import coding_stream
+            coding_stream.append_thought_current(event["thought_delta"])
+            phase = "cli_responding"
         elif event.get("text_delta"):
             phase = "cli_responding"
         else:
