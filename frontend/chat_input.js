@@ -11,6 +11,10 @@
     let composeTimer = null;
 
     const resize = () => {
+      if (form._petitPromptBox) {
+        form._petitPromptBox.fit();
+        return;
+      }
       const cssMax = parseFloat(getComputedStyle(input).maxHeight);
       const limit = Number.isFinite(cssMax) ? Math.min(cssMax, maxHeight) : maxHeight;
       input.style.height = "auto";
@@ -50,7 +54,7 @@
       if (event.shiftKey) return;
       if (composing || event.isComposing || event.keyCode === 229) return;
       event.preventDefault();
-      if (event.repeat || form.querySelector('[type="submit"]')?.disabled) return;
+      if (event.repeat || form.querySelector('[type="submit"]')?.disabled || form._petitPromptBox?.isBusy?.()) return;
       form.requestSubmit();
     }, true);
 
