@@ -71,7 +71,7 @@ class ResumeUnavailable(lmstudio_client.LMStudioError):
 
 
 class RPC:
-    def __init__(self, *, workspace=None, web_search="disabled"):
+    def __init__(self, *, workspace=None, web_search="disabled", development=False):
         binary = executable()
         if not binary:
             raise lmstudio_client.LMStudioError("Codex CLIが未導入です。公式CLIをサーバーへ導入してください。")
@@ -91,6 +91,8 @@ class RPC:
                  'approval_policy="never"', 'sandbox_mode="read-only"',
                  f'permissions.{PERMISSIONS}.filesystem={{ {json.dumps(self.workspace.resolve().as_posix(), ensure_ascii=False)} = "read" }}',
                  f"permissions.{PERMISSIONS}.network.enabled=false"]
+        if development:
+            flags = ['approval_policy="never"', 'sandbox_mode="danger-full-access"']
         argv = [binary, "app-server", "--listen", "stdio://"]
         for flag in flags:
             argv.extend(["-c", flag])

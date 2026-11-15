@@ -175,25 +175,6 @@ def validate_check_command(argv: list[str]) -> list[str]:
     raise WorktreeError("テスト・ビルド・静的検査のコマンドだけ実行できます（pytest / npm test / go test など）。")
 
 
-def validate_job_check_command(argv):
-    argv = validate_check_command(argv)
-    runner = argv[0].lower().removesuffix(".exe")
-    arguments = argv[1:]
-    allowed_scripts = {"test", "build", "lint", "check", "typecheck", "format", "verify"}
-    if runner in SCRIPT_RUNNERS and arguments[0] != "test":
-        if arguments[0] != "run" or arguments[1].split(":", 1)[0] not in allowed_scripts:
-            raise WorktreeError("リポジトリのテスト・ビルド・検査スクリプトを指定してください。")
-    if runner == "npx" or (runner in {"node", "deno"} and (not arguments or arguments[0] not in {"--test", "--check", "test", "check"})):
-        raise WorktreeError("パッケージの取得・任意スクリプトの実行はできません。")
-    if runner == "make" and (not arguments or any(arg not in allowed_scripts for arg in arguments)):
-        raise WorktreeError("make のテスト・ビルド・検査ターゲットを指定してください。")
-    for arg in arguments:
-        candidate = Path(arg.partition("=")[2] if arg.startswith("-") and "=" in arg else arg)
-        if candidate.anchor or ".." in candidate.parts:
-            raise WorktreeError("検査のパスは作業ブランチ内の相対パスで指定してください。")
-    return argv
-
-
 def run_check(worktree_id: str, command: list[str]) -> dict:
     """L1: run a test/build/lint command in the worktree. No shell; no Core secrets."""
     item = _row(worktree_id)

@@ -72,7 +72,7 @@ flowchart TD
     Entry -->|Develop| Queued
     Queued -->|条件付き取得| Run[running]
     Chat -.-> Compact[Front Brainは委譲スキルで目的・制約・完了条件を短く渡す]
-    Run --> Model[Antigravity CLI / NDJSONを実行中に読み取り・JSON Schemaで応答検証]
+    PC --> Model[構造化応答または動的Toolを受信]
     Model -->|復旧可能なエラー| Retry[同一モデル応答だけを再試行 / 一段につき1回・ジョブ内で2回まで]
     Retry --> Model
     Model -->|検証済みのTool要求| JobTool[CoreがジョブのToolを実行]
@@ -83,8 +83,11 @@ flowchart TD
     Progress -.-> SSE[管理者用 Job SSE / Chatカード・Develop]
     Run --> Mode{対象モード}
     Mode -->|Git| Git[開始コミットの clone と専用ブランチ]
-    Git --> GitTool[Core Tool で編集・静的検査・テスト・ビルド・commit]
-    GitTool --> Check{検査結果}
+    Git --> Executor{実行方式}
+    Executor --> Native[Codex / Antigravity / Claude Codeが専用cloneで調査・編集・検査・commit]
+    Native -->|自然文の終了応答| Check{検査結果}
+    Native -->|失敗した場合は差分を保持| Error
+    Native -.-> Progress
     Check -->|成功| Review[ready_for_review]
     Check -->|失敗| FailedChecks[checks_failed]
     Mode -->|PC| PC[範囲内の検索・読み取りと scratch へのコピー]
@@ -96,6 +99,8 @@ flowchart TD
     Review -->|利用者のレビュー| Completed[completed]
     Run -->|再起動| Interrupted[interrupted]
 ```
+
+Git開発ではCLIのネイティブToolを使う。構造化されたCLIイベントは進捗と終了通知の受信に使い、モデルへ応答Schemaは渡さない。CLI内の検査結果は最終報告に含まれ、Coreによる静的検査・Git差分は別に記録する。
 
 ## Front Brain と一般作業の CLI 委譲（#411）
 

@@ -137,7 +137,7 @@
       const link = append(box, "a", "Developで開発ジョブを確認");
       link.href = "/static/universe.html?view=development";
     } else {
-      const testLabel = { not_run: "未実施", passed: "成功", failed: "失敗" };
+      const testLabel = { not_run: "未実施", not_verified: "CLIの報告を参照", passed: "成功", failed: "失敗" };
       append(box, "p", "コマンド検証 " + (testLabel[job.tests] || "不明") + " / 実アプリ動作 未確認");
       if (job.workspace) {
         button(actions, "変更ファイル・差分を見る", async () => {
