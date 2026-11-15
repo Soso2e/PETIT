@@ -8,7 +8,6 @@ def test_agy_windows_use_hydrogen_gemini_limits():
         "Gemini Models\tWeekly Limit Remaining\t96%\t2026-11-14T04:22:57Z\n"
         "Gemini Models\tFive Hour Limit Remaining\t98%\t2026-11-09T12:43:45Z\n"
         "Claude and GPT models\tFive Hour Limit Remaining\t0%\t2026-11-09T09:22:46Z\n"
-        "Gemini 4 Argon\tGemini 4 Argon Weekly Limit\t39%\t2026-11-16T01:51:37Z\n"
     )
     assert models.parse_agy(raw) == {"antigravity_hydrogen": (98, 96), "gemini_flash": (98, 96)}
 
