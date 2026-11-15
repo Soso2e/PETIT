@@ -1,0 +1,30 @@
+/* PETIT shared island: reuse global theme variables; opt-in, not fixed-position. */
+.petit-morph-island {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: min(100%, 320px);
+  padding: 0 14px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--bg-surface, #0c0e18);
+  border: 1px solid var(--line-mid, rgba(200,207,222,.14));
+  box-shadow: var(--shadow-sm, 0 4px 16px rgba(0,0,0,.4));
+  color: var(--text, #dde1ec);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+  contain: layout style;
+}
+.petit-morph-island__marker { color: var(--accent, #a8b4d0); flex: 0 0 auto; }
+.petit-morph-island__label { overflow: hidden; text-overflow: ellipsis; }
+.petit-morph-island__detail { color: var(--text-sub, #8c93a8); overflow: hidden; text-overflow: ellipsis; }
+.petit-morph-island__detail[hidden] { display: none; }
+.petit-morph-island[data-state="success"] .petit-morph-island__marker { color: var(--ok, #6dbf9a); }
+.petit-morph-island[data-state="error"] .petit-morph-island__marker { color: var(--danger, #c96070); }
+@media (prefers-reduced-motion: reduce) {
+  .petit-morph-island { transition: none !important; animation: none !important; }
+}
