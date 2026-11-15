@@ -68,45 +68,68 @@ GIT_NATIVE_INSTRUCTIONS = (
 )
 
 
-def run_git(provider, target, goal, workspace, check, progress):
+def _resume_unavailable(label):
+    # Raised only before the CLI started any work, so the caller may start a fresh session once.
+    return antigravity_cli_brain.CLIError("resume_unavailable", label + "の前回セッションを再開できませんでした。")
+
+
+def run_git(provider, target, goal, workspace, check, progress, *, resume=None, on_session=None):
+    """One native CLI turn in the job checkout.
+
+    ``resume`` is the CLI's own session ID from an earlier job in the same checkout.
+    ``on_session`` receives the session ID as soon as the CLI reports it.
+    """
     prompt = GIT_NATIVE_INSTRUCTIONS + goal
+    session = on_session or (lambda _id: None)
     if provider == "antigravity_cli":
-        return _run_antigravity_git(target, prompt, workspace, check, progress)
+        return _run_antigravity_git(target, prompt, workspace, check, progress, resume, session)
     if provider == "claude_code":
-        return _run_claude_git(target, prompt, workspace, check, progress)
+        return _run_claude_git(target, prompt, workspace, check, progress, resume, session)
     if provider == "codex":
         check()
         client = codex_brain.RPC(workspace=workspace, development=True)
         try:
-            return _run_codex(client, target, prompt, None, check, progress, (), "", development=True)
+            return _run_codex(client, target, prompt, None, check, progress, (), "", development=True,
+                              resume=resume, on_session=session)
         finally:
             client.close()
     raise ValueError("unsupported_coding_provider")
 
 
-def _run_claude_git(target, prompt, workspace, check, progress):
+def _run_claude_git(target, prompt, workspace, check, progress, resume=None, on_session=lambda _id: None):
     binary = claude_code_brain.executable()
     label = claude_code_brain.LABEL
     if not binary:
         raise antigravity_cli_brain.CLIError("not_configured", label + "が見つかりません。")
     command = [binary, "-p", "--output-format", "stream-json", "--verbose",
-               "--permission-mode", "bypassPermissions", "--no-session-persistence"]
+               "--permission-mode", "bypassPermissions"]
+    if resume:
+        command += ["--resume", resume]
     if target.get("model"):
         command += ["--model", target["model"]]
     if target.get("effort"):
         command += ["--effort", target["effort"]]
     result = None
     responding = False
+    reported = None
 
     def observe(line):
-        nonlocal result, responding
+        nonlocal result, responding, reported
         try:
             event = json.loads(line)
             if not isinstance(event, dict):
                 raise ValueError("invalid_cli_event")
         except ValueError:
+            if resume and reported is None:
+                raise _resume_unavailable(label) from None
             raise antigravity_cli_brain.CLIError("invalid_cli_protocol", label + "の出力を検証できませんでした。") from None
         kind = event.get("type")
+        identifier = event.get("session_id")
+        # An unknown --resume ID is echoed back in an error result with no init event; never save that.
+        started = kind == "system" and event.get("subtype") == "init"
+        if (started or reported) and isinstance(identifier, str) and identifier and identifier != reported:
+            reported = identifier
+            on_session(identifier)
         if kind == "system" and event.get("subtype") == "init":
             progress("cli_initialized")
         elif kind in {"assistant", "user", "stream_event"} and not responding:
@@ -125,6 +148,9 @@ def _run_claude_git(target, prompt, workspace, check, progress):
         )
     except UnicodeError:
         raise antigravity_cli_brain.CLIError("invalid_cli_protocol", label + "の出力を検証できませんでした。") from None
+    if resume and reported is None and not (result or {}).get("num_turns"):
+        # The session never started, so nothing was changed in the checkout.
+        raise _resume_unavailable(label)
     if result and result.get("permission_denials"):
         raise antigravity_cli_brain.CLIError("permission_denied", label + "がToolの実行を許可しませんでした。")
     if code or result is None or result.get("is_error") or result.get("subtype") != "success":
@@ -137,18 +163,21 @@ def _run_claude_git(target, prompt, workspace, check, progress):
     return summary.strip()
 
 
-def _run_antigravity_git(target, prompt, workspace, check, progress):
+def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None, on_session=lambda _id: None):
     binary = antigravity_cli.executable()
     if not binary:
         raise antigravity_cli_brain.CLIError("not_configured", "公式Antigravity CLIが見つかりません。")
 
     command = [binary, "--input-format", "stream-json", "--output-format", "stream-json", "--mode=auto"]
+    if resume:
+        command += ["--conversation", antigravity_cli.conversation_id(resume)]
     if target.get("model"):
         command += ["--model", target["model"]]
     if target.get("effort"):
         command += ["--effort", target["effort"]]
 
-    protocol = antigravity_cli.Protocol()
+    # A resumed run must report the same conversation; Protocol rejects any other ID.
+    protocol = antigravity_cli.Protocol(antigravity_cli.conversation_id(resume) if resume else None)
     phase = None
 
     def observe(line):
@@ -156,7 +185,11 @@ def _run_antigravity_git(target, prompt, workspace, check, progress):
         try:
             event = protocol.feed(line)
         except ValueError:
+            if resume and not protocol.initialized:
+                raise _resume_unavailable("Antigravity CLI") from None
             raise antigravity_cli_brain.result_error("invalid_cli_protocol") from None
+        if event["kind"] == "init":
+            on_session(protocol.conversation)
         next_phase = {
             "init": "cli_initialized",
             "step": "cli_responding",
@@ -175,6 +208,8 @@ def _run_antigravity_git(target, prompt, workspace, check, progress):
     except UnicodeError:
         raise antigravity_cli_brain.result_error("invalid_cli_protocol") from None
     result = protocol.result
+    if resume and not protocol.initialized:
+        raise _resume_unavailable("Antigravity CLI")
     if result is None:
         reason = antigravity_cli.error_category(error) if code else "invalid_cli_protocol"
         raise antigravity_cli_brain.result_error(reason)
@@ -234,7 +269,8 @@ def run(provider, target, goal, invoke, check, progress, *, catalog=CATALOG, ins
             client.close()
 
 
-def _run_codex(client, target, goal, invoke, check, progress, catalog, instructions, *, development=False):
+def _run_codex(client, target, goal, invoke, check, progress, catalog, instructions, *, development=False,
+               resume=None, on_session=lambda _id: None):
     reply, final = "", ""
     seen = {}
     if (client.request("account/read", {"refreshToken": False}).get("account") or {}).get("type") != "chatgpt":
@@ -246,10 +282,22 @@ def _run_codex(client, target, goal, invoke, check, progress, catalog, instructi
             "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}, "arguments_json": {"type": "string"}},
                 "required": ["name", "arguments_json"], "additionalProperties": False}}]}
     if development:
-        params = {"cwd": str(client.workspace), "sandbox": "danger-full-access",
-                  "approvalPolicy": "never", "ephemeral": True}
+        # Persisted so that the next job in the same checkout can resume this thread.
+        params = {"cwd": str(client.workspace), "sandbox": "danger-full-access", "approvalPolicy": "never"}
     if target.get("model"):params["model"] = target["model"]
-    started = client.request("thread/start", params)
+    if development and resume:
+        try:
+            started = client.request("thread/resume", {**params, "threadId": resume, "excludeTurns": True})
+        except codex_brain.ResumeUnavailable:
+            raise _resume_unavailable("Codex") from None
+        if started["thread"]["id"] != resume:
+            raise ValueError("codex_thread_mismatch")
+    else:
+        if development:
+            params["ephemeral"] = False
+        started = client.request("thread/start", params)
+    if development:
+        on_session(started["thread"]["id"])
     if not development and any(not path.is_relative_to(Path(client.workspace).resolve()) for path in codex_brain.instruction_sources(started)):
         raise ValueError("Codexがジョブ外の指示ファイルを参照しました。")
     thread = started["thread"]["id"]

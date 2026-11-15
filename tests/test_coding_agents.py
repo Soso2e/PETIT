@@ -148,3 +148,83 @@ def test_claude_git_uses_native_tools_and_reports_denials(monkeypatch, tmp_path,
         assert exc.value.reason == "permission_denied"
     else:
         assert coding_agents.run_git(*args) == "作業報告"
+
+
+def test_claude_git_resumes_session_and_reports_new_id(monkeypatch, tmp_path):
+    monkeypatch.setattr(coding_agents.claude_code_brain, "executable", lambda: "claude")
+    commands = []
+
+    def invoke(command, workspace, prompt, check, *, timeout, raw_stdin, env, label, on_line):
+        commands.append(command)
+        if "--resume" in command and command[command.index("--resume") + 1] == "gone":
+            # Shape observed from the official CLI for an unknown session ID.
+            on_line(json.dumps({"type": "result", "subtype": "error_during_execution", "is_error": True,
+                                "num_turns": 0, "session_id": "gone"}))
+            return 1, "", "No conversation found with session ID: gone"
+        on_line(json.dumps({"type": "system", "subtype": "init", "session_id": "s-2"}))
+        on_line(json.dumps({"type": "result", "subtype": "success", "result": "続きの報告", "session_id": "s-2"}))
+        return 0, "", ""
+
+    monkeypatch.setattr(coding_agents.antigravity_cli_brain, "invoke", invoke)
+    seen = []
+    args = ("claude_code", {}, "続き", tmp_path, lambda: None, lambda _: None)
+    assert coding_agents.run_git(*args, resume="s-1", on_session=seen.append) == "続きの報告"
+    assert commands[0][commands[0].index("--resume") + 1] == "s-1" and "--no-session-persistence" not in commands[0]
+    assert seen == ["s-2"]
+    with pytest.raises(coding_agents.antigravity_cli_brain.CLIError) as exc:
+        coding_agents.run_git(*args, resume="gone", on_session=seen.append)
+    assert exc.value.reason == "resume_unavailable" and seen == ["s-2"]
+
+
+def test_antigravity_git_resumes_only_the_same_conversation(monkeypatch, tmp_path):
+    conversation = "83d75605-0804-4d10-8787-fef77fe44190"
+    other = "11111111-2222-4333-8444-555555555555"
+    monkeypatch.setattr(coding_agents.antigravity_cli, "executable", lambda: "agy")
+    reported = {"id": conversation}
+
+    def invoke(command, workspace, prompt, check, *, timeout, on_line):
+        assert command[command.index("--conversation") + 1] == conversation
+        on_line(json.dumps({"event": "init", "conversation_id": reported["id"], "init": {}}))
+        on_line(json.dumps({"event": "result", "result": {
+            "conversation_id": reported["id"], "status": "SUCCESS", "response": "続きの報告"}}))
+        return 0, "", ""
+
+    monkeypatch.setattr(coding_agents.antigravity_cli_brain, "invoke", invoke)
+    seen = []
+    args = ("antigravity_cli", {}, "続き", tmp_path, lambda: None, lambda _: None)
+    assert coding_agents.run_git(*args, resume=conversation, on_session=seen.append) == "続きの報告"
+    assert seen == [conversation]
+    reported["id"] = other
+    with pytest.raises(coding_agents.antigravity_cli_brain.CLIError) as exc:
+        coding_agents.run_git(*args, resume=conversation)
+    assert exc.value.reason == "resume_unavailable"
+    with pytest.raises(ValueError):
+        coding_agents.run_git(*args, resume="--not-an-id")
+
+
+def test_codex_git_persists_and_resumes_thread(monkeypatch, tmp_path):
+    class DevelopmentRPC(FakeRPC):
+        def __init__(self, *, workspace, development):
+            super().__init__(workspace=workspace)
+
+        def request(self, method, params=None, **kwargs):
+            if method == "thread/resume" and params["threadId"] == "gone":
+                self.requests.append((method, params))
+                raise codex_brain.ResumeUnavailable("synthetic")
+            return super().request(method, params, **kwargs)
+
+    monkeypatch.setattr(codex_brain, "RPC", DevelopmentRPC)
+    FakeRPC.clients = []
+    FakeRPC.scripts = [[delta("初回"), complete()], [delta("続き"), complete()], []]
+    seen = []
+    args = ("codex", {}, "目的", tmp_path, lambda: None, lambda _: None)
+    assert coding_agents.run_git(*args, on_session=seen.append) == "初回"
+    start = next(params for method, params in FakeRPC.clients[0].requests if method == "thread/start")
+    assert start["ephemeral"] is False
+    assert coding_agents.run_git(*args, resume="synthetic-cli-thread", on_session=seen.append) == "続き"
+    methods = [method for method, _ in FakeRPC.clients[1].requests]
+    assert "thread/resume" in methods and "thread/start" not in methods
+    assert seen == ["synthetic-cli-thread", "synthetic-cli-thread"]
+    with pytest.raises(coding_agents.antigravity_cli_brain.CLIError) as exc:
+        coding_agents.run_git(*args, resume="gone")
+    assert exc.value.reason == "resume_unavailable" and FakeRPC.clients[2].closed

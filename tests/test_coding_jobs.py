@@ -196,8 +196,8 @@ def test_develop_direct_reviews_committed_native_cli_changes(repository, client,
     jobs.git(repository, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "add test")
     observed = {}
 
-    def agent(provider, target, goal, workspace, check, progress):
-        assert provider == "codex"
+    def agent(provider, target, goal, workspace, check, progress, *, resume=None, on_session=None):
+        assert provider == "codex" and resume is None
         check()
         observed["target"] = (target["model"], target["effort"])
         (workspace / "main.py").write_text("VALUE = 2\n", encoding="utf-8")
@@ -218,6 +218,84 @@ def test_develop_direct_reviews_committed_native_cli_changes(repository, client,
     result = client.get(f"/api/coding/jobs/{job['id']}/diff").json()
     assert result["files"] == ["main.py"] and "+VALUE = 2" in result["diff"]
     assert (repository / "main.py").read_text(encoding="utf-8") == "VALUE = 1\n"
+
+
+def _native_recorder(calls, sessions, *, refuse=()):
+    """Synthetic native CLI: appends one line per run and reports a session ID."""
+    def agent(provider, target, goal, workspace, check, progress, *, resume=None, on_session=None):
+        calls.append({"goal": goal, "workspace": workspace, "resume": resume})
+        if resume in refuse:
+            raise coding_agents.antigravity_cli_brain.CLIError("resume_unavailable", "synthetic")
+        on_session(sessions.pop(0))
+        with (workspace / "main.py").open("a", encoding="utf-8") as stream:
+            stream.write("# run %d\n" % len(calls))
+        return "run %d" % len(calls)
+    return agent
+
+
+def _thread_job(request_id, repository, goal, thread_id="develop-thread"):
+    job = jobs.create_development(request_id, str(repository), goal, direct=True, thread_id=thread_id)
+    assert jobs.pump()
+    return jobs.get(job["id"])
+
+
+def test_same_thread_continues_checkout_and_cli_session(repository, client, development_quota, monkeypatch):
+    admin(client)
+    calls = []
+    monkeypatch.setattr(coding_agents, "run_git", _native_recorder(calls, ["session-1", "session-2"]))
+    first = _thread_job("first", repository, "最初の依頼")
+    second = _thread_job("second", repository, "続きの依頼")
+    assert first["status"] == second["status"] == "ready_for_review", (first["error"], second["error"])
+    assert second["workspace"] == first["workspace"] and second["branch"] == first["branch"]
+    assert [call["resume"] for call in calls] == [None, "session-1"]
+    # The resumed CLI already holds the conversation; only the new request is sent.
+    assert calls[1]["goal"] == "続きの依頼"
+    kinds = [item["kind"] for item in second["events"]]
+    assert "workspace_continued" in kinds and "session_resumed" in kinds and "workspace_ready" not in kinds
+    diff = client.get(f"/api/coding/jobs/{second['id']}/diff").json()["diff"]
+    assert "+# run 1" in diff and "+# run 2" in diff
+    with db.get_connection() as connection:
+        saved = dict(connection.execute("SELECT job_id,session_id FROM coding_job_sessions").fetchall())
+    assert saved == {first["id"]: "session-1", second["id"]: "session-2"}
+    assert (repository / "main.py").read_text(encoding="utf-8") == "VALUE = 1\n"
+
+
+def test_refused_session_restarts_once_with_thread_summary(repository, development_quota, monkeypatch):
+    calls = []
+    monkeypatch.setattr(coding_agents, "run_git", _native_recorder(calls, ["old", "new"], refuse={"old"}))
+    first = _thread_job("first", repository, "最初の依頼")
+    second = _thread_job("second", repository, "続きの依頼")
+    assert second["status"] == "ready_for_review", second["error"]
+    assert [call["resume"] for call in calls] == [None, "old", None]
+    assert "最初の依頼" in calls[2]["goal"] and "引き継いでいます" in calls[2]["goal"]
+    assert calls[2]["workspace"] == Path(first["workspace"])
+    assert "session_restarted" in [item["kind"] for item in second["events"]]
+
+
+def test_other_thread_or_moved_repository_starts_fresh_clone(repository, development_quota, monkeypatch):
+    calls = []
+    monkeypatch.setattr(coding_agents, "run_git", _native_recorder(calls, ["a", "b", "c"]))
+    first = _thread_job("first", repository, "最初の依頼")
+    other = _thread_job("other", repository, "別スレッド", thread_id="another-thread")
+    assert other["workspace"] != first["workspace"] and calls[1]["resume"] is None
+    (repository / "main.py").write_text("VALUE = 3\n", encoding="utf-8")
+    jobs.git(repository, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qam", "move")
+    moved = _thread_job("moved", repository, "続きの依頼")
+    assert moved["status"] == "ready_for_review", moved["error"]
+    assert moved["workspace"] not in {first["workspace"], other["workspace"]} and calls[2]["resume"] is None
+    assert "新しいclone" in calls[2]["goal"]
+    assert "workspace_ready" in [item["kind"] for item in moved["events"]]
+
+
+def test_session_is_not_offered_to_another_cli(repository, development_quota, monkeypatch):
+    calls = []
+    monkeypatch.setattr(coding_agents, "run_git", _native_recorder(calls, ["codex-session", "agy-session"]))
+    first = _thread_job("first", repository, "最初の依頼")
+    with db.get_connection() as connection:
+        connection.execute("UPDATE coding_jobs SET provider='antigravity_cli' WHERE id=?", (first["id"],))
+    second = _thread_job("second", repository, "続きの依頼")
+    assert second["workspace"] == first["workspace"] and calls[1]["resume"] is None
+    assert "引き継いでいます" in calls[1]["goal"]
 
 
 def test_pc_scope_copy_and_approval_for_original(repository, client, development_quota, monkeypatch, tmp_path):
