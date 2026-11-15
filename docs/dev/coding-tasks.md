@@ -29,12 +29,12 @@
 | --- | --- | --- |
 | Claude Opus 5.5 | Claude Code | `opus` と `--effort` |
 | Codex Sol 6.1 | Codex app-server | `gpt-6.1-sol` と `turn/start.effort` |
-| Antigravity Argon | Antigravity CLI | `gemini-4-argon-<effort>` |
+| Antigravity Hydrogen | Antigravity CLI | `gemini-4-hydrogen-<effort>` |
 | Gemini 3.8 Flash | Antigravity CLI | `gemini-3.8-flash-<effort>` |
 
 Effort は low / medium / high、既定は medium。自動選択は軽量調査で利用可能な Flash を優先し、通常の開発では認証を確認できた候補を週次、次いで5時間枠の残量順に比較する。0% の枠を持つ候補は除外し、不明な枠は既知の残量より後に置く。
 
-`GET /api/coding/usage` は公式 CLI で得た結果を60秒キャッシュする。Antigravity の `/usage` は Gemini 共通の5時間枠と、Argon 専用または Gemini 共通の週次枠を使う。Codex は `account/rateLimits/read` を使う。Claude は認証確認に加え、PETIT のジョブ履歴から5時間40リクエスト・7日200リクエストを目安に推定する。Anthropic の実契約枠や他のアプリからの消費は含まない。利用制限エラーから5時間は5時間枠を0%と扱う。
+`GET /api/coding/usage` は公式 CLI で得た結果を60秒キャッシュする。Antigravity の `/usage` は Gemini 共通の5時間枠と週次枠を使う。Codex は `account/rateLimits/read` を使う。Claude は認証確認に加え、PETIT のジョブ履歴から5時間40リクエスト・7日200リクエストを目安に推定する。Anthropic の実契約枠や他のアプリからの消費は含まない。利用制限エラーから5時間は5時間枠を0%と扱う。
 
 Codex は OS 標準の CLI 認証を参照する。明示的に分離する場合は `PETIT_CODEX_HOME` を使う。Claude Code の設定ではサーバーPCの公式ブラウザ認証を開始でき、状態確認とログアウトを行える。Claude Code のエージェントモードで `--restricted` が見つからない場合は `claude update` を案内する。
 

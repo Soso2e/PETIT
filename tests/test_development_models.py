@@ -48,3 +48,11 @@ def test_auto_falls_back_when_hydrogen_unavailable(monkeypatch):
     })
     assert models.select("auto", "medium")[:2] == ("codex", "gpt-6.1-sol")
     assert models.select("auto", "medium", lightweight=True)[:2] == ("antigravity_cli", "gemini-3.8-flash-medium")
+
+
+def test_development_request_accepts_all_configured_model_keys():
+    from backend import coding_api
+
+    for key in ("auto", *models.MODELS):
+        req = coding_api.DevelopmentRequest(request_id="req-1", goal="check", model_key=key)
+        assert req.model_key == key

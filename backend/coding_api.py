@@ -41,7 +41,7 @@ class DevelopmentRequest(BaseModel):
     request_id: str = Field(min_length=1, max_length=200)
     repository: str = Field(default="", max_length=1000)
     goal: str = Field(min_length=1, max_length=8000)
-    model_key: Literal["auto", "claude_opus", "codex_sol", "antigravity_argon", "gemini_flash"] = "auto"
+    model_key: Literal["auto", "claude_opus", "codex_sol", "antigravity_hydrogen", "gemini_flash"] = "auto"
     effort: Literal["low", "medium", "high"] = "medium"
     lightweight: bool = False
     thread_id: str | None = Field(default=None, min_length=1, max_length=200)
