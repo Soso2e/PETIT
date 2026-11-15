@@ -6,6 +6,7 @@ from backend.tools import coding as coding_tools
 
 
 def test_add_coding_repository(tmp_path, monkeypatch):
+    monkeypatch.setenv("PETIT_SETTINGS_DIR", str(tmp_path / "settings"))
     # 一時リポジトリ作成
     repo_dir = tmp_path / "my_project"
     repo_dir.mkdir()
