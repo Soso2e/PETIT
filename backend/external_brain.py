@@ -79,8 +79,18 @@ def context(request_id: str, messages=None, *, include_history=True, record_metr
     else:
         transcript = messages
         current_request = "上記の保存済みTool結果と承認結果を踏まえて、今回の依頼の回答を続けてください。実行済みの操作を再実行しないでください。"
-    reference = store.encode({"current_time": time_context.current_datetime().isoformat(), "past_transcript": transcript,
-                              "confirmed_focus": dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:]})
+    reference = {"current_time": time_context.current_datetime().isoformat(), "past_transcript": transcript,
+                 "confirmed_focus": dialogue_state.load(row["thread_id"]).get("focus_stack", [])[-3:]}
+    if messages is None:
+        # Same block as the native loop, so every Brain starts from the same known state.
+        from . import ambient
+        known = ambient.build(row["thread_id"])
+        if known["text"]:
+            reference["known_situation"] = known["text"]
+            if record_metrics:
+                with db.get_connection() as c:
+                    ambient.record(c, row["thread_id"], request_id, known)
+    reference = store.encode(reference)
     if record_metrics:
         with db.get_connection() as c:
             store.event(c, row["thread_id"], request_id, "brain_context_metrics", {"instructions_chars":len(instructions),
