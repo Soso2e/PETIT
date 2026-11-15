@@ -48,9 +48,11 @@
 
   function watchProgress(element, job, refresh) {
     element.setAttribute("aria-live", "polite");
+    const replyBox = element.closest(".development-thread-reply");
     const update = ({ status, phase }) => {
       const next = (status === "running" && (retryPhases[phase] || phases[phase])) || states[status] || "";
       if (element.textContent !== next) element.textContent = next;
+      if (replyBox) replyBox.classList.toggle("is-streaming-status", active.has(status));
     };
     update({ status: job.status, phase: job.events?.at(-1)?.kind });
     if (!active.has(job.status) || typeof EventSource !== "function") return;
@@ -60,6 +62,7 @@
       const value = JSON.parse(event.data);
       if (value) update(value);
       if (!value || !active.has(value.status)) {
+        if (replyBox) replyBox.classList.remove("is-streaming-status");
         closeProgress(element);
         void refresh();
       }
@@ -211,6 +214,17 @@
   window.PetitDevelopment = { attachProposal };
   const form = $("development-request");
   if (!form) return;
+  const devPromptBox = (form.elements.goal && window.PetitChatMotion)
+    ? window.PetitChatMotion.createPromptBox({
+        form,
+        textarea: form.elements.goal,
+        submitBtn: form.querySelector('[type="submit"]'),
+        minHeight: 84,
+        maxHeight: 220,
+        enableMorph: false,
+      })
+    : null;
+  let justSubmittedThreadId = null;
   const composer = $("development-composer");
   const folders = $("development-roots");
   const notice = $("development-job-notice");
@@ -389,6 +403,16 @@
       const area = append(detail, "div", "");
       card(area, job, () => openThread(currentThread.thread_id), false);
     }
+    if (justSubmittedThreadId && justSubmittedThreadId === currentThread?.thread_id && window.PetitChatMotion) {
+      justSubmittedThreadId = null;
+      const lastTurn = list.lastElementChild;
+      if (lastTurn) {
+        const userEl = lastTurn.querySelector(".development-thread-user");
+        const replyEl = lastTurn.querySelector(".development-thread-reply");
+        if (userEl) window.PetitChatMotion.animateMessageIn(userEl, true);
+        if (replyEl) window.PetitChatMotion.animateMessageIn(replyEl, false);
+      }
+    }
   }
 
   async function openThread(id) {
@@ -498,6 +522,7 @@
     const submit = form.querySelector('[type="submit"]');
     if (submit.disabled) return;
     submit.disabled = true;
+    devPromptBox?.setStatus("think", "開発ジョブを送信中…");
     const input = Object.fromEntries(new FormData(form));
     input.repository = currentView === "home" ? input.repository : currentRepo;
     requestId ||= crypto.randomUUID();
@@ -514,11 +539,19 @@
       });
       requestId = undefined;
       newThreadId = undefined;
-      if (form.elements.goal.value === input.goal) form.elements.goal.value = "";
+      if (form.elements.goal.value === input.goal) {
+        form.elements.goal.value = "";
+        devPromptBox?.fit();
+      }
+      justSubmittedThreadId = currentThread.thread_id;
+      devPromptBox?.setStatus("done", "開発ジョブを開始しました", 2.0);
       report("開発を受け付けました: " + statusLabel(job.status));
       await openThread(currentThread.thread_id);
       void refreshWorkspace();
-    } catch (error) { report(error.message); }
+    } catch (error) {
+      devPromptBox?.setStatus("error", error.message || "送信に失敗しました", 3.0);
+      report(error.message);
+    }
     finally { submit.disabled = false; }
   });
 

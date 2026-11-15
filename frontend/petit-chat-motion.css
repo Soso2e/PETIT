@@ -1,0 +1,234 @@
+/* PETIT Chat & Develop Motion Components
+   Rebuilt from DesignBookmark "Prompt box" & "Streaming reply" using PETIT UI tokens. */
+
+/* ---------- Prompt Box: status line & spring composer ---------- */
+.petit-prompt-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ui-muted);
+  pointer-events: none;
+  will-change: height, opacity;
+}
+
+.petit-prompt-status.is-open {
+  pointer-events: auto;
+}
+
+.petit-prompt-status__mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ui-text);
+  flex: none;
+  transition: background 0.25s ease;
+}
+
+.petit-prompt-status.is-think .petit-prompt-status__mark {
+  animation: petit-prompt-pulse 1s ease-in-out infinite;
+}
+
+.petit-prompt-status.is-think .petit-prompt-status__label {
+  background: linear-gradient(90deg, var(--ui-dim) 20%, var(--ui-text) 50%, var(--ui-dim) 80%) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: petit-text-shine 1.4s linear infinite;
+}
+
+.petit-prompt-status.is-done .petit-prompt-status__mark {
+  background: var(--ui-ok);
+}
+
+.petit-prompt-status.is-done .petit-prompt-status__label {
+  color: var(--ui-text);
+}
+
+.petit-prompt-status.is-stopped .petit-prompt-status__mark {
+  background: var(--ui-warn);
+}
+
+.petit-prompt-status.is-stopped .petit-prompt-status__label {
+  color: var(--ui-muted);
+}
+
+.petit-prompt-status.is-error .petit-prompt-status__mark {
+  background: var(--ui-danger);
+}
+
+.petit-prompt-status.is-error .petit-prompt-status__label {
+  color: var(--ui-danger);
+}
+
+@keyframes petit-prompt-pulse {
+  50% {
+    transform: scale(0.55);
+    opacity: 0.5;
+  }
+}
+
+@keyframes petit-text-shine {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Grid integration for main chat composer */
+body .chat-composer.has-petit-prompt-box,
+body.petit-chat-screen .chat-composer.has-petit-prompt-box {
+  grid-template-areas:
+    "status status status status"
+    "input input input input"
+    "attach mic . send";
+}
+
+body .chat-composer .petit-prompt-status {
+  grid-area: status;
+}
+
+/* Send <-> Stop morph button */
+body .chat-composer button[type="submit"].petit-send-morph,
+body.petit-chat-screen .chat-composer button[type="submit"].petit-send-morph {
+  position: relative;
+  overflow: hidden;
+  background: var(--ui-soft);
+  color: var(--ui-muted);
+  border: 1px solid var(--ui-line);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+body .chat-composer button[type="submit"].petit-send-morph.is-ready,
+body.petit-chat-screen .chat-composer button[type="submit"].petit-send-morph.is-ready {
+  background: var(--ui-text);
+  color: var(--ui-bg);
+  border-color: transparent;
+}
+
+body .chat-composer button[type="submit"].petit-send-morph:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.petit-send-morph .petit-send-arrow,
+.petit-send-morph .petit-send-stop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.petit-send-morph .petit-send-stop {
+  transform: scale(0);
+}
+
+.petit-send-morph .petit-send-stop::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 2.5px;
+  background: currentColor;
+}
+
+/* Develop composer status row */
+#development-request .petit-prompt-status {
+  padding: 0 6px;
+}
+
+/* ---------- Streaming Reply: bubble morph & chunk reveal ---------- */
+.message.petit-msg-entering {
+  will-change: transform, opacity;
+}
+
+body .messages .message--assistant.petit-stream-bubble {
+  position: relative;
+  align-self: flex-start;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--ui-soft);
+  border: 1px solid var(--ui-line);
+  padding: 10px 14px;
+  box-sizing: border-box;
+  min-height: 42px;
+  max-width: 100%;
+  transition: background 0.22s ease, border-color 0.22s ease;
+}
+
+html[data-petit-theme="light"] body .messages .message--assistant.petit-stream-bubble {
+  background: var(--ui-bg-2);
+}
+
+.petit-stream-think {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  background: linear-gradient(90deg, var(--ui-dim) 20%, var(--ui-text) 50%, var(--ui-dim) 80%) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: petit-text-shine 1.4s linear infinite;
+  will-change: opacity;
+}
+
+.petit-stream-bubble .message-body {
+  display: block;
+  width: 100%;
+}
+
+.petit-stream-bubble.is-thinking .message-body {
+  position: absolute;
+  left: 14px;
+  top: 10px;
+  width: calc(100% - 28px);
+  pointer-events: none;
+}
+
+.petit-stream-bubble.is-streaming-text .petit-stream-think {
+  position: absolute;
+  left: 14px;
+  top: 10px;
+  pointer-events: none;
+}
+
+.petit-stream-chunk {
+  display: inline-block;
+  white-space: pre-wrap;
+  will-change: transform, opacity, filter;
+}
+
+/* Develop thread streaming status shimmer */
+.development-thread-reply.is-streaming-status > p {
+  display: inline-block;
+  background: linear-gradient(90deg, var(--ui-muted) 20%, var(--ui-text) 50%, var(--ui-muted) 80%) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: petit-text-shine 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .petit-prompt-status.is-think .petit-prompt-status__mark,
+  .petit-prompt-status.is-think .petit-prompt-status__label,
+  .petit-stream-think,
+  .development-thread-reply.is-streaming-status > p {
+    animation: none !important;
+  }
+
+  .petit-prompt-status.is-think .petit-prompt-status__label,
+  .petit-stream-think,
+  .development-thread-reply.is-streaming-status > p {
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    color: var(--ui-muted);
+  }
+}

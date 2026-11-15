@@ -1238,6 +1238,22 @@
     history: () => [...state.history],
   };
 
+  let isRestoringHistory = false;
+  let activeChatStopHandler = null;
+  const chatPromptBox = (chatFormEl && chatInputEl && window.PetitChatMotion)
+    ? window.PetitChatMotion.createPromptBox({
+        form: chatFormEl,
+        textarea: chatInputEl,
+        submitBtn: chatFormEl.querySelector('[type="submit"]'),
+        maxHeight: 180,
+        minHeight: 44,
+        enableMorph: true,
+        onStop: () => {
+          if (typeof activeChatStopHandler === "function") activeChatStopHandler();
+        },
+      })
+    : null;
+
   const appendMessage = (role, message, actions = [], developmentJobId = null) => {
     const item = document.createElement("div");
     item.className = `message message--${role}`;
@@ -1276,6 +1292,9 @@
     }
 
     messagesEl.appendChild(item);
+    if (!isRestoringHistory && window.PetitChatMotion) {
+      window.PetitChatMotion.animateMessageIn(item, role === "user");
+    }
     if (developmentJobId) window.PetitDevelopment?.attachProposal(item, developmentJobId);
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return item;
@@ -1319,7 +1338,13 @@
   const sendChat = async (message) => {
     const attachmentIds = window.PetitChatAttachments?.ids() || [];
     const submit = chatFormEl.querySelector('[type="submit"]');
-    submit.disabled = true;
+    if (chatPromptBox) {
+      chatPromptBox.setBusy(true);
+      chatPromptBox.setStatus("think", "考え中…");
+      chatPromptBox.fit();
+    } else if (submit) {
+      submit.disabled = true;
+    }
     window.PetitChatAttachments?.lock(true);
     const requestId = randomId();
     appendMessage("user", message + (attachmentIds.length ? `\n[画像 ${attachmentIds.length}枚]` : ""));
@@ -1327,13 +1352,33 @@
     if (workCommand) {
       try { await handleWorkCommand(workCommand); }
       finally {
-        submit.disabled = false;
+        if (chatPromptBox) {
+          chatPromptBox.setBusy(false);
+          chatPromptBox.setStatus("done", "完了", 1.4);
+        } else if (submit) {
+          submit.disabled = false;
+        }
         window.PetitChatAttachments?.lock(false);
       }
       return;
     }
     const pending = appendMessage("assistant", "考え中…");
     pending.classList.add("is-loading");
+    const streamCtrl = window.PetitChatMotion
+      ? window.PetitChatMotion.createStreamingController(pending, "考え中…")
+      : null;
+    let stoppedByUser = false;
+    activeChatStopHandler = () => {
+      stoppedByUser = true;
+      window.PETIT_SESSION?.stopWaiting?.();
+      streamCtrl?.finish();
+      pending.classList.remove("is-loading", "is-streaming");
+      const copy = pending.firstElementChild;
+      if (copy) copy.textContent = "待機を停止しました（依頼はCoreで継続しています）。";
+      else pending.textContent = "待機を停止しました（依頼はCoreで継続しています）。";
+      chatPromptBox?.setBusy(false);
+      chatPromptBox?.setStatus("stopped", "待機を停止しました", 2.4);
+    };
     try {
       if (state.workSession?.awaiting_response_since && state.workSessionId) {
         const session = await workSessionRequest(`/${encodeURIComponent(state.workSessionId)}/respond`);
@@ -1342,14 +1387,23 @@
       const data = await window.PETIT_SESSION.send({ message, attachment_ids: attachmentIds,
         request_id: requestId, conversation_mode: window.PetitVoiceConversation?.active() ? "voice" : "text" }, requestJson,
         (progress) => {
-          const copy = pending.firstElementChild;
-          if (copy) {
-            if (progress.text && window.PetitMarkdown) {
-              copy.classList.add("petit-markdown");
-              copy.innerHTML = window.PetitMarkdown.render(progress.text);
-            } else {
-              copy.classList.remove("petit-markdown");
-              copy.textContent = progress.text || progress.label;
+          if (stoppedByUser) return;
+          if (chatPromptBox && progress.label) {
+            chatPromptBox.setStatus("think", progress.label);
+          }
+          if (streamCtrl) {
+            if (progress.text) streamCtrl.updateDraft(progress.text);
+            else streamCtrl.setPhase(progress.label);
+          } else {
+            const copy = pending.firstElementChild;
+            if (copy) {
+              if (progress.text && window.PetitMarkdown) {
+                copy.classList.add("petit-markdown");
+                copy.innerHTML = window.PetitMarkdown.render(progress.text);
+              } else {
+                copy.classList.remove("petit-markdown");
+                copy.textContent = progress.text || progress.label;
+              }
             }
           }
           pending.classList.toggle("is-loading", !progress.text);
@@ -1358,18 +1412,37 @@
         });
       if (data.error) throw new Error(data.error);
       window.PetitChatAttachments?.complete(attachmentIds);
+      streamCtrl?.finish();
       pending.remove();
       appendMessage("assistant", data.reply || "", data.pending_actions || [], data.development_job_id);
       state.history.push({ role: "user", content: message }, { role: "assistant", content: data.reply || "" });
       if (data.used_tools?.some((item) => item.name === "delegate_to_agent")) void window.PetitDelegations?.refresh();
+      chatPromptBox?.setStatus("done", "応答完了", 1.8);
       await loadUniverse();
     } catch (error) {
-      pending.classList.remove("is-loading");
-      pending.classList.add("message--error");
-      pending.textContent = `通信に失敗しました: ${error.message}`;
-      if (!chatInputEl.value) chatInputEl.value = message;
+      streamCtrl?.finish();
+      pending.classList.remove("is-loading", "is-streaming");
+      if (stoppedByUser) {
+        const copy = pending.firstElementChild;
+        if (copy) copy.textContent = "待機を停止しました（依頼はCoreで継続しています）。";
+        else pending.textContent = "待機を停止しました（依頼はCoreで継続しています）。";
+      } else {
+        pending.classList.add("message--error");
+        pending.textContent = `通信に失敗しました: ${error.message}`;
+        if (!chatInputEl.value) {
+          chatInputEl.value = message;
+          chatPromptBox?.fit();
+        }
+        chatPromptBox?.setStatus("error", "通信エラー", 2.8);
+      }
     } finally {
-      submit.disabled = false;
+      activeChatStopHandler = null;
+      if (chatPromptBox) {
+        chatPromptBox.setBusy(false);
+        chatPromptBox.fit();
+      } else if (submit) {
+        submit.disabled = false;
+      }
       window.PetitChatAttachments?.lock(false);
     }
   };
@@ -1377,9 +1450,11 @@
   chatFormEl?.addEventListener("submit", (event) => {
     event.preventDefault();
     const message = String(chatInputEl.value || "").trim();
-    if (chatFormEl.querySelector('[type="submit"]').disabled || (window.PetitChatAttachments && !window.PetitChatAttachments.ready())) return;
+    const busyOrDisabled = chatPromptBox ? chatPromptBox.isBusy() : chatFormEl.querySelector('[type="submit"]').disabled;
+    if (busyOrDisabled || (window.PetitChatAttachments && !window.PetitChatAttachments.ready())) return;
     if (!message && !window.PetitChatAttachments?.ids().length) return;
     chatInputEl.value = "";
+    chatPromptBox?.fit();
     sendChat(message);
   });
 
@@ -1521,6 +1596,7 @@
   }, 1000);
 
   const restoreHistory = async () => {
+    isRestoringHistory = true;
     try {
       const data = await requestJson(`/api/conversations?limit=10&session_id=${encodeURIComponent(state.sessionId)}`);
       const rows = data.conversations || [];
@@ -1543,6 +1619,8 @@
       } catch { return rows.length > 0; }
     } catch (_error) {
       return false;
+    } finally {
+      isRestoringHistory = false;
     }
   };
 
