@@ -7,10 +7,21 @@
 - Chat は `list_coding_repositories` で対象を確認し、`propose_development_job` に整えたプロンプト、対象、モデルと Effort を渡す。同じジョブの `proposed` カードが返信内と Develop に表示される。開始操作で `queued` に進む。
 - DeepSeekのFront Brainは[委譲スキル](../../backend/skills/compact-cli-handoff/SKILL.md)を読み、目的、必須の制約、完了条件に絞って依頼する。
 - Git開発ジョブは依頼を1回のCLIセッションで実行し、実行全体の上限は15分とする。CLIがすでに変更を加えている可能性があるため、失敗したセッションは自動再実行しない。PCモードのAntigravityはCore Tool向けの構造化応答と応答単位の再試行を使う。
+- 同じ開発スレッドの次のGit開発ジョブは、前回ジョブの作業クローンとブランチを引き継ぐ（[スレッドの継続](#スレッドの継続)）。
 - Chatの開発カードとDevelopは、管理者向けSSEでCLIの受信・検証・再試行などの進捗文を表示する。保存済みの結果・差分・承認はジョブ詳細から取得する。CLIの内部思考、CLIの生出力、ツール引数は進捗配信の対象外。
 - Develop のフォームは管理者の送信で `queued` を作る。以降はどちらも同じ Coding Job Worker が処理する。
 - request ID と入力のハッシュで再送を判定し、状態の更新条件で承認と Worker の取得を一度に限る。実行中の Core 再起動は `interrupted` とし、作業コピーを保持する。
 - 旧ジョブの記録と API は残す。旧開発ページの URL は Develop タブへ移動する。通常の会話カタログでは、旧 `delegate_coding_task` と worktree 変更 Tool に代わって開発提案を公開する。
+
+## スレッドの継続
+
+同じ開発スレッドでGit開発ジョブを続けると、直前に作業場所を用意したジョブのクローンとブランチをそのまま使う。前回までの編集とcommitが残り、差分レビューは開始コミットからの累積になる。
+
+- 引き継ぐ条件は、同じスレッド・同じリポジトリで、リポジトリのHEADが前回ジョブの開始コミットから変わっていないこと。HEADが進んだ場合や作業場所が見つからない場合は、新しいクローンで始める。
+- CLIが報告した自身のセッションIDを `coding_job_sessions` にジョブ単位で保存する（Claude Code の `session_id`、Antigravity CLI の `conversation_id`、Codex の Thread ID）。保存するのはIDだけで、会話の本文はCLI側にある。
+- 次のジョブが同じCLIなら、そのセッションを再開し（`claude --resume`、`agy --conversation`、Codex `thread/resume`）、今回の依頼文だけを渡す。別のCLIへ切り替えた場合はセッションを渡さず、スレッドの直近履歴の要約と「作業場所を引き継いでいる」旨を渡す。
+- CLIが作業を始める前にセッションの再開を拒否した場合に限り、同じジョブ内で1回だけ新しいセッションを開始し、履歴の要約を渡す。作業開始後の失敗は従来どおり自動再実行しない。
+- 進捗には `workspace_continued` / `session_resumed` / `session_restarted` を記録する。PCモードのジョブは対象外で、毎回新しい scratch で始める。
 
 ## モデルと利用枠
 

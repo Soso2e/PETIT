@@ -133,12 +133,20 @@ flowchart TD
     Model -.-> Progress[開始・応答・検証・再試行の段階を記録]
     Progress -.-> SSE[管理者用 Job SSE / Chatカード・Develop]
     Run --> Mode{対象モード}
-    Mode -->|Git| Git[開始コミットの clone と専用ブランチ]
+    Mode -->|Git| Continue{同じスレッドの前回ジョブと<br/>リポジトリ・開始コミットが同じ}
+    Continue -->|いいえ| Git[開始コミットの clone と専用ブランチ]
+    Continue -->|はい| Reuse[前回の clone とブランチを引き継ぐ]
+    Reuse --> SameCLI{同じCLIのセッションIDがある}
+    SameCLI -->|はい| Resume[CLIのセッションを再開し依頼文だけ渡す]
+    SameCLI -->|いいえ| Executor
+    Resume -->|作業開始前に再開を拒否| Executor
+    Resume --> Native
     Git --> Executor{実行方式}
     Executor --> Native[Codex / Antigravity / Claude Codeが専用cloneで調査・編集・検査・commit]
     Native -->|自然文の終了応答| Check{検査結果}
     Native -->|失敗した場合は差分を保持| Error
     Native -.-> Progress
+    Native -.-> Session[(coding_job_sessions にCLIのセッションIDを保存)]
     Check -->|成功| Review[ready_for_review]
     Check -->|失敗| FailedChecks[checks_failed]
     Mode -->|PC| PC[範囲内の検索・読み取りと scratch へのコピー]

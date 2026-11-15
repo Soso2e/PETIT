@@ -11,6 +11,9 @@
   const $ = (id) => document.getElementById(id);
   const phases = {
     workspace_ready: "作業場所を準備しました",
+    workspace_continued: "前回の作業場所を引き継ぎました",
+    session_resumed: "CLIの前回セッションを再開します",
+    session_restarted: "前回セッションを再開できず、新しいセッションで続けます",
     model_request: "CLIに応答を依頼中…",
     cli_initialized: "CLIが応答を考えています…",
     cli_responding: "CLIから応答を受信中…",

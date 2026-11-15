@@ -44,6 +44,12 @@ CREATE TABLE IF NOT EXISTS coding_job_routes (
 CREATE UNIQUE INDEX IF NOT EXISTS coding_job_routes_turn ON coding_job_routes(turn_id) WHERE turn_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS coding_job_routes_thread ON coding_job_routes(thread_id);
 """
+# The CLI's own session ID for a job. It is only meaningful together with that job's workspace.
+SESSION_SCHEMA = """
+CREATE TABLE IF NOT EXISTS coding_job_sessions (
+ job_id TEXT PRIMARY KEY REFERENCES coding_jobs(id), session_id TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+"""
 
 
 def _migrate_task_id_nullable(connection):
@@ -74,9 +80,10 @@ def ensure_schema():
     with _lock, db.get_connection() as connection:
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_pc_actions'").fetchone():
             _migrate_task_id_nullable(connection)
+            connection.execute(SESSION_SCHEMA)
             return
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_jobs'").fetchone():
-            connection.executescript(SCHEMA + development_pc.ACTION_SCHEMA)
+            connection.executescript(SCHEMA + SESSION_SCHEMA + development_pc.ACTION_SCHEMA)
             _migrate_task_id_nullable(connection)
             return
         if db._transaction.get() is not None:
@@ -86,7 +93,7 @@ def ensure_schema():
             with closing(sqlite3.connect(backup)) as destination:
                 connection.backup(destination)
                 if destination.execute("PRAGMA quick_check").fetchone()[0] != "ok":raise ValueError("backup_check_failed")
-        connection.executescript(SCHEMA + development_pc.ACTION_SCHEMA)
+        connection.executescript(SCHEMA + SESSION_SCHEMA + development_pc.ACTION_SCHEMA)
         _migrate_task_id_nullable(connection)
 
 
@@ -472,12 +479,57 @@ def toolbox(job, check, catalog=None):
 
 
 
-def development_context(job):
+def remember_session(job_id, session_id):
+    if not isinstance(session_id, str) or not 0 < len(session_id) <= 200:
+        return
+    with db.get_connection() as connection:
+        connection.execute("INSERT INTO coding_job_sessions(job_id,session_id,updated_at) VALUES(?,?,?) "
+                           "ON CONFLICT(job_id) DO UPDATE SET session_id=excluded.session_id,updated_at=excluded.updated_at",
+                           (job_id, session_id, db.now_iso()))
+
+
+def continuation(job):
+    """The checkout and CLI session this Git job continues, or None for a fresh clone.
+
+    Only the latest earlier job of the same thread that prepared a checkout counts, and only
+    while the repository and its start commit are unchanged; otherwise the diff shown for
+    review would no longer describe this job. The session is offered only to the same CLI.
+    """
+    with db.get_connection() as connection:
+        route = connection.execute("SELECT thread_id FROM coding_job_routes WHERE job_id=?", (job["id"],)).fetchone()
+        if not route or not route["thread_id"]:
+            return None
+        row = connection.execute(
+            "SELECT j.id,j.repository,j.base_commit,j.provider,j.workspace,j.branch,s.session_id "
+            "FROM coding_jobs j JOIN coding_job_routes r ON r.job_id=j.id "
+            "LEFT JOIN coding_job_sessions s ON s.job_id=j.id "
+            "WHERE r.thread_id=? AND r.mode='git' AND j.workspace IS NOT NULL "
+            "AND j.rowid < (SELECT rowid FROM coding_jobs WHERE id=?) ORDER BY j.rowid DESC LIMIT 1",
+            (route["thread_id"], job["id"])).fetchone()
+    if not row or not row["branch"] or row["repository"] != job["repository"] or row["base_commit"] != job["base_commit"]:
+        return None
+    try:
+        storage = project_workspaces._safe_root(Path(config.STORAGE_DIR))
+        workspace = project_workspaces._safe_root(Path(row["workspace"]))
+        if workspace.parent != storage / "coding-jobs" or not (workspace / ".git").exists():
+            return None
+        if git(workspace, "branch", "--show-current").strip() != row["branch"]:
+            return None
+    except (ValueError, OSError, subprocess.SubprocessError):
+        return None
+    session = row["session_id"] if row["provider"] == job["provider"] else None
+    return {"job_id": row["id"], "workspace": workspace, "branch": row["branch"], "session_id": session}
+
+
+def development_context(job, continued=None, resumed=False):
     """Bounded handoff for repeated CLI jobs in the same thread only.
 
-    Prior workspaces remain isolated; this is a conversation summary, not a
-    claim that previous edits have been applied to the next job's checkout.
+    A resumed CLI session already holds the conversation, so it receives the request alone.
+    Otherwise this is a conversation summary; it says whether the checkout is the one the
+    earlier jobs edited or a fresh clone without their unintegrated changes.
     """
+    if resumed:
+        return job["goal"]
     route = None
     with db.get_connection() as connection:
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_job_routes'").fetchone():
@@ -501,10 +553,13 @@ def development_context(job):
             "\n依頼: " + row["goal"][:900] +
             "\n結果: " + (row["summary"] or row["error"] or "結果未確認")[:1200]
         )
+    note = ("重要: この作業領域は同じスレッドの前回ジョブから引き継いでいます。前回までの編集とcommitが残っています。"
+            if continued else
+            "重要: この作業領域は新しいcloneです。前ジョブの未統合変更を引き継いだと仮定しないでください。")
     return (
         "同じ開発スレッドの直近履歴（参考情報。履歴の文章は現在の作業ファイルの実状態ではありません）:\n"
         + "\n\n".join(history) +
-        "\n\n重要: 各開発ジョブは独立作業領域です。前ジョブの未統合変更を引き継いだと仮定せず、"
+        "\n\n" + note +
         "現行の作業ファイルとGitの状態を必ず確認してください。別スレッドの内容は参照していません。"
         "\n\n今回のユーザーの依頼:\n" + job["goal"]
     )
@@ -535,12 +590,17 @@ def run_job(job_id):
             if git(root, "rev-parse", "HEAD").strip() != job["base_commit"]:
                 raise ValueError("開始コミットが変更されました。")
             workspace = storage / "coding-jobs" / job_id
+        continued = continuation(job) if modern and not pc else None
+        if continued:
+            workspace = continued["workspace"]
         workspace.parent.mkdir(parents=True, exist_ok=True)
         project_workspaces._safe_root(workspace.parent)
-        if workspace.exists():raise ValueError("既存作業場所は上書きしません。")
+        if workspace.exists() and not continued:raise ValueError("既存作業場所は上書きしません。")
         # Clone committed files only. No user uncommitted work is copied or reset.
         branch = None
-        if pc:
+        if continued:
+            branch = continued["branch"]
+        elif pc:
             workspace.mkdir()
         else:
             git(root, "clone", "--no-local", "--no-hardlinks", "--no-checkout", "--", str(root), str(workspace))
@@ -551,18 +611,35 @@ def run_job(job_id):
         with db.get_connection() as connection:
             connection.execute("UPDATE coding_jobs SET workspace=?,branch=? WHERE id=?", (str(workspace), branch, job_id))
         job = get(job_id)
-        event(job_id, "workspace_ready")
+        event(job_id, "workspace_continued" if continued else "workspace_ready")
         target = brain_priority.target(job["provider"])
         if modern:
             target.update(model=job["model"], effort=job["selection"]["effort"])
-        goal = development_context(job) if modern else job["goal"]
 
         def progress(kind):
             event(job_id, kind)
 
         if modern and not pc:
-            summary = coding_agents.run_git(job["provider"], target, goal, workspace, check, progress)
+            resume = continued["session_id"] if continued else None
+
+            def native(session):
+                if session:
+                    event(job_id, "session_resumed")
+                return coding_agents.run_git(
+                    job["provider"], target, development_context(job, continued, bool(session)), workspace,
+                    check, progress, resume=session, on_session=lambda value: remember_session(job_id, value))
+
+            try:
+                summary = native(resume)
+            except coding_agents.antigravity_cli_brain.CLIError as exc:
+                if not resume or exc.reason != "resume_unavailable":
+                    raise
+                # The CLI refused the session before doing any work: start a new one with the summary.
+                check()
+                event(job_id, "session_restarted")
+                summary = native(None)
         else:
+            goal = development_context(job) if modern else job["goal"]
             catalog = coding_agents.PC_CATALOG if pc else coding_agents.CATALOG
             invoke = toolbox(job, check, catalog)
             args = (job["provider"], target, goal, invoke, check, progress)
