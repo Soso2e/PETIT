@@ -1,35 +1,25 @@
-# PETIT shared Morph Island — draft integration
+# PETIT shared Morph Island
 
-## Status / upstream limitation
+## Reference & Springs
 
 - Reference: https://designbookmark.com/motion#db-morph-island
-- Source: https://designbookmark.com/motion-src/morph-island/index.html
-- Shared source: https://designbookmark.com/motion-src/shared/tokens.css , base.css , motion.js
-- At implementation time the source URLs could not be fetched via the available web/browser access. **No source-faithful reproduction is claimed.**
-- The current `DEFAULT_SPRING` values (260 stiffness, 24 damping, mass 1) are **PETIT placeholders**, not extracted from upstream. Before merging, read upstream tokens.css and the island source, replace these values/logic as needed, and verify parity.
-- This PR is a reusable foundation only: no automatic insertion into Chat, Develop, Dashboard, or the Electron desktop. Page placement needs a separate design decision.
+- Source: https://designbookmark.com/motion-src/morph-island/index.html (`island.css`, `island.js`)
+- Shared tokens: https://designbookmark.com/motion-src/shared/ (`tokens.css`, `base.css`, `motion.js`)
+- `frontend/components/morph-island.js` と `morph-island.css` は上記ソースの物理スプリング定数をそのまま使用している：
+  - `--island-w: 380 24`（width morph: stiffness 380, damping 24）
+  - `--island-h: 300 22`（height morph: stiffness 300, damping 22、縮小時は stiffness 1.3x）
+  - press spring: stiffness 520, damping 18
+  - max radius: `32px`（`min(height / 2, 32)`）
+  - volume give: `width * (1 + clamp(-H.v / 7000, -0.05, 0.05))`
+  - コンテンツ切替: 2レイヤーによるブラー付きクロスフェード（`0.09s` 遅延）
+- 色・フォント・影は PETIT の `petit-ui-system.css`（`--ui-surface-solid`, `--ui-text`, `--ui-muted`, `--ui-ok`, `--ui-warn`, `--ui-danger`, ダーク/ライト両テーマ）に従う。
 
-## Usage
+## Placement & Live Status Integration
 
-Load `/static/components/morph-island.css` and `/static/components/morph-island.js` from the existing asset pipeline. Then:
-
-```js
-const island = window.PetitMorphIsland.mount(document.getElementById('status-host'), {
-  initialState: 'idle',
-  // override spring with verified upstream parameters once available
-});
-island.setState('listening');
-island.setState('working', { label: 'Codexで開発中' });
-island.setState('success', { label: 'PRを作成したよ' });
-island.destroy(); // on teardown
-```
-
-The caller owns all state updates. Do not infer real agent/voice/task status from timers; subscribe to the authoritative service events. Only one status should own an island instance. Add focusable controls **outside** its status role until interaction requirements are decided.
-
-## Review checklist
-
-1. Retrieve and inspect all original HTML/CSS/JS and shared springs, including any usage/licensing conditions.
-2. Match upstream stiffness/damping and content timing exactly, then compare movement visually.
-3. Test the reusable component with and without motion reduction; ensure no orphan animation frames after destroy.
-4. Integrate with the existing Chat/Develop/Desktop authoritative state events, without duplicating the existing status pill or interfering with mascot pointer events.
-5. Run the actual PETIT app, check responsive views and browser console errors; only then mark the PR ready.
+- `frontend/universe.html` 読み込み時に `frontend/components/petit-island-status.js` が画面上部中央（`.petit-island-dock`）へ自動マウントし、以下の状態を優先順に表示する：
+  1. 会話・音声の即時状態（`petit:mascot` イベント: `listening` / `thinking` / `speaking` / `approval` / `error` / `success`）
+  2. 開発ジョブ実行中・確認待ち（`GET /api/coding/activity?limit=10`）
+  3. 未読通知（`GET /api/notifications/events?state=pending&limit=10`）
+  4. 作業セッション計測中・一時停止中（`GET /api/work-sessions/active` + 1秒ごとの経過時間表示）
+  5. `idle`（待機中: `PETIT`）
+- アイランドをクリック（タップ）すると、表示中の状態に対応する画面（`development` / `reminders` / `focus` / `chat`）へ移動する。
