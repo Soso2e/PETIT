@@ -1,11 +1,12 @@
 # PROGRESS — 変更履歴
 
-**Current Version: v0.63.0**
+**Current Version: v0.64.0**
 
 **Last Updated: 2026-11-15 UTC**
 
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
+- #458 Morph Island の実状態連携と上部中央フローティング配置（v0.64.0）: `frontend/components/morph-island.js` / `.css` を DesignBookmark の実スプリング定数（幅 `380/24`・高さ `300/22`・押下 `520/18`・volume give・2レイヤーブラークロスフェード）で再構築し、`frontend/components/petit-island-status.js` を追加。`universe.html` の画面上部中央へ自動マウントし、会話/音声・開発ジョブ・通知・作業セッションを優先度順に表示（タップで該当画面へ遷移）。Node単体・統合テスト38件成功。実サーバー・実ブラウザでの目視確認は未実施。
 - Chat・Develop欄のモーション改善（v0.63.0）: `frontend/petit-chat-motion.js` / `frontend/petit-chat-motion.css` を新設し、DesignBookmark の「Prompt box」（スプリング入力伸縮 `420/34`・ステータス行開閉 `380/30`・送信↔Stopモーフ `520/30`）と「Streaming reply」（メッセージ出現 `300/22`・バブルサイズモーフ `260/26`・考え中フェード `300/30`・チャンク出現 `340/26`）を Chat 画面および Develop 画面へ適用。単体・契約テスト62件およびPlaywright（1440×900 / 390×844、模擬API）でコンソールエラー0件を確認済み。実サーバー・実LLM/CLI・実iPhone/Desktopでの受入は未確認。
 - Rubber Dock ナビゲーション統一（v0.62.0）: PC版の左サイドバー（`.petit-area-rail`）および右上ユーティリティドックを廃止し、PC・スマホ共通で下部中央フローティングの5タブ Rubber Dock（`Chat` / `Univ` / `Develop` / `Dashboard` ＋ `More`、`frontend/petit-rubber-dock.js` / `frontend/petit-rubber-dock.css`）へ統一。スプリング物理によるピルの伸縮・ドラッグスクラブ・`clip-path` 反転・`More` タブからのカードモーフ展開（`Tasks` / `Remind` / `Settings`・コマンドパレット・テーマ切替・接続ステータス）を実装。関連UIテスト56件とPlaywright（デスクトップ1440×900 / モバイル390×844、模擬API）を確認済み。実サーバー・実iPhone/Desktop(Electron)の受入は未確認。
 - #456 CLI開発ジョブのリポジトリ直接編集（ダイレクト作業方式、v0.61.0）: 登録Gitリポジトリを対象とするCLI開発ジョブにおいて、`storage/coding-jobs/<job_id>` への専用クローン作成を廃止し、登録リポジトリのルート（`root`）そのものを作業ディレクトリとして直接作業する方式へ移行。クローン・専用ブランチ切替のオーバーヘッドをなくし、カレントブランチの作業ツリーをそのままCLI（Codex / Claude Code / Antigravity CLI）が直接編集・テスト・commit可能とした。同じ開発スレッドでのセッション継続（`continuation`）も直接作業に合わせて調整。単体テスト全件成功。実CLIでの直接編集・差分レビュー・完了フローは実機受入確認が必要。
@@ -462,3 +463,4 @@
 | 2026-11-15 | 00:56 | #389 | Git開発をネイティブCLIへ切替。Windowsの実3 CLIで合成ファイル変更・Git検査・ローカルcommitを確認。 |
 | 2026-11-15 | 01:45 | #428 | v0.60.0: 同じ開発スレッドのGit開発ジョブで作業クローンとCLIセッションを引き継ぐ。実CLI3種で再開を確認。 |
 | 2026-11-15 | 03:28 | #456 | v0.61.0: CLI開発ジョブをクローン方式からリポジトリ直接編集（ダイレクト作業）へ移行。元リポジトリで直接CLIが作業し、セッション継続も直接作業に合わせて調整。単体テスト全件成功。 |
+| 2026-11-15 | 17:44 | #458 | v0.64.0: Morph IslandをDesignBookmark実スプリングで再構築し、画面上部中央へ配置して会話/音声・開発ジョブ・通知・作業セッションと連携。Nodeテスト38件成功。 |
