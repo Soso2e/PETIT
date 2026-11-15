@@ -7,7 +7,6 @@
 ## 現在の状態 / 未確認・TODO（最新を上書き）
 
 - #456 CLI開発ジョブのリポジトリ直接編集（ダイレクト作業方式、v0.61.0）: 登録Gitリポジトリを対象とするCLI開発ジョブにおいて、`storage/coding-jobs/<job_id>` への専用クローン作成を廃止し、登録リポジトリのルート（`root`）そのものを作業ディレクトリとして直接作業する方式へ移行。クローン・専用ブランチ切替のオーバーヘッドをなくし、カレントブランチの作業ツリーをそのままCLI（Codex / Claude Code / Antigravity CLI）が直接編集・テスト・commit可能とした。同じ開発スレッドでのセッション継続（`continuation`）も直接作業に合わせて調整。単体テスト全件成功。実CLIでの直接編集・差分レビュー・完了フローは実機受入確認が必要。
-
 - #428 開発スレッドの継続（v0.60.0、PR前）: 同じ開発スレッドのGit開発ジョブは、リポジトリのHEADが前回の開始コミットから変わっていなければ、前回の作業クローンとブランチを引き継ぐ。CLIのセッションIDを `coding_job_sessions` に保存し、同じCLIなら再開して依頼文だけを渡す（`claude --resume` / `agy --conversation` / Codex `thread/resume`）。別のCLIへ切り替えた場合は作業場所だけ引き継ぎ、履歴の要約を渡す。作業開始前に再開を拒否された場合だけ、同じジョブ内で1回新しいセッションを始める。差分レビューは開始コミットからの累積になる。Windowsの実CLI3種で、合成リポジトリでの2往復の再開と、存在しないセッションIDの拒否検出を確認。**稼働中のPETITのDevelop画面からの継続、HEADが進んだ後の新規clone、PCモード（対象外）は実機未確認。** #428 の残り: 実行状況のリアルタイム表示、Chat発の開始確認の削減、Developの返答のMarkdown描画。
 
 - #389 Git開発ジョブのネイティブCLI実行（実装済み・Windowsの合成リポジトリで確認）: Codex・Antigravity・Claude Codeに依頼を1回渡し、専用cloneでCLIが直接編集・端末検査・ローカルcommitを行う。PETITの応答SchemaとGit専用Tool中継を撤去。Codex/Claude Codeはホスト実行ユーザー権限、AntigravityはCLIのAutoモード。実CLI3種でファイル内容とcommitを確認。実際のChat/Developからの長時間タスクと既存アプリ稼働環境への反映は未確認。Gitのコマンド検証はCLIの最終報告を参照。

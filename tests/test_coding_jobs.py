@@ -299,6 +299,8 @@ def test_session_is_not_offered_to_another_cli(repository, development_quota, mo
     assert "引き継いでいます" in calls[1]["goal"]
 
 
+
+
 def test_pc_scope_copy_and_approval_for_original(repository, client, development_quota, monkeypatch, tmp_path):
     admin(client)
     folder = tmp_path / "documents"
