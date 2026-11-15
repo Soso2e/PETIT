@@ -1,30 +1,213 @@
-/* PETIT shared island: reuse global theme variables; opt-in, not fixed-position. */
+/* PETIT shared Morph Island — rebuilt with DesignBookmark spring dynamics & PETIT tokens */
+:root {
+  --island-w: 380 24;
+  --island-h: 300 22;
+  --island-radius: 32;
+}
+
+.petit-island-dock {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 225;
+  display: flex;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+
 .petit-morph-island {
+  position: relative;
   display: inline-flex;
-  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  max-width: min(100%, 320px);
-  padding: 0 14px;
+  flex: 0 0 auto;
+  width: 128px;
+  height: 36px;
+  border-radius: 18px;
+  max-width: calc(100vw - 24px);
   overflow: hidden;
-  white-space: nowrap;
-  background: var(--bg-surface, #0c0e18);
-  border: 1px solid var(--line-mid, rgba(200,207,222,.14));
-  box-shadow: var(--shadow-sm, 0 4px 16px rgba(0,0,0,.4));
-  color: var(--text, #dde1ec);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.25;
-  contain: layout style;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: width, height, transform, border-radius;
+  background: color-mix(in srgb, var(--ui-surface-solid, var(--bg-surface, #151618)) 92%, transparent);
+  border: 1px solid var(--ui-line-strong, var(--line-mid, rgba(255, 255, 255, 0.145)));
+  box-shadow: var(--ui-shadow-lg, 0 18px 48px rgba(0, 0, 0, 0.36));
+  backdrop-filter: blur(22px) saturate(1.2);
+  color: var(--ui-text, var(--text, #f0f0ed));
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
-.petit-morph-island__marker { color: var(--accent, #a8b4d0); flex: 0 0 auto; }
-.petit-morph-island__label { overflow: hidden; text-overflow: ellipsis; }
-.petit-morph-island__detail { color: var(--text-sub, #8c93a8); overflow: hidden; text-overflow: ellipsis; }
-.petit-morph-island__detail[hidden] { display: none; }
-.petit-morph-island[data-state="success"] .petit-morph-island__marker { color: var(--ok, #6dbf9a); }
-.petit-morph-island[data-state="error"] .petit-morph-island__marker { color: var(--danger, #c96070); }
+
+.petit-morph-island:focus-visible {
+  outline: 2px solid var(--ui-focus, var(--accent, #d9d9d3));
+  outline-offset: 2px;
+}
+
+/* Cross-fade with blur while the pill morphs */
+.petit-morph-island__content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.petit-morph-island__layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 26px);
+  opacity: 0;
+  filter: blur(6px);
+  transform: translate(-50%, -50%) scale(0.9);
+  transition: opacity 0.14s ease, filter 0.14s ease, transform 0.2s ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.petit-morph-island__layer.is-on {
+  opacity: 1;
+  filter: none;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+  transition:
+    opacity 0.35s ease 0.09s,
+    filter 0.35s ease 0.09s,
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.09s;
+}
+
+.petit-morph-island__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--ui-accent, var(--accent, #d3d3ce));
+}
+
+.petit-morph-island__marker svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.petit-morph-island__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+.petit-morph-island[data-state="session"] .petit-morph-island__marker,
+.petit-morph-island[data-state="success"] .petit-morph-island__marker {
+  color: var(--ui-ok, var(--ok, #82ad94));
+}
+
+.petit-morph-island[data-state="develop"] .petit-morph-island__marker {
+  color: var(--ui-warn, var(--warn, #b99a68));
+}
+
+.petit-morph-island[data-state="notification"] .petit-morph-island__marker {
+  color: var(--ui-warn, var(--warn, #b99a68));
+}
+
+.petit-morph-island[data-state="error"] .petit-morph-island__marker {
+  color: var(--ui-danger, var(--danger, #c77b7f));
+}
+
+.petit-morph-island[data-state="listening"] .petit-morph-island__dot,
+.petit-morph-island[data-state="working"] .petit-morph-island__dot,
+.petit-morph-island[data-state="develop"] .petit-morph-island__dot,
+.petit-morph-island[data-state="session"] .petit-morph-island__dot {
+  animation: petit-island-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes petit-island-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.75); opacity: 0.55; }
+}
+
+.petit-morph-island__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 1px;
+}
+
+.petit-morph-island__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+  color: var(--ui-text, var(--text, #f0f0ed));
+}
+
+.petit-morph-island__detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--ui-muted, var(--text-sub, #a3a3a0));
+}
+
+.petit-morph-island__detail[hidden] {
+  display: none;
+}
+
+.petit-morph-island__trailing {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--ui-text, var(--text, #f0f0ed));
+}
+
+.petit-morph-island[data-state="session"] .petit-morph-island__trailing {
+  color: var(--ui-ok, var(--ok, #82ad94));
+}
+
+.petit-morph-island__trailing[hidden] {
+  display: none;
+}
+
+.petit-morph-island__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--ui-accent-soft, rgba(255, 255, 255, 0.1));
+  color: var(--ui-text, var(--text, #f0f0ed));
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .petit-morph-island { transition: none !important; animation: none !important; }
+  .petit-morph-island,
+  .petit-morph-island__layer {
+    transition: none !important;
+    animation: none !important;
+  }
+  .petit-morph-island__dot {
+    animation: none !important;
+  }
 }
