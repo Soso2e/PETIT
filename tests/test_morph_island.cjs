@@ -209,3 +209,98 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
 
   ctx.window.PetitIslandStatus.destroy();
 });
+
+// ---- Upstream parity -------------------------------------------------------
+// Independent re-implementation of DesignBookmark morph-island/island.js +
+// shared/motion.js (dt capped at 1/30 s, 4 substeps), used as the oracle.
+// Values copied from shared/tokens.css (--island-w/-h/-radius) and island.js.
+const UPSTREAM = { w: [380, 24], h: [300, 22], radius: 32, press: [520, 18] };
+function upstreamSim(start) {
+  const S = (x, k, c) => ({ x, v: 0, t: x, k, c });
+  const step = (s, dt) => { const a = -s.k * (s.x - s.t) - s.c * s.v; s.v += a * dt; s.x += s.v * dt; };
+  const W = S(start[0], ...UPSTREAM.w), H = S(start[1], ...UPSTREAM.h), press = S(1, ...UPSTREAM.press);
+  return {
+    go([w, h]) {
+      const grow = w * h > W.t * H.t;
+      W.k = UPSTREAM.w[0]; W.c = UPSTREAM.w[1];
+      H.k = UPSTREAM.h[0] * (grow ? 1 : 1.3); H.c = UPSTREAM.h[1];
+      W.t = w; H.t = h;
+      press.v -= grow ? 1.6 : 1;
+    },
+    frame(dt) {
+      dt = Math.min(dt, 1 / 30);
+      for (let k = 0; k < 4; k++) { step(W, dt / 4); step(H, dt / 4); step(press, dt / 4); }
+    },
+    render() {
+      const h = Math.max(H.x, 20);
+      const give = Math.max(-0.05, Math.min(0.05, -H.v / 7000));
+      return { width: W.x * (1 + give), height: h, radius: Math.min(h / 2, UPSTREAM.radius), scale: press.x };
+    },
+  };
+}
+const px = (v) => parseFloat(v);
+function assertClose(actual, expected, msg) {
+  assert.ok(Math.abs(actual - expected) < 1e-9, `${msg}: ${actual} != ${expected}`);
+}
+
+for (const [name, from, to] of [
+  ['growing', 'idle', 'develop'],
+  ['shrinking (height 1.3x stiffer)', 'develop', 'idle'],
+]) {
+  test(`frame-by-frame parity with upstream integrator: ${name}`, () => {
+    const h = setup();
+    const island = h.api.mount(new FakeElement(), { initialState: from });
+    const views = h.api.DEFAULT_VIEWS;
+    const ref = upstreamSim([views[from].width, views[from].height]);
+    island.setState(to);
+    ref.go([views[to].width, views[to].height]);
+    // Frame gaps include a long stall to exercise the 1/30 s cap.
+    const gaps = [16, 16, 16, 250, 16, 8, 33, 16, 16, 16, 16, 16, 16, 16, 16];
+    let time = 0;
+    let first = true;
+    for (const gap of gaps) {
+      const jobs = [...h.queue.values()];
+      assert.equal(jobs.length, 1, 'one pending frame while moving');
+      h.queue.clear();
+      time += gap;
+      jobs[0](time);
+      ref.frame(first ? 1 / 60 : gap / 1000);
+      first = false;
+      const exp = ref.render();
+      const st = island.element.style;
+      assertClose(px(st.width), exp.width, 'width');
+      assertClose(px(st.height), exp.height, 'height');
+      assertClose(px(st.borderRadius), exp.radius, 'radius');
+      assertClose(Number(/scale\(([^)]+)\)/.exec(st.transform)[1]), exp.scale, 'scale');
+    }
+    island.destroy();
+  });
+}
+
+test('radius follows height and caps at 32px', () => {
+  const h = setup();
+  const island = h.api.mount(new FakeElement(), {
+    views: { tall: { width: 300, height: 120, radius: 60, label: 'tall' } },
+  });
+  island.setState('tall');
+  h.flush();
+  assert.equal(h.queue.size, 0, 'animation stops once settled');
+  assert.equal(island.element.style.height, '120px');
+  assert.equal(island.element.style.borderRadius, '32px');
+  island.destroy();
+});
+
+test('switching to reduced motion mid-morph snaps to the target', () => {
+  const h = setup();
+  const island = h.api.mount(new FakeElement());
+  island.setState('develop');
+  h.flush(3);
+  assert.notEqual(island.element.style.width, '292px');
+  h.mq.matches = true;
+  h.listeners.get('change')();
+  assert.equal(h.queue.size, 0);
+  assert.equal(island.element.style.width, '292px');
+  assert.equal(island.element.style.height, '54px');
+  assert.equal(island.element.style.transform, 'scale(1)');
+  island.destroy();
+});
