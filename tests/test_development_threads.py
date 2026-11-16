@@ -209,3 +209,91 @@ def test_jobs_create_with_thread_id_surfaces_in_develop(repository, client, monk
     assert any(t["thread_id"] == "delegate-thread-1" for t in threads)
     target = next(t for t in threads if t["thread_id"] == "delegate-thread-1")
     assert target["title"] == "直接委譲された開発ジョブ"
+
+
+def test_stale_threads_archived_after_30_days_keeping_jobs_and_chat(repository, client, development_quota):
+    from datetime import datetime, timedelta, timezone
+    from backend import conversation_store, development_threads
+
+    admin(client)
+    root = str(repository)
+    now = datetime.now(timezone.utc)
+    old_40d = (now - timedelta(days=40)).isoformat(timespec="seconds")
+    old_31d = (now - timedelta(days=31)).isoformat(timespec="seconds")
+    recent_5d = (now - timedelta(days=5)).isoformat(timespec="seconds")
+
+    # 1. 古い完了ジョブのみを持つスレッド (31日前) -> 非表示対象
+    conversation_store.create_thread("stale-chat-thread", source="web", title="")
+    stale_job = coding_jobs.create_development(
+        "stale-req-1", root, "古い完了ジョブ", "codex_sol",
+        thread_id="stale-chat-thread", turn_id="stale-turn-1"
+    )
+    # 2. スレッド作成は40日前だが最新ジョブが5日前のスレッド -> 残る
+    client.post("/api/coding/threads", json={"thread_id": "active-recent", "repository": root, "title": "継続中"})
+    recent_job = coding_jobs.create_development(
+        "recent-req-1", root, "最近のジョブ", "codex_sol",
+        thread_id="active-recent", turn_id="recent-turn-1"
+    )
+    # 3. 40日前だが未完了(queued)ジョブを持つスレッド -> 残る
+    client.post("/api/coding/threads", json={"thread_id": "active-queued", "repository": root, "title": "待機中"})
+    queued_job = coding_jobs.create_development(
+        "queued-req-1", root, "実行待ちジョブ", "codex_sol",
+        thread_id="active-queued", turn_id="queued-turn-1"
+    )
+    # 4. ジョブなしで作成日時が31日前のスレッド -> 非表示対象
+    client.post("/api/coding/threads", json={"thread_id": "stale-empty", "repository": root, "title": "空の古いスレッド"})
+
+    with db.write_transaction() as connection:
+        connection.execute(
+            "UPDATE coding_develop_threads SET created_at=? WHERE thread_id=?",
+            (old_40d, "stale-chat-thread"),
+        )
+        connection.execute(
+            "UPDATE coding_jobs SET status='completed', created_at=?, updated_at=? WHERE id=?",
+            (old_31d, old_31d, stale_job["id"]),
+        )
+        connection.execute(
+            "UPDATE coding_develop_threads SET created_at=? WHERE thread_id=?",
+            (old_40d, "active-recent"),
+        )
+        connection.execute(
+            "UPDATE coding_jobs SET status='completed', created_at=?, updated_at=? WHERE id=?",
+            (recent_5d, recent_5d, recent_job["id"]),
+        )
+        connection.execute(
+            "UPDATE coding_develop_threads SET created_at=? WHERE thread_id=?",
+            (old_40d, "active-queued"),
+        )
+        connection.execute(
+            "UPDATE coding_jobs SET status='queued', created_at=?, updated_at=? WHERE id=?",
+            (old_40d, old_40d, queued_job["id"]),
+        )
+        connection.execute(
+            "UPDATE coding_develop_threads SET created_at=? WHERE thread_id=?",
+            (old_31d, "stale-empty"),
+        )
+
+    # list_threads / workspaces の thread_count から古いスレッドのみ除外される
+    visible_ids = {t["thread_id"] for t in client.get("/api/coding/threads", params={"repository": root}).json()["threads"]}
+    assert visible_ids == {"active-recent", "active-queued"}
+    workspace = client.get("/api/coding/workspaces").json()["repositories"][0]
+    assert workspace["thread_count"] == 2
+
+    # sync_chat_threads を再実行してもアーカイブ済みスレッドは復活しない
+    development_threads.sync_chat_threads()
+    visible_after_sync = {t["thread_id"] for t in development_threads.list_threads(repository=root)}
+    assert visible_after_sync == {"active-recent", "active-queued"}
+
+    # ジョブ記録と通常会話スレッド自体は DB に残っている
+    all_job_ids = {j["id"] for j in client.get("/api/coding/jobs").json()["jobs"]}
+    assert stale_job["id"] in all_job_ids
+    with db.get_connection() as connection:
+        assert connection.execute("SELECT 1 FROM threads WHERE id='stale-chat-thread'").fetchone() is not None
+
+    # 同じスレッドで新規開発ジョブが登録された場合は再表示される
+    coding_jobs.create_development(
+        "reopen-req-1", root, "再活動ジョブ", "codex_sol",
+        thread_id="stale-chat-thread", turn_id="reopen-turn-1"
+    )
+    visible_reopened = {t["thread_id"] for t in development_threads.list_threads(repository=root)}
+    assert "stale-chat-thread" in visible_reopened

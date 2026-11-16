@@ -5,19 +5,38 @@ coding_jobs tables. Legacy/unbound jobs are not silently assigned to a thread.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from . import coding_jobs, conversation_store, db
 
+RETENTION_DAYS = 30
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS coding_develop_threads (
     thread_id TEXT PRIMARY KEY REFERENCES threads(id),
     repository TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    archived_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_coding_develop_repo ON coding_develop_threads(repository);
 """
+
+
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def ensure_schema():
@@ -25,10 +44,56 @@ def ensure_schema():
     coding_jobs.ensure_schema()
     with db.get_connection() as connection:
         connection.executescript(SCHEMA)
+        db._ensure_columns(connection, "coding_develop_threads", {"archived_at": "TEXT"})
     try:
         sync_chat_threads()
     except Exception:
         pass
+    try:
+        archive_stale_threads()
+    except Exception:
+        pass
+
+
+def archive_stale_threads(retention_days: int = RETENTION_DAYS) -> int:
+    """Hide Develop threads inactive for over retention_days while keeping job records."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max(1, int(retention_days)))
+    with db.get_connection() as connection:
+        rows = connection.execute(
+            "SELECT d.thread_id, d.created_at, j.status, j.updated_at "
+            "FROM coding_develop_threads d "
+            "LEFT JOIN coding_job_routes r ON r.thread_id=d.thread_id "
+            "LEFT JOIN coding_jobs j ON j.id=r.job_id "
+            "WHERE d.archived_at IS NULL"
+        ).fetchall()
+    if not rows:
+        return 0
+    threads: dict[str, dict] = {}
+    for row in rows:
+        tid = row["thread_id"]
+        entry = threads.setdefault(tid, {"created_at": _parse_iso(row["created_at"]), "latest_job": None, "active": False})
+        status = row["status"]
+        if status is not None and status not in coding_jobs.TERMINAL:
+            entry["active"] = True
+        updated = _parse_iso(row["updated_at"])
+        if updated and (entry["latest_job"] is None or updated > entry["latest_job"]):
+            entry["latest_job"] = updated
+    stale = []
+    for tid, entry in threads.items():
+        if entry["active"]:
+            continue
+        last_active = entry["latest_job"] or entry["created_at"]
+        if last_active and last_active < cutoff:
+            stale.append(tid)
+    if not stale:
+        return 0
+    now = db.now_iso()
+    with db.write_transaction() as connection:
+        connection.executemany(
+            "UPDATE coding_develop_threads SET archived_at=? WHERE thread_id=? AND archived_at IS NULL",
+            [(now, tid) for tid in stale]
+        )
+    return len(stale)
 
 
 def _repository(path):
@@ -40,7 +105,7 @@ def _repository(path):
 def _row(thread_id):
     with db.get_connection() as connection:
         row = connection.execute(
-            "SELECT d.thread_id,d.repository,d.created_at,t.title FROM coding_develop_threads d "
+            "SELECT d.thread_id,d.repository,d.created_at,d.archived_at,t.title FROM coding_develop_threads d "
             "JOIN threads t ON t.id=d.thread_id WHERE d.thread_id=?", (thread_id,)
         ).fetchone()
     if not row:
@@ -65,6 +130,10 @@ def create(repository="", title="", thread_id=None):
         connection.execute(
             "INSERT OR IGNORE INTO coding_develop_threads(thread_id,repository,created_at) VALUES(?,?,?)",
             (thread_id, repository, db.now_iso())
+        )
+        connection.execute(
+            "UPDATE coding_develop_threads SET archived_at=NULL WHERE thread_id=? AND archived_at IS NOT NULL",
+            (thread_id,)
         )
     return _row(thread_id)
 
@@ -116,6 +185,10 @@ def register_conversation_thread(thread_id: str, repository: str = "", title: st
         connection.execute(
             "INSERT OR IGNORE INTO coding_develop_threads(thread_id,repository,created_at) VALUES(?,?,?)",
             (thread_id, safe_repo, db.now_iso())
+        )
+        connection.execute(
+            "UPDATE coding_develop_threads SET archived_at=NULL WHERE thread_id=? AND archived_at IS NOT NULL",
+            (thread_id,)
         )
     return _row(thread_id)
 
@@ -178,11 +251,11 @@ def list_threads(repository=None, limit=100):
     limit = max(1, min(int(limit), 200))
     query = (
         "SELECT d.thread_id,d.repository,d.created_at,t.title FROM coding_develop_threads d "
-        "JOIN threads t ON t.id=d.thread_id"
+        "JOIN threads t ON t.id=d.thread_id WHERE d.archived_at IS NULL"
     )
     params = []
     if repository is not None:
-        query += " WHERE d.repository=?"
+        query += " AND d.repository=?"
         params.append(_repository(repository))
     query += " ORDER BY d.created_at DESC LIMIT ?"
     params.append(limit)
@@ -224,7 +297,7 @@ def repositories():
             ).fetchone()
             root["latest_job"] = dict(row) if row else None
             root["thread_count"] = connection.execute(
-                "SELECT COUNT(*) FROM coding_develop_threads WHERE repository=?", (path,)
+                "SELECT COUNT(*) FROM coding_develop_threads WHERE repository=? AND archived_at IS NULL", (path,)
             ).fetchone()[0]
             root["observed_at"] = db.now_iso()
     return roots
