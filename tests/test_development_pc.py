@@ -26,3 +26,21 @@ def test_unindexed_drives_are_searched_and_secrets_excluded(tmp_path, monkeypatc
     monkeypatch.setattr(development_pc, "_search_roots", lambda root: [first, second])
     found = development_pc.search("example-plan", None, lambda: None)
     assert found == {"files": [str(good)], "source": "filesystem", "truncated": False}
+
+
+def test_list_dir_lists_entries_and_excludes_protected_paths(tmp_path):
+    (tmp_path / "Server").mkdir()
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".env").write_text("SECRET=1", encoding="utf-8")
+    (tmp_path / "readme.txt").write_text("ok", encoding="utf-8")
+    listed = development_pc.list_dir(str(tmp_path), None, lambda: None)
+    assert listed["directories"] == ["Server"]
+    assert listed["files"] == ["readme.txt"]
+    assert listed["truncated"] is False
+
+
+def test_list_dir_empty_path_returns_roots(tmp_path, monkeypatch):
+    monkeypatch.setattr(development_pc, "_search_roots", lambda root: [tmp_path])
+    listed = development_pc.list_dir("", None, lambda: None)
+    assert listed["directories"] == [str(tmp_path)]
+    assert listed["files"] == []

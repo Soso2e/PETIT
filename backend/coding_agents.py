@@ -38,6 +38,8 @@ PATH = {"type": "string", "minLength": 1, "maxLength": 1000}
 ARGV = {"type": "array", "items": {"type": "string", "minLength": 1, "maxLength": 2000}, "minItems": 1, "maxItems": 40}
 PC_ACTIONS = {"write_pc_file": "write", "move_pc_file": "move", "delete_pc_file": "delete", "run_pc_command": "command"}
 PC_CATALOG = CATALOG[:3] + [
+    _tool("list_pc_dir", "List immediate subdirectories and files in an absolute PC folder (empty string lists drives/root).",
+          path={"type": "string", "maxLength": 1000}),
     _tool("search_pc_files", "Search for a literal filename fragment on PC drives or within the selected folder.",
           query={"type": "string", "minLength": 2, "maxLength": 150}),
     _tool("read_pc_file", "Read a bounded UTF-8 file at an absolute PC path.", path=PATH),
@@ -47,7 +49,8 @@ PC_CATALOG = CATALOG[:3] + [
     _tool("delete_pc_file", "Propose deleting one PC file; waits for approval.", path=PATH),
     _tool("run_pc_command", "Propose a command in an absolute PC folder; waits for approval.", path=PATH, argv=ARGV),
 ]
-PC_INSTRUCTIONS = """Use PETIT tools to search and read the PC scope selected by the user.
+PC_INSTRUCTIONS = """Use PETIT tools to search, list and read the PC scope selected by the user.
+Use list_pc_dir (with "" for drives/root or an absolute path) to inspect folder contents; do not propose run_pc_command just to list files or directories.
 Copy necessary files into job scratch and work there. list_files, read_file and write_file refer only to scratch.
 Any direct write, move, deletion or command on the PC must be proposed with its exact paths and arguments.
 A proposal has no effect until approved. Do not claim that pending actions ran. Report the results in Japanese.
@@ -142,12 +145,16 @@ def _run_claude_git(target, prompt, workspace, check, progress, resume=None, on_
             delta = event.get("delta") or {}
             if delta.get("type") == "text_delta" and isinstance(delta.get("text"), str):
                 coding_stream.append_delta_current(delta["text"])
+            elif delta.get("type") == "thinking_delta" and isinstance(delta.get("thinking"), str):
+                coding_stream.append_thought_current(delta["thinking"])
         elif kind == "assistant":
             for block in (event.get("message") or {}).get("content") or []:
                 if not isinstance(block, dict):
                     continue
                 if block.get("type") == "text" and isinstance(block.get("text"), str):
                     coding_stream.append_delta_current(block["text"])
+                elif block.get("type") == "thinking" and isinstance(block.get("thinking"), str):
+                    coding_stream.append_thought_current(block["thinking"])
                 elif block.get("type") == "tool_use" and isinstance(block.get("name"), str):
                     coding_stream.publish_tool_current(block["name"])
 
@@ -211,6 +218,8 @@ def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None
             phase = next_phase
             progress(phase)
         if event["kind"] == "step":
+            if event.get("thought_delta"):
+                coding_stream.append_thought_current(event["thought_delta"])
             if event.get("text_delta"):
                 coding_stream.append_delta_current(event["text_delta"])
             if event.get("tool"):
@@ -242,6 +251,43 @@ def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None
     return summary
 
 
+def _emit(progress, kind, detail=""):
+    if detail:
+        try:
+            progress(kind, detail)
+            return
+        except TypeError:
+            pass
+    progress(kind)
+
+
+def _describe_tool_call(name, arguments):
+    if not isinstance(arguments, dict):
+        return name
+    target = arguments.get("path") or arguments.get("query") or arguments.get("destination") or ""
+    if not target and isinstance(arguments.get("argv"), list) and arguments["argv"]:
+        target = str(arguments["argv"][0])
+    return f"{name} ({str(target)[:120]})" if target else name
+
+
+def _describe_tool_result(name, raw):
+    if not isinstance(raw, dict):
+        return name
+    if raw.get("error"):
+        return f"{name}: エラー ({raw['error']})"
+    if raw.get("approval_required"):
+        return f"{name}: 承認待ちを提案"
+    if "directories" in raw or "files" in raw:
+        dirs = len(raw.get("directories") or [])
+        files = len(raw.get("files") or [])
+        return f"{name}: フォルダ {dirs}件 / ファイル {files}件"
+    if raw.get("saved"):
+        return f"{name}: 保存完了"
+    if raw.get("copied"):
+        return f"{name}: 作業場所へコピー ({raw.get('bytes', 0)} bytes)"
+    return f"{name}: 完了"
+
+
 def run(provider, target, goal, invoke, check, progress, *, catalog=CATALOG, instructions=INSTRUCTIONS):
     messages = [{"role": "system", "content": instructions}, {"role": "user", "content": goal}]
     if provider in {"antigravity_cli", "claude_code"}:
@@ -265,17 +311,34 @@ def run(provider, target, goal, invoke, check, progress, *, catalog=CATALOG, ins
                 progress("model_retry_" + exc.reason)
                 # Only the model call is replayed. Tool responses from prior rounds stay in messages.
                 response, _ = completion(target, messages, catalog, check, **options)
-            progress("model_response")
             calls = response.get("tool_calls") or []
+            content = (response.get("content") or "").strip()
+            if content:
+                coding_stream.append_delta_current(content + ("\n\n" if calls else ""))
+                coding_stream.add_activity_current("CLI応答: " + content[:240])
+                _emit(progress, "model_response", content[:240])
+            elif calls:
+                names = ", ".join(call["function"]["name"] for call in calls)
+                coding_stream.add_activity_current("ツール呼び出し: " + names)
+                _emit(progress, "model_response", "ツール呼び出し: " + names)
+            else:
+                progress("model_response")
             if not calls:
-                if not response["content"].strip():
+                if not content:
                     raise ValueError("empty_agent_reply")
-                return response["content"]
+                return content
             messages.append(response)
             for call in calls:
                 check()
                 function = call["function"]
-                raw = invoke(function["name"], json.loads(function["arguments"]))
+                args = json.loads(function["arguments"])
+                label = _describe_tool_call(function["name"], args)
+                coding_stream.publish_tool_current(function["name"])
+                coding_stream.add_activity_current("実行: " + label)
+                raw = invoke(function["name"], args)
+                result_summary = _describe_tool_result(function["name"], raw)
+                coding_stream.add_activity_current("結果: " + result_summary)
+                _emit(progress, "tool_result", result_summary)
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(raw, ensure_ascii=False)})
         raise ValueError("coding_agent_step_limit")
     with tempfile.TemporaryDirectory(prefix="petit-codex-development-") as workspace:

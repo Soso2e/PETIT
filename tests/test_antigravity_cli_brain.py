@@ -124,3 +124,18 @@ def test_setup_failure_reports_safe_reason_and_persists_it(client, selected, mon
     with db.get_connection() as connection:
         row=connection.execute("SELECT result_json FROM turns WHERE request_id LIKE 'setup-test-%' ORDER BY updated_at DESC LIMIT 1").fetchone()
     assert json.loads(row[0])["reason"]==reason
+
+
+def test_invoke_popen_oserror_reports_cli_start_failed(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.subprocess, "Popen", Mock(side_effect=FileNotFoundError(2, "missing")))
+    with pytest.raises(runtime.CLIError) as exc:
+        runtime.invoke(["missing-agy"], tmp_path, "synthetic", lambda: None)
+    assert exc.value.reason == "cli_start_failed"
+
+
+def test_completion_post_start_oserror_reports_cli_io_error(monkeypatch):
+    monkeypatch.setattr(runtime.cli, "executable", lambda: "agy")
+    monkeypatch.setattr(runtime, "invoke", Mock(side_effect=PermissionError(13, "locked")))
+    with pytest.raises(runtime.CLIError) as exc:
+        runtime.completion({"model": "gemini-3.8-flash-medium"}, [{"role": "user", "content": "hi"}], [], lambda: None)
+    assert exc.value.reason == "cli_io_error"

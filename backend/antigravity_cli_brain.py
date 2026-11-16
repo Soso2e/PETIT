@@ -108,13 +108,12 @@ def invoke(command, root, prompt, check, *, timeout=90, label="Antigravity CLI",
     from .provider_runtime import stop_worker
     from .cli_job import ProcessJob
     with ExitStack() as stack:
-        output = stack.enter_context(tempfile.NamedTemporaryFile(prefix="petit-cli-output-"))
-        # Independent read cursor. On Windows both handles must share delete access.
-        def open_reader(path, flags):
-            return os.open(path, flags | getattr(os, "O_TEMPORARY", 0))
-        reader = stack.enter_context(open(output.name, "rb", opener=open_reader))
-        source = stack.enter_context(tempfile.TemporaryFile())
-        error = stack.enter_context(tempfile.TemporaryFile())
+        io_dir = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="petit-cli-io-", ignore_cleanup_errors=True)))
+        out_path = io_dir / "stdout.log"
+        output = stack.enter_context(out_path.open("wb"))
+        reader = stack.enter_context(out_path.open("rb"))
+        source = stack.enter_context((io_dir / "stdin.json").open("w+b"))
+        error = stack.enter_context((io_dir / "stderr.log").open("w+b"))
         pending = b""
 
         def read_updates(*, final=False):
@@ -129,6 +128,7 @@ def invoke(command, root, prompt, check, *, timeout=90, label="Antigravity CLI",
 
         source.write(prompt.encode("utf-8") if raw_stdin else
                      (json.dumps({"event": "user", "message": {"content": prompt}}, ensure_ascii=False) + "\n").encode())
+        source.flush()
         source.seek(0)
         try:
             process = subprocess.Popen(command, cwd=root, env=environment() if env is None else env,
@@ -138,7 +138,8 @@ def invoke(command, root, prompt, check, *, timeout=90, label="Antigravity CLI",
         except OSError as exc:
             if getattr(exc, "winerror", None) in {8, 32, 33, 1450} or exc.errno == errno.EAGAIN:
                 raise CLIError("cli_start_transient", label + "の起動に一時的に失敗しました。") from None
-            raise
+            log.warning("%s Popen failed (errno=%s, winerror=%s)", label, exc.errno, getattr(exc, "winerror", None))
+            raise CLIError("cli_start_failed", label + "を起動できません。実行ユーザーと配置を確認してください。") from None
         job = None
         try:
             try:
@@ -224,6 +225,10 @@ def completion(target: dict, messages: list, catalog: list, check, *, on_progres
             phase = "cli_initialized"
         elif event["kind"] == "result":
             phase = "cli_validating"
+        elif event.get("thought_delta"):
+            from . import coding_stream
+            coding_stream.append_thought_current(event["thought_delta"])
+            phase = "cli_responding"
         elif event.get("text_delta"):
             phase = "cli_responding"
         else:
@@ -249,8 +254,8 @@ def completion(target: dict, messages: list, catalog: list, check, *, on_progres
         except UnicodeError:
             raise CLIError("invalid_cli_protocol", "Antigravity CLIの出力を検証できませんでした。") from None
         except OSError as exc:
-            log.warning("Antigravity CLI invoke failed (errno=%s, winerror=%s)", exc.errno, getattr(exc, "winerror", None))
-            raise CLIError("cli_start_failed", "Antigravity CLIを起動できません。実行ユーザーと配置を確認してください。") from None
+            log.warning("Antigravity CLI I/O failed (errno=%s, winerror=%s)", exc.errno, getattr(exc, "winerror", None))
+            raise CLIError("cli_io_error", "Antigravity CLIの実行中に入出力エラーが発生しました。") from None
     try:
         if not stream.count:
             for line in output.splitlines():

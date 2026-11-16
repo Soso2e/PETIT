@@ -268,3 +268,16 @@ def test_real_grandchild_stops_with_owned_process_tree(tmp_path):
                 import os
                 import signal
                 os.kill(int(pidfile.read_text()), signal.SIGTERM)
+
+
+def test_protocol_captures_thinking_step_delta():
+    parser = cli.Protocol()
+    parser.feed(lines()[0])
+    step = parser.feed(json.dumps({
+        "event": "step_update",
+        "step_update": {
+            "conversation_id": CID, "step_index": 1, "state": "ACTIVE",
+            "step_type": "thinking", "text_delta": "フォルダを確認します",
+        },
+    }))
+    assert step["thought_delta"] == "フォルダを確認します"

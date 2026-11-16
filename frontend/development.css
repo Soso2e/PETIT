@@ -149,6 +149,29 @@
 .development-thread-error {
   color: var(--ui-danger, #ff5a5f);
 }
+.development-thread-trace {
+  margin: .35rem 0 0;
+  padding: .55rem .75rem;
+  border-radius: 10px;
+  background: var(--ui-soft, rgba(145,157,183,.1));
+  border: 1px solid var(--ui-line, rgba(145,157,183,.18));
+  color: var(--ui-muted, #a8b2c4);
+  font-size: .82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.development-thread-trace[hidden] {
+  display: none;
+}
+.development-thread-trace-details > summary {
+  cursor: pointer;
+  font-size: .82rem;
+  color: var(--ui-muted, #a8b2c4);
+  margin-top: .25rem;
+}
 .development-thread-details {
   align-self: flex-start;
   max-width: 100%;
