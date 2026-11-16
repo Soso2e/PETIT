@@ -28,6 +28,16 @@ def service_worker() -> Any:
     return JSONResponse({"detail": "service worker not found"}, status_code=404)
 
 
+@router.get("/apple-touch-icon.png", include_in_schema=False)
+@router.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
+def apple_touch_icon() -> Any:
+    """Serve the Apple touch icon from the root path for mobile Safari."""
+    icon_file = config.FRONTEND_DIR / "apple-touch-icon.png"
+    if icon_file.exists():
+        return FileResponse(icon_file, media_type="image/png")
+    return JSONResponse({"detail": "apple touch icon not found"}, status_code=404)
+
+
 @router.get("/")
 def index() -> Any:
     index_file = config.FRONTEND_DIR / "index.html"
