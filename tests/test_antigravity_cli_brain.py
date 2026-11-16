@@ -139,3 +139,11 @@ def test_completion_post_start_oserror_reports_cli_io_error(monkeypatch):
     with pytest.raises(runtime.CLIError) as exc:
         runtime.completion({"model": "gemini-3.8-flash-medium"}, [{"role": "user", "content": "hi"}], [], lambda: None)
     assert exc.value.reason == "cli_io_error"
+
+
+def test_parse_response_unwraps_nested_json_content():
+    inner = json.dumps({"content": "作業セッションの確認を行いました。", "tool_calls": []}, ensure_ascii=False)
+    outer = json.dumps({"content": inner, "tool_calls": []}, ensure_ascii=False)
+    parsed = runtime.parse_response(outer, brain.schemas())
+    assert parsed["content"] == "作業セッションの確認を行いました。"
+    assert parsed["tool_calls"] == []
