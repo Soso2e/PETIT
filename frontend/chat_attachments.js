@@ -62,10 +62,9 @@
       list.append(row);
     }
   };
-  picker.addEventListener("change", async () => {
-    const files = Array.from(picker.files || []);
-    picker.value = "";
+  const uploadFiles = async (files) => {
     if (busy) return;
+    if (!files.length) return;
     if (files.length + selected.length > 4 || files.some((file) => file.size > 8 * 1024 * 1024)) {
       status.textContent = "画像は4枚まで・各8MiB以下にしてください。";
       return;
@@ -87,6 +86,36 @@
       status.textContent = "画像を添付しました。送信すると解析します。";
     } catch (error) { status.textContent = error.message; }
     finally { busy = false; picker.disabled = false; choose.disabled = false; render(); }
+  };
+  picker.addEventListener("change", async () => {
+    const files = Array.from(picker.files || []);
+    picker.value = "";
+    await uploadFiles(files);
+  });
+  // Allow pasting images from the clipboard directly into the composer.
+  const acceptable = new Set(["image/png", "image/jpeg", "image/webp"]);
+  const onPaste = (event) => {
+    const items = event.clipboardData && event.clipboardData.items;
+    if (!items) return;
+    const files = [];
+    for (const item of items) {
+      if (item.kind !== "file") continue;
+      const file = item.getAsFile();
+      if (!file || !acceptable.has(file.type)) continue;
+      const ext = file.type.split("/")[1] || "png";
+      const named = file.name && file.name !== "image.png" ? file : new File([file], `pasted-${Date.now()}.${ext}`, { type: file.type });
+      files.push(named);
+    }
+    if (!files.length) return;
+    event.preventDefault();
+    uploadFiles(files);
+  };
+  form.addEventListener("paste", onPaste);
+  document.addEventListener("paste", (event) => {
+    if (form.contains(event.target)) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && !form.contains(active)) return;
+    onPaste(event);
   });
   window.PetitChatAttachments = {
     ids: () => selected.map((item) => item.id),
@@ -96,6 +125,6 @@
       if (!ids.includes(item.id)) return true;
       URL.revokeObjectURL(item.preview);
       return false;
-    }); status.textContent = "画像の解析が完了しました。新しい画像も添付できます。"; render(); },
+    }); status.textContent = ""; render(); },
   };
 })();

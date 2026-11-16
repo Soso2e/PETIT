@@ -62,7 +62,13 @@ def root() -> Path:
     from . import request_context
     request_context.forbid_guild_mode("PETIT Home")
     configured = os.getenv("PETIT_HOME", "").strip()
-    return Path(configured).expanduser() if configured else Path.home() / "PETIT-Home"
+    target = Path(configured).expanduser() if configured else Path.home() / "PETIT-Home"
+    try:
+        if target.exists():
+            os.listdir(target)
+    except PermissionError:
+        return Path.home() / "PETIT-Home-app"
+    return target
 
 
 def _git(home: Path, *args: str) -> bool:
