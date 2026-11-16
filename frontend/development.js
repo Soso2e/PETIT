@@ -86,14 +86,18 @@
       }
       return false;
     };
+    const parseEvent = (event) => {
+      try { return JSON.parse(event.data); }
+      catch { return null; } // A malformed SSE event must not break later progress updates.
+    };
     stream.addEventListener("progress", (event) => {
-      const value = JSON.parse(event.data);
+      const value = parseEvent(event);
       if (value) update(value);
       if (!value) return;
       finishIfDone(value.status);
     });
     stream.addEventListener("draft", (event) => {
-      const value = JSON.parse(event.data);
+      const value = parseEvent(event);
       if (value) update(value);
       if (value) finishIfDone(value.status);
     });
