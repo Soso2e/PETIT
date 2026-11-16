@@ -1,5 +1,19 @@
 # PETIT Runtime Flows
 
+## Develop進捗SSEの不正イベント耐性（v0.66.2）
+
+```mermaid
+flowchart LR
+  SSE[進捗・draft SSE受信] --> Parse{JSONとして解析できるか}
+  Parse -->|Yes| Update[進捗表示を更新 / 終了なら詳細再取得]
+  Parse -->|No| Ignore[そのイベントのみ無視]
+  Ignore --> SSE
+  Update --> SSE
+```
+
+壊れた単一イベントによる画面側の例外を防ぎ、EventSourceの後続イベント受信を維持する。サーバー側のジョブ状態・再試行・認証は変更しない。
+
+
 ## エピソード要約から記憶への昇格（v0.58.0・#446）
 
 会話のTurn処理とは別の、既存のバックグラウンド要約の経路。記憶へ書くのは、モデルが長く使える知識としてラベルを付けたものだけ。
