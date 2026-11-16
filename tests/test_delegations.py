@@ -337,6 +337,18 @@ def test_expired_approval_stops_the_work_and_is_reported(ready, model, monkeypat
 
 def test_tools_are_registered_with_their_risks():
     assert {"delegate_to_agent", "get_delegation_status", "cancel_delegation"} <= brain.PUBLIC_TOOLS
+    assert "delete_work_session" in brain.PUBLIC_TOOLS and "delete_work_session" in brain.LOCAL_WRITES
     assert tools.risk_for("delegate_to_agent") == "low_risk_write" and not tools.requires_confirmation("delegate_to_agent")
     assert tools.risk_for("get_delegation_status") == "safe_read"
     assert brain_priority.delegate_target("claude_code", setup_store.load())["_delegate"] is True
+
+
+def test_render_report_unwraps_json_content():
+    row = {"status": "completed", "created_at": "2026-11-16T05:32:16+00:00",
+           "turn_updated_at": "2026-11-16T05:33:32+00:00", "goal": "作業確認"}
+    report = delegations.render_report(
+        row, "antigravity_cli", "gemini-3.8-flash-low",
+        {"reply": '{"content":"見やすい日本語報告","tool_calls":[]}', "used_tools": [], "effects": []},
+    )
+    assert "見やすい日本語報告" in report
+    assert '"tool_calls"' not in report

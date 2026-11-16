@@ -70,6 +70,29 @@ def prepare(root: Path):
     (agents / (AGENT + ".md")).write_text(AGENT_SOURCE, encoding="utf-8")
 
 
+def _unwrap_structured_content(value: dict) -> dict:
+    """Unwrap nested {"content": ..., "tool_calls": ...} JSON strings emitted inside content."""
+    for _ in range(3):
+        text = value.get("content")
+        if not isinstance(text, str):
+            break
+        stripped = text.strip()
+        if not stripped.startswith("{"):
+            break
+        try:
+            inner = json.loads(stripped, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        except (ValueError, RecursionError):
+            break
+        if not isinstance(inner, dict) or set(inner) != {"content", "tool_calls"}:
+            break
+        if not isinstance(inner["content"], str) or not isinstance(inner["tool_calls"], list):
+            break
+        if value["tool_calls"] and inner["tool_calls"]:
+            break
+        value = {"content": inner["content"], "tool_calls": value["tool_calls"] or inner["tool_calls"]}
+    return value
+
+
 def parse_response(raw, catalog, *, label="Antigravity CLI", prefix="agy-") -> dict:
     try:
         value = raw if isinstance(raw, dict) else json.loads(raw, parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
@@ -77,6 +100,7 @@ def parse_response(raw, catalog, *, label="Antigravity CLI", prefix="agy-") -> d
             raise ValueError()
         if not isinstance(value["content"], str) or not isinstance(value["tool_calls"], list):
             raise ValueError()
+        value = _unwrap_structured_content(value)
         if hasattr(catalog, "full"):
             allowed = catalog.full()
         elif hasattr(catalog, "schemas"):

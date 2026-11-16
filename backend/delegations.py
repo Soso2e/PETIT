@@ -36,10 +36,11 @@ FRONT_HIDDEN = {"gmail_get_message",
                 "delegate_coding_task", "get_coding_task_status", "cancel_coding_task",
                 "write_home_file", "edit_home_file"}
 _HANDOFF_SKILL = (Path(__file__).parent / "skills" / "compact-cli-handoff" / "SKILL.md")
-FRONT_HINT = ("\n開発・コード修正・リポジトリ調査・PCファイル作業は list_coding_repositories で対象を確認し、"
-              "具体的な目的と制約を整理して propose_development_job で提案する。利用者の開始確認を待つ。"
-              "その他の複数ステップの作業（PETIT Home内の作業、メール本文の確認）は"
-              "delegate_to_agentでCLIに任せる。「できない」と答える前に、任せられないか確かめる。"
+FRONT_HINT = ("\n開発・コード修正・リポジトリ調査・PCファイル作業・CLIでの調査や修正依頼（「CLIにお願いして」等）は "
+              "list_coding_repositories で対象を確認し、具体的な目的と制約を整理して propose_development_job で開発タブへ提案する。利用者の開始確認を待つ。"
+              "PETIT Toolだけで完結する裏作業（PETIT Home内の作業、メール本文の確認）は delegate_to_agentでCLIに任せる"
+              "（開発タブには追加されず、CLIの直接ファイル/コマンド操作も使えない）。"
+              "「できない」と答える前に、利用可能なPETIT Toolや propose_development_job で対応できないか確かめる。"
               "雑談・予定・タスク・作業記録は任せず自分で処理する。Web調査は委譲しない。"
               "任せた作業を完了と言わない。進み具合はget_delegation_statusで確認する。\n"
               + _HANDOFF_SKILL.read_text(encoding="utf-8").split("---", 2)[2].strip())
@@ -297,6 +298,13 @@ def render_report(row, provider: str, model: str, result: dict) -> str:
     if result.get("error"):
         lines.append("理由: " + str(result["error"])[:500])
     reply = str(result.get("reply") or "").strip()
+    if reply.startswith("{"):
+        try:
+            parsed = json.loads(reply)
+            if isinstance(parsed, dict) and isinstance(parsed.get("content"), str) and "tool_calls" in parsed:
+                reply = parsed["content"].strip()
+        except ValueError:
+            pass
     if reply:
         room = max(200, REPORT_CHARS - sum(len(x) for x in lines))
         lines.append("CLIの報告（未検証）:\n" + (reply if len(reply) <= room else reply[:room] + "…（続きは省略）"))
