@@ -27,6 +27,10 @@ Desktop v0.26.0では別の通知経路を使用します。Desktop設定で「�
 - `high_task` — Highタスクのリマインド
 - `morning_briefing` — 朝ブリーフィング
 - `github_ci_failure` — GitHub CI失敗
+- `sync_failure` — 同期失敗（このカテゴリだけ初期ON）
+- `background_task` — バックグラウンド調査の完了
+- `delegation` — 任せた作業の確認待ちと結果
+- `development` — 開発ジョブの確認待ちと結果（レビュー待ち・チェック失敗・失敗・PC操作の承認待ち・再起動での中断）。文面に依頼内容・パス・CLIの出力は含めず、リンクからDevelopの該当スレッドを開く
 
 明示的なテスト通知だけはカテゴリ設定を無視します。
 

@@ -171,6 +171,11 @@ flowchart TD
     PC -->|承認対象なし| Review
     Review -->|利用者のレビュー| Completed[completed]
     Run -->|再起動| Interrupted[interrupted / 作業場所のHEADを記録]
+    Review -.-> Notice[通知 development / 初期OFF・文面に依頼内容なし・該当スレッドへのリンク]
+    FailedChecks -.-> Notice
+    Error -.-> Notice
+    Pending -.-> Notice
+    Interrupted -.-> Notice
     Native -.->|終了時（成功・失敗・取消）| Head[(coding_job_heads に終了時HEADを保存)]
     Interrupted -.->|続きから再開 / 次の依頼| Queued
 ```

@@ -20,9 +20,10 @@
 
 - `frontend/universe.html` 読み込み時に `frontend/components/petit-island-status.js` が画面上部中央（`.petit-island-dock`）へ自動マウントし、以下の状態を優先順に表示する：
   1. 会話・音声の即時状態（`petit:mascot` イベント: `listening` / `thinking` / `speaking` / `approval` / `error` / `success`）
-  2. 開発ジョブ実行中・確認待ち（`GET /api/coding/activity?limit=10`）
-  3. 未読通知（`GET /api/notifications/events?state=pending&limit=10`）
+  2. 開発ジョブ（`GET /api/coding/activity?limit=10`）。PC操作の承認待ち、実行中・順番待ち、結果（完了・失敗・チェック失敗・中断）・提案の順で1件を表示する
+  3. 30分以内の未読通知（`GET /api/notifications/events?state=unread&limit=10`）。`development` カテゴリは 2 で表示するため除く。それより古い未読は通知センターで確認する
   4. 作業セッション計測中・一時停止中（`GET /api/work-sessions/active` + 1秒ごとの経過時間表示）
   5. `idle`（待機中: `PETIT`）
 - 開発ジョブの「完了しました」（`ready_for_review`）は一度きりの通知とする。アイランドから、または他の経路でDevelopを開く・該当の会話を表示すると、そのジョブIDを `localStorage`（`petit-island-seen-reviews`）へ記録して表示をやめる。レビュー完了時はDevelopが状態を再取得させる。別のジョブが完了すれば再び通知する。
+- 失敗・チェック失敗・再起動での中断（`failed` / `checks_failed` / `interrupted`）は、更新から24時間以内のジョブだけを同じ一度きりの通知として表示する。PC操作の承認待ち（`waiting_approval`）は、Developを開いても解決するまで表示し続ける。
 - アイランドをクリック（タップ）すると、表示中の状態に対応する画面（`development` / `reminders` / `focus` / `chat`）へ移動する。

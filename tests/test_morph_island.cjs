@@ -152,7 +152,7 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
   const mockFetchData = {
     '/api/work-sessions/active': { session: { status: 'active', task_title: '設計レビュー', started_at: new Date(Date.now() - 65000).toISOString(), paused_total_seconds: 0 } },
     '/api/coding/activity?limit=10': { jobs: [] },
-    '/api/notifications/events?state=pending&limit=10': { events: [] },
+    '/api/notifications/events?state=unread&limit=10': { events: [] },
   };
   const window = {
     matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }),
@@ -252,6 +252,53 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
   };
   await ctx.window.PetitIslandStatus.refresh();
   assert.equal(islandEl.dataset.state, 'session');
+
+  // A job waiting for a decision outranks running work and stays until it is resolved.
+  const label = () => islandEl.children[0].children.find((l) => l.classList.contains('is-on')).children[1].children[0].textContent;
+  const now = new Date().toISOString();
+  mockFetchData['/api/coding/activity?limit=10'] = {
+    jobs: [
+      { id: 'job5', status: 'running', updated_at: now },
+      { id: 'job6', status: 'waiting_approval', updated_at: now },
+    ],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(label(), '承認待ちです');
+  winListeners.get('petit:area-change')({ detail: { area: 'development' } });
+  assert.equal(label(), '承認待ちです');
+
+  // A recent failure is announced once; an old one is not announced at all.
+  mockFetchData['/api/coding/activity?limit=10'] = {
+    jobs: [
+      { id: 'job7', status: 'failed', updated_at: now },
+      { id: 'job8', status: 'interrupted', updated_at: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString() },
+    ],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(label(), '開発が失敗しました');
+  winListeners.get('petit:area-change')({ detail: { area: 'development' } });
+  assert.equal(islandEl.dataset.state, 'session');
+  mockFetchData['/api/coding/activity?limit=10'] = {
+    jobs: [{ id: 'job8', status: 'interrupted', updated_at: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString() }],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(islandEl.dataset.state, 'session');
+
+  // Only fresh unread notifications reach the Island; Develop ones are already shown as jobs.
+  mockFetchData['/api/coding/activity?limit=10'] = { jobs: [] };
+  mockFetchData['/api/notifications/events?state=unread&limit=10'] = {
+    events: [
+      { id: 1, category: 'development', title: '開発ジョブ: レビュー待ち', created_at: now },
+      { id: 2, category: 'schedule_reminder', title: '古い通知', created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString() },
+    ],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(islandEl.dataset.state, 'session');
+  mockFetchData['/api/notifications/events?state=unread&limit=10'].events.push(
+    { id: 3, category: 'schedule_reminder', title: '10分後に予定', created_at: now });
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(islandEl.dataset.state, 'notification');
+  assert.equal(label(), '10分後に予定');
 
   ctx.window.PetitIslandStatus.destroy();
 });

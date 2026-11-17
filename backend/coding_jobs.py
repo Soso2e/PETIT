@@ -13,6 +13,7 @@ import stat
 import subprocess
 import threading
 import time
+from urllib.parse import quote
 from uuid import uuid4
 
 from . import (config, db, setup_store as settings, project_workspaces, brain_priority, coding_agents,
@@ -25,6 +26,14 @@ _stop = threading.Event()
 _worker = None
 TERMINAL = {"completed", "failed", "cancelled", "interrupted", "ready_for_review", "checks_failed"}
 _is_reserved = getattr(os.path, "isreserved", lambda value: Path(value).is_reserved())
+# States the owner has to act on or look at. The owner's own cancel and review completion are not announced.
+NOTICES = {
+    "waiting_approval": "開発ジョブの確認が必要です",
+    "ready_for_review": "開発ジョブ: レビュー待ち",
+    "checks_failed": "開発ジョブ: チェック失敗",
+    "failed": "開発ジョブ: 失敗",
+    "interrupted": "開発ジョブ: 再起動で中断",
+}
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS coding_jobs (
  id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, input_hash TEXT NOT NULL, task_id INTEGER,
@@ -354,6 +363,26 @@ def finish(job_id, status, *, summary="", checks=None, error=None):
         if status in {"failed", "cancelled", "interrupted"}:
             connection.execute("UPDATE coding_pc_actions SET status='rejected' WHERE job_id=? AND status='proposed'", (job_id,))
         event(job_id, status)
+    notify(job_id, status)
+
+
+def notify(job_id, status):
+    """Announce a job that needs the owner. The text carries no goal, path or CLI output."""
+    if status not in NOTICES:
+        return
+    try:
+        from . import notifications
+        with db.get_connection() as connection:
+            route = connection.execute("SELECT thread_id FROM coding_job_routes WHERE job_id=?", (job_id,)).fetchone()
+        url = "/static/universe.html?view=development"
+        if route and route["thread_id"]:
+            url += "&dev_thread=" + quote(route["thread_id"], safe="")
+        notifications.dispatch_notification(
+            category="development", title=NOTICES[status],
+            body="PETITのDevelopを開いて判断してください。" if status == "waiting_approval"
+            else "PETITのDevelopを開くと結果を確認できます。", url=url)
+    except Exception:  # noqa: BLE001 - a missing notification never changes the job's state
+        log.exception("development notification unavailable job=%s", job_id)
 
 
 def path_for(workspace, name):
@@ -734,15 +763,17 @@ def start():
     if _worker and _worker.is_alive():return
     with db.get_connection() as connection:
         stopped = connection.execute(
-            "SELECT j.id,j.workspace FROM coding_jobs j JOIN coding_job_routes r ON r.job_id=j.id "
-            "WHERE j.status='running' AND r.mode='git' AND j.workspace IS NOT NULL").fetchall()
+            "SELECT j.id,j.workspace,r.mode FROM coding_jobs j LEFT JOIN coding_job_routes r ON r.job_id=j.id "
+            "WHERE j.status='running'").fetchall()
         connection.execute("UPDATE coding_jobs SET status='interrupted',error='Core再起動で中断しました。自動再実行していません。' WHERE status='running'")
         connection.execute("UPDATE coding_pc_actions SET status='unknown' WHERE status='running'")
         connection.execute("UPDATE coding_pc_actions SET status='rejected' WHERE status='proposed' AND job_id IN "
                            "(SELECT id FROM coding_jobs WHERE status='interrupted')")
     for row in stopped:
-        # The CLI died with the Core, so the checkout's HEAD is where the interrupted job left it.
-        remember_head(row["id"], row["workspace"])
+        if row["mode"] == "git" and row["workspace"]:
+            # The CLI died with the Core, so the checkout's HEAD is where the interrupted job left it.
+            remember_head(row["id"], row["workspace"])
+        notify(row["id"], "interrupted")
     _stop.clear()
     def loop():
         while not _stop.wait(.5):

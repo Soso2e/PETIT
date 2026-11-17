@@ -8,6 +8,7 @@
   };
   const operations = { write: "書き込み", move: "移動", delete: "削除", command: "コマンド実行" };
   const active = new Set(["queued", "running"]);
+  const noticed = new Set(["ready_for_review", "failed", "checks_failed", "interrupted"]);
   const $ = (id) => document.getElementById(id);
   const phases = {
     workspace_ready: "作業場所を準備しました",
@@ -754,7 +755,7 @@
       $("development-nav-thread").textContent = data.title || "開発チャット";
       const parent = repositories.find((item) => item.path === data.repository);
       $("development-back-thread").textContent = "← " + (parent?.name || (data.repository ? "リポジトリ" : "一覧"));
-      const waiting = data.jobs.filter((job) => job.status === "ready_for_review").map((job) => job.id);
+      const waiting = data.jobs.filter((job) => noticed.has(job.status)).map((job) => job.id);
       if (waiting.length && !panel.hidden) window.PetitIslandStatus?.acknowledgeReviews?.(waiting);
       const latest = data.jobs[data.jobs.length - 1];
       $("development-thread-meta").textContent = [
@@ -921,6 +922,15 @@
       void refreshWorkspace();
     } catch (error) { report(error.message); }
   });
+  // A notification links to its thread with ?dev_thread=<id>; open it once and drop the parameter.
+  const openLinkedThread = () => {
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get("dev_thread");
+    if (!id) return;
+    url.searchParams.delete("dev_thread");
+    window.history.replaceState(window.history.state, "", url);
+    void openThread(id);
+  };
   const refresh = () => {
     void refreshConfig();
     void refreshWorkspace();
@@ -934,7 +944,7 @@
   });
   legacy.addEventListener("toggle", () => { if (legacy.open) void refreshJobs(); });
   window.addEventListener("petit:area-change", (event) => {
-    if (event.detail?.area === "development") refresh();
+    if (event.detail?.area === "development") { refresh(); openLinkedThread(); }
   });
   setInterval(() => {
     if (document.hidden || panel.hidden) return;
@@ -944,5 +954,5 @@
     void refreshUsage();
   }, 12000);
   show("home");
-  if (!panel.hidden) refresh();
+  if (!panel.hidden) { refresh(); openLinkedThread(); }
 })();

@@ -49,3 +49,9 @@ def test_stopped_job_offers_resume_in_the_same_thread():
     # Only the latest turn offers it, and it reuses the thread and the job's model selection.
     assert "latest && resumeGoals[job.status] && currentThread" in script
     assert "thread_id: threadId, model_key: job.selection?.model_key" in script
+
+
+def test_notification_link_opens_its_develop_thread_once():
+    script = read("development.js")
+    assert 'url.searchParams.get("dev_thread")' in script and 'url.searchParams.delete("dev_thread")' in script
+    assert script.count("openLinkedThread();") == 2

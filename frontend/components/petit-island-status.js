@@ -7,7 +7,18 @@
   if (window.PetitIslandStatus || !window.PetitMorphIsland) return;
   if (!document.querySelector('.universe-shell')) return;
 
-  const ACTIVE_JOB_STATUSES = new Set(['running', 'queued', 'ready_for_review', 'proposed']);
+  const ACTIVE_JOB_STATUSES = new Set(['running', 'queued', 'ready_for_review', 'proposed', 'waiting_approval']);
+  // Jobs that stopped without a result are announced for a day, like a finished one.
+  const STOPPED_JOB_STATUSES = new Set(['failed', 'checks_failed', 'interrupted']);
+  const STOPPED_NOTICE_MS = 24 * 60 * 60 * 1000;
+  // One-time notices: shown until the user has gone to Develop once.
+  const NOTICE_JOB_STATUSES = new Set(['ready_for_review', ...STOPPED_JOB_STATUSES]);
+  const JOB_LABELS = {
+    running: '開発中', queued: '開発待機中', ready_for_review: '完了しました', proposed: '開発提案',
+    waiting_approval: '承認待ちです', failed: '開発が失敗しました', checks_failed: 'チェック失敗',
+    interrupted: '開発が中断しました',
+  };
+  const NOTIFICATION_NOTICE_MS = 30 * 60 * 1000;
   const POLL_MS = 20000;
 
   const store = {
@@ -31,13 +42,18 @@
   } catch { /* Storage can be unavailable; the notice then resets on reload. */ }
 
   const visibleJobs = () => store.codingJobs.filter(
-    (job) => !(job.status === 'ready_for_review' && seenReviews.has(String(job.id))),
+    (job) => !(NOTICE_JOB_STATUSES.has(job.status) && seenReviews.has(String(job.id))),
   );
+
+  const isRecent = (value, windowMs) => {
+    const time = Date.parse(value || '');
+    return Number.isFinite(time) && Date.now() - time < windowMs;
+  };
 
   const acknowledgeReviews = (ids) => {
     const targets = Array.isArray(ids)
       ? ids
-      : store.codingJobs.filter((job) => job.status === 'ready_for_review').map((job) => job.id);
+      : store.codingJobs.filter((job) => NOTICE_JOB_STATUSES.has(job.status)).map((job) => job.id);
     let changed = false;
     for (const id of targets) {
       if (id == null || seenReviews.has(String(id))) continue;
@@ -85,19 +101,15 @@
     }
 
     const jobs = visibleJobs();
-    const runningJob = jobs.find((j) => j.status === 'running' || j.status === 'queued')
+    // A job waiting for the user's decision comes first; then work in progress; then results.
+    const runningJob = jobs.find((j) => j.status === 'waiting_approval')
+      || jobs.find((j) => j.status === 'running' || j.status === 'queued')
       || jobs[0];
     if (runningJob) {
-      const statusText = runningJob.status === 'running'
-        ? '開発中'
-        : runningJob.status === 'queued'
-          ? '開発待機中'
-          : runningJob.status === 'ready_for_review'
-            ? '完了しました'
-            : '開発提案';
+      const statusText = JOB_LABELS[runningJob.status] || '開発提案';
       const detail = runningJob.summary
         ? String(runningJob.summary).slice(0, 28)
-        : runningJob.status === 'ready_for_review'
+        : NOTICE_JOB_STATUSES.has(runningJob.status) || runningJob.status === 'waiting_approval'
           ? 'タップして確認'
           : 'Developで確認できます';
       return {
@@ -172,18 +184,20 @@
       const [sessionData, codingData, notifData] = await Promise.all([
         safeFetchJson('/api/work-sessions/active'),
         safeFetchJson('/api/coding/activity?limit=10'),
-        safeFetchJson('/api/notifications/events?state=pending&limit=10'),
+        safeFetchJson('/api/notifications/events?state=unread&limit=10'),
       ]);
       if (sessionData && 'session' in sessionData) {
         store.activeSession = sessionData.session || null;
       }
       if (codingData && Array.isArray(codingData.jobs)) {
-        store.codingJobs = codingData.jobs.filter((j) => ACTIVE_JOB_STATUSES.has(j.status));
+        store.codingJobs = codingData.jobs.filter((j) => ACTIVE_JOB_STATUSES.has(j.status)
+          || (STOPPED_JOB_STATUSES.has(j.status) && isRecent(j.updated_at, STOPPED_NOTICE_MS)));
       }
       if (notifData && Array.isArray(notifData.events)) {
-        store.notifications = notifData.events;
-      } else if (notifData && Array.isArray(notifData.items)) {
-        store.notifications = notifData.items;
+        // Fresh unread notices only; older ones stay in the notification centre. Develop jobs show as jobs above.
+        store.notifications = notifData.events.filter(
+          (item) => item.category !== 'development' && isRecent(item.created_at, NOTIFICATION_NOTICE_MS),
+        );
       }
       syncDisplay();
     } finally {
