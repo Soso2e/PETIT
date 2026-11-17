@@ -55,3 +55,12 @@ def test_notification_link_opens_its_develop_thread_once():
     script = read("development.js")
     assert 'url.searchParams.get("dev_thread")' in script and 'url.searchParams.delete("dev_thread")' in script
     assert script.count("openLinkedThread();") == 2
+
+
+def test_chat_proposal_passes_the_request_as_written():
+    from backend.tools import coding  # noqa: F401 - registers the tool
+    from backend import tools, delegations
+    description = next(item["function"]["description"] for item in tools.openai_tools_schema()
+                       if item["function"]["name"] == "propose_development_job")
+    assert "原文のまま" in description and "足さない" in description
+    assert "原文のまま goal" in delegations.FRONT_HINT

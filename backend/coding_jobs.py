@@ -645,7 +645,8 @@ def run_job(job_id):
     def check():
         current = get(job_id)
         if _stop.is_set() or current["cancel_requested"]:raise InterruptedError("取消要求で停止しました。差分は保持しています。")
-        if time.monotonic() - started > 900:raise ValueError("開発タスクの実行時間上限に達しました。")
+        if time.monotonic() - started > config.CODING_JOB_TIMEOUT_SECONDS:
+            raise ValueError("開発タスクの実行時間上限に達しました。「続きから再開」で同じ会話の続きを依頼できます。")
         data = settings.load()
         if not brain_priority.permitted(job["provider"], data):raise ValueError("CLI接続が解除されました。")
         if job["repository"]:

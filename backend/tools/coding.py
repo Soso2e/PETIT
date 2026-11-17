@@ -39,7 +39,7 @@ def add_coding_repository(path: str):
 
 
 @tool(name="propose_development_job",
-      description="開発・コード修正・リポジトリ調査・PCファイル作業の依頼を具体的な開発プロンプトに整え、利用者の開始確認待ちとして保存する。実行は始まらない。先に list_coding_repositories で対象を確認する。全PCが意図された場合は repository を空文字にする。軽量な読み取り調査だけ lightweight を true にする。",
+      description="開発・コード修正・リポジトリ調査・PCファイル作業の依頼を、利用者の開始確認待ちとして保存する。実行は始まらない。goal には利用者の依頼を原文のまま入れ、会話の文脈がないと分からない対象や前提だけを補う。利用者が言っていない制約・手順・完了条件は足さない（進め方はCLIが決める）。先に list_coding_repositories で対象を確認する。全PCが意図された場合は repository を空文字にする。軽量な読み取り調査だけ lightweight を true にする。",
       parameters={"type": "object", "properties": {
           "repository": {"type": "string", "maxLength": 1000},
           "goal": {"type": "string", "minLength": 1, "maxLength": 8000},

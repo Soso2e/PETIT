@@ -129,6 +129,8 @@ PETIT_OWNER_ID = os.getenv("PETIT_OWNER_ID", "soso").strip() or "soso"
 AUTO_SUMMARY_ENABLED = os.getenv("PETIT_AUTO_SUMMARY_ENABLED", "1") not in ("0", "false", "False")
 SUMMARY_INTERVAL_HOURS = float(os.getenv("PETIT_SUMMARY_INTERVAL_HOURS", "3"))
 SUMMARY_MIN_CONVERSATIONS = int(os.getenv("PETIT_SUMMARY_MIN_CONVERSATIONS", "1"))
+# Whole-run limit of one development job. Real work in a repository often needs more than a few minutes.
+CODING_JOB_TIMEOUT_SECONDS = max(60, int(float(os.getenv("PETIT_CODING_JOB_TIMEOUT_MINUTES", "60")) * 60))
 # One scheduler tick works through this many sessions, so a backlog clears without one long burst.
 SUMMARY_MAX_PER_TICK = int(os.getenv("PETIT_SUMMARY_MAX_EPISODES_PER_TICK", "6"))
 # A Core that restarts more often than the interval would otherwise never summarize.
