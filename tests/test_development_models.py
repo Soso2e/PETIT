@@ -56,3 +56,82 @@ def test_development_request_accepts_all_configured_model_keys():
     for key in ("auto", *models.MODELS):
         req = coding_api.DevelopmentRequest(request_id="req-1", goal="check", model_key=key)
         assert req.model_key == key
+
+
+def _usage_fixture(monkeypatch, clock):
+    calls = []
+
+    def probe():
+        calls.append(clock[0])
+        return {"codex_sol": (True, 100 - len(calls), 50)}
+
+    monkeypatch.setattr(models, "PROBES", {"codex": probe})
+    monkeypatch.setattr(models.setup_store, "load", lambda: {})
+    monkeypatch.setattr(models.brain_priority, "permitted", lambda provider, data: True)
+    monkeypatch.setattr(models.brain_priority, "target", lambda provider, data=None: {"configured": True})
+    monkeypatch.setattr(models.time, "monotonic", lambda: clock[0])
+    models.invalidate()
+    return calls
+
+
+def _wait_for_refresh():
+    import time as real_time
+    for _ in range(200):
+        with models._lock:
+            if not models._refreshing:
+                return
+        real_time.sleep(0.01)
+    raise AssertionError("background refresh did not finish")
+
+
+def test_usage_serves_stale_result_while_one_background_probe_refreshes(monkeypatch):
+    clock = [1000.0]
+    calls = _usage_fixture(monkeypatch, clock)
+    assert models.usage()["codex_sol"]["five_hour"] == 99 and len(calls) == 1
+    clock[0] += 30
+    assert models.usage()["codex_sol"]["five_hour"] == 99 and len(calls) == 1  # fresh: no probe
+    clock[0] += 120
+    # Older than a minute: the caller gets the previous value at once; the probe runs behind it.
+    assert models.usage()["codex_sol"]["five_hour"] == 99
+    _wait_for_refresh()
+    assert len(calls) == 2 and models.usage()["codex_sol"]["five_hour"] == 98
+    clock[0] += models.STALE_SECONDS + 1
+    assert models.usage()["codex_sol"]["five_hour"] == 97 and len(calls) == 3  # too old: wait for the probe
+    models.invalidate()
+
+
+def test_invalidation_discards_cache_and_any_probe_started_before_it(monkeypatch):
+    clock = [1000.0]
+    calls = _usage_fixture(monkeypatch, clock)
+    models.usage()
+    models.invalidate()
+    assert models.usage()["codex_sol"]["five_hour"] == 98 and len(calls) == 2
+    with models._lock:
+        generation = models._generation
+    models.invalidate()
+    models._probe_and_store(("codex",), generation)  # a probe that began before the invalidation
+    assert models._cache is None
+    models.invalidate()
+
+
+def test_stale_result_never_turns_a_request_down_without_asking_the_cli(monkeypatch):
+    clock = [1000.0]
+    state = {"five": 0}
+    probes = []
+
+    def probe():
+        probes.append(clock[0])
+        return {"codex_sol": (True, state["five"], 50)}
+
+    _usage_fixture(monkeypatch, clock)
+    monkeypatch.setattr(models, "PROBES", {"codex": probe})
+    assert models.usage()["codex_sol"]["available"] is False  # the five-hour window is used up
+    state["five"] = 80  # ...and has reset by the time of the next request
+    clock[0] += 900
+    with models._lock:
+        models._refreshing = True  # as if a background refresh were still running: only the stale value is at hand
+    assert models.select("codex_sol", "low")[:2] == ("codex", "gpt-6.1-sol")
+    assert len(probes) == 2
+    models.invalidate()
+    with models._lock:
+        models._refreshing = False

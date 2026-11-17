@@ -17,14 +17,22 @@ MODELS = {
     "gemini_flash": ("antigravity_cli", "gemini-3.8-flash", "Gemini 3.8 Flash"),
 }
 EFFORTS = ("low", "medium", "high")
+# Probing three CLIs takes seconds. A recent result is served as is; an older one is still served
+# at once while a single background probe replaces it, so creating a job does not wait for the CLIs.
+FRESH_SECONDS = 60
+STALE_SECONDS = 3600
 _lock = threading.Lock()
-_cache = None
+_probing = threading.Lock()
+_cache = None  # (eligible providers, time.monotonic() of the probe, result)
+_generation = 0
+_refreshing = False
 
 
 def invalidate():
-    global _cache
+    global _cache, _generation
     with _lock:
         _cache = None
+        _generation += 1
 
 
 def parse_agy(raw):
@@ -103,32 +111,91 @@ def _probe(provider):
         return {}
 
 
-def usage():
+def _collect(eligible):
+    accounts = {}
+    if eligible:
+        with ThreadPoolExecutor(max_workers=len(eligible)) as pool:
+            for result in pool.map(_probe, eligible):
+                accounts.update(result)
+    result = {}
+    for key, (provider, _, label) in MODELS.items():
+        authenticated, five, weekly = accounts.get(key, (None, None, None))
+        result[key] = {"provider": provider, "label": label, "authenticated": authenticated,
+                       "five_hour": five, "weekly": weekly, "estimated": key == "claude_opus",
+                       "available": provider in eligible and authenticated is True and five != 0 and weekly != 0}
+    return result
+
+
+def _cached(eligible, limit):
+    """The cached result for these providers if it is younger than ``limit`` seconds. Call with _lock held."""
+    if _cache and _cache[0] == eligible and time.monotonic() - _cache[1] < limit:
+        return _cache[2]
+    return None
+
+
+def _probe_and_store(eligible, generation):
     global _cache
+    result = _collect(eligible)
+    with _lock:
+        # An invalidation during the probe (settings change, usage limit) wins over this result.
+        if generation == _generation:
+            _cache = (eligible, time.monotonic(), result)
+    return result
+
+
+def _refresh(eligible, generation):
+    global _refreshing
+    try:
+        with _probing:
+            _probe_and_store(eligible, generation)
+    except Exception:  # noqa: BLE001 - the stale value stays until the next request probes again
+        pass
+    finally:
+        with _lock:
+            _refreshing = False
+
+
+def usage(*, allow_stale=True):
+    global _refreshing
     data = setup_store.load()
     eligible = tuple(p for p in PROBES if brain_priority.permitted(p, data) and brain_priority.target(p, data)["configured"])
     with _lock:
-        if _cache and _cache[0] == eligible and time.monotonic() < _cache[1]:
-            return _cache[2]
-        accounts = {}
-        if eligible:
-            with ThreadPoolExecutor(max_workers=len(eligible)) as pool:
-                for result in pool.map(_probe, eligible):
-                    accounts.update(result)
-        result = {}
-        for key, (provider, _, label) in MODELS.items():
-            authenticated, five, weekly = accounts.get(key, (None, None, None))
-            result[key] = {"provider": provider, "label": label, "authenticated": authenticated,
-                           "five_hour": five, "weekly": weekly, "estimated": key == "claude_opus",
-                           "available": provider in eligible and authenticated is True and five != 0 and weekly != 0}
-        _cache = (eligible, time.monotonic() + 60, result)
-        return result
+        fresh = _cached(eligible, FRESH_SECONDS)
+        if fresh is not None:
+            return fresh
+        stale = _cached(eligible, STALE_SECONDS) if allow_stale else None
+        if stale is not None:
+            if not _refreshing:
+                _refreshing = True
+                threading.Thread(target=_refresh, args=(eligible, _generation), daemon=True,
+                                 name="petit-development-usage").start()
+            return stale
+        generation = _generation
+    with _probing:
+        with _lock:
+            # Another caller may have finished the same probe while this one waited.
+            fresh = _cached(eligible, FRESH_SECONDS)
+            if fresh is not None:
+                return fresh
+        return _probe_and_store(eligible, generation)
 
 
 def select(key, effort, lightweight=False):
     if effort not in EFFORTS or key not in {"auto", *MODELS}:
         raise ValueError("開発モデル・Effortを選択してください。")
     quotas = usage()
+    try:
+        return _choose(key, effort, lightweight, quotas)
+    except ValueError:
+        with _lock:
+            served_stale = bool(_cache and _cache[2] is quotas and time.monotonic() - _cache[1] >= FRESH_SECONDS)
+        if not served_stale:
+            raise
+        # An older result must not turn a request down: a quota window may have reset since. Ask the CLIs now.
+        return _choose(key, effort, lightweight, usage(allow_stale=False))
+
+
+def _choose(key, effort, lightweight, quotas):
     if key == "auto":
         if quotas["antigravity_hydrogen"]["available"]:
             key = "antigravity_hydrogen"

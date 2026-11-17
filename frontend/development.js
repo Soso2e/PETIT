@@ -931,7 +931,15 @@
     window.history.replaceState(window.history.state, "", url);
     void openThread(id);
   };
+  // Opening Develop renews the CLI quota cache behind the scenes, so the first request does not wait for the probes.
+  let lastWarm = 0;
+  const warmUsage = () => {
+    if (Date.now() - lastWarm < 60000) return;
+    lastWarm = Date.now();
+    void api("/usage").catch(() => {});
+  };
   const refresh = () => {
+    warmUsage();
     void refreshConfig();
     void refreshWorkspace();
     void refreshJobs();
