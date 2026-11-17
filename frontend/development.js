@@ -797,11 +797,13 @@
   async function openThread(id) {
     if (threadLoading) return;
     threadLoading = true;
+    const threadChanged = currentThread?.thread_id !== id;
     try {
       const data = await api("/threads/" + encodeURIComponent(id));
       currentThread = data;
       currentRepo = data.repository;
       show("thread");
+      if (threadChanged) $("development-thread-rename-form").hidden = true;
       $("development-thread-title").textContent = data.title || "開発チャット";
       $("development-nav-thread").textContent = data.title || "開発チャット";
       const parent = repositories.find((item) => item.path === data.repository);
@@ -960,6 +962,38 @@
     currentThread = null; newThreadId = undefined;
     if (repo) void openRepository(repo);
     else { currentRepo = ""; show("home"); void refreshWorkspace(); }
+  });
+  $("development-thread-rename").addEventListener("click", () => {
+    if (!currentThread) return;
+    const form = $("development-thread-rename-form");
+    form.hidden = !form.hidden;
+    if (!form.hidden) {
+      const input = $("development-thread-rename-input");
+      input.value = currentThread.title || "";
+      input.focus();
+    }
+  });
+  $("development-thread-rename-cancel").addEventListener("click", () => {
+    $("development-thread-rename-form").hidden = true;
+  });
+  $("development-thread-rename-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentThread) return;
+    const input = $("development-thread-rename-input");
+    try {
+      const response = await fetch("/api/threads/" + encodeURIComponent(currentThread.thread_id), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: input.value }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "タイトルを更新できませんでした。");
+      currentThread.title = data.title;
+      $("development-thread-title").textContent = data.title || "開発チャット";
+      $("development-nav-thread").textContent = data.title || "開発チャット";
+      $("development-thread-rename-form").hidden = true;
+      void refreshWorkspace();
+    } catch (error) { report(error.message); }
   });
   $("development-thread-attach-button").addEventListener("click", async () => {
     if (!currentThread) return;

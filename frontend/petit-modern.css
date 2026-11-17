@@ -120,6 +120,33 @@ body .petit-thread-controls > details pre {
   background: var(--ui-bg-2); color: var(--ui-text); font-size: 12px;
 }
 body .petit-thread-controls:has(> details[open]) { flex-wrap: wrap; }
+body .petit-thread-controls > .petit-thread-rename {
+  display: inline-flex; align-items: center; gap: 6px; flex: 1 1 100%;
+  padding-top: 4px;
+}
+body .petit-thread-controls > .petit-thread-rename[hidden] { display: none; }
+body .petit-thread-controls:has(> .petit-thread-rename:not([hidden])) { flex-wrap: wrap; }
+body .petit-thread-controls > .petit-thread-rename input {
+  flex: 1 1 180px; min-width: 140px; min-height: 32px; padding: 0 12px;
+  border: 1px solid var(--ui-line-strong); border-radius: 999px;
+  background: var(--ui-surface); color: var(--ui-text); font: inherit; font-size: 12.5px;
+}
+body .petit-thread-controls > .petit-thread-rename button {
+  flex: 0 0 auto; min-height: 32px; padding: 0 12px;
+  border: 1px solid var(--ui-line); border-radius: 999px;
+  background: transparent; color: var(--ui-text); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+body .petit-thread-controls > .petit-thread-rename button:hover {
+  background: var(--ui-soft); border-color: var(--ui-line-strong);
+}
+.development-thread-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.development-thread-rename-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+.development-thread-rename-form[hidden] { display: none; }
+.development-thread-rename-form input {
+  flex: 1 1 220px; max-width: 420px; min-height: 34px; padding: 0 12px;
+  border: 1px solid var(--ui-line-strong); border-radius: 10px;
+  background: var(--ui-surface); color: var(--ui-text); font: inherit; font-size: 13px;
+}
 
 /* ---------- Chat: pill composer ---------- */
 body .chat-composer,
