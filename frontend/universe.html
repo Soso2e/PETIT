@@ -255,6 +255,12 @@
               </div>
             </div>
           </section>
+          <section id="development-attention-section" class="development-attention-section" hidden>
+            <div class="development-section-title">
+              <h2>確認待ち・未確認</h2><span id="development-attention-count"></span>
+            </div>
+            <div id="development-attention-threads" class="development-thread-list" aria-live="polite"></div>
+          </section>
           <div class="development-section-title">
             <h2>リポジトリ</h2><span id="development-repository-count"></span>
           </div>
@@ -281,7 +287,15 @@
             <button id="development-nav-home" type="button" class="development-back">Develop</button>
             <span id="development-nav-thread" class="development-nav-title"></span>
           </nav>
-          <h2 id="development-thread-title"></h2>
+          <div class="development-thread-title-row">
+            <h2 id="development-thread-title"></h2>
+            <button id="development-thread-rename" type="button" class="development-back">名前を変更</button>
+          </div>
+          <form id="development-thread-rename-form" class="development-thread-rename-form" hidden>
+            <input id="development-thread-rename-input" type="text" maxlength="160" placeholder="スレッドのタイトル" />
+            <button type="submit">保存</button>
+            <button id="development-thread-rename-cancel" type="button">キャンセル</button>
+          </form>
           <p id="development-thread-meta" class="development-muted"></p>
           <div id="development-thread-history" class="development-thread-history" aria-live="polite"></div>
           <div id="development-thread-attach" hidden>

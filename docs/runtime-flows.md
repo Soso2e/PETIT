@@ -1091,3 +1091,22 @@ flowchart TD
     Provenance --> Brain
     Brain --> Answer["根拠つきの回答をユーザーへ提示"]
 ```
+
+
+## スレッドタイトルの自動生成と手動変更
+
+会話応答の速度を落とさないため、スレッドタイトルの自動生成は Turn 完了後にバックグラウンドで実行する。
+
+```mermaid
+flowchart TD
+    TurnDone[Turn完了 status=completed] --> Gate{titleが空 かつ<br/>local_onlyでない かつ<br/>委譲スレッドでない}
+    Gate -->|No| Skip[自動生成しない]
+    Gate -->|Yes| BG[バックグラウンド実行<br/>thread_titles.ensure_thread_title]
+    BG --> DeepSeek[DeepSeek Flash<br/>この文章を一言に言い直してください]
+    DeepSeek -->|成功| SaveIfEmpty[titleが空のままなら保存]
+    DeepSeek -->|未設定 / 失敗| Ignore[無視して会話は継続]
+
+    UserEdit[ユーザーの手動変更<br/>Chat / Develop UI] --> Patch["PATCH /api/threads/{thread_id}"]
+    Patch --> Update[titleを更新 / 空欄でリセット]
+```
+
