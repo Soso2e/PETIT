@@ -94,9 +94,9 @@ def test_windows_runtime_env_keys_are_preserved(monkeypatch):
     }
     for key, value in expected.items():
         monkeypatch.setenv(key, value)
-    env = runtime.environment()
+    env = {k.upper(): v for k, v in runtime.environment().items()}
     for key, value in expected.items():
-        assert env[key] == value
+        assert env[key.upper()] == value
 
 
 def test_cli_cancel_before_start(selected, monkeypatch):
