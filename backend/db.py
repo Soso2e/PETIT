@@ -465,12 +465,38 @@ def update_memory_indexed(memory_id: int, model: str, version: str) -> None:
         conn.execute("UPDATE memory SET embedding_model=?, embedding_version=?, indexed_at=? WHERE id=?", (model, version, now_iso(), memory_id))
 
 
+# Turns the summarizer has given up on (chit-chat with nothing to keep, or repeatedly unreadable
+# output). Without this record one such session is retried forever and every later session waits behind it.
+_SUMMARY_SKIP_SCHEMA = """
+CREATE TABLE IF NOT EXISTS conversation_summary_skips (
+    conversation_id INTEGER PRIMARY KEY, reason TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 1,
+    final INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+)"""
+SUMMARY_MAX_ATTEMPTS = 3
+
+
+def skip_summary(conversation_ids: list[int], reason: str, *, final: bool = False) -> bool:
+    """Count one failed summary for these turns. Returns True once they will not be retried."""
+    now = now_iso()
+    with get_connection() as conn:
+        conn.execute(_SUMMARY_SKIP_SCHEMA)
+        conn.executemany(
+            "INSERT INTO conversation_summary_skips(conversation_id,reason,attempts,final,updated_at) VALUES(?,?,1,?,?) "
+            "ON CONFLICT(conversation_id) DO UPDATE SET reason=excluded.reason,attempts=attempts+1,"
+            "final=MAX(final,excluded.final,attempts+1>=?),updated_at=excluded.updated_at",
+            [(int(item), reason, int(final or SUMMARY_MAX_ATTEMPTS <= 1), now, SUMMARY_MAX_ATTEMPTS) for item in conversation_ids])
+        row = conn.execute("SELECT MIN(final) FROM conversation_summary_skips WHERE conversation_id IN (%s)"
+                           % ",".join("?" for _ in conversation_ids), [int(item) for item in conversation_ids]).fetchone()
+    return bool(row and row[0])
+
+
 def pending_episode_groups() -> list[list[dict[str, Any]]]:
     """Unfinalized turns grouped by browser session; never includes an episode twice."""
     with get_connection() as conn:
-        privacy_filter = ""
+        conn.execute(_SUMMARY_SKIP_SCHEMA)
+        privacy_filter = " AND id NOT IN (SELECT conversation_id FROM conversation_summary_skips WHERE final=1)"
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name='threads'").fetchone():
-            privacy_filter = " AND (session_id IS NULL OR session_id NOT IN (SELECT id FROM threads WHERE privacy='local_only'))"
+            privacy_filter += " AND (session_id IS NULL OR session_id NOT IN (SELECT id FROM threads WHERE privacy='local_only'))"
         rows = conn.execute("SELECT id, timestamp, user_text, assistant_text, used_tools, session_id FROM conversations WHERE episode_id IS NULL" + privacy_filter + " ORDER BY id ASC").fetchall()
     groups: dict[str, list[dict[str, Any]]] = {}
     for row in rows:

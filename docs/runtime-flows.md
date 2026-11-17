@@ -20,8 +20,11 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Idle[未整理の会話 / 一定件数または無操作] --> Summarize[summarizer: 1エピソードを要約]
-    Summarize -->|JSON不正 / 空の要約| Pending[会話は未整理のまま再試行]
+    Tick[起動5分後 / 以後3時間ごと] --> Idle[未整理の会話 / 一定件数または無操作]
+    Idle --> Summarize[summarizer: 1回の実行で最大6セッション / 長い会話は8件ずつ]
+    Summarize -->|モデルが使えない| Pending[その回を打ち切り / 会話は未整理のまま]
+    Summarize -->|空の要約（雑談）| Skip2[conversation_summary_skips に記録 / 以後は要約しない / 会話は残す]
+    Summarize -->|JSON不正| Retry[次のセッションへ進む / 3回目で同様に記録]
     Summarize --> Episode[conversation_episodes: decisions / facts / work_in_progress / next_action]
     Summarize --> Durable{durable_knowledge}
     Durable -->|kind付き・8〜300文字・最大5件| Memory[memory: source=auto_knowledge]

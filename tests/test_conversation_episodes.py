@@ -125,3 +125,69 @@ class ConversationEpisodeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SummaryBacklogTests(ConversationEpisodeTests):
+    """A session with nothing to keep, or unreadable output, must not hold up the sessions behind it."""
+
+    EMPTY = {"content": '{"title":"雑談","summary":"","decisions":[],"facts":[],"work_in_progress":[],"next_action":[]}'}
+
+    def _run(self, replies, **kwargs):
+        with patch.object(summarizer, "chat_completion", side_effect=replies) as model, \
+                patch.object(chroma_client, "sync_structured_data", return_value={}), \
+                patch.object(summarizer.markdown_export, "append_episode"), \
+                patch.object(summarizer, "_eligible", return_value=True):
+            return summarizer.summarize_backlog(**kwargs), model
+
+    def test_chitchat_is_set_aside_and_later_sessions_are_summarized(self):
+        self._turns(1, session="chat")
+        self._turns(3, session="work")
+        result, model = self._run([self.EMPTY, self._valid()])
+        self.assertEqual((result["episodes"], result["skipped"], result["pending"]), (1, 1, 0))
+        self.assertEqual(len(db.recent_episodes()), 1)
+        # The chit-chat is kept as a conversation and is not sent to the model again.
+        again, model = self._run([])
+        self.assertEqual(again["reason"], "no_eligible_episode")
+        model.assert_not_called()
+        with db.get_connection() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0], 4)
+
+    def test_unreadable_output_is_retried_then_given_up_without_blocking(self):
+        self._turns(2, session="broken")
+        self._turns(2, session="fine")
+        bad = {"content": "not json"}
+        first, _ = self._run([bad, self._valid()])
+        self.assertEqual((first["episodes"], first["skipped"], first["pending"]), (1, 1, 2))
+        for _ in range(db.SUMMARY_MAX_ATTEMPTS - 1):
+            last, _ = self._run([bad])
+        self.assertEqual(last["pending"], 0)
+        self.assertEqual(self._run([])[0]["reason"], "no_eligible_episode")
+
+    def test_model_outage_stops_the_run_and_keeps_everything_pending(self):
+        self._turns(2, session="a")
+        self._turns(2, session="b")
+        result, model = self._run(summarizer.LMStudioError("down"))
+        self.assertEqual((result["reason"], result["pending"], model.call_count), ("lm_unavailable", 4, 1))
+        with db.get_connection() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM conversation_summary_skips").fetchone()[0], 0)
+
+    def test_long_session_is_summarized_a_stretch_at_a_time_within_the_run_limit(self):
+        self._turns(config.EPISODE_MAX_TURNS * 2 + 1, session="long")
+        result, model = self._run([self._valid("前半"), self._valid("後半"), self._valid("残り")], limit=2)
+        self.assertEqual((result["episodes"], result["pending"], model.call_count), (2, 1, 2))
+        sent = model.call_args_list[0].args[0][1]["content"]
+        self.assertEqual(sent.count("ユーザー:"), config.EPISODE_MAX_TURNS)
+        self.assertEqual(model.call_args_list[0].kwargs["max_tokens"], summarizer.SUMMARY_MAX_TOKENS)
+
+    def test_scheduler_reports_counts_only(self):
+        from backend import scheduler
+        self._turns(2)
+        instance = scheduler.SummaryScheduler()
+        with patch.object(summarizer, "chat_completion", return_value=self._valid()), \
+                patch.object(chroma_client, "sync_structured_data", return_value={}), \
+                patch.object(summarizer.markdown_export, "append_episode"), \
+                patch.object(summarizer, "_eligible", return_value=True):
+            instance.run_once()
+        self.assertEqual({key: instance.last_result[key] for key in ("summarized", "episodes", "pending")},
+                         {"summarized": True, "episodes": 1, "pending": 0})
+        self.assertNotIn("error", instance.last_result)

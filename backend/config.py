@@ -129,6 +129,10 @@ PETIT_OWNER_ID = os.getenv("PETIT_OWNER_ID", "soso").strip() or "soso"
 AUTO_SUMMARY_ENABLED = os.getenv("PETIT_AUTO_SUMMARY_ENABLED", "1") not in ("0", "false", "False")
 SUMMARY_INTERVAL_HOURS = float(os.getenv("PETIT_SUMMARY_INTERVAL_HOURS", "3"))
 SUMMARY_MIN_CONVERSATIONS = int(os.getenv("PETIT_SUMMARY_MIN_CONVERSATIONS", "1"))
+# One scheduler tick works through this many sessions, so a backlog clears without one long burst.
+SUMMARY_MAX_PER_TICK = int(os.getenv("PETIT_SUMMARY_MAX_EPISODES_PER_TICK", "6"))
+# A Core that restarts more often than the interval would otherwise never summarize.
+SUMMARY_FIRST_DELAY_MINUTES = float(os.getenv("PETIT_SUMMARY_FIRST_DELAY_MINUTES", "5"))
 EPISODE_IDLE_MINUTES = int(os.getenv("PETIT_EPISODE_IDLE_MINUTES", "20"))
 EPISODE_MAX_TURNS = int(os.getenv("PETIT_EPISODE_MAX_TURNS", "8"))
 EMBEDDING_VERSION = os.getenv("PETIT_EMBEDDING_VERSION", "1")
