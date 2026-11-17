@@ -577,7 +577,9 @@
   loadStatus().then(async () => {
     const params = new URLSearchParams(window.location.search);
     const notificationId = params.get("notification");
-    if (isUniverse && (notificationId || params.get("view") === "notifications")) {
+    // A notification that names its own destination (e.g. a Develop thread) keeps it; others open the list.
+    const requestedView = params.get("view");
+    if (isUniverse && (requestedView === "notifications" || (notificationId && !requestedView))) {
       window.dispatchEvent(new CustomEvent("petit:navigate", { detail: { view: "reminders" } }));
     }
     if (notificationId && /^\d+$/.test(notificationId)) {

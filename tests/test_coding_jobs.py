@@ -526,3 +526,55 @@ def test_coding_stream_emits_draft_and_tool_events(repository, client):
 
 
 
+
+
+def _notices():
+    from backend import notifications
+    notifications.init_db()
+    with db.get_connection() as connection:
+        return [dict(row) for row in connection.execute(
+            "SELECT category,title,body,target_url FROM notification_events ORDER BY id")]
+
+
+def test_finished_and_failed_jobs_notify_without_job_content(repository, development_quota, monkeypatch):
+    calls = []
+    monkeypatch.setattr(coding_agents, "run_git", _native_recorder(calls, ["session-1"]))
+    done = _thread_job("first", repository, "秘密の依頼内容", thread_id="develop-thread/1")
+    assert done["status"] == "ready_for_review"
+
+    def broken(*args, **kwargs):
+        raise ValueError("秘密のエラー詳細")
+
+    monkeypatch.setattr(coding_agents, "run_git", broken)
+    failed = _thread_job("second", repository, "続きの依頼", thread_id="develop-thread/1")
+    assert failed["status"] == "failed"
+    jobs.cancel(jobs.create_development("third", str(repository), "取消する依頼", direct=True)["id"])
+    notices = _notices()
+    assert [item["title"] for item in notices] == ["開発ジョブ: レビュー待ち", "開発ジョブ: 失敗"]
+    assert {item["category"] for item in notices} == {"development"}
+    # The link opens the thread; nothing from the request, the repository or the error is in the text.
+    assert all(item["target_url"].startswith("/static/universe.html?view=development&dev_thread=develop-thread%2F1")
+               for item in notices), notices
+    text = json.dumps(notices, ensure_ascii=False)
+    assert "秘密" not in text and str(repository) not in text and "main.py" not in text
+    from backend import notifications
+    assert notifications.DEFAULT_PREFERENCES["development"] is False
+
+
+def test_notification_failure_never_changes_the_job(repository, development_quota, monkeypatch):
+    from backend import notifications
+    monkeypatch.setattr(notifications, "dispatch_notification", Mock(side_effect=RuntimeError("push down")))
+    monkeypatch.setattr(coding_agents, "run_git", _native_recorder([], ["session-1"]))
+    assert _thread_job("first", repository, "最初の依頼")["status"] == "ready_for_review"
+
+
+def test_restart_announces_the_interrupted_job(repository):
+    job_id = jobs.create("one", str(repository), "目的", "codex", approved=True)["job_id"]
+    with db.get_connection() as connection:
+        connection.execute("UPDATE coding_jobs SET status='running' WHERE id=?", (job_id,))
+    try:
+        jobs.start()
+    finally:
+        jobs.stop()
+        jobs._stop.clear()
+    assert [item["title"] for item in _notices()] == ["開発ジョブ: 再起動で中断"]
