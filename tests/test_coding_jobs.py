@@ -578,3 +578,24 @@ def test_restart_announces_the_interrupted_job(repository):
         jobs.stop()
         jobs._stop.clear()
     assert [item["title"] for item in _notices()] == ["開発ジョブ: 再起動で中断"]
+
+
+def test_complete_ignores_unrelated_whitespace_after_head_advances(repository, client, monkeypatch):
+    admin(client)
+    assert client.put("/api/coding/config", json={"paths": [str(repository)]}).status_code == 200
+    monkeypatch.setattr(coding_agents, "run", synthetic_agent)
+    payload = {"request_id": "web-whitespace", "repository": str(repository), "provider": "codex", "goal": "合成変更"}
+    job_id = client.post("/api/coding/jobs", json=payload).json()["job_id"]
+    assert client.post(f"/api/coding/jobs/{job_id}/approve").status_code == 200
+    jobs.pump()
+    assert jobs.get(job_id)["status"] == "ready_for_review"
+
+    # Simulate another commit advancing the workspace with a trailing blank line.
+    workspace = Path(jobs.get(job_id)["workspace"])
+    (workspace / "extra.md").write_text("line\n\n", encoding="utf-8")
+    jobs.git(workspace, "add", "extra.md")
+    jobs.git(workspace, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "unrelated whitespace")
+
+    response = client.post(f"/api/coding/jobs/{job_id}/complete")
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "completed"
