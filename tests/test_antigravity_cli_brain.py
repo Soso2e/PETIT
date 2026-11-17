@@ -77,6 +77,28 @@ def test_secrets_are_not_in_child_environment(monkeypatch):
     assert "SYNTHETIC-SECRET" not in json.dumps(runtime.environment())
 
 
+def test_windows_runtime_env_keys_are_preserved(monkeypatch):
+    expected = {
+        "PATHEXT": ".COM;.EXE;.BAT;.CMD",
+        "ComSpec": r"C:\WINDOWS\system32\cmd.exe",
+        "SystemDrive": "C:",
+        "OS": "Windows_NT",
+        "NUMBER_OF_PROCESSORS": "8",
+        "PROCESSOR_ARCHITECTURE": "AMD64",
+        "CommonProgramFiles": r"C:\Program Files\Common Files",
+        "CommonProgramFiles(x86)": r"C:\Program Files (x86)\Common Files",
+        "CommonProgramW6432": r"C:\Program Files\Common Files",
+        "ProgramW6432": r"C:\Program Files",
+        "HOMEDRIVE": "C:",
+        "HOMEPATH": r"\Users\synthetic",
+    }
+    for key, value in expected.items():
+        monkeypatch.setenv(key, value)
+    env = {k.upper(): v for k, v in runtime.environment().items()}
+    for key, value in expected.items():
+        assert env[key.upper()] == value
+
+
 def test_cli_cancel_before_start(selected, monkeypatch):
     store.create_thread("thread");store.accept("thread", "cancel", {"message": "合成"})
     with db.get_connection() as connection:
