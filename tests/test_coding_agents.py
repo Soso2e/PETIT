@@ -1,5 +1,6 @@
 """Protocol lifecycle checks; synthetic RPC only, no actual Codex inference."""
 import json
+from pathlib import Path
 from unittest.mock import Mock
 import pytest
 
@@ -264,7 +265,7 @@ def test_structured_run_publishes_stream_activity_and_progress_details(monkeypat
 def test_native_cli_tool_steps_are_described_without_contents(tmp_path):
     describe = coding_agents._describe_cli_tool
     assert describe("Bash", {"command": "git status\n -sb"}) == "コマンド実行: git status -sb"
-    assert describe("Read", {"file_path": str(tmp_path / "src" / "app.py")}, tmp_path) == "読み取り: src/app.py"
+    assert describe("Read", {"file_path": str(tmp_path / "src" / "app.py")}, tmp_path) == "読み取り: " + str(Path("src") / "app.py")
     assert describe("Edit", {"file_path": "a.py", "old_string": "secret", "new_string": "x"}) == "編集: a.py"
     assert describe("Grep", {"pattern": "TODO", "path": "src"}) == "検索: TODO (src)"
     assert describe("commandExecution", {"command": ["npm", "test"], "path": ""}) == "コマンド実行: npm test"

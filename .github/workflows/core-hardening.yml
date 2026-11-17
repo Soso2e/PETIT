@@ -7,6 +7,8 @@ on:
       - "frontend/**"
       - "tests/test_core_hardening.py"
       - "tests/test_development_threads.py"
+      - "tests/test_coding_jobs.py"
+      - "tests/test_coding_agents.py"
       - "tests/test_chat_context_budget.py"
       - "tests/test_schedule_date_parsing.py"
       - "tests/test_notion_search.py"
@@ -60,7 +62,7 @@ jobs:
           node --check frontend/univ-space.js
 
       - name: Run Develop workspace thread contracts
-        run: python -m pytest tests/test_development_threads.py -q
+        run: python -m pytest tests/test_development_threads.py tests/test_coding_jobs.py tests/test_coding_agents.py -q
 
       - name: Run durable background read task regressions
         run: python -m unittest tests.test_durable_reads tests.test_activity_jobs -v

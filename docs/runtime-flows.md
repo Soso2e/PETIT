@@ -147,7 +147,7 @@ flowchart TD
     Model -.-> Progress[開始・応答・検証・再試行の段階を記録]
     Progress -.-> SSE[管理者用 Job SSE / Chatカード・Develop]
     Run --> Mode{対象モード}
-    Mode -->|Git| Continue{同じスレッドの前回ジョブと<br/>リポジトリ・開始コミットが同じ}
+    Mode -->|Git| Continue{同じスレッド・同じリポジトリで、開始コミットが<br/>前回ジョブの開始〜終了時HEADの範囲にある}
     Continue -->|いいえ| Git[元リポジトリを作業場所に設定]
     Continue -->|はい| Reuse[同じリポジトリ作業場所を引き継ぐ]
     Reuse --> SameCLI{同じCLIのセッションIDがある}
@@ -170,7 +170,9 @@ flowchart TD
     Effect -->|操作の結果を記録| Review
     PC -->|承認対象なし| Review
     Review -->|利用者のレビュー| Completed[completed]
-    Run -->|再起動| Interrupted[interrupted]
+    Run -->|再起動| Interrupted[interrupted / 作業場所のHEADを記録]
+    Native -.->|終了時（成功・失敗・取消）| Head[(coding_job_heads に終了時HEADを保存)]
+    Interrupted -.->|続きから再開 / 次の依頼| Queued
 ```
 
 Git開発ではCLIのネイティブToolを使う。構造化されたCLIイベントは進捗と終了通知の受信に使い、モデルへ応答Schemaは渡さない。CLI内の検査結果は最終報告に含まれ、Coreによる静的検査・Git差分は別に記録する。

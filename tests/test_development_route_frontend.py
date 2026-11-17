@@ -40,3 +40,12 @@ def test_claude_auth_actions_and_update_guidance_are_present():
     assert "claude update" in script
     assert "api('/claude-code/auth/login', 'POST')" in script
     assert "api('/claude-code/auth/logout', 'POST')" in script
+
+
+def test_stopped_job_offers_resume_in_the_same_thread():
+    script = read("development.js")
+    for status in ("interrupted", "failed", "cancelled", "checks_failed"):
+        assert status + ":" in script.split("const resumeGoals = {")[1].split("};")[0]
+    # Only the latest turn offers it, and it reuses the thread and the job's model selection.
+    assert "latest && resumeGoals[job.status] && currentThread" in script
+    assert "thread_id: threadId, model_key: job.selection?.model_key" in script

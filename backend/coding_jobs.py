@@ -50,6 +50,12 @@ CREATE TABLE IF NOT EXISTS coding_job_sessions (
  job_id TEXT PRIMARY KEY REFERENCES coding_jobs(id), session_id TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 """
+# The checkout's HEAD when a Git job stopped. Commits between a job's base and this are the job's own.
+HEAD_SCHEMA = """
+CREATE TABLE IF NOT EXISTS coding_job_heads (
+ job_id TEXT PRIMARY KEY REFERENCES coding_jobs(id), end_commit TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+"""
 
 
 def _migrate_task_id_nullable(connection):
@@ -81,9 +87,10 @@ def ensure_schema():
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_pc_actions'").fetchone():
             _migrate_task_id_nullable(connection)
             connection.execute(SESSION_SCHEMA)
+            connection.execute(HEAD_SCHEMA)
             return
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_jobs'").fetchone():
-            connection.executescript(SCHEMA + SESSION_SCHEMA + development_pc.ACTION_SCHEMA)
+            connection.executescript(SCHEMA + SESSION_SCHEMA + HEAD_SCHEMA + development_pc.ACTION_SCHEMA)
             _migrate_task_id_nullable(connection)
             return
         if db._transaction.get() is not None:
@@ -93,7 +100,7 @@ def ensure_schema():
             with closing(sqlite3.connect(backup)) as destination:
                 connection.backup(destination)
                 if destination.execute("PRAGMA quick_check").fetchone()[0] != "ok":raise ValueError("backup_check_failed")
-        connection.executescript(SCHEMA + SESSION_SCHEMA + development_pc.ACTION_SCHEMA)
+        connection.executescript(SCHEMA + SESSION_SCHEMA + HEAD_SCHEMA + development_pc.ACTION_SCHEMA)
         _migrate_task_id_nullable(connection)
 
 
@@ -501,24 +508,53 @@ def remember_session(job_id, session_id):
                            (job_id, session_id, db.now_iso()))
 
 
+def remember_head(job_id, workspace):
+    """Record where a Git job left the checkout. Best effort: a missing record only costs the session resume."""
+    try:
+        head = git(workspace, "rev-parse", "HEAD").strip()
+        with db.get_connection() as connection:
+            connection.execute("INSERT INTO coding_job_heads(job_id,end_commit,updated_at) VALUES(?,?,?) "
+                               "ON CONFLICT(job_id) DO UPDATE SET end_commit=excluded.end_commit,updated_at=excluded.updated_at",
+                               (job_id, head, db.now_iso()))
+    except (ValueError, OSError, subprocess.SubprocessError, sqlite3.Error):
+        log.warning("Could not record the final HEAD of coding job %s", job_id)
+
+
+def _is_ancestor(root, older, newer):
+    try:
+        git(root, "merge-base", "--is-ancestor", older, newer)
+        return True
+    except (ValueError, OSError, subprocess.SubprocessError):
+        return False
+
+
 def continuation(job):
-    """The checkout and CLI session this Git job continues, or None."""
+    """The checkout and CLI session this Git job continues, or None.
+
+    The thread continues while the repository's HEAD is where the previous job started or
+    somewhere on the commits that job made itself. A HEAD moved by anyone else starts fresh.
+    """
     with db.get_connection() as connection:
         route = connection.execute("SELECT thread_id FROM coding_job_routes WHERE job_id=?", (job["id"],)).fetchone()
         if not route or not route["thread_id"]:
             return None
         row = connection.execute(
-            "SELECT j.id,j.repository,j.base_commit,j.provider,j.workspace,j.branch,s.session_id "
+            "SELECT j.id,j.repository,j.base_commit,j.provider,j.workspace,j.branch,s.session_id,h.end_commit "
             "FROM coding_jobs j JOIN coding_job_routes r ON r.job_id=j.id "
             "LEFT JOIN coding_job_sessions s ON s.job_id=j.id "
+            "LEFT JOIN coding_job_heads h ON h.job_id=j.id "
             "WHERE r.thread_id=? AND r.mode='git' AND j.workspace IS NOT NULL "
             "AND j.rowid < (SELECT rowid FROM coding_jobs WHERE id=?) ORDER BY j.rowid DESC LIMIT 1",
             (route["thread_id"], job["id"])).fetchone()
-    if not row or not row["repository"] or row["repository"] != job["repository"] or row["base_commit"] != job["base_commit"]:
+    if not row or not row["repository"] or row["repository"] != job["repository"]:
         return None
     try:
         workspace = project_workspaces._safe_root(Path(row["workspace"]))
         if not (workspace / ".git").exists():
+            return None
+        if row["base_commit"] != job["base_commit"] and not (
+                row["end_commit"] and _is_ancestor(workspace, row["base_commit"], job["base_commit"])
+                and _is_ancestor(workspace, job["base_commit"], row["end_commit"])):
             return None
         current_branch = git(workspace, "branch", "--show-current").strip() or "HEAD"
     except (ValueError, OSError, subprocess.SubprocessError):
@@ -576,6 +612,7 @@ def run_job(job_id):
     modern = "mode" in job
     pc = job.get("mode") == "pc"
     started = time.monotonic()
+    checkout = None
     def check():
         current = get(job_id)
         if _stop.is_set() or current["cancel_requested"]:raise InterruptedError("取消要求で停止しました。差分は保持しています。")
@@ -599,7 +636,7 @@ def run_job(job_id):
             if workspace.exists():raise ValueError("既存作業場所は上書きしません。")
             workspace.mkdir()
         elif modern:
-            workspace = root
+            workspace = checkout = root
             branch = git(root, "branch", "--show-current").strip() or "HEAD"
         else:
             if git(root, "rev-parse", "HEAD").strip() != job["base_commit"]:
@@ -677,6 +714,8 @@ def run_job(job_id):
     finally:
         from . import coding_stream
         coding_stream.clear(job_id)
+        if checkout:
+            remember_head(job_id, checkout)
 
 
 def pump():
@@ -694,10 +733,16 @@ def start():
     ensure_schema()
     if _worker and _worker.is_alive():return
     with db.get_connection() as connection:
+        stopped = connection.execute(
+            "SELECT j.id,j.workspace FROM coding_jobs j JOIN coding_job_routes r ON r.job_id=j.id "
+            "WHERE j.status='running' AND r.mode='git' AND j.workspace IS NOT NULL").fetchall()
         connection.execute("UPDATE coding_jobs SET status='interrupted',error='Core再起動で中断しました。自動再実行していません。' WHERE status='running'")
         connection.execute("UPDATE coding_pc_actions SET status='unknown' WHERE status='running'")
         connection.execute("UPDATE coding_pc_actions SET status='rejected' WHERE status='proposed' AND job_id IN "
                            "(SELECT id FROM coding_jobs WHERE status='interrupted')")
+    for row in stopped:
+        # The CLI died with the Core, so the checkout's HEAD is where the interrupted job left it.
+        remember_head(row["id"], row["workspace"])
     _stop.clear()
     def loop():
         while not _stop.wait(.5):

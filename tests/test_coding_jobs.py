@@ -302,6 +302,54 @@ def test_session_is_not_offered_to_another_cli(repository, development_quota, mo
     assert "引き継いでいます" in calls[1]["goal"]
 
 
+def _commit(repository, message):
+    jobs.git(repository, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qam", message)
+
+
+def test_commits_made_by_the_job_keep_the_thread_session(repository, development_quota, monkeypatch):
+    calls = []
+    recorder = _native_recorder(calls, ["session-1", "session-2"])
+
+    def committing(provider, target, goal, workspace, check, progress, **options):
+        summary = recorder(provider, target, goal, workspace, check, progress, **options)
+        _commit(workspace, "job commit")
+        return summary
+
+    monkeypatch.setattr(coding_agents, "run_git", committing)
+    first = _thread_job("first", repository, "最初の依頼")
+    second = _thread_job("second", repository, "続きの依頼")
+    assert first["status"] == second["status"] == "ready_for_review", (first["error"], second["error"])
+    assert second["base_commit"] != first["base_commit"]
+    assert [call["resume"] for call in calls] == [None, "session-1"] and calls[1]["goal"] == "続きの依頼"
+    kinds = [item["kind"] for item in second["events"]]
+    assert "workspace_continued" in kinds and "session_resumed" in kinds
+    # Each review covers the commits since that job's own start.
+    assert jobs.changed(second["workspace"], second["base_commit"]) == ["main.py"]
+    diff = jobs.git(second["workspace"], "diff", second["base_commit"])
+    assert "+# run 2" in diff and "+# run 1" not in diff
+
+
+def test_restart_records_head_so_the_interrupted_session_continues(repository, development_quota, monkeypatch):
+    calls = []
+    monkeypatch.setattr(coding_agents, "run_git", _native_recorder(calls, ["session-2"]))
+    first = jobs.create_development("first", str(repository), "最初の依頼", direct=True, thread_id="develop-thread")
+    # The Core died while the CLI was working: it had reported its session and committed once.
+    with db.get_connection() as connection:
+        connection.execute("UPDATE coding_jobs SET status='running',workspace=? WHERE id=?", (str(repository), first["id"]))
+    jobs.remember_session(first["id"], "session-1")
+    (repository / "main.py").write_text("VALUE = 5\n", encoding="utf-8")
+    _commit(repository, "work before the restart")
+    try:
+        jobs.start()
+    finally:
+        jobs.stop()
+        jobs._stop.clear()
+    assert jobs.get(first["id"])["status"] == "interrupted"
+    second = _thread_job("second", repository, "続きから再開")
+    assert second["status"] == "ready_for_review", second["error"]
+    assert calls[0]["resume"] == "session-1" and calls[0]["goal"] == "続きから再開"
+
+
 
 
 def test_pc_scope_copy_and_approval_for_original(repository, client, development_quota, monkeypatch, tmp_path):
