@@ -247,3 +247,29 @@ def test_explicit_codex_path_is_not_silently_replaced(tmp_path, monkeypatch):
     assert codex.executable() == str(launcher)
     monkeypatch.setenv("PETIT_CODEX_EXECUTABLE", str(tmp_path / "missing.exe"))
     assert codex.executable() is None
+
+
+def test_codex_environment_preserves_windows_runtime_vars_and_excludes_secrets(monkeypatch):
+    for secret in ["PETIT_BOOTSTRAP_TOKEN", "DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ACCESS_TOKEN"]:
+        monkeypatch.setenv(secret, "SYNTHETIC-SECRET")
+    expected = {
+        "PATHEXT": ".COM;.EXE;.BAT;.CMD",
+        "COMSPEC": r"C:\WINDOWS\system32\cmd.exe",
+        "SYSTEMDRIVE": "C:",
+        "OS": "Windows_NT",
+        "NUMBER_OF_PROCESSORS": "8",
+        "PROCESSOR_ARCHITECTURE": "AMD64",
+        "COMMONPROGRAMFILES": r"C:\Program Files\Common Files",
+        "COMMONPROGRAMFILES(X86)": r"C:\Program Files (x86)\Common Files",
+        "COMMONPROGRAMW6432": r"C:\Program Files\Common Files",
+        "PROGRAMW6432": r"C:\Program Files",
+        "HOMEDRIVE": "C:",
+        "HOMEPATH": r"\Users\synthetic",
+    }
+    for key, value in expected.items():
+        monkeypatch.setenv(key, value)
+    env = codex.environment()
+    assert "SYNTHETIC-SECRET" not in json.dumps(env)
+    assert env["PYTHONUTF8"] == "1"
+    for key, value in expected.items():
+        assert env[key] == value

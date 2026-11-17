@@ -85,8 +85,11 @@ def test_api_keys_and_core_secrets_are_not_forwarded(monkeypatch):
     for key in ["ANTHROPIC_API_KEY", "PETIT_BOOTSTRAP_TOKEN", "DEEPSEEK_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"]:
         monkeypatch.setenv(key, "SYNTHETIC-SECRET")
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", "/synthetic/config")
+    monkeypatch.setenv("PATHEXT", ".COM;.EXE;.BAT;.CMD")
+    monkeypatch.setenv("COMSPEC", r"C:\WINDOWS\system32\cmd.exe")
     env = runtime.environment()
     assert "SYNTHETIC-SECRET" not in json.dumps(env) and env["CLAUDE_CONFIG_DIR"] == "/synthetic/config"
+    assert env["PATHEXT"] == ".COM;.EXE;.BAT;.CMD" and env["COMSPEC"] == r"C:\WINDOWS\system32\cmd.exe"
 
 
 def test_not_permitted_without_explicit_connection(monkeypatch):
