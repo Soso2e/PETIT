@@ -5,7 +5,7 @@ import queue
 import tempfile
 import time
 
-from . import antigravity_cli, antigravity_cli_brain, claude_code_brain, codex_brain, coding_stream
+from . import antigravity_cli, antigravity_cli_brain, claude_code_brain, codex_brain, coding_stream, config
 
 CATALOG = [{"type": "function", "function": {"name": name, "description": description, "parameters": schema}}
     for name, description, schema in [
@@ -63,12 +63,11 @@ ANTIGRAVITY_RETRYABLE = {
 }
 
 
-GIT_NATIVE_INSTRUCTIONS = (
-    "Carry out the development request directly in this repository. Follow the repository's instructions. "
-    "Use your native tools to inspect, edit, run checks or builds, and commit locally when appropriate. "
-    "If the user's request asks to push, open a pull request, or merge, carry out those Git/GitHub operations as well; "
-    "otherwise keep changes local unless the repository workflow requires it. "
-    "Report changes, actual check results and anything still unverified in Japanese.\n\n"
+# The request reaches the CLI as the user wrote it. How to investigate, edit, test and commit is the
+# CLI's own business and the repository's instructions'; Core adds only what the CLI cannot know.
+GIT_NATIVE_NOTE = (
+    "\n\n（PETITからの補足: push・Pull Requestの作成・mergeは、上の依頼に含まれる場合だけ行ってください。"
+    "最後に結果を日本語で報告してください。）"
 )
 
 
@@ -118,7 +117,7 @@ def run_git(provider, target, goal, workspace, check, progress, *, resume=None, 
     ``resume`` is the CLI's own session ID from an earlier job in the same checkout.
     ``on_session`` receives the session ID as soon as the CLI reports it.
     """
-    prompt = GIT_NATIVE_INSTRUCTIONS + goal
+    prompt = goal + GIT_NATIVE_NOTE
     session = on_session or (lambda _id: None)
     if provider == "antigravity_cli":
         return _run_antigravity_git(target, prompt, workspace, check, progress, resume, session)
@@ -200,7 +199,7 @@ def _run_claude_git(target, prompt, workspace, check, progress, resume=None, on_
     progress("model_request")
     try:
         code, _, error = antigravity_cli_brain.invoke(
-            command, workspace, prompt, check, timeout=900, raw_stdin=True,
+            command, workspace, prompt, check, timeout=config.CODING_JOB_TIMEOUT_SECONDS, raw_stdin=True,
             env=claude_code_brain.environment(), label=label, on_line=observe,
         )
     except UnicodeError:
@@ -272,7 +271,7 @@ def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None
     progress("model_request")
     try:
         code, _, error = antigravity_cli_brain.invoke(
-            command, workspace, prompt, check, timeout=900, on_line=observe,
+            command, workspace, prompt, check, timeout=config.CODING_JOB_TIMEOUT_SECONDS, on_line=observe,
         )
     except UnicodeError:
         raise antigravity_cli_brain.result_error("invalid_cli_protocol") from None
@@ -431,7 +430,7 @@ def _run_codex(client, target, goal, invoke, check, progress, catalog, instructi
     if target.get("effort"):
         turn["effort"] = target["effort"]
     client.request("turn/start", turn)
-    deadline = time.monotonic() + 900
+    deadline = time.monotonic() + config.CODING_JOB_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
         check()
         try:item = client.pending.pop(0) if client.pending else client.events.get(timeout=.2)

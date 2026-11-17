@@ -12,7 +12,7 @@ from .petit_prompt import voice_turn_instructions
 # A reviewed public catalog, never the registry's internal approval executors.
 # Optional integrations simply disappear when their Tools are not registered.
 PUBLIC_TOOLS = {
-    "list_coding_repositories", "propose_development_job", "get_coding_task_status", "cancel_coding_task",
+    "list_coding_repositories", "add_coding_repository", "propose_development_job", "get_coding_task_status", "cancel_coding_task",
     "get_current_time", "get_tasks", "get_schedule", "save_memory", "search_memory",
     "get_work_status", "get_work_report", "start_work_session", "update_work_session", "record_past_work", "delete_work_session",
     "create_task", "update_task", "complete_task", "set_task_parent", "get_task_sync_status",
@@ -29,7 +29,7 @@ PUBLIC_TOOLS = {
     "delegate_to_agent", "get_delegation_status", "cancel_delegation",
 }
 LOCAL_WRITES = {
-    "delegate_coding_task", "propose_development_job", "cancel_coding_task", "delegate_background_research", "delegate_to_agent",
+    "delegate_coding_task", "add_coding_repository", "propose_development_job", "cancel_coding_task", "delegate_background_research", "delegate_to_agent",
     "start_work_session", "update_work_session", "record_past_work", "delete_work_session", "save_memory", "create_task",
     "update_task", "complete_task", "set_task_parent", "retry_task_sync",
     "create_internal_project", "add_internal_project_alias", "activate_internal_project",

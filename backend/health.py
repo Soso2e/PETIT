@@ -95,6 +95,8 @@ def health() -> dict[str, Any]:
             "interval_hours": config.SUMMARY_INTERVAL_HOURS,
             "summaries": len(db.recent_summaries(limit=1000)),
             "episodes": len(db.recent_episodes(limit=1000)),
+            "pending_conversations": sum(len(rows) for rows in db.pending_episode_groups()),
+            "last_run": __import__("backend.scheduler", fromlist=["get_scheduler"]).get_scheduler().last_result,
         },
         "markdown": markdown_export.status(),
         "obsidian_vault": vault_indexer.status(),

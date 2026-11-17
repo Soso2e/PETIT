@@ -118,6 +118,7 @@
         detail,
         badge: '',
         view: 'development',
+        jobId: runningJob.id,
       };
     }
 
@@ -254,7 +255,10 @@
         const current = computeView();
         if (current.view) {
           navigateTo(current.view);
-          if (current.view === 'development') acknowledgeReviews();
+          if (current.view === 'development') {
+            acknowledgeReviews();
+            if (current.jobId) void window.PetitDevelopment?.openJobThread?.(current.jobId);
+          }
         } else {
           void refresh();
         }

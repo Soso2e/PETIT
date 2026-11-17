@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 MAX_EVENTS_PER_DAY = 6
 MAX_TASKS = 5
 MAX_DUE_SOON = 4
+MAX_DEVELOPMENT_ROOTS = 12
 DUE_SOON_DAYS = 3
 _WEEKDAYS = "月火水木金土日"
 _HEADER = (
@@ -54,7 +55,7 @@ def build(thread_id: str | None) -> dict[str, Any]:
         return empty
     now = time_context.current_datetime()
     parts: list[tuple[str, list[str], int]] = []
-    for name, collect in (("work", _work), ("schedule", _schedule), ("tasks", _tasks)):
+    for name, collect in (("work", _work), ("schedule", _schedule), ("tasks", _tasks), ("development", _development)):
         try:
             lines, count = collect(now)
         except Exception as exc:  # noqa: BLE001 - context is optional, the Turn is not
@@ -161,6 +162,26 @@ def _tasks(now) -> tuple[list[str], int]:
     if pending:
         lines.append("[タスク同期の未解決] " + " / ".join(f"{key}={value}" for key, value in pending.items()))
     return lines, len(listed) + len(soon)
+
+
+def _development(_now) -> tuple[list[str], int]:
+    """Names of the registered development folders, so a development request needs no listing round.
+
+    Names only: no paths, branches or Git state. Anything beyond the name still comes from the Tools.
+    """
+    from . import development_roots
+    from pathlib import Path
+    names: list[str] = []
+    for path, _source in development_roots.configured():
+        root = Path(path)
+        name = _clip(root.name, 40)
+        if name and name not in names:
+            names.append(name + ("(Git)" if (root / ".git").exists() else "(フォルダ)"))
+    if not names:
+        return [], 0
+    shown = names[:MAX_DEVELOPMENT_ROOTS]
+    line = "[開発対象の登録名" + ("・一部" if len(names) > len(shown) else "") + "] " + " / ".join(shown)
+    return [line + "（propose_development_job の repository にこの名前を指定できる）"], len(shown)
 
 
 def _task_line(task: dict[str, Any]) -> str:

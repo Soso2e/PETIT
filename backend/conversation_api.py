@@ -26,6 +26,10 @@ class ThreadCreate(BaseModel):
     privacy: Literal["standard", "local_only"] = "standard"
 
 
+class ThreadTitleUpdate(BaseModel):
+    title: str = Field(max_length=160)
+
+
 class TurnCreate(BaseModel):
     request_id: str = Field(min_length=1, max_length=200)
     message: str = Field(min_length=1, max_length=20000)
@@ -45,6 +49,16 @@ def process(request_id: str) -> dict:
         return result
     finally:
         turn_stream.close(request_id, status)
+
+
+def _schedule_title_if_empty(thread_id: str, message: str) -> None:
+    if not str(message or "").strip():
+        return
+    from . import chat, delegations, thread_titles
+    current = store.thread(thread_id)
+    if current.get("title") or current.get("privacy") == "local_only" or delegations.is_work_thread(thread_id):
+        return
+    chat._artifact_executor.submit(thread_titles.ensure_thread_title, thread_id, message)
 
 
 def _process_claimed(request_id: str) -> dict:
@@ -75,6 +89,8 @@ def _process_claimed(request_id: str) -> dict:
                     result = store.finish(request_id, data)
                     attachments.save_observations(store.load_turn(request_id)["conversation_id"],
                                                  row["thread_id"], observations)
+                    if result["status"] == "completed":
+                        _schedule_title_if_empty(row["thread_id"], payload.get("message", ""))
                     return result
                 result = brain.run(request_id)
                 from . import delegations
@@ -83,6 +99,8 @@ def _process_claimed(request_id: str) -> dict:
                     from .chat import _artifact_executor, _persist_chat_artifacts
                     _artifact_executor.submit(_persist_chat_artifacts, store.load_turn(request_id)["conversation_id"],
                         payload["message"], result["reply"], ", ".join(t["name"] for t in result.get("used_tools", [])) or None)
+                if result["status"] == "completed":
+                    _schedule_title_if_empty(row["thread_id"], payload.get("message", ""))
                 return result
     except brain.TurnCancelled as exc:
         return store.finish(request_id, {"reply": "", "error": str(exc)}, status="cancelled")
@@ -110,6 +128,11 @@ def submit(thread_id: str, request_id: str, message: str, *, source="web", conve
 @router.post("/api/threads", status_code=201)
 def create_thread(payload: ThreadCreate) -> dict:
     return store.create_thread(payload.id, source=payload.source, title=payload.title, privacy=payload.privacy)
+
+
+@router.patch("/api/threads/{thread_id}")
+def update_thread(thread_id: str, payload: ThreadTitleUpdate) -> dict:
+    return store.update_thread_title(thread_id, payload.title)
 
 
 @router.get("/api/threads")

@@ -118,6 +118,30 @@ def thread(thread_id: str) -> dict:
     return dict(row)
 
 
+def update_thread_title(thread_id: str, title: str) -> dict:
+    ensure_schema()
+    normalized = str(title or "").strip()[:160]
+    with db.get_connection() as connection:
+        row = connection.execute("SELECT * FROM threads WHERE id=?", (thread_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "thread_not_found")
+        connection.execute("UPDATE threads SET title=? WHERE id=?", (normalized, thread_id))
+        return dict(connection.execute("SELECT * FROM threads WHERE id=?", (thread_id,)).fetchone())
+
+
+def set_thread_title_if_empty(thread_id: str, title: str) -> bool:
+    ensure_schema()
+    normalized = str(title or "").strip()[:160]
+    if not normalized:
+        return False
+    with db.get_connection() as connection:
+        cursor = connection.execute(
+            "UPDATE threads SET title=? WHERE id=? AND (title IS NULL OR title='')",
+            (normalized, thread_id),
+        )
+        return cursor.rowcount > 0
+
+
 def list_threads(limit=30) -> list[dict]:
     ensure_schema()
     with db.get_connection() as connection:

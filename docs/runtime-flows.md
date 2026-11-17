@@ -20,8 +20,11 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Idle[未整理の会話 / 一定件数または無操作] --> Summarize[summarizer: 1エピソードを要約]
-    Summarize -->|JSON不正 / 空の要約| Pending[会話は未整理のまま再試行]
+    Tick[起動5分後 / 以後3時間ごと] --> Idle[未整理の会話 / 一定件数または無操作]
+    Idle --> Summarize[summarizer: 1回の実行で最大6セッション / 長い会話は8件ずつ]
+    Summarize -->|モデルが使えない| Pending[その回を打ち切り / 会話は未整理のまま]
+    Summarize -->|空の要約（雑談）| Skip2[conversation_summary_skips に記録 / 以後は要約しない / 会話は残す]
+    Summarize -->|JSON不正| Retry[次のセッションへ進む / 3回目で同様に記録]
     Summarize --> Episode[conversation_episodes: decisions / facts / work_in_progress / next_action]
     Summarize --> Durable{durable_knowledge}
     Durable -->|kind付き・8〜300文字・最大5件| Memory[memory: source=auto_knowledge]
@@ -47,6 +50,8 @@ flowchart TD
     Build --> Work[作業: active_session]
     Build --> Schedule[予定: 今日・明日のキャッシュ / 同期はしない]
     Build --> Tasks[タスク: get_tasksの既定 + 期限3日以内・超過 + 同期の未解決件数]
+    Build --> Dev[開発対象: 登録フォルダの名前とGitかどうか / パス・状態は含めない]
+    Dev --> Budget
     Work --> Budget[節ごとに丸ごと採否 / 上限1800文字 / 失敗した節は落とす]
     Schedule --> Budget
     Tasks --> Budget
@@ -1091,3 +1096,22 @@ flowchart TD
     Provenance --> Brain
     Brain --> Answer["根拠つきの回答をユーザーへ提示"]
 ```
+
+
+## スレッドタイトルの自動生成と手動変更
+
+会話応答の速度を落とさないため、スレッドタイトルの自動生成は Turn 完了後にバックグラウンドで実行する。
+
+```mermaid
+flowchart TD
+    TurnDone[Turn完了 status=completed] --> Gate{titleが空 かつ<br/>local_onlyでない かつ<br/>委譲スレッドでない}
+    Gate -->|No| Skip[自動生成しない]
+    Gate -->|Yes| BG[バックグラウンド実行<br/>thread_titles.ensure_thread_title]
+    BG --> DeepSeek[DeepSeek Flash<br/>この文章を一言に言い直してください]
+    DeepSeek -->|成功| SaveIfEmpty[titleが空のままなら保存]
+    DeepSeek -->|未設定 / 失敗| Ignore[無視して会話は継続]
+
+    UserEdit[ユーザーの手動変更<br/>Chat / Develop UI] --> Patch["PATCH /api/threads/{thread_id}"]
+    Patch --> Update[titleを更新 / 空欄でリセット]
+```
+

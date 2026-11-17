@@ -36,6 +36,15 @@ schema変更は列追加のみ。既存memoryのID・本文・作成日時、旧
 - `decisions` / `facts` / `work_in_progress` はエピソード（`conversation_episodes`）に残る。`search_memory` のエピソード検索から従来どおり読める。
 - **未確認**: 実モデルが `durable_knowledge` を指示どおりに分けられるかは計測していない。出力が無い・形が違う場合は何も書かない。
 
+### 要約の実行（v0.66.14・#487）
+
+- 起動の5分後に最初の実行を行い、以後は3時間ごとに実行する（`PETIT_SUMMARY_FIRST_DELAY_MINUTES` / `PETIT_SUMMARY_INTERVAL_HOURS`）。
+- 1回の実行で最大6セッションを古い順に処理する（`PETIT_SUMMARY_MAX_EPISODES_PER_TICK`）。長いセッションは8件（`PETIT_EPISODE_MAX_TURNS`）ずつ要約する。
+- 要約が空（残す内容のない雑談）のセッションは `conversation_summary_skips` に記録し、以後は要約しない。読めない出力は3回まで再試行し、その後は同じく記録する。どちらも会話の行は削除せず、`search_conversations` で読める。
+- モデルが使えない時は、その回を打ち切る。会話は未整理のまま残り、次の実行で再開する。
+- `/health` の `auto_summary` に、未整理の会話の件数（`pending_conversations`）と直近の実行結果（件数と理由のみ）が出る。
+- 以前は、先頭のセッションが雑談だと記録を残さずに終わり、毎回同じセッションを選び続けて後続がすべて止まっていた。
+
 ### 以前の自動抽出の整理（本人が確認してから適用）
 
 `source=auto_episode` の既存行は自動では変更しない。`scripts/memory_review.py` で本人が確認する。

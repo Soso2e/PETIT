@@ -283,3 +283,26 @@ def test_trace_publishes_live_step_and_stored_event():
         assert coding_stream.snapshot("trace-job")["activity"] == ["コマンド実行: git log"]
     finally:
         coding_stream.clear("trace-job")
+
+
+def test_native_request_reaches_the_cli_as_written_with_one_short_note(monkeypatch):
+    seen = {}
+
+    def capture(target, prompt, workspace, check, progress, resume, session):
+        seen["prompt"] = prompt
+        return "done"
+
+    monkeypatch.setattr(coding_agents, "_run_claude_git", capture)
+    request = "ログイン画面の文言を直して。\nテストも通して。"
+    coding_agents.run_git("claude_code", {}, request, Path("."), lambda: None, lambda *a: None)
+    assert seen["prompt"].startswith(request)
+    note = seen["prompt"][len(request):]
+    # Nothing about how to work: only what the CLI cannot know by itself.
+    assert "push" in note and "日本語" in note and len(note) < 120
+    for word in ("commit", "テスト", "検査", "build", "Follow", "inspect"):
+        assert word not in note
+
+
+def test_job_time_limit_is_configurable_and_longer_than_a_quick_fix():
+    from backend import config
+    assert config.CODING_JOB_TIMEOUT_SECONDS >= 3600 or "PETIT_CODING_JOB_TIMEOUT_MINUTES" in __import__("os").environ

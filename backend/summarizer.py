@@ -29,6 +29,8 @@ durable_knowledge には、数か月後の別の会話でもそのまま正し�
 DURABLE_SOURCE = "auto_knowledge"
 DURABLE_KINDS = {"preference", "profile", "decision", "fact"}
 MAX_DURABLE_PER_EPISODE = 5
+# The reply is one JSON object; the default light budget cut longer sessions off mid-object.
+SUMMARY_MAX_TOKENS = 1500
 
 
 def _durable(value: Any) -> list[tuple[str, str]]:
@@ -80,31 +82,43 @@ def _episode_text(parsed: dict[str, Any]) -> str:
     return "\n".join(value for value in values if value)
 
 
-def summarize_pending(kind: str = "interval", min_conversations: int | None = None, force: bool = False) -> dict[str, Any]:
-    """Finalize eligible unassigned turns. Failure leaves them untouched for retry."""
+def summarize_pending(kind: str = "interval", min_conversations: int | None = None, force: bool = False,
+                      tried: set[int] | None = None) -> dict[str, Any]:
+    """Finalize one eligible session's unassigned turns.
+
+    A model outage leaves the turns untouched. Unreadable output is retried on later runs, a few
+    times; a session with nothing to keep is set aside at once. Either way later sessions go on.
+    ``tried`` collects the sessions already attempted in the caller's run.
+    """
     threshold = config.SUMMARY_MIN_CONVERSATIONS if min_conversations is None else min_conversations
-    groups = [rows for rows in db.pending_episode_groups() if len(rows) >= threshold and _eligible(rows, force)]
+    tried = set() if tried is None else tried
+    groups = [rows for rows in db.pending_episode_groups()
+              if len(rows) >= threshold and _eligible(rows, force) and int(rows[0]["id"]) not in tried]
     if not groups:
         return {"summarized": False, "reason": "no_eligible_episode", "pending": sum(len(x) for x in db.pending_episode_groups())}
-    rows = groups[0]  # one bounded LLM job per scheduler tick
+    # One bounded LLM job: a long session is summarized a stretch at a time, oldest first.
+    rows = groups[0][:max(1, config.EPISODE_MAX_TURNS)]
+    ids = [int(row["id"]) for row in rows]
     try:
         result = chat_completion(
             [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": _transcript(rows)}],
             tools=None,
             temperature=0.2,
             model=config.AGENT_MODEL,
+            max_tokens=SUMMARY_MAX_TOKENS,
             route="agent",
         )
     except LMStudioError as exc:
         return {"summarized": False, "reason": "lm_unavailable", "error": str(exc)}
     parsed = _json((result.get("content") or "").strip())
     if parsed is None:
-        return {"summarized": False, "reason": "invalid_json"}
+        tried.add(ids[0])
+        return {"summarized": False, "reason": "invalid_json", "gave_up": db.skip_summary(ids, "invalid_json")}
     summary = str(parsed.get("summary") or "").strip()
     title = str(parsed.get("title") or "").strip()
     if not summary or not title:
-        return {"summarized": False, "reason": "empty_episode"}
-    ids = [int(row["id"]) for row in rows]
+        db.skip_summary(ids, "empty_episode", final=True)
+        return {"summarized": False, "reason": "empty_episode", "gave_up": True}
     text = _episode_text(parsed)
     data = {
         "started_at": rows[0]["timestamp"], "ended_at": rows[-1]["timestamp"], "title": title, "summary": summary,
@@ -122,3 +136,27 @@ def summarize_pending(kind: str = "interval", min_conversations: int | None = No
             saved += 1
     chroma_client.sync_structured_data(db.all_memory(), db.all_episodes())
     return {"summarized": True, "episode_id": episode_id, "conv_count": len(rows), "kind": kind, "memories_saved": saved}
+
+
+def summarize_backlog(kind: str = "interval", limit: int | None = None) -> dict[str, Any]:
+    """One scheduler run: work through several waiting sessions, stopping when the model is unavailable."""
+    limit = config.SUMMARY_MAX_PER_TICK if limit is None else limit
+    episodes = skipped = saved = 0
+    tried: set[int] = set()
+    last: dict[str, Any] = {"reason": "no_eligible_episode"}
+    for _ in range(max(1, limit)):
+        last = summarize_pending(kind=kind, tried=tried)
+        if last.get("summarized"):
+            episodes += 1
+            saved += int(last.get("memories_saved") or 0)
+        elif last.get("reason") in {"empty_episode", "invalid_json"}:
+            skipped += 1
+        else:
+            break
+    result = {"summarized": bool(episodes), "episodes": episodes, "skipped": skipped, "memories_saved": saved,
+              "pending": sum(len(rows) for rows in db.pending_episode_groups())}
+    if not episodes:
+        result["reason"] = last.get("reason")
+    if last.get("error"):
+        result["error"] = last["error"]
+    return result

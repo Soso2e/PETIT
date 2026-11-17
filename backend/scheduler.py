@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import date
+from datetime import date, datetime, timezone
 
 from . import config, summarizer
 
@@ -24,6 +24,7 @@ class SummaryScheduler:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_day: date | None = None
+        self.last_result: dict | None = None  # counts and a reason only, for the health report
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -48,18 +49,27 @@ class SummaryScheduler:
         """Run a single summarization pass now (used by the scheduler and /api/summarize)."""
         kind = self._next_kind()
         try:
-            return summarizer.summarize_pending(kind=kind)
+            result = summarizer.summarize_backlog(kind=kind)
         except Exception as exc:  # noqa: BLE001 - a bad tick must not kill the loop
             log.warning("Summarization tick failed: %s", exc)
-            return {"summarized": False, "reason": "exception", "error": str(exc)}
+            result = {"summarized": False, "reason": "exception", "error": str(exc)}
+        self.last_result = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                            **{key: result[key] for key in ("summarized", "episodes", "skipped", "memories_saved", "pending", "reason")
+                               if key in result}}
+        return result
 
     def _run_loop(self) -> None:
         interval_seconds = max(60.0, self.interval_hours * 3600.0)
-        # 起動直後は要約しない（最初の interval を待ってから）
-        while not self._stop.wait(interval_seconds):
+        # Not right at startup, but soon after: waiting a whole interval first meant that a Core
+        # restarted more often than the interval never summarized at all.
+        wait = min(interval_seconds, max(60.0, config.SUMMARY_FIRST_DELAY_MINUTES * 60.0))
+        while not self._stop.wait(wait):
+            wait = interval_seconds
             result = self.run_once()
-            if result.get("summarized"):
-                log.info("Auto-summary: %s", result)
+            if result.get("summarized") or result.get("skipped"):
+                log.info("Auto-summary: %s", {key: value for key, value in result.items() if key != "error"})
+            elif result.get("reason") not in (None, "no_eligible_episode"):
+                log.warning("Auto-summary did not run: %s", result.get("reason"))
 
 
 # Module-level singleton, started from main.py on app startup.

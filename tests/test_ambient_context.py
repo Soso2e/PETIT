@@ -79,6 +79,22 @@ class AmbientContextTests(unittest.TestCase):
         self.assertNotIn("来週の旅行", block)
         self.assertLessEqual(len(block), config.AMBIENT_MAX_CHARS)
 
+    def test_development_folders_are_offered_by_name_only(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from backend import development_roots
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, folder = Path(tmp) / "WEVORA", Path(tmp) / "notes"
+            (repo / ".git").mkdir(parents=True)
+            folder.mkdir()
+            with self.owner(), patch.object(development_roots, "configured",
+                                            return_value=[(str(repo), "settings"), (str(folder), "settings")]):
+                built = ambient.build("a")
+        self.assertEqual(built["sections"], {"development": 2})
+        self.assertIn("[開発対象の登録名] WEVORA(Git) / notes(フォルダ)", built["text"])
+        self.assertNotIn(tmp, built["text"])
+
     def test_event_log_keeps_counts_not_content(self):
         self.seed()
         self.turn("WEVORAの敵AIどうするんだっけ")

@@ -64,6 +64,15 @@
   // Display-only hint for the mascot; never carries message text.
   const mascot = (state) => { try { document.dispatchEvent(new CustomEvent('petit:mascot', { detail: { state } })); } catch { /* display only */ } };
   const mascotResult = (data) => mascot(data?.error ? 'error' : data?.pending_actions?.length ? 'approval' : 'success');
+  let currentTitle = '';
+  async function syncCurrentTitle() {
+    try {
+      const snap = await json('/api/threads/' + encodeURIComponent(id) + '/snapshot');
+      return snap?.thread?.title || '';
+    } catch {
+      return '';
+    }
+  }
   async function send(payload, transport = json, onProgress = null) {
     stopped = false;
     // The legacy adapter also uses the same durable ledger, including images.
@@ -80,10 +89,12 @@
       if (['queued', 'running'].includes(data.status)) {
         const final = await waitFor(request.request_id, transport);
         mascotResult(final);
+        if (!currentTitle) setTimeout(() => { document.dispatchEvent(new Event('petit:sync-thread-title')); }, 1500);
         return final;
       }
       remember(null);
       mascotResult(data);
+      if (!currentTitle) setTimeout(() => { document.dispatchEvent(new Event('petit:sync-thread-title')); }, 1500);
       return data;
     } catch (error) {
       mascot('error');
@@ -116,16 +127,50 @@
     controls.className = 'petit-thread-controls';
     const select = document.createElement('select'); select.setAttribute('aria-label', '会話スレッド');
     const current = document.createElement('option'); current.value = id; current.textContent = '現在の会話'; select.append(current);
+    const applyTitle = (title) => {
+      currentTitle = String(title || '').trim();
+      current.textContent = currentTitle || '現在の会話';
+      if (window.PETIT_SESSION) window.PETIT_SESSION.label = current.textContent;
+    };
     select.onchange = () => open(select.value);
     const refresh = document.createElement('button'); refresh.type = 'button'; refresh.textContent = '会話一覧';
+    const rename = document.createElement('button'); rename.type = 'button'; rename.textContent = 'タイトル変更';
     const status = document.createElement('span'); status.setAttribute('role', 'status');
     const showError = e => { status.textContent = e.message; };
+    const renameBox = document.createElement('span'); renameBox.className = 'petit-thread-rename'; renameBox.hidden = true;
+    const renameInput = document.createElement('input'); renameInput.type = 'text'; renameInput.maxLength = 160; renameInput.placeholder = 'スレッドタイトル（空欄でリセット）';
+    const renameSave = document.createElement('button'); renameSave.type = 'button'; renameSave.textContent = '保存';
+    const renameCancel = document.createElement('button'); renameCancel.type = 'button'; renameCancel.textContent = '取消';
+    renameBox.append(renameInput, renameSave, renameCancel);
+    const saveTitle = async () => {
+      status.textContent = '';
+      renameSave.disabled = true;
+      try {
+        const updated = await json('/api/threads/' + encodeURIComponent(id), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: renameInput.value }),
+        });
+        applyTitle(updated.title);
+        renameBox.hidden = true;
+      } catch (e) { showError(e); } finally { renameSave.disabled = false; }
+    };
+    rename.onclick = () => {
+      renameBox.hidden = !renameBox.hidden;
+      if (!renameBox.hidden) { renameInput.value = currentTitle; renameInput.focus(); }
+    };
+    renameSave.onclick = () => { void saveTitle(); };
+    renameCancel.onclick = () => { renameBox.hidden = true; };
+    renameInput.onkeydown = (event) => {
+      if (event.key === 'Enter') { event.preventDefault(); void saveTitle(); }
+      else if (event.key === 'Escape') { renameBox.hidden = true; }
+    };
     refresh.onclick = async () => {
       try {
         const data = await json('/api/threads');
         select.replaceChildren(current);
         for (const thread of data.threads) {
-          if (thread.id === id) continue;
+          if (thread.id === id) { applyTitle(thread.title); continue; }
           const option = document.createElement('option'); option.value = thread.id;
           option.textContent = (thread.title || thread.created_at.slice(0, 16)) + ' / ' + thread.source;
           select.append(option);
@@ -142,7 +187,7 @@
         open(thread.id);
       } catch (e) { showError(e); }
     };
-    controls.append(select, refresh, create, label);
+    controls.append(select, refresh, rename, create, label);
     const last = document.createElement('details');
     const summary = document.createElement('summary'); summary.textContent = '最新の依頼';
     const result = document.createElement('pre');
@@ -163,7 +208,11 @@
       const restoreButton = document.createElement('button'); restoreButton.type = 'button'; restoreButton.textContent = '依頼の結果を再取得';
       restoreButton.onclick = () => restore().catch(showError); controls.append(restoreButton);
     }
-    controls.append(status); form.before(controls);
+    controls.append(renameBox, status); form.before(controls);
+    syncCurrentTitle().then((title) => { if (title) applyTitle(title); });
+    document.addEventListener('petit:sync-thread-title', () => {
+      syncCurrentTitle().then((title) => { if (title) applyTitle(title); });
+    });
     document.addEventListener('petit:turn-pending', () => {
       if (controls.querySelector('[data-restore]')) return;
       const button = document.createElement('button'); button.type = 'button'; button.dataset.restore = 'true'; button.textContent = '依頼の結果を再取得';
