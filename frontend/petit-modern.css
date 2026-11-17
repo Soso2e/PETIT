@@ -45,14 +45,22 @@ body .messages .message {
   color: var(--ui-text); font-size: 15.5px; line-height: 1.75; letter-spacing: .005em;
   animation: none;
 }
-body .messages .message--assistant { align-self: stretch; }
+body .messages .message--assistant {
+  align-self: flex-start; max-width: min(88%, 720px);
+  padding: 10px 14px; border-radius: 20px;
+  background: var(--ui-soft); border: 1px solid var(--ui-line);
+  box-sizing: border-box; overflow-wrap: anywhere;
+}
+html[data-petit-theme="light"] body .messages .message--assistant { background: var(--ui-surface); }
 body .messages .message--user {
   align-self: flex-end; max-width: min(85%, 620px);
   padding: 10px 16px; border-radius: 20px;
-  background: var(--ui-surface); border: 1px solid var(--ui-line);
+  background: var(--ui-accent-soft); border: 1px solid var(--ui-line-strong);
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
-html[data-petit-theme="light"] body .messages .message--user { background: var(--ui-bg-2); }
+html[data-petit-theme="light"] body .messages .message--user {
+  background: var(--ui-bg-2); border-color: var(--ui-line-strong);
+}
 body .messages .message .petit-markdown strong { color: inherit; }
 body .messages .message .message-body > :first-child { margin-top: 0; }
 body .messages .message .message-body > :last-child { margin-bottom: 0; }
@@ -300,10 +308,23 @@ body .development-muted { color: var(--ui-muted); }
 body .development-thread-history { gap: 1.25rem; }
 body .development-thread-turn { gap: .45rem; }
 body .development-thread-user {
-  padding: 10px 16px; border-radius: 20px; border: 1px solid var(--ui-line);
-  background: var(--ui-surface); line-height: 1.7; max-width: min(85%, 620px);
+  padding: 10px 16px; border-radius: 20px; border: 1px solid var(--ui-line-strong);
+  background: var(--ui-accent-soft); line-height: 1.7; max-width: min(85%, 620px);
+}
+html[data-petit-theme="light"] body .development-thread-user {
+  background: var(--ui-bg-2); border-color: var(--ui-line-strong);
 }
 body .development-thread-reply { padding: 2px 2px; border-left: 0; line-height: 1.75; }
+body .development-thread-stream {
+  align-self: flex-start; max-width: min(90%, 720px);
+  padding: 10px 14px; border-radius: 20px;
+  background: var(--ui-soft); border: 1px solid var(--ui-line);
+  box-sizing: border-box; overflow-wrap: anywhere;
+}
+html[data-petit-theme="light"] body .development-thread-stream { background: var(--ui-surface); }
+body .development-thread-stream:empty { display: none; }
+body .development-thread-body > :first-child { margin-top: 0; }
+body .development-thread-body > :last-child { margin-bottom: 0; }
 body .development-thread-reply-meta strong { font-size: 13px; font-weight: 600; color: var(--ui-muted); }
 body .development-thread-reply-meta small { font-size: 12px; }
 body .development-advanced > summary { font-size: 13px; color: var(--ui-dim); padding: 8px 0; }

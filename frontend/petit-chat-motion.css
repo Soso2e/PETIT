@@ -158,13 +158,13 @@ body .development-thread-stream.petit-stream-bubble {
   padding: 10px 14px;
   box-sizing: border-box;
   min-height: 42px;
-  max-width: 100%;
+  max-width: min(88%, 720px);
   transition: background 0.22s ease, border-color 0.22s ease;
 }
 
 html[data-petit-theme="light"] body .messages .message--assistant.petit-stream-bubble,
 html[data-petit-theme="light"] body .development-thread-stream.petit-stream-bubble {
-  background: var(--ui-bg-2);
+  background: var(--ui-surface);
 }
 
 .petit-stream-think {
