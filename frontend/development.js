@@ -330,6 +330,7 @@
     const onError = (message) => { notice.textContent = message; };
     const decide = (path, label, parent = actions) => button(parent, label, async () => {
       await api(route + path, "POST");
+      notifyIsland();
       await refresh();
     }, onError);
     if (job.status === "proposed") {
@@ -473,32 +474,80 @@
     moveComposer(slot, view === "home" ? "" : currentRepo);
   }
 
-  function threadCard(parent, data) {
+  const attentionPriority = { waiting_approval: 0, proposed: 1, ready_for_review: 2, checks_failed: 3 };
+
+  function repoLabel(repository) {
+    if (!repository) return "PC全体";
+    const found = repositories.find((item) => item.path === repository);
+    if (found?.name) return found.name;
+    const parts = String(repository).split(/[\\/]/).filter(Boolean);
+    return parts.at(-1) || repository;
+  }
+
+  function threadCard(parent, data, options = {}) {
     const latest = data.latest_job;
+    const status = latest?.status || "";
+    const needsAttention = Object.hasOwn(attentionPriority, status);
     const control = append(parent, "button", "");
     control.type = "button";
     control.className = "development-thread-card";
-    append(control, "strong", data.title || "名称未設定の開発チャット");
+    if (needsAttention) {
+      control.dataset.attention = "true";
+      control.dataset.status = status;
+    }
+    const head = append(control, "div", "");
+    head.className = "development-thread-card-head";
+    append(head, "strong", data.title || "名称未設定の開発チャット");
+    if (needsAttention) {
+      const badge = append(head, "span", statusLabel(status));
+      badge.className = "development-attention-badge";
+      badge.dataset.status = status;
+    }
     const meta = append(control, "span", [
+      options.showRepository ? repoLabel(data.repository) : null,
       latest?.provider || "CLI未選択",
       statusLabel(latest?.status),
       timestamp(latest?.updated_at || data.created_at),
-    ].join(" · "));
+    ].filter(Boolean).join(" · "));
     meta.className = "development-muted";
     const preview = append(control, "span", shorten(latest?.latest_message || "まだ開発依頼はありません。"));
     preview.className = "development-thread-preview";
     control.addEventListener("click", () => void openThread(data.thread_id));
   }
 
-  async function loadThreads(repository, target) {
-    const response = await api("/threads?repository=" + encodeURIComponent(repository));
-    if (!target.isConnected) return;
+  function renderAttentionThreads(threads) {
+    const section = $("development-attention-section");
+    const target = $("development-attention-threads");
+    const count = $("development-attention-count");
+    if (!section || !target) return;
+    const items = (threads || [])
+      .filter((item) => Object.hasOwn(attentionPriority, item.latest_job?.status))
+      .sort((a, b) => {
+        const diff = attentionPriority[a.latest_job.status] - attentionPriority[b.latest_job.status];
+        if (diff !== 0) return diff;
+        const ta = Date.parse(a.latest_job?.updated_at || a.created_at || "") || 0;
+        const tb = Date.parse(b.latest_job?.updated_at || b.created_at || "") || 0;
+        return tb - ta;
+      });
     target.replaceChildren();
-    if (!response.threads.length) {
+    section.hidden = items.length === 0;
+    if (count) count.textContent = items.length ? items.length + "件" : "";
+    for (const item of items) threadCard(target, item, { showRepository: true });
+  }
+
+  function renderThreadList(threads, target) {
+    if (!target || !target.isConnected) return;
+    target.replaceChildren();
+    if (!threads.length) {
       empty(target, "開発チャットはまだありません。上の入力欄から始められます。");
       return;
     }
-    for (const item of response.threads) threadCard(target, item);
+    for (const item of threads) threadCard(target, item);
+  }
+
+  async function loadThreads(repository, target) {
+    const response = await api("/threads?repository=" + encodeURIComponent(repository));
+    renderThreadList(response.threads, target);
   }
 
   function renderRepositories() {
@@ -541,7 +590,9 @@
       repositories = snapshot.repositories || [];
       renderRepositories();
       if (currentView === "home") {
-        await loadThreads("", $("development-loose-threads"));
+        const all = await api("/threads");
+        renderAttentionThreads(all.threads);
+        renderThreadList(all.threads.filter((item) => !item.repository), $("development-loose-threads"));
       } else if (currentView === "repo") {
         renderCurrentRepository();
         await loadThreads(currentRepo, $("development-repo-threads"));
@@ -922,6 +973,17 @@
       void refreshWorkspace();
     } catch (error) { report(error.message); }
   });
+  async function openJobThread(jobId) {
+    try {
+      const all = await api("/threads");
+      const threads = all.threads || [];
+      const exact = jobId ? threads.find((item) => item.latest_job?.id === jobId) : null;
+      const fallback = exact || threads.find((item) => Object.hasOwn(attentionPriority, item.latest_job?.status));
+      if (fallback) await openThread(fallback.thread_id);
+    } catch (error) { report(error.message); }
+  }
+  window.PetitDevelopment = { attachProposal, openThread, openJobThread };
+
   // A notification links to its thread with ?dev_thread=<id>; open it once and drop the parameter.
   const openLinkedThread = () => {
     const url = new URL(window.location.href);

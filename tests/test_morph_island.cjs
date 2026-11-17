@@ -149,6 +149,7 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
   const winListeners = new Map();
   const body = new FakeElement();
   const navCalls = [];
+  const openedJobs = [];
   const mockFetchData = {
     '/api/work-sessions/active': { session: { status: 'active', task_title: '設計レビュー', started_at: new Date(Date.now() - 65000).toISOString(), paused_total_seconds: 0 } },
     '/api/coding/activity?limit=10': { jobs: [] },
@@ -161,6 +162,7 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
     addEventListener: (ev, fn) => winListeners.set(ev, fn),
     removeEventListener: (ev) => winListeners.delete(ev),
     PetitAppShell: { activateView: (view) => navCalls.push(view) },
+    PetitDevelopment: { openJobThread: (jobId) => openedJobs.push(jobId) },
   };
   const document = {
     readyState: 'complete',
@@ -223,6 +225,7 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
 
   islandEl.listeners.get('click')({});
   assert.deepEqual(navCalls, ['development']);
+  assert.deepEqual(openedJobs, ['job1']);
 
   // Going to Develop once dismisses the notice, and it stays dismissed on the next poll.
   assert.equal(islandEl.dataset.state, 'session');
