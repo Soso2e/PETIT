@@ -81,7 +81,10 @@ class RPC:
             raise ValueError("invalid_web_search_mode")
         self.events, self.counter, self.pending = queue.Queue(), 0, []
         env = {k: v for k, v in os.environ.items() if k.upper() in {
-            "PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOME", "LOCALAPPDATA", "APPDATA", "PROGRAMFILES"}}
+            "PATH", "PATHEXT", "COMSPEC", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "OS",
+            "TEMP", "TMP", "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH",
+            "LOCALAPPDATA", "APPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMDATA",
+            "LANG", "LC_ALL", "GH_CONFIG_DIR", "GIT_CONFIG_GLOBAL"}}
         env["PYTHONUTF8"] = "1"
         if home := _configured_home():
             env["CODEX_HOME"] = str(home)

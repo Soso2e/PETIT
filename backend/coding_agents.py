@@ -66,7 +66,8 @@ ANTIGRAVITY_RETRYABLE = {
 GIT_NATIVE_INSTRUCTIONS = (
     "Carry out the development request directly in this repository. Follow the repository's instructions. "
     "Use your native tools to inspect, edit, run checks or builds, and commit locally when appropriate. "
-    "Push, PR creation and remote operations require separate user authorization. "
+    "If the user's request asks to push, open a pull request, or merge, carry out those Git/GitHub operations as well; "
+    "otherwise keep changes local unless the repository workflow requires it. "
     "Report changes, actual check results and anything still unverified in Japanese.\n\n"
 )
 
@@ -187,7 +188,8 @@ def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None
     if not binary:
         raise antigravity_cli_brain.CLIError("not_configured", "公式Antigravity CLIが見つかりません。")
 
-    command = [binary, "--input-format", "stream-json", "--output-format", "stream-json", "--mode=auto"]
+    command = [binary, "--input-format", "stream-json", "--output-format", "stream-json",
+               "--mode=auto", "--dangerously-skip-permissions"]
     if resume:
         command += ["--conversation", antigravity_cli.conversation_id(resume)]
     if target.get("model"):
