@@ -314,7 +314,7 @@ body .development-advanced > summary { font-size: 13px; color: var(--ui-dim); pa
   body #petit-context-bar > summary { min-height: 36px; padding: 6px 16px; font-size: 13px; }
   body #petit-context-bar[open] { border-radius: 18px 18px 0 0; }
 
-  body:not(.petit-univ-active) .universe-main { padding-top: calc(var(--petit-work-top) + 50px) !important; }
+  body:not(.petit-univ-active):not(.petit-chat-screen) .universe-main { padding-top: calc(var(--petit-work-top) + 50px) !important; }
   body .universe-main { padding-inline: 14px !important; }
 
   body.petit-chat-screen [data-view-panel="chat"] {

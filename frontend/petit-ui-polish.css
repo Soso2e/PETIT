@@ -247,8 +247,10 @@ body #petit-work-details #detail-panel {
 }
 body.petit-univ-active.petit-univ-screen .univ-hud { position: fixed; top: calc(var(--petit-work-top) + 56px); left: var(--petit-content-left); right: 16px; }
 body:not(.petit-univ-active) .universe-main { padding-top: calc(var(--petit-work-top) + 64px) !important; }
-html:has(body.petit-chat-screen), body.petit-chat-screen { height: 100%; overflow: hidden; }
+html:has(body.petit-chat-screen), body.petit-chat-screen { height: 100dvh; min-height: 100dvh; overflow: hidden; overscroll-behavior: none; }
 body.petit-chat-screen { padding-bottom: 0; }
+body.petit-chat-screen .universe-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+body.petit-chat-screen .universe-main { height: 100dvh; min-height: 0; padding: 0 !important; overflow: hidden; }
 body.petit-chat-screen [data-view-panel="chat"] {
   position: fixed; inset: calc(var(--petit-work-top) + 60px) 16px calc(var(--petit-bottom-nav-height, calc(78px + env(safe-area-inset-bottom))) + 12px) var(--petit-content-left);
   width: auto; max-width: 1040px; margin-inline: auto; min-height: 0; overflow: hidden;

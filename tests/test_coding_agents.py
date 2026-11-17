@@ -78,7 +78,8 @@ def test_antigravity_git_uses_one_native_turn(monkeypatch, tmp_path, status):
     def invoke(command, workspace, prompt, check, *, timeout, on_line):
         assert workspace == tmp_path
         assert command == ["agy", "--input-format", "stream-json", "--output-format", "stream-json",
-                           "--mode=auto", "--model", "gemini-test", "--effort", "medium"]
+                           "--mode=auto", "--dangerously-skip-permissions",
+                           "--model", "gemini-test", "--effort", "medium"]
         assert "合成開発" in prompt
         events = [
             {"event": "init", "conversation_id": conversation, "init": {}},
