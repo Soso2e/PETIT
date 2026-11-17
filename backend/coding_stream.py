@@ -6,6 +6,7 @@ import threading
 import time
 
 MAX_DRAFT_CHARS = 16000
+MAX_ACTIVITY = 80
 _LOCK = threading.Lock()
 _STREAMS: dict[str, dict] = {}
 _LOCAL = threading.local()
@@ -79,7 +80,7 @@ def add_activity(job_id: str, text: str) -> None:
         return
     with _LOCK:
         item = _entry(job_id)
-        item["activity"] = (item["activity"] + [text.strip()[:300]])[-20:]
+        item["activity"] = (item["activity"] + [text.strip()[:300]])[-MAX_ACTIVITY:]
         item["seq"] += 1
         item["updated_at"] = time.monotonic()
 

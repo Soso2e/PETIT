@@ -264,7 +264,10 @@
         </div>
 
         <div id="development-repo-view" class="development-level" hidden>
-          <button id="development-back-home" type="button" class="development-back">← リポジトリ一覧</button>
+          <nav class="development-nav" aria-label="Develop内の移動">
+            <button id="development-back-home" type="button" class="development-back">← リポジトリ一覧</button>
+            <span id="development-nav-repo" class="development-nav-title"></span>
+          </nav>
           <div class="development-section-title"><h2 id="development-repo-title"></h2></div>
           <p id="development-repo-status" class="development-muted" role="status"></p>
           <div id="development-repo-compose"></div>
@@ -273,7 +276,11 @@
         </div>
 
         <div id="development-thread-view" class="development-level" hidden>
-          <button id="development-back-thread" type="button" class="development-back">← 戻る</button>
+          <nav class="development-nav" aria-label="Develop内の移動">
+            <button id="development-back-thread" type="button" class="development-back">← 戻る</button>
+            <button id="development-nav-home" type="button" class="development-back">Develop</button>
+            <span id="development-nav-thread" class="development-nav-title"></span>
+          </nav>
           <h2 id="development-thread-title"></h2>
           <p id="development-thread-meta" class="development-muted"></p>
           <div id="development-thread-history" class="development-thread-history" aria-live="polite"></div>

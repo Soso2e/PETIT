@@ -370,20 +370,27 @@ flowchart TD
     Slot -->|いいえ| Move["フォームを新しいビューの配置先へ移す"]
 ```
 
-## Development Job UI更新（v0.48.3 / #467更新）
+## Development Job UI更新（v0.48.3 / #467・#479更新）
 
 ```mermaid
 flowchart LR
     DB[(既存SQLite coding_jobs / events)] --> API[管理者GET /api/coding/jobs]
     Stream[(coding_stream / thought・draft・tool・activity)] --> SSE[GET /api/coding/jobs/:id/stream]
     API --> Poll[Development UI / 3秒可視時poll]
-    SSE --> Live[スレッド返信へ思考・ツール・応答をリアルタイム反映]
+    Native[CLIのツール実行 / コマンド・対象パスの要約] -->|activity| Stream
+    Native -->|cli_toolイベント| DB
+    SSE --> Live[スレッド返信へ思考・ツール実行の一覧・応答をリアルタイム反映]
     Poll --> Signature[status / events / summary / error / checks / workspace / branch]
     Signature -->|変化あり| Render[状態・実行CLI・実行過程・結果・静的チェックを再描画]
     Signature -->|変化なし| Keep[DOM維持]
+    Render --> Review{ready_for_review?}
+    Review -->|はい| Bar[折りたたみの外にレビュー完了ボタンと変更ファイル一覧]
+    Bar --> Diff[GET /api/coding/jobs/:id/diff / entries: パス・状態・+/-行数・差分]
+    Diff --> Open[ファイル行のクリックでそのファイルの差分を開く]
+    Bar -->|レビュー完了| Complete[POST /complete → Islandを再取得]
 ```
 
-既存の承認・取消・差分表示APIは不変。PC全体モードでも `list_pc_dir` による安全なフォルダ一覧取得と、思考・ツール実行・途中応答の要約表示（ファイル本文や生JSONは除外）を行う。Claude CodeのProvider名を正しく表示し、実行完了の証拠と静的チェック・実機確認を混同しない。
+承認・取消APIは不変。差分APIは従来の `files`・`diff`・`truncated` に加えてファイルごとの `entries` を返す。完了後の実行過程は保存済みイベント（`cli_tool` を含む）から表示する。PC全体モードでも `list_pc_dir` による安全なフォルダ一覧取得と、思考・ツール実行・途中応答の要約表示（ファイル本文や生JSONは除外）を行う。Claude CodeのProvider名を正しく表示し、実行完了の証拠と静的チェック・実機確認を混同しない。
 
 ## Claude Code CLI Executor（v0.44.0開発版）
 

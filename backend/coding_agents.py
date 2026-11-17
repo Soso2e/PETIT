@@ -72,6 +72,41 @@ GIT_NATIVE_INSTRUCTIONS = (
 )
 
 
+def _describe_cli_tool(name, arguments, workspace=None):
+    """One short line per native CLI tool call: what it ran or touched, never file contents or output."""
+    arguments = arguments if isinstance(arguments, dict) else {}
+
+    def short(value, limit=160):
+        text = " ".join(str(value).split())
+        root = str(workspace or "")
+        if root and text.startswith(root):
+            text = text[len(root):].lstrip("/\\") or "."
+        return text[:limit]
+
+    command = arguments.get("command")
+    if isinstance(command, list):
+        command = " ".join(str(part) for part in command)
+    if command:
+        return "コマンド実行: " + short(command)
+    path = arguments.get("file_path") or arguments.get("path") or arguments.get("notebook_path")
+    pattern = arguments.get("pattern") or arguments.get("query")
+    lowered = name.lower()
+    if path and any(word in lowered for word in ("edit", "write", "patch", "filechange")):
+        return "編集: " + short(path)
+    if pattern:
+        return "検索: " + short(pattern) + (" (" + short(path, 80) + ")" if path else "")
+    if path:
+        return ("読み取り: " if "read" in lowered or "view" in lowered else name + ": ") + short(path)
+    detail = arguments.get("description") or arguments.get("url") or arguments.get("prompt")
+    return name + (": " + short(detail, 120) if detail else "")
+
+
+def _trace(progress, text):
+    """Live step for the open stream, and a stored event so the steps stay readable after the job ends."""
+    coding_stream.add_activity_current(text)
+    _emit(progress, "cli_tool", text)
+
+
 def _resume_unavailable(label):
     # Raised only before the CLI started any work, so the caller may start a fresh session once.
     return antigravity_cli_brain.CLIError("resume_unavailable", label + "の前回セッションを再開できませんでした。")
@@ -153,11 +188,13 @@ def _run_claude_git(target, prompt, workspace, check, progress, resume=None, on_
                 if not isinstance(block, dict):
                     continue
                 if block.get("type") == "text" and isinstance(block.get("text"), str):
-                    coding_stream.append_delta_current(block["text"])
+                    # Interim messages arrive whole; keep them apart in the live draft.
+                    coding_stream.append_delta_current(block["text"].rstrip() + "\n\n")
                 elif block.get("type") == "thinking" and isinstance(block.get("thinking"), str):
-                    coding_stream.append_thought_current(block["thinking"])
+                    coding_stream.append_thought_current(block["thinking"].rstrip() + "\n\n")
                 elif block.get("type") == "tool_use" and isinstance(block.get("name"), str):
                     coding_stream.publish_tool_current(block["name"])
+                    _trace(progress, _describe_cli_tool(block["name"], block.get("input"), workspace))
 
     check()
     progress("model_request")
@@ -200,6 +237,7 @@ def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None
     # A resumed run must report the same conversation; Protocol rejects any other ID.
     protocol = antigravity_cli.Protocol(antigravity_cli.conversation_id(resume) if resume else None)
     phase = None
+    traced = set()
 
     def observe(line):
         nonlocal phase
@@ -226,6 +264,9 @@ def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None
                 coding_stream.append_delta_current(event["text_delta"])
             if event.get("tool"):
                 coding_stream.publish_tool_current(event["tool"])
+                if event["index"] not in traced:
+                    traced.add(event["index"])
+                    _trace(progress, "ツール実行: " + event["tool"])
 
     check()
     progress("model_request")
@@ -416,7 +457,12 @@ def _run_codex(client, target, goal, invoke, check, progress, catalog, instructi
             client.send({"id": item["id"], "error": {"code": -32601, "message": "PETIT coding tools only"}})
         elif development and method == "item/started" and params.get("item", {}).get("type") in {"commandExecution", "fileChange"}:
             progress("cli_responding")
-            coding_stream.publish_tool_current(params.get("item", {}).get("type", ""))
+            started = params["item"]
+            coding_stream.publish_tool_current(started.get("type", ""))
+            changes = started.get("changes") if isinstance(started.get("changes"), list) else []
+            paths = [change.get("path") for change in changes if isinstance(change, dict) and change.get("path")]
+            _trace(progress, _describe_cli_tool(
+                started["type"], {"command": started.get("command"), "path": ", ".join(map(str, paths[:4]))}))
         elif method == "item/agentMessage/delta":
             delta = params.get("delta", "")
             reply += delta

@@ -239,20 +239,40 @@ def preview_action(job_id: str, action_id: str):
     return call(development_pc.preview, call(jobs.get, job_id), action_id)
 
 
+def _diff_entry(name, text, untracked=False):
+    """Per-file summary for the review list: status and line counts, diff body on demand in the UI."""
+    lines = text.splitlines()
+    if untracked:
+        body = lines[1:-1] if lines[-1:] == [""] else lines[1:]
+        status, additions, deletions = "added", len(body), 0
+    else:
+        status = ("added" if any(line.startswith("new file mode") for line in lines[:6])
+                  else "deleted" if any(line.startswith("deleted file mode") for line in lines[:6]) else "modified")
+        additions = sum(1 for line in lines if line.startswith("+") and not line.startswith("+++"))
+        deletions = sum(1 for line in lines if line.startswith("-") and not line.startswith("---"))
+    binary = any(line.startswith("Binary files ") for line in lines[:8])
+    return {"path": name, "status": status, "additions": additions, "deletions": deletions,
+            "binary": binary, "diff": text, "truncated": False}
+
+
 @router.get("/jobs/{job_id}/diff")
 def diff(job_id: str):
     job = call(jobs.get, job_id)
-    if not job["workspace"]:return {"files": [], "diff": "", "truncated": False}
+    if not job["workspace"]:return {"files": [], "diff": "", "truncated": False, "entries": []}
     if job.get("mode") == "pc":
         from pathlib import Path
         from itertools import islice
         root = Path(job["workspace"])
         files = [str(path.relative_to(root)) for path in islice(root.rglob("*"), 1000) if path.is_file()]
-        return {"files": files, "diff": "", "truncated": False}
+        entries = [{"path": name, "status": "file", "additions": None, "deletions": None,
+                    "binary": False, "diff": "", "truncated": False} for name in files]
+        return {"files": files, "diff": "", "truncated": False, "entries": entries}
     base = job["base_commit"] if job.get("mode") == "git" else "HEAD"
     changed = call(jobs.changed, job["workspace"], base)
     pieces = []
     visible_files = []
+    entries = []
+    budget = 100000
     for name in changed:
         try:
             path = jobs.path_for(job["workspace"], name)
@@ -260,12 +280,20 @@ def diff(job_id: str):
             continue
         visible_files.append(name)
         tracked = jobs.git(job["workspace"], "ls-files", "--", name).strip()
-        if tracked or not path.exists():
-            pieces.append(jobs.git(job["workspace"], "diff", "--no-ext-diff", "--no-textconv", base, "--", name))
+        untracked = not (tracked or not path.exists())
+        if untracked:
+            piece = "New file: " + name + "\n" + path.read_bytes()[:50000].decode("utf-8", "replace") + "\n"
         else:
-            pieces.append("New file: " + name + "\n" + path.read_bytes()[:50000].decode("utf-8", "replace") + "\n")
+            piece = jobs.git(job["workspace"], "diff", "--no-ext-diff", "--no-textconv", base, "--", name)
+        pieces.append(piece)
+        entry = _diff_entry(name, piece, untracked)
+        # Counts cover the whole file; only the body shown in the list shares the response budget.
+        if len(piece) > budget:
+            entry.update(diff=piece[:budget], truncated=True)
+        budget -= len(entry["diff"])
+        entries.append(entry)
     text = "\n".join(pieces)
-    return {"files": visible_files, "diff": text[:100000], "truncated": len(text) > 100000}
+    return {"files": visible_files, "diff": text[:100000], "truncated": len(text) > 100000, "entries": entries}
 
 
 @router.post("/jobs/{job_id}/complete", dependencies=[Depends(setup_api._same_origin)])

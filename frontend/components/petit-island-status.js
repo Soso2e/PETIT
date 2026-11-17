@@ -22,6 +22,35 @@
   let tickTimer = null;
   let fetching = false;
 
+  // "完了しました" is a one-time notice: once the user has gone to Develop for a job, it stays dismissed.
+  const SEEN_KEY = 'petit-island-seen-reviews';
+  const seenReviews = new Set();
+  try {
+    const saved = JSON.parse(window.localStorage?.getItem(SEEN_KEY) || '[]');
+    if (Array.isArray(saved)) saved.forEach((id) => seenReviews.add(String(id)));
+  } catch { /* Storage can be unavailable; the notice then resets on reload. */ }
+
+  const visibleJobs = () => store.codingJobs.filter(
+    (job) => !(job.status === 'ready_for_review' && seenReviews.has(String(job.id))),
+  );
+
+  const acknowledgeReviews = (ids) => {
+    const targets = Array.isArray(ids)
+      ? ids
+      : store.codingJobs.filter((job) => job.status === 'ready_for_review').map((job) => job.id);
+    let changed = false;
+    for (const id of targets) {
+      if (id == null || seenReviews.has(String(id))) continue;
+      seenReviews.add(String(id));
+      changed = true;
+    }
+    if (!changed) return;
+    try {
+      window.localStorage?.setItem(SEEN_KEY, JSON.stringify([...seenReviews].slice(-200)));
+    } catch { /* Kept in memory for this page only. */ }
+    syncDisplay();
+  };
+
   const formatElapsed = (session) => {
     if (!session?.started_at) return '00:00';
     const start = Date.parse(session.started_at);
@@ -55,8 +84,9 @@
       return store.ephemeral;
     }
 
-    const runningJob = store.codingJobs.find((j) => j.status === 'running' || j.status === 'queued')
-      || store.codingJobs[0];
+    const jobs = visibleJobs();
+    const runningJob = jobs.find((j) => j.status === 'running' || j.status === 'queued')
+      || jobs[0];
     if (runningJob) {
       const statusText = runningJob.status === 'running'
         ? '開発中'
@@ -113,7 +143,7 @@
     };
   };
 
-  const syncDisplay = () => {
+  function syncDisplay() {
     if (!island) return;
     const next = computeView();
     island.setState(next.state, {
@@ -123,7 +153,7 @@
       badge: next.badge || '',
       icon: next.icon,
     });
-  };
+  }
 
   const safeFetchJson = async (url) => {
     try {
@@ -195,6 +225,10 @@
     }
   };
 
+  const onAreaChange = (event) => {
+    if (event.detail?.area === 'development') acknowledgeReviews();
+  };
+
   const mountIsland = () => {
     const dock = document.createElement('div');
     dock.className = 'petit-island-dock';
@@ -206,6 +240,7 @@
         const current = computeView();
         if (current.view) {
           navigateTo(current.view);
+          if (current.view === 'development') acknowledgeReviews();
         } else {
           void refresh();
         }
@@ -214,6 +249,7 @@
 
     document.addEventListener('petit:mascot', onMascotSignal);
     document.addEventListener('petit:working-task', () => { void refresh(); });
+    window.addEventListener('petit:area-change', onAreaChange);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) void refresh();
     });
@@ -236,11 +272,13 @@
 
   window.PetitIslandStatus = Object.freeze({
     refresh,
+    acknowledgeReviews,
     setState: (state, overrides) => island?.setState(state, overrides),
     destroy() {
       if (pollTimer) clearInterval(pollTimer);
       if (tickTimer) clearInterval(tickTimer);
       document.removeEventListener('petit:mascot', onMascotSignal);
+      window.removeEventListener('petit:area-change', onAreaChange);
       island?.destroy();
     },
   });

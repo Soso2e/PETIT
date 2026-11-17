@@ -146,6 +146,7 @@ test('rejects an invalid host', () => {
 
 test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notifications, and active work session', async () => {
   const docListeners = new Map();
+  const winListeners = new Map();
   const body = new FakeElement();
   const navCalls = [];
   const mockFetchData = {
@@ -157,8 +158,8 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
     matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }),
     requestAnimationFrame: () => 1,
     cancelAnimationFrame() {},
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener: (ev, fn) => winListeners.set(ev, fn),
+    removeEventListener: (ev) => winListeners.delete(ev),
     PetitAppShell: { activateView: (view) => navCalls.push(view) },
   };
   const document = {
@@ -222,6 +223,35 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
 
   islandEl.listeners.get('click')({});
   assert.deepEqual(navCalls, ['development']);
+
+  // Going to Develop once dismisses the notice, and it stays dismissed on the next poll.
+  assert.equal(islandEl.dataset.state, 'session');
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(islandEl.dataset.state, 'session');
+
+  // A different job that finishes later is announced again, until Develop is opened by any route.
+  mockFetchData['/api/coding/activity?limit=10'] = {
+    jobs: [
+      { id: 'job1', provider: 'Antigravity CLI', status: 'ready_for_review', summary: '' },
+      { id: 'job3', provider: 'Codex', status: 'ready_for_review', summary: '' },
+    ],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(islandEl.dataset.state, 'develop');
+  winListeners.get('petit:area-change')({ detail: { area: 'development' } });
+  assert.equal(islandEl.dataset.state, 'session');
+
+  // Completing the review removes the job from the active list.
+  mockFetchData['/api/coding/activity?limit=10'] = {
+    jobs: [{ id: 'job4', provider: 'Codex', status: 'ready_for_review', summary: '' }],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(islandEl.dataset.state, 'develop');
+  mockFetchData['/api/coding/activity?limit=10'] = {
+    jobs: [{ id: 'job4', provider: 'Codex', status: 'completed', summary: '' }],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(islandEl.dataset.state, 'session');
 
   ctx.window.PetitIslandStatus.destroy();
 });
