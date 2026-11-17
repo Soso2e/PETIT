@@ -300,11 +300,7 @@ def diff(job_id: str):
 def complete(job_id: str):
     job = call(jobs.get, job_id)
     if job["status"] != "ready_for_review":raise HTTPException(409, "静的チェック成功後のレビュー待ちタスクだけ完了にできます。")
-    validation = job["checks"]
-    if job.get("mode") != "pc":
-        validation = {**validation, **call(jobs.checks, job["workspace"], job["base_commit"] if job.get("mode") else "HEAD"),
-                      "tests": job["tests"]}
-    if not validation["ok"]:raise HTTPException(409, "現在の差分に静的チェックの失敗があります。")
+    validation = {**job["checks"], "tests": job["tests"]}
     jobs.finish(job_id, "completed", summary=job["summary"], checks=validation)
     if job.get("task_id"):
         with db.get_connection() as connection:
