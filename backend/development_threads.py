@@ -12,13 +12,16 @@ from uuid import uuid4
 from . import coding_jobs, conversation_store, db
 
 RETENTION_DAYS = 30
+TRIAGE_STATUSES = ("active", "completed", "review_later")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS coding_develop_threads (
     thread_id TEXT PRIMARY KEY REFERENCES threads(id),
     repository TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
-    archived_at TEXT
+    archived_at TEXT,
+    triage_status TEXT NOT NULL DEFAULT 'active',
+    deleted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_coding_develop_repo ON coding_develop_threads(repository);
 """
@@ -44,7 +47,15 @@ def ensure_schema():
     coding_jobs.ensure_schema()
     with db.get_connection() as connection:
         connection.executescript(SCHEMA)
-        db._ensure_columns(connection, "coding_develop_threads", {"archived_at": "TEXT"})
+        db._ensure_columns(
+            connection,
+            "coding_develop_threads",
+            {
+                "archived_at": "TEXT",
+                "triage_status": "TEXT NOT NULL DEFAULT 'active'",
+                "deleted_at": "TEXT",
+            },
+        )
     try:
         sync_chat_threads()
     except Exception:
@@ -64,7 +75,7 @@ def archive_stale_threads(retention_days: int = RETENTION_DAYS) -> int:
             "FROM coding_develop_threads d "
             "LEFT JOIN coding_job_routes r ON r.thread_id=d.thread_id "
             "LEFT JOIN coding_jobs j ON j.id=r.job_id "
-            "WHERE d.archived_at IS NULL"
+            "WHERE d.archived_at IS NULL AND d.deleted_at IS NULL"
         ).fetchall()
     if not rows:
         return 0
@@ -105,8 +116,9 @@ def _repository(path):
 def _row(thread_id):
     with db.get_connection() as connection:
         row = connection.execute(
-            "SELECT d.thread_id,d.repository,d.created_at,d.archived_at,t.title FROM coding_develop_threads d "
-            "JOIN threads t ON t.id=d.thread_id WHERE d.thread_id=?", (thread_id,)
+            "SELECT d.thread_id,d.repository,d.created_at,d.archived_at,COALESCE(d.triage_status,'active') AS triage_status,t.title "
+            "FROM coding_develop_threads d "
+            "JOIN threads t ON t.id=d.thread_id WHERE d.thread_id=? AND d.deleted_at IS NULL", (thread_id,)
         ).fetchone()
     if not row:
         raise ValueError("開発スレッドが見つかりません。")
@@ -132,7 +144,8 @@ def create(repository="", title="", thread_id=None):
             (thread_id, repository, db.now_iso())
         )
         connection.execute(
-            "UPDATE coding_develop_threads SET archived_at=NULL WHERE thread_id=? AND archived_at IS NOT NULL",
+            "UPDATE coding_develop_threads SET archived_at=NULL, deleted_at=NULL "
+            "WHERE thread_id=? AND (archived_at IS NOT NULL OR deleted_at IS NOT NULL)",
             (thread_id,)
         )
     return _row(thread_id)
@@ -187,7 +200,8 @@ def register_conversation_thread(thread_id: str, repository: str = "", title: st
             (thread_id, safe_repo, db.now_iso())
         )
         connection.execute(
-            "UPDATE coding_develop_threads SET archived_at=NULL WHERE thread_id=? AND archived_at IS NOT NULL",
+            "UPDATE coding_develop_threads SET archived_at=NULL, deleted_at=NULL "
+            "WHERE thread_id=? AND (archived_at IS NOT NULL OR deleted_at IS NOT NULL)",
             (thread_id,)
         )
     return _row(thread_id)
@@ -246,12 +260,16 @@ def _latest(connection, thread_id):
     return job
 
 
+_TRIAGE_ORDER = {"review_later": 0, "active": 1, "completed": 2}
+
+
 def list_threads(repository=None, limit=100):
     ensure_schema()
     limit = max(1, min(int(limit), 200))
     query = (
-        "SELECT d.thread_id,d.repository,d.created_at,t.title FROM coding_develop_threads d "
-        "JOIN threads t ON t.id=d.thread_id WHERE d.archived_at IS NULL"
+        "SELECT d.thread_id,d.repository,d.created_at,COALESCE(d.triage_status,'active') AS triage_status,t.title "
+        "FROM coding_develop_threads d "
+        "JOIN threads t ON t.id=d.thread_id WHERE d.archived_at IS NULL AND d.deleted_at IS NULL"
     )
     params = []
     if repository is not None:
@@ -263,9 +281,42 @@ def list_threads(repository=None, limit=100):
         rows = [dict(r) for r in connection.execute(query, params)]
         for row in rows:
             row["latest_job"] = _latest(connection, row["thread_id"])
-    return sorted(rows, key=lambda row: (
-        (row["latest_job"] or {}).get("updated_at") or row["created_at"], row["created_at"]
-    ), reverse=True)
+    rows.sort(
+        key=lambda row: ((row["latest_job"] or {}).get("updated_at") or row["created_at"], row["created_at"]),
+        reverse=True,
+    )
+    rows.sort(key=lambda row: _TRIAGE_ORDER.get(row.get("triage_status") or "active", 1))
+    return rows
+
+
+def update(thread_id: str, *, title: str | None = None, triage_status: str | None = None):
+    """Update thread title and/or Develop triage status."""
+    ensure_schema()
+    _row(thread_id)
+    if triage_status is not None and triage_status not in TRIAGE_STATUSES:
+        raise ValueError("不正なスレッド状態です。")
+    if title is not None:
+        conversation_store.update_thread_title(thread_id, title)
+    if triage_status is not None:
+        with db.write_transaction() as connection:
+            connection.execute(
+                "UPDATE coding_develop_threads SET triage_status=? WHERE thread_id=? AND deleted_at IS NULL",
+                (triage_status, thread_id),
+            )
+    return _row(thread_id)
+
+
+def delete(thread_id: str) -> dict:
+    """Soft-delete a Develop thread from the list while preserving underlying job records."""
+    ensure_schema()
+    _row(thread_id)
+    now = db.now_iso()
+    with db.write_transaction() as connection:
+        connection.execute(
+            "UPDATE coding_develop_threads SET deleted_at=? WHERE thread_id=? AND deleted_at IS NULL",
+            (now, thread_id),
+        )
+    return {"ok": True, "thread_id": thread_id}
 
 
 def detail(thread_id):
@@ -297,7 +348,7 @@ def repositories():
             ).fetchone()
             root["latest_job"] = dict(row) if row else None
             root["thread_count"] = connection.execute(
-                "SELECT COUNT(*) FROM coding_develop_threads WHERE repository=? AND archived_at IS NULL", (path,)
+                "SELECT COUNT(*) FROM coding_develop_threads WHERE repository=? AND archived_at IS NULL AND deleted_at IS NULL", (path,)
             ).fetchone()[0]
             root["observed_at"] = db.now_iso()
     return roots

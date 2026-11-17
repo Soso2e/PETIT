@@ -59,6 +59,12 @@ class DevelopThreadAttach(BaseModel):
     repository: str = Field(min_length=1, max_length=1000)
 
 
+class DevelopThreadUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = Field(default=None, max_length=160)
+    triage_status: Literal["active", "completed", "review_later"] | None = None
+
+
 def call(function, *args, **kwargs):
     try:return function(*args, **kwargs)
     except (ValueError, OSError, subprocess.SubprocessError) as exc:
@@ -142,6 +148,16 @@ def create_thread(payload: DevelopThreadCreate):
 @router.get("/threads/{thread_id}")
 def thread_detail(thread_id: str):
     return call(development_threads.detail, thread_id)
+
+
+@router.patch("/threads/{thread_id}", dependencies=[Depends(setup_api._same_origin)])
+def update_thread(thread_id: str, payload: DevelopThreadUpdate):
+    return call(development_threads.update, thread_id, **payload.model_dump())
+
+
+@router.delete("/threads/{thread_id}", dependencies=[Depends(setup_api._same_origin)])
+def delete_thread(thread_id: str):
+    return call(development_threads.delete, thread_id)
 
 
 @router.post("/threads/{thread_id}/repository", dependencies=[Depends(setup_api._same_origin)])

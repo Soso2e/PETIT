@@ -297,3 +297,44 @@ def test_stale_threads_archived_after_30_days_keeping_jobs_and_chat(repository, 
     )
     visible_reopened = {t["thread_id"] for t in development_threads.list_threads(repository=root)}
     assert "stale-chat-thread" in visible_reopened
+
+
+def test_thread_triage_rename_and_delete(repository, client, development_quota):
+    from backend import development_threads
+    admin(client)
+    root = str(repository)
+    for tid, title in [("t-active", "通常"), ("t-later", "確認予定"), ("t-done", "完了予定")]:
+        res = client.post("/api/coding/threads", json={"thread_id": tid, "repository": root, "title": title})
+        assert res.status_code == 200
+        assert res.json()["triage_status"] == "active"
+
+    # triage_status とタイトル変更
+    later = client.patch("/api/coding/threads/t-later", json={"triage_status": "review_later", "title": "あとで確認する件"})
+    assert later.status_code == 200, later.text
+    assert later.json()["triage_status"] == "review_later"
+    assert later.json()["title"] == "あとで確認する件"
+
+    done = client.patch("/api/coding/threads/t-done", json={"triage_status": "completed"})
+    assert done.status_code == 200, done.text
+    assert done.json()["triage_status"] == "completed"
+
+    # 不正な状態は拒否される
+    assert client.patch("/api/coding/threads/t-active", json={"triage_status": "unknown"}).status_code == 422
+
+    # review_later が先頭、active が中間、completed が末尾に並ぶ
+    ordered = [t["thread_id"] for t in client.get("/api/coding/threads", params={"repository": root}).json()["threads"]]
+    assert ordered == ["t-later", "t-active", "t-done"]
+
+    # 削除すると一覧と thread_count から外れ、sync_chat_threads でも復活しない
+    deleted = client.delete("/api/coding/threads/t-done")
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json() == {"ok": True, "thread_id": "t-done"}
+
+    after_delete = [t["thread_id"] for t in client.get("/api/coding/threads", params={"repository": root}).json()["threads"]]
+    assert after_delete == ["t-later", "t-active"]
+    assert client.get("/api/coding/threads/t-done").status_code == 400
+    assert client.get("/api/coding/workspaces").json()["repositories"][0]["thread_count"] == 2
+
+    development_threads.sync_chat_threads()
+    after_sync = [t["thread_id"] for t in development_threads.list_threads(repository=root)]
+    assert after_sync == ["t-later", "t-active"]
