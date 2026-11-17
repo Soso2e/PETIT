@@ -593,7 +593,14 @@
     message.textContent = states[job.status] || "";
   }
 
-  function buildTurnElement(job) {
+  // One tap continues a stopped job in the same thread; the CLI session resumes when the Core can.
+  const stoppedGoal = "前回の作業が途中で止まりました。作業ファイルとGitの状態を確認し、前回の依頼の続きから進めてください。";
+  const resumeGoals = {
+    interrupted: stoppedGoal, failed: stoppedGoal, cancelled: stoppedGoal,
+    checks_failed: "前回の変更で静的チェックが失敗しました。原因を確認して修正してください。",
+  };
+
+  function buildTurnElement(job, latest = false) {
     const entry = document.createElement("article");
     entry.className = "development-thread-turn";
     entry.dataset.jobId = job.id;
@@ -654,6 +661,28 @@
       if (job.workspace) mountChanges(panel, job, onError, true);
       panel.append(notice);
     }
+    if (latest && resumeGoals[job.status] && currentThread) {
+      const bar = append(entry, "div", "");
+      bar.className = "development-review-bar development-resume";
+      const text = append(bar, "div", "");
+      append(text, "strong", statusLabel(job.status));
+      append(text, "span", "同じ会話・同じモデル設定で続きを依頼します。");
+      const notice = document.createElement("p");
+      notice.className = "development-review-notice";
+      notice.setAttribute("role", "status");
+      const resumeId = crypto.randomUUID();
+      button(bar, "続きから再開", async () => {
+        const threadId = currentThread.thread_id;
+        await api("/jobs/start", "POST", {
+          request_id: resumeId, repository: currentThread.repository, goal: resumeGoals[job.status],
+          thread_id: threadId, model_key: job.selection?.model_key || "auto",
+          effort: job.selection?.effort || "medium",
+        });
+        justSubmittedThreadId = threadId;
+        await refreshThread();
+      }, (value) => { notice.textContent = value; }).className = "development-primary";
+      entry.append(notice);
+    }
     const detail = append(entry, "details", "");
     detail.className = "development-thread-details";
     if (job.status === "waiting_approval") {
@@ -693,11 +722,11 @@
         if (isStreamingNow || currentEl?.dataset.jobSig === nextSig) {
           continue;
         }
-        const replacement = buildTurnElement(job);
+        const replacement = buildTurnElement(job, job === items.at(-1));
         currentEl.replaceWith(replacement);
       }
     } else {
-      list.replaceChildren(...items.map(buildTurnElement));
+      list.replaceChildren(...items.map((job, index) => buildTurnElement(job, index === items.length - 1)));
     }
 
     if (justSubmittedThreadId && justSubmittedThreadId === currentThread?.thread_id) {

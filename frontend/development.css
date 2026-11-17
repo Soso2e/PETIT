@@ -279,6 +279,7 @@
 .development-review-bar span { font-size: .84rem; color: var(--ui-muted, #a8b2c4); }
 .development-review-notice { margin: 0; font-size: .84rem; color: var(--ui-danger, #c77b7f); }
 .development-review-notice:empty { display: none; }
+.development-resume { align-self: stretch; }
 body .development-primary {
   flex: 0 0 auto;
   min-height: 44px;
