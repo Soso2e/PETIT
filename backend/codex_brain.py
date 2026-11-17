@@ -70,6 +70,24 @@ class ResumeUnavailable(lmstudio_client.LMStudioError):
     pass
 
 
+ENV_KEYS = {
+    "PATH", "PATHEXT", "COMSPEC", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "OS",
+    "TEMP", "TMP", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "HOME",
+    "LOCALAPPDATA", "APPDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432",
+    "COMMONPROGRAMFILES", "COMMONPROGRAMFILES(X86)", "COMMONPROGRAMW6432", "PROGRAMDATA",
+    "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE",
+}
+
+
+def environment() -> dict[str, str]:
+    # Never forward Core/API secrets to the Codex app-server child process.
+    env = {k: v for k, v in os.environ.items() if k.upper() in ENV_KEYS}
+    env["PYTHONUTF8"] = "1"
+    if home := _configured_home():
+        env["CODEX_HOME"] = str(home)
+    return env
+
+
 class RPC:
     def __init__(self, *, workspace=None, web_search="disabled", development=False):
         binary = executable()
@@ -80,11 +98,7 @@ class RPC:
         if web_search not in {"disabled", "cached", "live"}:
             raise ValueError("invalid_web_search_mode")
         self.events, self.counter, self.pending = queue.Queue(), 0, []
-        env = {k: v for k, v in os.environ.items() if k.upper() in {
-            "PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOME", "LOCALAPPDATA", "APPDATA", "PROGRAMFILES"}}
-        env["PYTHONUTF8"] = "1"
-        if home := _configured_home():
-            env["CODEX_HOME"] = str(home)
+        env = environment()
         flags = ["features.shell_tool=false", "features.multi_agent=false", "features.apps=false", "features.plugins=false",
                  "features.memories=false", "features.hooks=false", "mcp_servers={}",
                  'project_root_markers=["AGENTS.md"]', 'web_search=' + json.dumps(web_search),
