@@ -26,6 +26,7 @@
     read_pc_file: "PCファイルを読み取りました",
     copy_pc_file_to_workspace: "作業場所へコピーしました",
     tool_result: "ツール実行が完了しました",
+    cli_tool: "CLIがツールを実行中…",
     repository_check: "テスト・検査結果を受け取りました",
   };
   const retryPhases = {
@@ -56,24 +57,61 @@
     return [event.created_at, label, event.detail].filter(Boolean).join(" · ");
   }
 
-  function renderTrace(traceBox, thought, activity) {
-    if (!traceBox) return;
-    const lines = [];
-    if (thought) lines.push("思考中:\n" + thought);
-    if (Array.isArray(activity) && activity.length) lines.push(...activity);
-    if (!lines.length) {
-      traceBox.hidden = true;
-      traceBox.textContent = "";
-      return;
-    }
-    traceBox.hidden = false;
-    traceBox.textContent = lines.join("\n");
+  // Live steps of the CLI: collapsible thinking text and one row per tool call or interim reply.
+  function createTrace(host) {
+    host.classList.add("development-trace");
+    host.hidden = true;
+    const thoughtBox = document.createElement("details");
+    thoughtBox.className = "development-trace-thought";
+    thoughtBox.hidden = true;
+    const thoughtLabel = document.createElement("summary");
+    const thoughtText = document.createElement("pre");
+    thoughtBox.append(thoughtLabel, thoughtText);
+    const list = document.createElement("ol");
+    list.className = "development-trace-steps";
+    host.append(thoughtBox, list);
+    let key = "";
+    return {
+      update(thought, activity, live = true) {
+        if (typeof thought === "string") {
+          const text = thought.trim();
+          thoughtBox.hidden = !text;
+          const last = text.split("\n").filter(Boolean).at(-1) || "";
+          thoughtLabel.textContent = (live ? "思考中 · " : "思考 · ") + last.slice(0, 90);
+          if (thoughtText.textContent !== text) {
+            thoughtText.textContent = text;
+            thoughtText.scrollTop = thoughtText.scrollHeight;
+          }
+        }
+        if (Array.isArray(activity)) {
+          const next = activity.join("\n");
+          if (next !== key) {
+            key = next;
+            const pinned = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+            list.replaceChildren(...activity.map((line) => {
+              const row = document.createElement("li");
+              const cut = line.indexOf(": ");
+              if (cut > 0 && cut < 24) {
+                append(row, "span", line.slice(0, cut)).className = "development-trace-kind";
+                append(row, "code", line.slice(cut + 2));
+              } else {
+                append(row, "span", line);
+              }
+              return row;
+            }));
+            if (pinned) list.scrollTop = list.scrollHeight;
+          }
+        }
+        list.dataset.live = String(Boolean(live));
+        host.hidden = thoughtBox.hidden && !list.children.length;
+      },
+    };
   }
 
   function watchProgress(element, job, refresh, options = {}) {
     element.setAttribute("aria-live", "polite");
     const replyBox = options.replyBox || element.closest(".development-thread-reply");
-    const traceBox = options.traceBox || null;
+    const trace = options.trace || null;
     const useStreaming = Boolean(options.streamReply && replyBox && window.PetitChatMotion?.createStreamingController);
     const labelFor = ({ status, phase, tool }) => {
       if (status === "running" && tool) return "ツール実行中: " + tool + "…";
@@ -94,8 +132,9 @@
       } else {
         if (element.textContent !== next) element.textContent = next;
       }
-      if (traceBox && (payload.thought !== undefined || payload.activity !== undefined)) {
-        renderTrace(traceBox, payload.thought, payload.activity);
+      if (options.onStatus && payload.status) options.onStatus(payload.status);
+      if (trace && (payload.thought !== undefined || payload.activity !== undefined)) {
+        trace.update(payload.thought, payload.activity);
       }
       if (replyBox && !streamCtrl) replyBox.classList.toggle("is-streaming-status", active.has(payload.status));
     };
@@ -169,7 +208,105 @@
       (item?.estimated ? "（PETIT内の推定）" : "");
   }
 
-  function card(box, job, refresh, compact = false) {
+  const fileMarks = { added: "A", modified: "M", deleted: "D", file: "·" };
+  const fileStatus = { added: "追加", modified: "変更", deleted: "削除", file: "ファイル" };
+
+  function renderDiff(target, entry) {
+    const untracked = entry.diff.startsWith("New file: ");
+    const lines = entry.diff.replace(/\n$/, "").split("\n");
+    const header = /^(diff --git |index |--- |\+\+\+ |new file mode|deleted file mode|old mode|new mode|similarity index|New file: )/;
+    let inBody = untracked;
+    for (const [index, line] of lines.entries()) {
+      if (untracked && index === 0) continue;
+      if (!untracked && !inBody) {
+        if (line.startsWith("@@")) inBody = true;
+        else if (header.test(line)) continue;
+      }
+      const row = append(target, "span", line || " ");
+      row.className = "development-diff-line";
+      if (untracked || line.startsWith("+")) row.dataset.kind = "add";
+      else if (line.startsWith("-")) row.dataset.kind = "del";
+      else if (line.startsWith("@@")) row.dataset.kind = "hunk";
+    }
+    if (!target.children.length) append(target, "span", entry.binary ? "バイナリファイルのため差分を表示できません。" : "表示できる差分はありません。").className = "development-diff-line";
+    if (entry.truncated) append(target, "span", "（表示上限のため以降を省略）").className = "development-diff-line";
+  }
+
+  // File list first (which files, how much); a file's diff opens only when its row is clicked.
+  function mountChanges(parent, job, onError, auto = false) {
+    const section = append(parent, "section", "");
+    section.className = "development-changes";
+    const head = append(section, "div", "");
+    head.className = "development-changes-head";
+    append(head, "strong", "変更ファイル");
+    const total = append(head, "span", auto ? "読み込み中…" : "");
+    total.className = "development-changes-total";
+    const list = append(section, "div", "");
+    list.className = "development-changes-list";
+    const load = async () => {
+      const result = await api("/jobs/" + encodeURIComponent(job.id) + "/diff");
+      if (!section.isConnected) return;
+      const entries = result.entries || result.files.map((path) => ({ path, status: "file", diff: "" }));
+      list.replaceChildren();
+      opener?.remove();
+      if (!entries.length) {
+        total.textContent = "変更されたファイルはありません";
+        return;
+      }
+      const sum = (key) => entries.reduce((value, entry) => value + (entry[key] || 0), 0);
+      total.replaceChildren(entries.length + " ファイル");
+      if (entries.some((entry) => entry.additions != null)) {
+        append(total, "span", "+" + sum("additions")).dataset.kind = "add";
+        append(total, "span", "−" + sum("deletions")).dataset.kind = "del";
+      }
+      for (const entry of entries) {
+        const item = append(list, "div", "");
+        item.className = "development-file";
+        const row = append(item, "button", "");
+        row.type = "button";
+        row.className = "development-file-row";
+        row.setAttribute("aria-expanded", "false");
+        const mark = append(row, "span", fileMarks[entry.status] || "·");
+        mark.className = "development-file-mark";
+        mark.dataset.status = entry.status;
+        mark.title = fileStatus[entry.status] || entry.status;
+        const slash = entry.path.lastIndexOf("/") + 1;
+        const name = append(row, "span", "");
+        name.className = "development-file-path";
+        if (slash) append(name, "span", entry.path.slice(0, slash)).className = "development-file-dir";
+        append(name, "strong", entry.path.slice(slash));
+        const stat = append(row, "span", "");
+        stat.className = "development-file-stat";
+        if (entry.additions != null) {
+          append(stat, "span", "+" + entry.additions).dataset.kind = "add";
+          append(stat, "span", "−" + entry.deletions).dataset.kind = "del";
+        }
+        if (!entry.diff && !entry.binary) { row.disabled = true; continue; }
+        append(row, "span", "›").className = "development-file-chevron";
+        let pane;
+        row.addEventListener("click", () => {
+          if (!pane) {
+            pane = append(item, "pre", "");
+            pane.className = "development-file-diff";
+            renderDiff(pane, entry);
+            pane.hidden = true;
+          }
+          pane.hidden = !pane.hidden;
+          row.setAttribute("aria-expanded", String(!pane.hidden));
+        });
+      }
+    };
+    let opener = null;
+    if (auto) load().catch((error) => { total.textContent = ""; onError(error.message); });
+    else opener = button(head, "変更ファイルを見る", load, onError);
+    return section;
+  }
+
+  function notifyIsland() {
+    void window.PetitIslandStatus?.refresh?.();
+  }
+
+  function card(box, job, refresh, compact = false, external = false) {
     box.replaceChildren();
     box.dataset.job = job.id;
     box.className = "coding-job";
@@ -200,22 +337,20 @@
     } else if (active.has(job.status) || job.status === "waiting_approval") {
       decide("/cancel", job.cancel_requested ? "取消要求済み" : "ジョブを止める").disabled = Boolean(job.cancel_requested);
     }
-    if (job.status === "ready_for_review" && !compact) decide("/complete", "レビュー完了");
+    if (job.status === "ready_for_review" && !compact && !external) {
+      button(actions, "レビュー完了", async () => {
+        await api(route + "/complete", "POST");
+        notifyIsland();
+        await refresh();
+      }, onError);
+    }
     if (compact) {
       const link = append(box, "a", "Developで開発ジョブを確認");
       link.href = "/static/universe.html?view=development";
     } else {
       const testLabel = { not_run: "未実施", not_verified: "CLIの報告を参照", passed: "成功", failed: "失敗" };
       append(box, "p", "コマンド検証 " + (testLabel[job.tests] || "不明") + " / 実アプリ動作 未確認");
-      if (job.workspace) {
-        button(actions, "変更ファイル・差分を見る", async () => {
-          const result = await api(route + "/diff");
-          const preview = box.querySelector(".diff") || append(box, "pre", "");
-          preview.className = "diff";
-          preview.textContent = result.files.join("\n") + "\n\n" + result.diff +
-            (result.truncated ? "\n（表示上限で省略）" : "");
-        }, onError);
-      }
+      if (job.workspace && !external) mountChanges(box, job, onError);
       const details = append(box, "details", "");
       append(details, "summary", "進捗・チェック結果");
       append(details, "pre", job.events.map(formatEventLine).join("\n") +
@@ -417,6 +552,7 @@
   function renderCurrentRepository() {
     const root = repositories.find((item) => item.path === currentRepo);
     $("development-repo-title").textContent = root?.name || "開発ワークスペース";
+    $("development-nav-repo").textContent = root?.name || "";
     if (!root) {
       $("development-repo-status").textContent = "登録先が見つかりません。";
       return;
@@ -471,19 +607,19 @@
     reply.className = "development-thread-reply";
     const metaRow = append(reply, "div", "");
     metaRow.className = "development-thread-reply-meta";
-    append(metaRow, "strong", [job.provider || "CLI", statusLabel(job.status)].join(" · "));
+    const metaLabel = append(metaRow, "strong", [job.provider || "CLI", statusLabel(job.status)].join(" · "));
+    const onStatus = (status) => { metaLabel.textContent = [job.provider || "CLI", statusLabel(status)].join(" · "); };
     append(metaRow, "small", timestamp(job.updated_at)).className = "development-muted";
     const streamHost = append(reply, "div", "");
     streamHost.className = "development-thread-stream";
     const message = append(streamHost, "div", "");
     message.className = "message-body development-thread-body";
-    const traceBox = append(reply, "pre", "");
-    traceBox.className = "development-thread-trace";
-    traceBox.hidden = true;
+    const trace = createTrace(append(reply, "div", ""));
+    const refreshThread = () => {
+      if (currentView === "thread" && currentThread) return openThread(currentThread.thread_id);
+    };
     if (active.has(job.status)) {
-      watchProgress(message, job, () => {
-        if (currentView === "thread" && currentThread) return openThread(currentThread.thread_id);
-      }, { replyBox: streamHost, traceBox, streamReply: true });
+      watchProgress(message, job, refreshThread, { replyBox: streamHost, trace, streamReply: true, onStatus });
     } else {
       renderReplyBody(message, job);
       const traces = (job.events || []).filter((ev) => ev.detail && ev.kind !== "cli_failure");
@@ -491,24 +627,42 @@
         const traceDetails = append(reply, "details", "");
         traceDetails.className = "development-thread-trace-details";
         append(traceDetails, "summary", "実行過程・途中応答（" + traces.length + "件）");
-        append(traceDetails, "pre", traces.map((ev) => {
-          const label = retryPhases[ev.kind] || phases[ev.kind] || ev.kind;
-          return label + ": " + ev.detail;
-        }).join("\n")).className = "development-thread-trace";
+        createTrace(append(traceDetails, "div", "")).update(undefined, traces.map((ev) =>
+          ev.kind === "cli_tool" ? ev.detail : (retryPhases[ev.kind] || phases[ev.kind] || ev.kind) + ": " + ev.detail), false);
       }
+    }
+    const review = job.status === "ready_for_review";
+    if (review) {
+      // The decision stays visible: no need to open the details to finish a review.
+      const panel = append(entry, "section", "");
+      panel.className = "development-review";
+      const bar = append(panel, "div", "");
+      bar.className = "development-review-bar";
+      const text = append(bar, "div", "");
+      append(text, "strong", "レビュー待ち");
+      append(text, "span", "変更内容を確認して、問題なければ完了にしてください。");
+      const notice = document.createElement("p");
+      notice.className = "development-review-notice";
+      notice.setAttribute("role", "status");
+      const onError = (value) => { notice.textContent = value; };
+      const done = button(bar, "レビュー完了", async () => {
+        await api("/jobs/" + encodeURIComponent(job.id) + "/complete", "POST");
+        notifyIsland();
+        await refreshThread();
+      }, onError);
+      done.className = "development-primary";
+      if (job.workspace) mountChanges(panel, job, onError, true);
+      panel.append(notice);
     }
     const detail = append(entry, "details", "");
     detail.className = "development-thread-details";
-    if (job.status === "ready_for_review" || job.status === "waiting_approval") {
+    if (job.status === "waiting_approval") {
       detail.dataset.attention = "true";
+      detail.open = true;
     }
-    append(detail, "summary", job.status === "ready_for_review"
-      ? "変更差分を確認・レビュー完了"
-      : job.status === "waiting_approval"
-        ? "PC操作の承認が必要です"
-        : "詳細・差分・承認");
+    append(detail, "summary", job.status === "waiting_approval" ? "PC操作の承認が必要です" : "詳細・進捗");
     const area = append(detail, "div", "");
-    card(area, job, () => openThread(currentThread.thread_id), false);
+    card(area, job, () => openThread(currentThread.thread_id), false, review);
     return entry;
   }
 
@@ -568,6 +722,11 @@
       currentRepo = data.repository;
       show("thread");
       $("development-thread-title").textContent = data.title || "開発チャット";
+      $("development-nav-thread").textContent = data.title || "開発チャット";
+      const parent = repositories.find((item) => item.path === data.repository);
+      $("development-back-thread").textContent = "← " + (parent?.name || (data.repository ? "リポジトリ" : "一覧"));
+      const waiting = data.jobs.filter((job) => job.status === "ready_for_review").map((job) => job.id);
+      if (waiting.length && !panel.hidden) window.PetitIslandStatus?.acknowledgeReviews?.(waiting);
       const latest = data.jobs[data.jobs.length - 1];
       $("development-thread-meta").textContent = [
         data.repository || "リポジトリなし", latest?.provider || "CLI未選択",
@@ -709,10 +868,12 @@
       await refreshWorkspace();
     } catch (error) { report(error.message); }
   });
-  $("development-back-home").addEventListener("click", () => {
+  const goHome = () => {
     currentRepo = ""; currentThread = null; newThreadId = undefined;
     show("home"); void refreshWorkspace();
-  });
+  };
+  $("development-back-home").addEventListener("click", goHome);
+  $("development-nav-home").addEventListener("click", goHome);
   $("development-back-thread").addEventListener("click", () => {
     const repo = currentThread?.repository || "";
     currentThread = null; newThreadId = undefined;

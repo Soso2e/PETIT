@@ -100,7 +100,8 @@ def test_antigravity_git_uses_one_native_turn(monkeypatch, tmp_path, status):
     args = ({"model": "gemini-test", "effort": "medium"}, "合成開発", tmp_path, lambda: None, phases.append)
     if status == "SUCCESS":
         assert coding_agents.run_git("antigravity_cli", *args) == "確認結果を報告します。"
-        assert phases == ["model_request", "cli_initialized", "cli_responding", "cli_validating", "model_response"]
+        assert phases == ["model_request", "cli_initialized", "cli_responding", "cli_tool",
+                          "cli_validating", "model_response"]
     else:
         with pytest.raises(coding_agents.antigravity_cli_brain.CLIError) as exc:
             coding_agents.run_git("antigravity_cli", *args)
@@ -257,3 +258,26 @@ def test_structured_run_publishes_stream_activity_and_progress_details(monkeypat
     assert ("tool_result", "list_pc_dir: フォルダ 1件 / ファイル 0件") in recorded
     assert "Serverを確認します" in snap["draft"] and "フォルダ一覧です" in snap["draft"]
     assert any("list_pc_dir" in item for item in snap["activity"])
+
+
+def test_native_cli_tool_steps_are_described_without_contents(tmp_path):
+    describe = coding_agents._describe_cli_tool
+    assert describe("Bash", {"command": "git status\n -sb"}) == "コマンド実行: git status -sb"
+    assert describe("Read", {"file_path": str(tmp_path / "src" / "app.py")}, tmp_path) == "読み取り: src/app.py"
+    assert describe("Edit", {"file_path": "a.py", "old_string": "secret", "new_string": "x"}) == "編集: a.py"
+    assert describe("Grep", {"pattern": "TODO", "path": "src"}) == "検索: TODO (src)"
+    assert describe("commandExecution", {"command": ["npm", "test"], "path": ""}) == "コマンド実行: npm test"
+    assert describe("TodoWrite", None) == "TodoWrite"
+    assert len(describe("Bash", {"command": "x" * 500})) < 200
+
+
+def test_trace_publishes_live_step_and_stored_event():
+    from backend import coding_stream
+    seen = []
+    with coding_stream.bind("trace-job"):
+        coding_agents._trace(lambda kind, detail="": seen.append((kind, detail)), "コマンド実行: git log")
+    try:
+        assert seen == [("cli_tool", "コマンド実行: git log")]
+        assert coding_stream.snapshot("trace-job")["activity"] == ["コマンド実行: git log"]
+    finally:
+        coding_stream.clear("trace-job")

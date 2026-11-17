@@ -155,6 +155,9 @@ def test_api_auth_proposal_diff_and_manual_completion(repository, client, monkey
     jobs.pump()
     diff=client.get(f"/api/coding/jobs/{job_id}/diff").json()
     assert diff["files"] == ["main.py"] and "+VALUE = 2" in diff["diff"]
+    entry, = diff["entries"]
+    assert (entry["path"], entry["status"], entry["additions"], entry["deletions"]) == ("main.py", "modified", 1, 1)
+    assert "+VALUE = 2" in entry["diff"] and entry["truncated"] is False
     completed=client.post(f"/api/coding/jobs/{job_id}/complete").json()
     assert completed["status"] == "completed" and completed["tests"] == "not_run"
     assert completed["task_id"] is None

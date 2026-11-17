@@ -24,4 +24,5 @@
   3. 未読通知（`GET /api/notifications/events?state=pending&limit=10`）
   4. 作業セッション計測中・一時停止中（`GET /api/work-sessions/active` + 1秒ごとの経過時間表示）
   5. `idle`（待機中: `PETIT`）
+- 開発ジョブの「完了しました」（`ready_for_review`）は一度きりの通知とする。アイランドから、または他の経路でDevelopを開く・該当の会話を表示すると、そのジョブIDを `localStorage`（`petit-island-seen-reviews`）へ記録して表示をやめる。レビュー完了時はDevelopが状態を再取得させる。別のジョブが完了すれば再び通知する。
 - アイランドをクリック（タップ）すると、表示中の状態に対応する画面（`development` / `reminders` / `focus` / `chat`）へ移動する。
