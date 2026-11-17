@@ -50,6 +50,8 @@ flowchart TD
     Build --> Work[作業: active_session]
     Build --> Schedule[予定: 今日・明日のキャッシュ / 同期はしない]
     Build --> Tasks[タスク: get_tasksの既定 + 期限3日以内・超過 + 同期の未解決件数]
+    Build --> Dev[開発対象: 登録フォルダの名前とGitかどうか / パス・状態は含めない]
+    Dev --> Budget
     Work --> Budget[節ごとに丸ごと採否 / 上限1800文字 / 失敗した節は落とす]
     Schedule --> Budget
     Tasks --> Budget

@@ -4,7 +4,7 @@
 
 ## 依頼と実行
 
-- Chat は `list_coding_repositories` で対象を確認し、`propose_development_job` に利用者の依頼（原文。会話の文脈がないと分からない対象や前提だけを補う）、対象、モデルと Effort を渡す。同じジョブの `proposed` カードが返信内と Develop に表示される。開始操作で `queued` に進む。
+- Chat は、対象の登録名が[現在状況](../core/ambient-context.md)に出ていればそれを使い、出ていない・曖昧な場合は `list_coding_repositories` で確認してから、`propose_development_job` に利用者の依頼（原文。会話の文脈がないと分からない対象や前提だけを補う）、対象、モデルと Effort を渡す。同じジョブの `proposed` カードが返信内と Develop に表示される。開始操作で `queued` に進む。
 - DeepSeekのFront Brainは[委譲スキル](../../backend/skills/compact-cli-handoff/SKILL.md)を読む。開発ジョブでは、利用者が言っていない制約・手順・完了条件を足さない（#489）。一般作業の委譲（`delegate_to_agent`）は、目的、必須の制約、完了条件に絞って依頼する。
 - Git開発ジョブは依頼を1回のCLIセッションで実行する。CLIへ渡すのは依頼文と短い補足1文だけで（push・PR作成・mergeは依頼に含まれる場合だけ行う／結果を日本語で報告する）、進め方・検査・commitの判断はCLIとリポジトリの指示ファイルに任せる。実行全体の上限は60分（`PETIT_CODING_JOB_TIMEOUT_MINUTES`）。上限に達したジョブは失敗になり、「続きから再開」で同じ会話の続きを依頼できる。CLIがすでに変更を加えている可能性があるため、失敗したセッションは自動再実行しない。PCモードのAntigravityはCore Tool向けの構造化応答と応答単位の再試行を使う。
 - 同じ開発スレッドの次のGit開発ジョブは、リポジトリの作業場所とブランチ・CLIセッションを引き継ぐ（[スレッドの継続](#スレッドの継続)）。

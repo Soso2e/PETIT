@@ -37,7 +37,7 @@ FRONT_HIDDEN = {"gmail_get_message",
                 "write_home_file", "edit_home_file"}
 _HANDOFF_SKILL = (Path(__file__).parent / "skills" / "compact-cli-handoff" / "SKILL.md")
 FRONT_HINT = ("\n開発・コード修正・リポジトリ調査・PCファイル作業・CLIでの調査や修正依頼（「CLIにお願いして」等）は "
-              "list_coding_repositories で対象を確認し、利用者の依頼を原文のまま goal に入れて propose_development_job で開発タブへ提案する。利用者の開始確認を待つ。"
+              "利用者の依頼を原文のまま goal に入れて propose_development_job で開発タブへ提案する。対象の登録名が現在状況に無い・曖昧な場合だけ先に list_coding_repositories で確認する。利用者の開始確認を待つ。"
               "PETIT Toolだけで完結する裏作業（PETIT Home内の作業、メール本文の確認）は delegate_to_agentでCLIに任せる"
               "（開発タブには追加されず、CLIの直接ファイル/コマンド操作も使えない）。"
               "「できない」と答える前に、利用可能なPETIT Toolや propose_development_job で対応できないか確かめる。"
