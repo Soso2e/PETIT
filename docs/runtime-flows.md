@@ -1105,6 +1105,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     TurnDone[Turn完了 status=completed] --> Gate{titleが空 かつ<br/>local_onlyでない かつ<br/>委譲スレッドでない}
+    DevelopStart[Develop依頼開始 /api/coding/jobs/start] --> Gate
     Gate -->|No| Skip[自動生成しない]
     Gate -->|Yes| BG[バックグラウンド実行<br/>thread_titles.ensure_thread_title]
     BG --> DeepSeek[DeepSeek Flash<br/>この文章を一言に言い直してください]

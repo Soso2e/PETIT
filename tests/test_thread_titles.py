@@ -111,3 +111,43 @@ class ThreadTitleTests(unittest.TestCase):
             api.submit("t-new", "req-2", "続きの質問", is_admin=True)
             scheduled_fns_2 = [c.args[0] for c in submit_mock.call_args_list]
             self.assertNotIn(thread_titles.ensure_thread_title, scheduled_fns_2)
+
+    def test_develop_job_start_schedules_title_only_when_empty(self):
+        from backend import coding_jobs, setup_store
+
+        setup_store.set_password("synthetic-passphrase")
+        token = setup_store.authenticate("synthetic-passphrase")
+        self.assertIsNotNone(token)
+        client = TestClient(main.app, headers={"Origin": "http://testserver"})
+        client.cookies.set("petit_admin", token)
+
+        created = client.post("/api/coding/threads", json={"thread_id": "dev-new", "repository": "", "title": ""})
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual(created.json()["title"], "")
+
+        with (
+            patch.object(coding_jobs.development_models, "select", return_value=("codex", "test-model", {"model_key": "codex_sol"})),
+            patch("backend.chat._artifact_executor.submit") as submit_mock,
+        ):
+            res1 = client.post("/api/coding/jobs/start", json={
+                "request_id": "dev-req-1",
+                "repository": "",
+                "goal": "Developタブからスレッド名を自動生成する",
+                "thread_id": "dev-new",
+            })
+            self.assertEqual(res1.status_code, 200)
+            self.assertEqual(store.thread("dev-new")["title"], "")
+            scheduled = [(c.args[0], c.args[1], c.args[2]) for c in submit_mock.call_args_list]
+            self.assertIn((thread_titles.ensure_thread_title, "dev-new", "Developタブからスレッド名を自動生成する"), scheduled)
+
+            submit_mock.reset_mock()
+            store.update_thread_title("dev-new", "スレッド名自動生成")
+            res2 = client.post("/api/coding/jobs/start", json={
+                "request_id": "dev-req-2",
+                "repository": "",
+                "goal": "追加の修正依頼",
+                "thread_id": "dev-new",
+            })
+            self.assertEqual(res2.status_code, 200)
+            scheduled_2 = [c.args[0] for c in submit_mock.call_args_list]
+            self.assertNotIn(thread_titles.ensure_thread_title, scheduled_2)

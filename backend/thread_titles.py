@@ -77,3 +77,18 @@ def ensure_thread_title(thread_id: str, message: str) -> str | None:
     if store.set_thread_title_if_empty(thread_id, title):
         return title
     return None
+
+
+def schedule_if_empty(thread_id: str, message: str) -> None:
+    """Schedule background title generation when the thread currently has no title."""
+    if not thread_id or not str(message or "").strip():
+        return
+    from . import chat
+
+    try:
+        current = store.thread(thread_id)
+    except HTTPException:
+        return
+    if current.get("title") or current.get("privacy") == "local_only" or delegations.is_work_thread(thread_id):
+        return
+    chat._artifact_executor.submit(ensure_thread_title, thread_id, message)

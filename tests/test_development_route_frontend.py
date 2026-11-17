@@ -17,6 +17,7 @@ def test_develop_starts_jobs_inside_the_main_tab():
     assert '/static/development.html' not in universe
     script = read("development.js")
     assert 'api("/jobs/start", "POST"' in script
+    assert 'title: ""' in script and 'input.goal.slice(0, 120)' not in script
     assert 'api("/usage")' in script and 'api("/config/root", "POST"' in script
 
 
@@ -64,3 +65,18 @@ def test_chat_proposal_passes_the_request_as_written():
                        if item["function"]["name"] == "propose_development_job")
     assert "原文のまま" in description and "足さない" in description
     assert "原文のまま goal" in delegations.FRONT_HINT
+
+
+def test_develop_thread_long_press_context_menu_and_motion():
+    script = read("development.js")
+    assert "attachThreadLongPress" in script
+    assert "openThreadContextMenu" in script
+    assert '"review_later"' in script and '"completed"' in script
+    assert "スレッド名変更" in script and "あとで確認" in script and "削除" in script
+    assert 'mutateThread(data.thread_id, "DELETE")' in script
+    assert "innerHTML" not in script
+
+    css = read("development.css")
+    assert ".development-context-menu" in css
+    assert "devMenuSpringIn" in css
+    assert "prefers-reduced-motion: reduce" in css

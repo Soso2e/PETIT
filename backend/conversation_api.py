@@ -52,13 +52,8 @@ def process(request_id: str) -> dict:
 
 
 def _schedule_title_if_empty(thread_id: str, message: str) -> None:
-    if not str(message or "").strip():
-        return
-    from . import chat, delegations, thread_titles
-    current = store.thread(thread_id)
-    if current.get("title") or current.get("privacy") == "local_only" or delegations.is_work_thread(thread_id):
-        return
-    chat._artifact_executor.submit(thread_titles.ensure_thread_title, thread_id, message)
+    from . import thread_titles
+    thread_titles.schedule_if_empty(thread_id, message)
 
 
 def _process_claimed(request_id: str) -> dict:

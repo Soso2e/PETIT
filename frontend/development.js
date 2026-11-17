@@ -484,9 +484,306 @@
     return parts.at(-1) || repository;
   }
 
+  const triageLabels = { review_later: "あとで確認", completed: "完了" };
+  let activeContextMenu = null;
+
+  function svgIcon(pathData) {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.9");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("class", "development-context-icon");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", pathData);
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function closeThreadContextMenu() {
+    if (!activeContextMenu) return;
+    const { backdrop, menu, cleanup } = activeContextMenu;
+    activeContextMenu = null;
+    cleanup();
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (reduced) {
+      backdrop.remove();
+      menu.remove();
+      return;
+    }
+    backdrop.dataset.closing = "true";
+    menu.dataset.closing = "true";
+    window.setTimeout(() => {
+      backdrop.remove();
+      menu.remove();
+    }, 150);
+  }
+
+  async function mutateThread(threadId, method, body) {
+    return api("/threads/" + encodeURIComponent(threadId), method, body);
+  }
+
+  function openThreadContextMenu(data, anchor = {}) {
+    closeThreadContextMenu();
+    const triage = data.triage_status || "active";
+    const backdrop = document.createElement("div");
+    backdrop.className = "development-context-backdrop";
+
+    const menu = document.createElement("div");
+    menu.className = "development-context-menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", (data.title || "開発チャット") + "の操作メニュー");
+
+    const header = append(menu, "div", "");
+    header.className = "development-context-header";
+    const titleEl = append(header, "span", data.title || "名称未設定の開発チャット");
+    titleEl.className = "development-context-title";
+    const subEl = append(header, "span", [
+      repoLabel(data.repository),
+      statusLabel(data.latest_job?.status),
+    ].filter(Boolean).join(" · "));
+    subEl.className = "development-context-sub";
+
+    const list = append(menu, "div", "");
+    list.className = "development-context-list";
+
+    let itemIndex = 0;
+    const addMenuItem = ({ label, iconPath, active = false, danger = false, onSelect }) => {
+      const btn = append(list, "button", "");
+      btn.type = "button";
+      btn.className = "development-context-item" + (danger ? " development-context-item--danger" : "");
+      btn.setAttribute("role", "menuitem");
+      btn.style.setProperty("--item-index", String(itemIndex++));
+      if (active) btn.dataset.active = "true";
+      btn.appendChild(svgIcon(iconPath));
+      const textSpan = append(btn, "span", label);
+      btn.addEventListener("click", () => void onSelect(btn, textSpan));
+      return btn;
+    };
+
+    const refreshAfterAction = async () => {
+      if (currentThread?.thread_id === data.thread_id) {
+        await openThread(data.thread_id);
+      }
+      await refreshWorkspace();
+    };
+
+    const isReviewLater = triage === "review_later";
+    addMenuItem({
+      label: isReviewLater ? "あとで確認を外す" : "あとで確認",
+      iconPath: "M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
+      active: isReviewLater,
+      onSelect: async () => {
+        closeThreadContextMenu();
+        try {
+          await mutateThread(data.thread_id, "PATCH", {
+            triage_status: isReviewLater ? "active" : "review_later",
+          });
+          await refreshAfterAction();
+        } catch (error) { report(error.message); }
+      },
+    });
+
+    const isCompleted = triage === "completed";
+    addMenuItem({
+      label: isCompleted ? "未完了に戻す" : "完了",
+      iconPath: "M20 6 9 17l-5-5",
+      active: isCompleted,
+      onSelect: async () => {
+        closeThreadContextMenu();
+        try {
+          await mutateThread(data.thread_id, "PATCH", {
+            triage_status: isCompleted ? "active" : "completed",
+          });
+          await refreshAfterAction();
+        } catch (error) { report(error.message); }
+      },
+    });
+
+    addMenuItem({
+      label: "スレッド名変更",
+      iconPath: "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z",
+      onSelect: () => {
+        list.replaceChildren();
+        const form = append(list, "form", "");
+        form.className = "development-context-rename";
+        const input = append(form, "input", "");
+        input.type = "text";
+        input.maxLength = 160;
+        input.placeholder = "スレッドのタイトル";
+        input.value = data.title || "";
+        const actions = append(form, "div", "");
+        actions.className = "development-context-rename-actions";
+        const cancelBtn = append(actions, "button", "キャンセル");
+        cancelBtn.type = "button";
+        cancelBtn.addEventListener("click", closeThreadContextMenu);
+        const saveBtn = append(actions, "button", "保存");
+        saveBtn.type = "submit";
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          saveBtn.disabled = true;
+          try {
+            await mutateThread(data.thread_id, "PATCH", { title: input.value });
+            closeThreadContextMenu();
+            await refreshAfterAction();
+          } catch (error) {
+            saveBtn.disabled = false;
+            report(error.message);
+          }
+        });
+        window.setTimeout(() => { input.focus(); input.select(); }, 20);
+      },
+    });
+
+    const divider = append(list, "div", "");
+    divider.className = "development-context-divider";
+
+    let confirmDelete = false;
+    addMenuItem({
+      label: "削除",
+      iconPath: "M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
+      danger: true,
+      onSelect: async (btn, textSpan) => {
+        if (!confirmDelete) {
+          confirmDelete = true;
+          btn.dataset.confirm = "true";
+          textSpan.textContent = "もう一度押して削除";
+          return;
+        }
+        closeThreadContextMenu();
+        if (anchor.card?.isConnected) anchor.card.dataset.removing = "true";
+        try {
+          await mutateThread(data.thread_id, "DELETE");
+          if (currentThread?.thread_id === data.thread_id) {
+            currentThread = null;
+            newThreadId = undefined;
+            show(currentRepo ? "repo" : "home");
+          }
+          window.setTimeout(() => void refreshWorkspace(), 180);
+        } catch (error) {
+          if (anchor.card?.isConnected) delete anchor.card.dataset.removing;
+          report(error.message);
+        }
+      },
+    });
+
+    document.body.append(backdrop, menu);
+
+    const rect = menu.getBoundingClientRect();
+    const cardRect = anchor.card?.getBoundingClientRect?.();
+    const rawX = typeof anchor.x === "number" && anchor.x > 0
+      ? anchor.x - rect.width * 0.5
+      : (cardRect ? cardRect.left + cardRect.width * 0.5 - rect.width * 0.5 : 16);
+    const rawY = typeof anchor.y === "number" && anchor.y > 0
+      ? anchor.y + 10
+      : (cardRect ? cardRect.bottom + 8 : 64);
+    const left = Math.max(12, Math.min(rawX, window.innerWidth - rect.width - 12));
+    const fitsBelow = rawY + rect.height + 12 <= window.innerHeight;
+    const top = fitsBelow
+      ? Math.max(12, rawY)
+      : Math.max(12, (typeof anchor.y === "number" && anchor.y > 0 ? anchor.y : (cardRect?.top || window.innerHeight * 0.5)) - rect.height - 10);
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    const originX = typeof anchor.x === "number" && anchor.x > 0 ? Math.max(12, Math.min(rect.width - 12, anchor.x - left)) : rect.width * 0.5;
+    menu.style.setProperty("--menu-origin-x", originX + "px");
+    menu.style.setProperty("--menu-origin-y", fitsBelow ? "0%" : "100%");
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeThreadContextMenu();
+      }
+    };
+    const onResize = () => closeThreadContextMenu();
+    backdrop.addEventListener("click", closeThreadContextMenu);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize);
+
+    activeContextMenu = {
+      backdrop,
+      menu,
+      cleanup: () => {
+        window.removeEventListener("keydown", onKeyDown);
+        window.removeEventListener("resize", onResize);
+      },
+    };
+    const firstItem = menu.querySelector(".development-context-item");
+    firstItem?.focus({ preventScroll: true });
+  }
+
+  function attachThreadLongPress(control, data) {
+    let pressTimer = 0;
+    let holdVisualTimer = 0;
+    let startX = 0;
+    let startY = 0;
+    let suppressClick = false;
+
+    const clearTimers = () => {
+      if (pressTimer) { window.clearTimeout(pressTimer); pressTimer = 0; }
+      if (holdVisualTimer) { window.clearTimeout(holdVisualTimer); holdVisualTimer = 0; }
+      delete control.dataset.pressing;
+    };
+
+    control.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      clearTimers();
+      suppressClick = false;
+      startX = event.clientX;
+      startY = event.clientY;
+      holdVisualTimer = window.setTimeout(() => {
+        control.dataset.pressing = "true";
+      }, 110);
+      pressTimer = window.setTimeout(() => {
+        clearTimers();
+        suppressClick = true;
+        control.dataset.popped = "true";
+        window.setTimeout(() => { delete control.dataset.popped; }, 380);
+        navigator.vibrate?.(12);
+        openThreadContextMenu(data, { x: startX, y: startY, card: control });
+      }, 470);
+    });
+
+    control.addEventListener("pointermove", (event) => {
+      if (!pressTimer) return;
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 10) {
+        clearTimers();
+      }
+    });
+
+    control.addEventListener("pointerup", clearTimers);
+    control.addEventListener("pointercancel", clearTimers);
+    control.addEventListener("pointerleave", clearTimers);
+
+    control.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      clearTimers();
+      openThreadContextMenu(data, { x: event.clientX, y: event.clientY, card: control });
+    });
+
+    control.addEventListener("keydown", (event) => {
+      if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+        event.preventDefault();
+        openThreadContextMenu(data, { card: control });
+      }
+    });
+
+    control.addEventListener("click", (event) => {
+      if (suppressClick) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        suppressClick = false;
+      }
+    }, true);
+  }
+
   function threadCard(parent, data, options = {}) {
     const latest = data.latest_job;
     const status = latest?.status || "";
+    const triage = data.triage_status || "active";
     const needsAttention = Object.hasOwn(attentionPriority, status);
     const control = append(parent, "button", "");
     control.type = "button";
@@ -495,13 +792,25 @@
       control.dataset.attention = "true";
       control.dataset.status = status;
     }
+    if (triage !== "active") {
+      control.dataset.triage = triage;
+    }
     const head = append(control, "div", "");
     head.className = "development-thread-card-head";
     append(head, "strong", data.title || "名称未設定の開発チャット");
-    if (needsAttention) {
-      const badge = append(head, "span", statusLabel(status));
-      badge.className = "development-attention-badge";
-      badge.dataset.status = status;
+    if (needsAttention || triageLabels[triage]) {
+      const badges = append(head, "div", "");
+      badges.className = "development-thread-badges";
+      if (triageLabels[triage]) {
+        const triageBadge = append(badges, "span", triageLabels[triage]);
+        triageBadge.className = "development-triage-badge";
+        triageBadge.dataset.triage = triage;
+      }
+      if (needsAttention) {
+        const badge = append(badges, "span", statusLabel(status));
+        badge.className = "development-attention-badge";
+        badge.dataset.status = status;
+      }
     }
     const meta = append(control, "span", [
       options.showRepository ? repoLabel(data.repository) : null,
@@ -512,6 +821,7 @@
     meta.className = "development-muted";
     const preview = append(control, "span", shorten(latest?.latest_message || "まだ開発依頼はありません。"));
     preview.className = "development-thread-preview";
+    attachThreadLongPress(control, data);
     control.addEventListener("click", () => void openThread(data.thread_id));
   }
 
@@ -916,7 +1226,7 @@
       if (!currentThread) {
         newThreadId ||= crypto.randomUUID().replace(/-/g, "");
         currentThread = await api("/threads", "POST", {
-          thread_id: newThreadId, repository: input.repository, title: input.goal.slice(0, 120),
+          thread_id: newThreadId, repository: input.repository, title: "",
         });
       }
       const job = await api("/jobs/start", "POST", {
@@ -930,10 +1240,19 @@
         devPromptBox?.fit();
       }
       justSubmittedThreadId = currentThread.thread_id;
+      const submittedThreadId = currentThread.thread_id;
       devPromptBox?.setStatus("done", "開発ジョブを開始しました", 2.0);
       report("開発を受け付けました: " + statusLabel(job.status));
-      await openThread(currentThread.thread_id);
+      await openThread(submittedThreadId);
       void refreshWorkspace();
+      if (!currentThread?.title) {
+        setTimeout(() => {
+          if (currentThread?.thread_id === submittedThreadId && !currentThread.title) {
+            void openThread(submittedThreadId);
+            void refreshWorkspace();
+          }
+        }, 1800);
+      }
     } catch (error) {
       devPromptBox?.setStatus("error", error.message || "送信に失敗しました", 3.0);
       report(error.message);

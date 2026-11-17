@@ -319,9 +319,19 @@ def create_development(request_id, repository, goal, model_key="auto", effort="m
     if thread_id:
         from . import development_threads
         try:
-            development_threads.register_conversation_thread(thread_id, str(root) if root else (repository or ""), title=goal[:120])
+            development_threads.register_conversation_thread(
+                thread_id,
+                str(root) if root else (repository or ""),
+                title="" if direct else goal[:120],
+            )
         except Exception as exc:
             log.warning("Failed to register develop thread for thread_id=%s: %s", thread_id, exc)
+        if direct:
+            from . import thread_titles
+            try:
+                thread_titles.schedule_if_empty(thread_id, goal)
+            except Exception as exc:
+                log.warning("Failed to schedule thread title for thread_id=%s: %s", thread_id, exc)
     return get(job_id)
 
 
