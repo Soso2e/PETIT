@@ -23,7 +23,7 @@ def run() -> None:
     # against the SHA-1 of the locally generated user-approved PNG.
     expected = 'e361a8144bf651dd352935747f24f35a53ee0e66'
     raw = SOURCE.read_bytes()
-    prefix = b'blob 4462\\x00'
+    prefix = b'blob 4462\x00'
     if hashlib.sha1(prefix + raw).hexdigest() != expected:
         repaired = None
         if len(raw) == 4461:
