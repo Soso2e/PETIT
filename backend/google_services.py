@@ -12,7 +12,16 @@ import httpx
 from . import setup_store as settings
 
 SCOPES = {"google_calendar": "https://www.googleapis.com/auth/calendar.readonly",
-          "gmail": "https://www.googleapis.com/auth/gmail.readonly"}
+          "gmail": "https://www.googleapis.com/auth/gmail.readonly",
+          "google_drive": "https://www.googleapis.com/auth/drive.readonly"}
+_BASES = {"google_calendar": "https://www.googleapis.com/calendar/v3/",
+          "gmail": "https://gmail.googleapis.com/gmail/v1/users/me/",
+          "google_drive": "https://www.googleapis.com/drive/v3/"}
+# Export formats for Google-native files that Drive for desktop syncs as .gdoc/.gsheet/.gslides stubs.
+DRIVE_EXPORT_TYPES = {"application/vnd.google-apps.document": "text/plain",
+                      "application/vnd.google-apps.spreadsheet": "text/csv",
+                      "application/vnd.google-apps.presentation": "text/plain"}
+DRIVE_EXPORT_MAX_CHARS = 200_000
 _lock = threading.RLock()
 
 
@@ -105,17 +114,38 @@ def access_token(service: str) -> str:
             return current["access_token"]
 
 
-def get(service: str, path: str, params: dict | None = None) -> dict:
-    base = "https://www.googleapis.com/calendar/v3/" if service == "google_calendar" else "https://gmail.googleapis.com/gmail/v1/users/me/"
+def _get_raw(service: str, path: str, params: dict | None = None) -> httpx.Response:
     for attempt in range(2):
-        response = httpx.get(base + path, params=params, headers={"Authorization": "Bearer " + access_token(service)}, timeout=25)
+        response = httpx.get(_BASES[service] + path, params=params,
+                             headers={"Authorization": "Bearer " + access_token(service)}, timeout=25)
         if response.status_code != 401 or attempt:
-            return _json(response)
+            return response
         with _lock:
             tokens = settings.secret("google_tokens", {})
             tokens["expires"] = 0
             settings.update({}, {"google_tokens": tokens})
     raise ServiceError("authentication_expired")
+
+
+def get(service: str, path: str, params: dict | None = None) -> dict:
+    return _json(_get_raw(service, path, params))
+
+
+def drive_export_text(file_id: str) -> dict:
+    """Read-only: export one Google Docs/Sheets/Slides file as text. Never writes to Drive."""
+    if not file_id or len(file_id) > 200 or not all(c.isalnum() or c in "-_" for c in file_id):
+        raise ValueError("invalid_file_id")
+    meta = get("google_drive", "files/" + quote(file_id, safe=""),
+               {"fields": "id,name,mimeType,modifiedTime", "supportsAllDrives": "true"})
+    export_type = DRIVE_EXPORT_TYPES.get(meta.get("mimeType", ""))
+    if not export_type:
+        raise ServiceError("unsupported_type")
+    response = _get_raw("google_drive", "files/" + quote(file_id, safe="") + "/export", {"mimeType": export_type})
+    if response.status_code >= 400:
+        _json(response)
+    text = response.content.decode("utf-8", errors="replace").lstrip("\ufeff")
+    return {"id": meta["id"], "name": meta.get("name", ""), "modified": meta.get("modifiedTime", ""),
+            "text": text[:DRIVE_EXPORT_MAX_CHARS], "read_only": True}
 
 
 def calendars() -> list[dict]:
@@ -191,7 +221,7 @@ def disconnect(service: str) -> None:
         data = settings.load()
         connected = [x for x in data["connected"] if x != service]
         # Shared grant remains while either service is connected; local detachment always takes effect.
-        if not ({"gmail", "google_calendar"} & set(connected)):
+        if not ({"gmail", "google_calendar", "google_drive"} & set(connected)):
             tokens = data["secrets"].get("google_tokens", {})
             token = tokens.get("refresh_token") or tokens.get("access_token")
             try:

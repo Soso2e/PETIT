@@ -177,6 +177,12 @@ def _require_manage_guild(*, manage_guild: bool, permissions: int | None) -> Non
         raise HTTPException(403, "この操作にはサーバーの「サーバー管理（Manage Server）」権限が必要です。")
 
 
+def _require_guild_mode() -> None:
+    """Setup / profile / chat need Guild mode on; reset and forget-me always work (#504)."""
+    if not discord_api.guild_mode_enabled():
+        raise HTTPException(403, discord_api.PRIVATE_NOTE)
+
+
 def _deepseek_target() -> dict[str, Any]:
     """Build DeepSeek target without touching brain_priority or owner Brain."""
     data = setup_store.load()
@@ -293,6 +299,7 @@ class GuildMessageRequest(BaseModel):
 @router.post("/api/guild/setup")
 def setup_guild(body: GuildSetupRequest, authorization: str | None = Header(default=None)) -> dict:
     discord_api._authorize(authorization)
+    _require_guild_mode()
     _require_manage_guild(manage_guild=body.manage_guild, permissions=body.permissions)
     tz_name = _valid_timezone(body.timezone)
     for ch in body.allowed_channels:
@@ -357,6 +364,7 @@ def reset_guild(body: GuildResetRequest, authorization: str | None = Header(defa
 @router.post("/api/guild/me")
 def member_me(body: GuildMemberRequest, authorization: str | None = Header(default=None)) -> dict:
     discord_api._authorize(authorization)
+    _require_guild_mode()
     with request_context.guild_mode(guild_id=body.guild_id):
         if not is_configured(body.guild_id):
             return {"mode": "guild", "status": "unconfigured", "reply": UNSET_GUIDE}
@@ -610,6 +618,7 @@ def handle_mention(body: GuildMessageRequest) -> dict:
 @router.post("/api/guild/messages")
 def receive_guild_message(body: GuildMessageRequest, authorization: str | None = Header(default=None)) -> dict:
     discord_api._authorize(authorization)
+    _require_guild_mode()
     return handle_mention(body)
 
 

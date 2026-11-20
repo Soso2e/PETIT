@@ -15,6 +15,7 @@
     notion: 'Notion',
     google_calendar: 'Googleカレンダー',
     gmail: 'Gmail',
+    google_drive: 'Google Drive',
     timetree: 'TimeTree',
     local: 'PETITローカル',
   };
@@ -296,8 +297,10 @@
     const gmailConn = connected.has('gmail');
     setBadge('badge-google_calendar', gCalConn ? (s.calendar === 'google_calendar' ? '接続済み（📅 同期元）' : '接続済み') : '未接続', gCalConn ? 'ok' : 'neutral');
     setBadge('badge-gmail', gmailConn ? '接続済み' : '未接続', gmailConn ? 'ok' : 'neutral');
-    if (gCalConn || gmailConn) {
-      setBadge('badge-google', [gCalConn ? 'カレンダー接続済' : null, gmailConn ? 'Gmail接続済' : null].filter(Boolean).join(' / '), 'ok');
+    const driveConn = connected.has('google_drive');
+    setBadge('badge-google_drive', driveConn ? '接続済み' : '未接続', driveConn ? 'ok' : 'neutral');
+    if (gCalConn || gmailConn || driveConn) {
+      setBadge('badge-google', [gCalConn ? 'カレンダー接続済' : null, gmailConn ? 'Gmail接続済' : null, driveConn ? 'Drive接続済' : null].filter(Boolean).join(' / '), 'ok');
     } else {
       setBadge('badge-google', '未接続', 'neutral');
     }
@@ -319,7 +322,7 @@
       $('ov-calendar').textContent = labels[s.calendar] + (s.calendar === 'local' ? '（外部未選択）' : '（毎日02:00同期）');
     }
     if ($('ov-services')) {
-      const svc = ['notion', 'timetree', 'google_calendar', 'gmail'].filter(x => connected.has(x)).map(x => labels[x]);
+      const svc = ['notion', 'timetree', 'google_calendar', 'gmail', 'google_drive'].filter(x => connected.has(x)).map(x => labels[x]);
       $('ov-services').textContent = svc.length ? svc.join('・') : '未接続（クリックで設定）';
     }
     if ($('ov-sync')) {

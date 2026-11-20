@@ -62,6 +62,7 @@ Brainの選択、CLI（Antigravity / Codex / Claude Code）接続、モデル切
 
 タスク、Notion、予定、リマインダー、作業記録
 
+- [activity-digest.md](life/activity-digest.md) — 活動ログの取り込みと毎日の進捗投稿（ChatGPT・Claude・GitHub → DeepSeek多段要約 → Discord、#504）
 - [brain_project_mapping.md](life/brain_project_mapping.md) — BRAIN Project Mapping
 - [daily_life_index.md](life/daily_life_index.md) — 日次生活インデックス
 - [generic_lists.md](life/generic_lists.md) — 汎用リスト管理

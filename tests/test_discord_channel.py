@@ -55,10 +55,19 @@ def test_owner_in_designated_guild_is_owner(client):
 
 
 @pytest.mark.parametrize("body", [event(author_id="9999"), event(author_id="9999", guild_id=GUILD), event(guild_id="4004")])
-def test_guest_or_undesignated_guild_never_calls_brain(client, body):
+def test_guest_or_undesignated_guild_never_calls_brain(client, monkeypatch, body):
+    monkeypatch.setenv("PETIT_DISCORD_GUILD_MODE", "on")
     data = post(client, body).json()
     assert data["mode"] == "guest" and data["reply"] == discord_api.GUEST_GUIDE
     assert client.calls == []
+
+
+@pytest.mark.parametrize("body", [event(author_id="9999"), event(author_id="9999", guild_id=GUILD), event(guild_id="4004")])
+def test_owner_only_by_default_guests_get_silence(client, body):
+    data = post(client, body).json()
+    assert data["mode"] == "guest" and data["reply"] == "" and data["status"] == "ignored"
+    assert client.calls == []
+    assert relay.split(data["reply"]) == []  # the Bot sends nothing
 
 
 def test_missing_owner_setting_treats_everyone_as_guest(client, monkeypatch):

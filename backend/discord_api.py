@@ -37,6 +37,18 @@ def owner_id() -> str:
     return os.getenv("PETIT_DISCORD_OWNER_ID", "").strip()
 
 
+def guild_mode_enabled() -> bool:
+    """Guild mode (other people in a server) is off unless explicitly turned on (#504).
+
+    While off, PETIT is the owner's private secretary: anyone else gets no reply at all
+    and no Brain call, and the guild commands only say the Bot is private.
+    """
+    return os.getenv("PETIT_DISCORD_GUILD_MODE", "off").strip().lower() in {"1", "on", "true", "yes"}
+
+
+PRIVATE_NOTE = "このプティは持ち主専用です。"
+
+
 def owner_guild_ids() -> set[str]:
     return {x.strip() for x in os.getenv("PETIT_DISCORD_OWNER_GUILD_IDS", "").split(",") if x.strip()}
 
@@ -84,6 +96,9 @@ def _reply(result: dict) -> dict:
 def receive(event: DiscordEvent, authorization: str | None = Header(default=None)) -> dict:
     _authorize(authorization)
     if mode_for(event) != "owner":
+        if not guild_mode_enabled():
+            # Silent: an empty reply makes the Bot send nothing.
+            return {"mode": "guest", "status": "ignored", "reply": "", "approvals": []}
         if event.guild_id is not None:
             from . import guild_api
             if guild_api.is_configured(event.guild_id):

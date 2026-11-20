@@ -51,6 +51,7 @@ def env( tmp_path, monkeypatch):
     monkeypatch.setenv("PETIT_DISCORD_SERVICE_TOKEN", TOKEN)
     monkeypatch.setenv("PETIT_DISCORD_OWNER_ID", OWNER)
     monkeypatch.setenv("PETIT_DISCORD_OWNER_GUILD_IDS", OWNER_GUILD)
+    monkeypatch.setenv("PETIT_DISCORD_GUILD_MODE", "on")
     monkeypatch.setenv("PETIT_DEEPSEEK_API_KEY", "sk-synthetic-deepseek-secret-key")
     deepseek_calls: list[dict] = []
 

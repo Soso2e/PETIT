@@ -25,6 +25,7 @@ _BUILTIN_MODULES = (
     "backend.tools.gmail",
     "backend.tools.delegations",
     "backend.tools.local_development",
+    "backend.tools.life_log",
     "backend.tools.lists",
     "backend.tools.memory",
     "backend.tools.notion",

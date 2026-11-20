@@ -61,7 +61,7 @@ flowchart TD
 | Desktop | `desktop/`（Electron）。既存のCoreへ接続するクライアントで、Core は同梱しない。ウェイクワードは openWakeWord（`wake/`） | [desktop/desktop.md](desktop/desktop.md)、[voice/openwakeword.md](voice/openwakeword.md) |
 | 音声 | Desktop の音声会話、Web 録音、AivisSpeech 読み上げ | [voice/voice_mode.md](voice/voice_mode.md)、[voice/aivis_speech.md](voice/aivis_speech.md) |
 | iOS | `ios/PETITMobile` は試作段階 | [../ios/PETITMobile/PHASE_STATUS.md](../ios/PETITMobile/PHASE_STATUS.md) |
-| Discord | **Owner モード MVP（v0.46.0）**。別プロセスの Bot（`backend/channels/discord/`）が DM・指定サーバーのメンションを `/api/channels/discord/events` へ中継し、owner 判定は Core が行う。owner 以外は固定の案内だけで Brain を呼ばない。承認ボタン（owner のみ・Discord 由来の承認のみ）と通知の DM 配送（opt-in）あり。Guild モードは未実装 | [channels/discord-bot.md](channels/discord-bot.md) |
+| Discord | **Owner モード MVP（v0.46.0）**。別プロセスの Bot（`backend/channels/discord/`）が DM・指定サーバーのメンションを `/api/channels/discord/events` へ中継し、owner 判定は Core が行う。owner 以外は固定の案内だけで Brain を呼ばない。承認ボタン（owner のみ・Discord 由来の承認のみ）と通知の DM 配送（opt-in）あり。Guild モードは `PETIT_DISCORD_GUILD_MODE=on` のときだけ動き、既定は本人専用（owner 以外には無反応）。`/petit digest` で毎日の進捗投稿（v0.68.0） | [channels/discord-bot.md](channels/discord-bot.md)、[life/activity-digest.md](life/activity-digest.md) |
 
 ### 2.2 会話の台帳（Thread / Turn）
 
@@ -104,7 +104,7 @@ flowchart TD
 | 記憶・ナレッジ | 記憶の保存と訂正、元発言の検索、Obsidian BRAIN 検索、Discord 過去ログ検索（Knowledge Gateway / FTS5）、Chroma（置き換え可能な検索インデックス） | [core/renaissance-memory.md](core/renaissance-memory.md)、[core/assistant-architecture.md](core/assistant-architecture.md) |
 | プロジェクト | Project Continuity（開始・再開・完了の確認）、GitHub evidence、ローカル開発環境の観測 | [core/assistant-architecture.md](core/assistant-architecture.md)、[dev/](dev/) |
 | 開発ジョブ | Chat の開始確認と Develop の直接送信を同じ台帳へ保存。同じ開発スレッドのGitジョブは作業場所とCLIのセッションを引き継ぐ。Gitリポジトリでは直接作業方式（#456）で選択したCLIがネイティブToolで編集・検査・commitし、PC モードで検索・コピー・承認付きの直接操作を扱う。モデル・Effort と利用枠は開発ジョブごとに選ぶ | [dev/coding-tasks.md](dev/coding-tasks.md) |
-| バックグラウンド | Durable Read Task（ニュース・天気）、通知イベント、Web Push、Discord ログ同期・索引化 | [core/durable-read-tasks.md](core/durable-read-tasks.md)、[channels/web_push_notifications.md](channels/web_push_notifications.md) |
+| バックグラウンド | Durable Read Task（ニュース・天気）、通知イベント、Web Push、Discord ログ同期・索引化、活動ログの取り込みと毎日の進捗投稿（DeepSeek 3段要約） | [core/durable-read-tasks.md](core/durable-read-tasks.md)、[channels/web_push_notifications.md](channels/web_push_notifications.md) |
 
 ### 2.6 データの正本
 
