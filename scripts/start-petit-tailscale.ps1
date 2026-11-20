@@ -50,7 +50,7 @@ if (-not (Test-Path -LiteralPath $PythonPath)) {
 Set-Location -LiteralPath $ProjectPath
 
 Write-Host ""
-Write-Host "[1/4] Checking Tailscale..."
+Write-Host "[1/5] Checking Tailscale..."
 $tailscale = Get-Command "tailscale.exe" -ErrorAction SilentlyContinue
 if (-not $tailscale) {
     $tailscale = Get-Command "tailscale" -ErrorAction SilentlyContinue
@@ -70,10 +70,11 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "[OK] Tailscale connected"
 
 Write-Host ""
-Write-Host "[2/4] Starting PETIT..."
+Write-Host "[2/5] Starting PETIT..."
 $uvicornArgs = @(
     "-m", "uvicorn", "backend.main:app",
-    "--host", "127.0.0.1", "--port", $Port
+    "--host", "127.0.0.1", "--port", $Port,
+    "--env-file", ".env"
 )
 if ($mode -eq "1") {
     $uvicornArgs += @("--reload", "--reload-dir", "backend")
@@ -87,7 +88,7 @@ $serverProcess = Start-Process -FilePath $PythonPath -ArgumentList $uvicornArgs 
 Write-Host "[OK] PETIT process started (PID: $($serverProcess.Id))"
 
 Write-Host ""
-Write-Host "[3/4] Waiting for PETIT health check..."
+Write-Host "[3/5] Waiting for PETIT health check..."
 $started = $false
 for ($i = 1; $i -le 30; $i++) {
     Start-Sleep -Seconds 1
@@ -112,7 +113,27 @@ if (-not $started) {
 Write-Host "[OK] PETIT is ready"
 
 Write-Host ""
-Write-Host "[4/4] Starting Tailscale Serve..."
+Write-Host "[4/5] Starting Discord Bot..."
+$existingBot = Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*backend.channels.discord*" } |
+    Select-Object -First 1
+if ($existingBot) {
+    Write-Host "[OK] Discord Bot is already running (PID: $($existingBot.ProcessId))"
+}
+else {
+    $discordConfigured = & $PythonPath -c "import os; from dotenv import load_dotenv; load_dotenv(); print('1' if os.environ.get('DISCORD_BOT_TOKEN') and len(os.environ.get('PETIT_DISCORD_SERVICE_TOKEN','')) >= 32 else '0')"
+    if ($discordConfigured -eq "1") {
+        $botArgs = @("-m", "backend.channels.discord")
+        $botProcess = Start-Process -FilePath $PythonPath -ArgumentList $botArgs -WorkingDirectory $ProjectPath -WindowStyle Minimized -PassThru
+        Write-Host "[OK] Discord Bot started (PID: $($botProcess.Id))"
+    }
+    else {
+        Write-Host "[SKIP] Discord Bot settings not found in .env"
+    }
+}
+
+Write-Host ""
+Write-Host "[5/5] Starting Tailscale Serve..."
 & $tailscale.Source serve --bg $LocalUrl
 if ($LASTEXITCODE -ne 0) {
     Stop-WithMessage "Tailscale Serve setup failed."

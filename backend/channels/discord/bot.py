@@ -688,8 +688,29 @@ def build_client(core: CoreClient):
     return client
 
 
+def _configure_logging() -> None:
+    log_dir = Path(__file__).resolve().parents[3] / "storage"
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_dir / "discord_bot.log", encoding="utf-8"))
+    except OSError:
+        pass
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        handlers=handlers,
+    )
+
+
 def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except ImportError:
+        pass
+    _configure_logging()
     token = os.environ.get("DISCORD_BOT_TOKEN", "")
     service = os.environ.get("PETIT_DISCORD_SERVICE_TOKEN", "")
     if not token or len(service) < 32:
