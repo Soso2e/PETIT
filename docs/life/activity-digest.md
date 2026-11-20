@@ -17,7 +17,7 @@ PETIT が「自分が何をしていたか」を全部知っている状態を�
 ```mermaid
 flowchart LR
     subgraph Sources[出典]
-        Inbox[BRAIN/inbox<br/>ChatGPT・Claude の日次ログ]
+        Inbox[BRAIN/00_Inbox・70_Outputs<br/>ChatGPT・Claude の日次ログ<br/>.gdoc は Drive API export で本文取得]
         GH[GitHub<br/>commit・PR]
         Petit[PETIT 日次索引]
         DA[Discord アーカイブ<br/>本人の投稿]
@@ -38,20 +38,28 @@ flowchart LR
 
 | 出典 | 設定 | 日付の決め方 |
 | --- | --- | --- |
-| inbox（`.md` `.markdown` `.txt`） | `PETIT_LIFELOG_INBOX_DIRS`（複数可。Windows は `;` 区切り） | front matter の `date:` → ファイル名の `YYYY-MM-DD` / `YYYYMMDD` → 更新日時 |
+| inbox（`.md` `.markdown` `.txt`、Googleドキュメントの `.gdoc` `.gsheet` `.gslides`） | `PETIT_LIFELOG_INBOX_DIRS`（複数可。Windows は `;` 区切り） | front matter の `covers:` → `date:` → ファイル名の `YYYY-MM-DD` / `YYYYMMDD` → 更新日時。`covers:` 以外には `PETIT_LIFELOG_DAY_SHIFT` を適用 |
 | GitHub | `PETIT_GITHUB_TOKEN`（既存）。止めるなら `PETIT_LIFELOG_GITHUB=0` | 既定ブランチの commit と、その日に更新された PR |
 | PETIT の会話 | 既存の日次索引（[daily_life_index.md](daily_life_index.md)） | 索引の日付 |
 | Discord の本人投稿 | 既存のアーカイブ（`storage/archive/personal.sqlite`）と `PETIT_DISCORD_OWNER_ID`。止めるなら `PETIT_LIFELOG_DISCORD=0` | 投稿日時 |
 
-- inbox はローカルフォルダとして読む。Google Drive は **Google Drive for desktop** で PC に同期したフォルダ（例 `G:\マイドライブ\BRAIN\inbox`）を指定する。Drive API は使わない。
-- 出典名（`origin`）は front matter の `source:`、なければ inbox 直下のフォルダ名（`chatgpt/` `claude/` など）。
+- inbox はローカルフォルダとして読む。Google Drive は **Google Drive for desktop** で PC に同期したフォルダ（例 `G:\マイドライブ\BRAIN\00_Inbox`）を指定する。普通のファイルは Drive API を使わない。
+- **Googleドキュメント（`.gdoc` など）**: PC 上は本文のないショートカット（中身はファイルIDの JSON）なので、設定画面の **Google Drive（Step 4、`drive.readonly`）** を接続すると、そのIDで Drive API の export（ドキュメント・スライドは text/plain、スプレッドシートは CSV）から本文を読む。読み取りだけで、Drive へは書かない。
+  - 結果は `lifelog_gdoc_cache` に保存し、ショートカットの更新日時とサイズが変わったときだけ取り直す。1回の取り込みで取り出すのは最大60件（初回に過去分が多くても、次回以降に続きを読む）。
+  - ドキュメントに Markdown を打ち込んだときに付く `\---` `\#` などのエスケープは外してから読む。
+  - ファイル名の `xxx.md.gdoc` は、タイトルとして `xxx` を使う。
+- **日付のずれ（`PETIT_LIFELOG_DAY_SHIFT`）**: 朝9時に前日のことを書くログのように、ファイルの日付と中身の日がずれるフォルダを `フォルダ名=-1` で指定する（例 `00_Inbox=-1;70_Outputs=-1`）。取り込み先そのもの、またはその中のフォルダ名に一致したものに適用する。ファイルの front matter に `covers: YYYY-MM-DD` があればそれを優先する。
+- 出典名（`origin`）は front matter の `source:`、なければ取り込み先直下のフォルダ名（`chatgpt/` `claude/` など）、直下のファイルなら取り込み先のフォルダ名。
 - 隠しファイル・シンボリックリンク・1MB を超えるファイルは読まない。1ファイルは `PETIT_LIFELOG_MAX_FILE_CHARS`（既定 20000 文字）まで。
 - 取り込んだ内容は `storage/app.db` の `lifelog_entries` に残る（内容ハッシュが同じなら更新しない）。
 - **読めなかったファイルの警告**: 取り込みのたびに、使えなかったファイルを記録し、`/petit digest action:preview`（自分にだけ見える）と Tool `get_activity_digest` の `inbox_warnings` に出す。定時投稿には出さない（ファイル名がチャンネルに出ないように）。
 
   | 警告 | 原因 | 対処 |
   | --- | --- | --- |
-  | Googleドキュメント形式（`.gdoc` など） | PC 上はショートカットだけで本文がない | `.md` / `.txt` で保存し直す |
+  | Googleドキュメント形式を読めていない | Google Drive 未接続、または図形描画・フォームなど非対応の形式 | 設定画面で Google Drive（Step 4）を接続する |
+  | Google Drive の認証が切れている | トークンの失効・権限の取り消し | Google Drive を接続し直す |
+  | 本文を取り出せなかった | ネットワーク・一時的な API エラー・ファイルを開けない | 次回の取り込みで再試行する |
+  | 取り出し待ち | 1回60件の上限 | 次回の取り込みで続きを読む |
   | 読み込めなかった | Google Drive のストリーミングで実体がない・オフライン | inbox を「オフラインで使用可能にする」 |
   | 1MB超 | 大きすぎる | 日ごとに分ける |
   | フォルダが見つからない | パス違い・同期停止 | `PETIT_LIFELOG_INBOX_DIRS` と同期を確認 |
@@ -71,6 +79,8 @@ title: ChatGPT 11/19 の作業ログ
 - 思いつき: 進捗投稿をフォーラムに日付ごとに立てる
 ```
 
+Googleドキュメントとして保存されても PETIT は読める（Google Drive 接続時）。ただ、本物の `.md` ファイルの方が Drive API を使わずに済むので、書き出し側が対応しているならテキストファイル（`text/markdown`）で保存させる。朝に前日分を書く場合は、front matter に `covers: <前日の日付>` を入れるとフォルダ単位の日付ずらし設定が要らない。
+
 定期実行の指示例（各サービスの定期実行機能に登録する）:
 
 > 毎日 3:00 に、前日の私とのチャットから「やったこと・決めたこと・詰まったこと・思いつき」を箇条書きにし、上のフォーマット（front matter つき Markdown）で `BRAIN/inbox/<サービス名>/YYYY-MM-DD.md` として保存して。事実だけ、推測は書かない。
@@ -84,7 +94,7 @@ title: ChatGPT 11/19 の作業ログ
 
 | 段 | モデル（既定） | 入力 → 出力 | 工夫 |
 | --- | --- | --- | --- |
-| ① extract | Flash（`PETIT_LIFELOG_EXTRACT_PROFILE`） | 記録のバッチ（約7000文字ごと）→ 短い事実の JSON（done / progress / idea / blocker / next / life、project、根拠番号） | バッチの内容ハッシュでキャッシュ（`lifelog_fact_cache`）。同じ日を作り直しても変わったバッチだけ呼ぶ。根拠番号が入力にないものは捨てる |
+| ① extract | Flash（`PETIT_LIFELOG_EXTRACT_PROFILE`） | 記録のバッチ（約7000文字ごと）→ 短い事実の JSON（done / progress / idea / blocker / next / life、project、根拠番号） | バッチの内容ハッシュでキャッシュ（`lifelog_fact_cache`）。同じ日を作り直しても変わったバッチだけ呼ぶ。根拠番号が入力にないものは捨てる。過去数日との比較形式の記録からは、その日に新しく起きた・進んだことだけを拾い（【新規】【進展】が手がかり）、「変化なし」の繰り返しは拾わない。「未確認」「未測定」は done にしない |
 | ② merge | Pro（`PETIT_LIFELOG_MERGE_PROFILE`） | 全事実 → 1日の構造（一言・ハイライト・プロジェクト別・くらし・思いつき・引っかかり・次の一歩） | 件数の上限を正規化で強制 |
 | ③ compose | Flash（`PETIT_LIFELOG_COMPOSE_PROFILE`） | ②の JSON だけ → Discord 投稿文 | 元の記録は見せない（記録内の文言が投稿へ混ざる経路を減らす）。1900 文字を超えたら使わない |
 
@@ -122,7 +132,8 @@ title: ChatGPT 11/19 の作業ログ
 ## 6. 設定と受入手順（未確認）
 
 ```env
-PETIT_LIFELOG_INBOX_DIRS=G:\マイドライブ\BRAIN\inbox
+PETIT_LIFELOG_INBOX_DIRS=G:\マイドライブ\BRAIN\00_Inbox;G:\マイドライブ\BRAIN\70_Outputs
+PETIT_LIFELOG_DAY_SHIFT=00_Inbox=-1;70_Outputs=-1
 PETIT_LIFELOG_TIMEZONE=Asia/Tokyo
 PETIT_DEEPSEEK_API_KEY=...
 PETIT_GITHUB_TOKEN=...            # 任意
@@ -130,7 +141,7 @@ PETIT_DISCORD_OWNER_ID=...
 PETIT_DISCORD_OWNER_GUILD_IDS=...
 ```
 
-1. inbox に推奨フォーマットのファイルを1つ置き、Core を再起動する。
+1. `.gdoc` がある場合は、設定画面の Google Drive（Step 4）で「Googleで接続」→「接続テスト」。Core を再起動する。
 2. Discord で `/petit digest action:preview day:前日` → まとめが自分にだけ表示される。
 3. 投稿したいフォーラムで `/petit digest action:here time:10:00`（またはテキストチャンネルで `channel:` 指定）。
 4. 翌日 10:00 に投稿されることを確認する。`/petit digest action:list` で登録を確認できる。

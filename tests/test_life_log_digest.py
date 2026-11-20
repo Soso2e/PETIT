@@ -328,7 +328,7 @@ def test_inbox_warnings_name_skipped_files(env, monkeypatch, tmp_path):
     scan = life_log.scan_inbox()
     assert scan["changed"] == 1
     notes = "\n".join(life_log.inbox_warnings(scan))
-    assert "chatgpt/会議メモ.gdoc" in notes and "Markdown" in notes
+    assert "chatgpt/会議メモ.gdoc" in notes and "Google Drive" in notes
     assert "claude/offline.md" in notes and "オフラインで使用可能" in notes
     assert "big.md" in notes and "1MB" in notes
     assert "フォルダが見つかりません" in notes
@@ -350,3 +350,87 @@ def test_preview_shows_warnings_but_scheduled_post_does_not(api, env, llm):
     discord_digest.run_due(datetime(2026, 11, 20, 1, 0, tzinfo=timezone.utc))
     posts = api.get("/api/channels/discord/digests", headers=HEADERS).json()["posts"]
     assert posts and "gdoc" not in posts[0]["body"] and "取り込みの注意" not in posts[0]["body"]
+
+
+
+# ---------------------------------------------------------------- Google Docs (.gdoc) via Drive, day shift
+
+
+class FakeDrive:
+    def __init__(self, texts):
+        self.texts, self.calls = texts, []
+
+    def __call__(self, file_id):
+        self.calls.append(file_id)
+        if file_id not in self.texts:
+            from backend.google_services import ServiceError
+            raise ServiceError("authentication_expired", 401)
+        return {"id": file_id, "name": "x", "modified": "", "text": self.texts[file_id], "read_only": True}
+
+
+@pytest.fixture
+def drive(monkeypatch):
+    from backend import google_services
+    fake = FakeDrive({"doc-1": "\ufeff\\---\r\ndate: 2026-11-20\r\nsource: chatgpt\r\n\\---\r\n\\# 今日の概要\r\n\\#\\# 【新規】SyncMon の端末別同期"})
+    monkeypatch.setattr(google_services, "drive_export_text", fake)
+    monkeypatch.setattr(life_log, "drive_connected", lambda: True)
+    return fake
+
+
+def test_gdoc_is_read_through_drive_and_cached(env, drive, monkeypatch):
+    monkeypatch.setenv("PETIT_LIFELOG_DAY_SHIFT", "00_Inbox=-1")
+    inbox = env / "00_Inbox"
+    inbox.mkdir()
+    write(env, "00_Inbox/2026-11-20_0900_デイリー知識ログ.md.gdoc", json.dumps({"": "WARNING", "doc_id": "doc-1"}))
+    scan = life_log.scan_inbox()
+    assert scan["changed"] == 1 and life_log.inbox_warnings(scan) == []
+    rows = life_log.entries_for("2026-11-19")  # dated 11/20 09:00, describes 11/19
+    assert len(rows) == 1 and rows[0]["origin"] == "chatgpt" and rows[0]["title"] == "2026-11-20_0900_デイリー知識ログ"
+    assert rows[0]["excerpt"].startswith("# 今日の概要") and "## 【新規】SyncMon" in rows[0]["excerpt"]
+    life_log.scan_inbox()
+    assert drive.calls == ["doc-1"]  # unchanged stub -> cached, no second export
+
+
+def test_gdoc_auth_error_is_reported(env, drive):
+    write(env, "chatgpt/2026-11-19.md.gdoc", json.dumps({"doc_id": "missing"}))
+    notes = "\n".join(life_log.inbox_warnings(life_log.scan_inbox()))
+    assert "認証が切れています" in notes and "chatgpt/2026-11-19.md.gdoc" in notes
+
+
+def test_gdoc_without_drive_connection_is_a_warning(env, monkeypatch):
+    monkeypatch.setattr(life_log, "drive_connected", lambda: False)
+    write(env, "chatgpt/2026-11-19.md.gdoc", json.dumps({"doc_id": "doc-1"}))
+    notes = "\n".join(life_log.inbox_warnings(life_log.scan_inbox()))
+    assert "Step 4" in notes
+
+
+def test_covers_wins_over_shift_and_top_level_origin_is_folder_name(env, monkeypatch, tmp_path):
+    outputs = tmp_path / "70_Outputs"
+    outputs.mkdir()
+    monkeypatch.setenv("PETIT_LIFELOG_INBOX_DIRS", str(outputs))
+    monkeypatch.setenv("PETIT_LIFELOG_DAY_SHIFT", "70_Outputs=-1")
+    (outputs / "2026-11-20_Media_a.md").write_text("- 投稿案", encoding="utf-8")
+    (outputs / "b.md").write_text("---\ndate: 2026-11-20\ncovers: 2026-11-18\n---\n- 振り返り", encoding="utf-8")
+    life_log.scan_inbox()
+    assert [r["origin"] for r in life_log.entries_for("2026-11-19")] == ["70_outputs"]
+    assert [r["title"] for r in life_log.entries_for("2026-11-18")] == ["b"]
+
+
+def test_drive_export_text_reads_metadata_then_exports_plain_text(monkeypatch):
+    import httpx
+    from backend import google_services
+    seen = []
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        seen.append((url, params))
+        if url.endswith("/export"):
+            return httpx.Response(200, content="﻿こんにちは".encode())
+        return httpx.Response(200, json={"id": "abc", "name": "n", "mimeType": "application/vnd.google-apps.document"})
+
+    monkeypatch.setattr(google_services, "access_token", lambda service: "tok")
+    monkeypatch.setattr(google_services.httpx, "get", fake_get)
+    assert google_services.drive_export_text("abc")["text"] == "こんにちは"
+    assert seen[1][0].startswith("https://www.googleapis.com/drive/v3/files/abc/export")
+    assert seen[1][1] == {"mimeType": "text/plain"}
+    with pytest.raises(ValueError):
+        google_services.drive_export_text("../x")

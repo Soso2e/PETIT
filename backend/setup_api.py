@@ -477,8 +477,13 @@ def test_connection(service: str):
         from .provider_runtime import RETIRED_SDK_MESSAGE
         raise HTTPException(409, RETIRED_SDK_MESSAGE)
     try:
-        if service in {"google_calendar", "gmail"}:
-            result = google_services.calendars() if service == "google_calendar" else google_services.get("gmail", "profile")
+        if service in {"google_calendar", "gmail", "google_drive"}:
+            if service == "google_calendar":
+                google_services.calendars()
+            elif service == "gmail":
+                google_services.get("gmail", "profile")
+            else:
+                google_services.get("google_drive", "about", {"fields": "user(displayName)"})
             return {"ok": True, "read_only": True}
         if service == "notion":
             from . import notion_client

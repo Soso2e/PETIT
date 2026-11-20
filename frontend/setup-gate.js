@@ -9,6 +9,7 @@
     notion: 'Notion',
     google_calendar: 'Googleカレンダー',
     gmail: 'Gmail',
+    google_drive: 'Google Drive',
     timetree: 'TimeTree',
     local: 'PETITローカル',
   };
