@@ -37,6 +37,10 @@ def run() -> None:
         )
         restored = b64decode(b64encode(raw).decode('ascii')[:5600] + tail)
         if hashlib.sha1(prefix + restored).hexdigest() != expected:
+            encoded = b64encode(raw).decode('ascii')
+            for i in range(0, 5600, 800):
+                print('ICON CHUNK', i // 800, hashlib.sha256(encoded[i:i+800].encode()).hexdigest())
+            print('restored length', len(restored), 'sha', hashlib.sha1(prefix + restored).hexdigest())
             raise ValueError('icon source transfer checksum mismatch')
         SOURCE.write_bytes(restored)
     src = Image.open(SOURCE).convert('RGB')
