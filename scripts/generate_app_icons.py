@@ -25,7 +25,7 @@ def run() -> None:
     from base64 import b64encode, b64decode
     expected = 'e361a8144bf651dd352935747f24f35a53ee0e66'
     raw = SOURCE.read_bytes()
-    prefix = b'blob 4462\\x00'
+    prefix = b'blob 4462\x00'
     if hashlib.sha1(prefix + raw).hexdigest() != expected:
         tail = (
             'joLD9yZP7eXGH0RAwkPSEzZ7CG9qdn46l/uEKchLwJ+4X4h7SmLNN5CUUf++BnjW'
