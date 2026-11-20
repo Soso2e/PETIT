@@ -84,6 +84,22 @@ def _require_owner(author_id: str, guild_id: str | None) -> None:
         raise HTTPException(403, "進捗投稿の設定は PETIT の持ち主だけが、DM か指定サーバーで行えます。")
 
 
+def audience_for(guild_id: str | None) -> str:
+    """A DM is private; a server channel can be read by others, so it gets work-only content."""
+    return "shared" if guild_id else "private"
+
+
+def _failure_reason(digest: dict) -> str:
+    status = digest.get("status")
+    if status == "empty":
+        return "情報不足（載せられる記録がない）"
+    if status == "degraded":
+        stages = digest.get("stages") or {}
+        failed = [name for name in ("extract", "merge", "compose") if stages.get(name) == "fallback"]
+        return "要約に失敗: " + ("/".join(failed) or "不明")
+    return "生成に失敗: " + str(digest.get("error") or status)
+
+
 def _describe(row) -> str:
     when = f"{row['hour']:02d}:{row['minute']:02d}"
     which = "前日" if row["day_offset"] == 1 else "当日"
@@ -125,16 +141,21 @@ def run_due(now: datetime | None = None) -> int:
     queued = 0
     for sub, day in due_subscriptions(now):
         try:
-            digest = life_log.generate(day)
+            digest = life_log.generate(day, audience=audience_for(sub["guild_id"]))
         except Exception as exc:  # noqa: BLE001 - one bad day must not stop the loop
             log.warning("digest generation failed: %s", type(exc).__name__)
-            digest = {"text": f"**{day} の進捗**\nまとめを作れませんでした（{type(exc).__name__}）。", "status": "failed"}
+            digest = {"status": "failed", "text": "", "error": type(exc).__name__}
+        # Only a real summary is posted. Anything else is recorded as failed, with the reason,
+        # and never reaches the channel (a wrong report is worse than a missing one).
+        ok = digest["status"] == "ok"
+        error = None if ok else _failure_reason(digest)
         with db.get_connection() as conn:
             inserted = conn.execute(
-                "INSERT OR IGNORE INTO discord_digest_posts(subscription_id,day,status,title,body,created_at) "
-                "VALUES(?,?,?,?,?,?)",
-                (sub["id"], day, "ready", f"{day} の進捗", digest["text"], db.now_iso())).rowcount
-        queued += inserted
+                "INSERT OR IGNORE INTO discord_digest_posts(subscription_id,day,status,title,body,error,created_at) "
+                "VALUES(?,?,?,?,?,?,?)",
+                (sub["id"], day, "ready" if ok else "failed", f"{day} の進捗", digest["text"] if ok else "", error,
+                 db.now_iso())).rowcount
+        queued += inserted if ok else 0
     return queued
 
 
@@ -184,7 +205,7 @@ def get_scheduler() -> DigestScheduler:
 
 
 class DigestCommand(BaseModel):
-    action: str = Field(pattern=r"^(here|off|list|preview)$")
+    action: str = Field(pattern=r"^(here|register|off|unregister|list|preview)$")
     author_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
     guild_id: str | None = Field(default=None, max_length=40, pattern=r"^[0-9]+$")
     channel_id: str | None = Field(default=None, max_length=40, pattern=r"^[0-9]+$")
@@ -202,11 +223,21 @@ def command(body: DigestCommand, authorization: str | None = Header(default=None
         with db.get_connection() as conn:
             rows = conn.execute("SELECT * FROM discord_digest_subscriptions ORDER BY id").fetchall()
         if not rows:
-            return {"reply": "進捗投稿の登録はまだありません。投稿したい場所で `/petit digest action:here` を実行してください。"}
-        return {"reply": "進捗投稿の登録:\n" + "\n".join("- " + _describe(r) for r in rows)}
+            return {"reply": "進捗投稿の登録はまだありません。投稿したい場所で `/petit digest action:register` を実行してください。"}
+        lines = []
+        with db.get_connection() as conn:
+            for row in rows:
+                lines.append("- " + _describe(row))
+                bad = conn.execute("SELECT day, error FROM discord_digest_posts WHERE subscription_id=? AND status='failed' "
+                                   "ORDER BY id DESC LIMIT 1", (row["id"],)).fetchone()
+                if bad:
+                    lines.append(f"  直近の失敗: {bad['day']}（{bad['error'] or '不明'}）")
+        return {"reply": "進捗投稿の登録:\n" + "\n".join(lines)}
     if body.action == "preview":
-        digest = life_log.generate(body.day)
+        digest = life_log.generate(body.day, audience=audience_for(body.guild_id))
         reply = digest["text"]
+        if digest["status"] != "ok":
+            reply += f"\n\n⚠️ この内容は定時投稿されません（{_failure_reason(digest)}）。"
         warnings = digest.get("warnings") or []
         if warnings:
             # Preview is ephemeral, so file names can be shown; scheduled posts never include them.
@@ -215,10 +246,14 @@ def command(body: DigestCommand, authorization: str | None = Header(default=None
     if not body.channel_id:
         raise HTTPException(400, "投稿先のチャンネルが分かりませんでした。")
     now = db.now_iso()
-    if body.action == "off":
+    if body.action in {"off", "unregister"}:
         with db.get_connection() as conn:
             changed = conn.execute("UPDATE discord_digest_subscriptions SET enabled=0, updated_at=? WHERE channel_id=?",
                                    (now, body.channel_id)).rowcount
+            # Unsent posts must not go out later if the channel is registered again.
+            conn.execute("UPDATE discord_digest_posts SET status='failed', error='登録解除' WHERE status='ready' AND "
+                         "subscription_id IN (SELECT id FROM discord_digest_subscriptions WHERE channel_id=?)",
+                         (body.channel_id,))
         return {"reply": f"<#{body.channel_id}> への進捗投稿を止めました。" if changed else "この場所には登録がありません。"}
     hour, minute = _parse_time(body.time)
     tz_name = body.timezone.strip() or life_log.timezone_name()

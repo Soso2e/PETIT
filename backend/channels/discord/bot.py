@@ -311,7 +311,7 @@ async def dispatch_slash_interaction(
         # Owner-only; Core checks the owner and the place. Works in DMs too.
         params = parsed[1]
         target = params.get("channel") or channel_id
-        body = {"action": str(params.get("action") or "here"), "author_id": author_id, "guild_id": guild_id,
+        body = {"action": str(params.get("action") or "register"), "author_id": author_id, "guild_id": guild_id,
                 "channel_id": str(target) if target else None, "time": str(params.get("time") or "10:00"),
                 "day": str(params.get("day") or "yesterday")}
         result = await core.digest_command(body)
@@ -570,13 +570,13 @@ def build_client(core: CoreClient):
         pass
 
     @petit_group.command(name="digest", description="毎日の進捗投稿を登録・停止・確認します（持ち主のみ）")
-    @app_commands.describe(action="here=ここに登録 / off=停止 / list=一覧 / preview=今すぐ自分だけに表示",
+    @app_commands.describe(action="register=登録 / unregister=解除 / list=一覧 / preview=今すぐ自分だけに表示",
                            time="投稿する時刻（HH:MM）", day="まとめる日",
                            channel="投稿先（省略時はこの場所。フォーラムなら毎日新しい投稿を作ります）")
     @app_commands.choices(
-        action=[app_commands.Choice(name=n, value=n) for n in ("here", "off", "list", "preview")],
+        action=[app_commands.Choice(name=n, value=n) for n in ("register", "unregister", "list", "preview")],
         day=[app_commands.Choice(name="前日", value="yesterday"), app_commands.Choice(name="当日", value="today")])
-    async def _cmd_digest(interaction: discord.Interaction, action: str = "here", time: str = "10:00",
+    async def _cmd_digest(interaction: discord.Interaction, action: str = "register", time: str = "10:00",
                           day: str = "yesterday",
                           channel: discord.TextChannel | discord.ForumChannel | discord.Thread | None = None):
         pass

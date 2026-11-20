@@ -129,6 +129,7 @@ def test_every_stage_falls_back(env, monkeypatch):
     assert digest["status"] == "degraded"
     assert digest["stages"]["extract"] == "fallback" and digest["stages"]["compose"] == "fallback"
     assert "Discord の設計を相談" in digest["text"]
+    assert digest["payload"]["projects"] and not digest["payload"]["projects"][0]["done"]  # never "done"
     assert len(digest["text"]) <= life_log.POST_LIMIT
 
 
@@ -444,3 +445,106 @@ def test_deepseek_key_from_setup_screen_is_used(monkeypatch):
     target = life_log._deepseek_target("deepseek_flash")
     assert target["configured"] and target["api_key"] == "sk-from-setup"
     assert life_log.deepseek_configured()
+
+
+# ---------------------------------------------------------------- privacy, destinations, failures
+
+
+def test_prompts_exclude_private_content_briefly():
+    for prompt in (life_log._EXTRACT_SYSTEM, life_log._COMPOSE_SYSTEM):
+        assert "private" in prompt
+    assert "人間関係" in life_log._EXTRACT_SYSTEM
+
+
+def test_shared_audience_keeps_work_only(env, monkeypatch):
+    class Mixed(FakeLLM):
+        def __call__(self, profile, system, user, max_tokens):
+            if "記録整理係" in system:
+                self.calls.append(("extract", profile, user))
+                return json.dumps({"facts": [
+                    {"kind": "done", "project": "PETIT", "text": "設計した", "src": 1},
+                    {"kind": "life", "project": "", "text": "友人との相談", "src": 1},
+                    {"kind": "blocker", "project": "", "text": "人間関係で悩む", "src": 1}]})
+            return super().__call__(profile, system, user, max_tokens)
+    fake = Mixed()
+    monkeypatch.setattr(life_log, "_llm", fake)
+    monkeypatch.setattr(life_log, "deepseek_configured", lambda: True)
+    write(env, "chatgpt/2026-11-19.md", "- 設計\n- 友人との相談")
+    shared = life_log.generate("2026-11-19", audience="shared")
+    merge_input = next(c[2] for c in fake.calls if c[0] == "merge")
+    assert "友人" not in merge_input and "悩む" not in merge_input and "設計した" in merge_input
+    assert shared["status"] == "ok"
+    private = life_log.generate("2026-11-19", audience="private")  # audience is part of the cache key
+    assert private["cached"] is False
+    assert "友人との相談" in next(c[2] for c in fake.calls[3:] if c[0] == "merge")
+
+
+def test_shared_audience_drops_chat_sources(env, llm, monkeypatch):
+    monkeypatch.setattr(life_log, "COLLECTORS", {"discord": lambda day: [
+        {"source": "discord", "origin": "dm", "ref": "m1", "day": day.isoformat(), "title": "t", "body": "秘密の相談"}]})
+    digest = life_log.generate("2026-11-19", audience="shared")
+    assert digest["status"] == "empty" and llm.calls == []
+
+
+def test_destination_decides_audience(api, env, llm, monkeypatch):
+    seen = []
+    real = life_log.generate
+    monkeypatch.setattr(life_log, "generate", lambda day, **kw: seen.append(kw["audience"]) or real(day, **kw))
+    write(env, "chatgpt/2026-11-19.md", "- 進めた")
+    command(api, time="10:00")                       # server channel
+    command(api, channel_id="888", guild_id=None)    # DM
+    _set_created("2026-11-18T00:00:00+00:00")
+    discord_digest.run_due(datetime(2026, 11, 20, 1, 0, tzinfo=timezone.utc))
+    assert sorted(seen) == ["private", "shared"]
+
+
+@pytest.mark.parametrize("case", ["exception", "fallback", "empty"])
+def test_failed_summary_is_recorded_not_posted(api, env, monkeypatch, case):
+    if case == "exception":
+        monkeypatch.setattr(life_log, "generate", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    elif case == "fallback":
+        monkeypatch.setattr(life_log, "_llm", FakeLLM(fail={"extract", "merge", "compose"}))
+        monkeypatch.setattr(life_log, "deepseek_configured", lambda: True)
+        write(env, "chatgpt/2026-11-19.md", "- 未完了の作業")
+    command(api, time="10:00")
+    _set_created("2026-11-18T00:00:00+00:00")
+    assert discord_digest.run_due(datetime(2026, 11, 20, 1, 0, tzinfo=timezone.utc)) == 0
+    assert api.get("/api/channels/discord/digests", headers=HEADERS).json()["posts"] == []
+    with db.get_connection() as conn:
+        row = conn.execute("SELECT status, body, error FROM discord_digest_posts").fetchone()
+    assert row["status"] == "failed" and row["body"] == "" and row["error"]
+    assert "直近の失敗: 2026-11-19" in command(api, action="list").json()["reply"]
+    assert discord_digest.run_due(datetime(2026, 11, 20, 1, 0, tzinfo=timezone.utc)) == 0  # one row per day
+
+
+def test_preview_says_degraded_digest_is_not_posted(api, env, monkeypatch):
+    monkeypatch.setattr(life_log, "deepseek_configured", lambda: False)
+    write(env, "chatgpt/2026-11-19.md", "- 作業")
+    reply = command(api, action="preview").json()["reply"]
+    assert "定時投稿されません" in reply
+
+
+def test_register_and_unregister_commands(api):
+    assert "登録しました" in command(api, action="register").json()["reply"]
+    assert "止めました" in command(api, action="unregister").json()["reply"]
+    assert "停止中" in command(api, action="list").json()["reply"]
+    assert "登録がありません" in command(api, action="unregister", channel_id="999").json()["reply"]
+
+
+def test_unregister_cancels_unsent_posts(api, env, llm):
+    write(env, "chatgpt/2026-11-19.md", "- 進めた")
+    command(api, time="10:00")
+    _set_created("2026-11-18T00:00:00+00:00")
+    assert discord_digest.run_due(datetime(2026, 11, 20, 1, 0, tzinfo=timezone.utc)) == 1
+    command(api, action="unregister")
+    command(api, action="register")
+    assert api.get("/api/channels/discord/digests", headers=HEADERS).json()["posts"] == []
+
+
+def test_slash_digest_defaults_to_register():
+    core = FakeCore([])
+    data = {"name": "petit", "options": [{"name": "digest", "options": []}]}
+    asyncio.run(bot.dispatch_slash_interaction(
+        core, interaction_id="1", guild_id=GUILD, author_id=OWNER, display_name="", manage_guild=False,
+        permissions=None, data=data, channel_id="555"))
+    assert core.commands[0]["action"] == "register"

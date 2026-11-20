@@ -279,15 +279,17 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Cmd["/petit digest here・off・list・preview"] --> CmdAPI[POST /api/channels/discord/digests/command]
+    Cmd["/petit digest register・unregister・list・preview"] --> CmdAPI[POST /api/channels/discord/digests/command]
     CmdAPI --> Owner{owner かつ DM か指定サーバー?}
     Owner -->|no| D403[403]
     Owner -->|preview| Gen
-    Owner -->|here / off / list| Subs[(discord_digest_subscriptions<br/>channel・時刻・TZ・前日/当日)]
+    Owner -->|register / unregister / list| Subs[(discord_digest_subscriptions<br/>channel・時刻・TZ・前日/当日)]
     Tick[DigestScheduler 1分ごと] --> Due{予定時刻〜6時間以内 かつ<br/>登録後の枠 かつ 未作成の日?}
     Subs --> Due
-    Due -->|yes| Gen[life_log.generate<br/>取り込み → ①extract ②merge ③compose<br/>元の記録が同じなら保存済みを再利用]
-    Gen --> Ready[(discord_digest_posts ready<br/>登録×日で一意)]
+    Due -->|yes| Gen[life_log.generate<br/>投稿先で private(DM) / shared(サーバー) を切替<br/>取り込み → ①extract ②merge ③compose<br/>元の記録が同じなら保存済みを再利用]
+    Gen --> Ok{status = ok?}
+    Ok -->|degraded / empty / 例外| Failed[(discord_digest_posts failed<br/>本文なし・理由のみ。投稿しない)]
+    Ok -->|ok| Ready[(discord_digest_posts ready<br/>登録×日で一意)]
     BotPoll[Bot 30秒ごと] --> ClaimD[GET /api/channels/discord/digests<br/>ready → claimed]
     Ready --> ClaimD
     ClaimD --> Kind{フォーラム?}
