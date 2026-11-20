@@ -271,3 +271,91 @@ def test_deliver_notifications_reports_each_outcome():
 
     assert asyncio.run(bot.deliver_notifications(Core(), fetch_user)) == 1
     assert reports == [(1, "sent"), (2, "failed")]
+
+
+def test_admin_registration_and_owner_routing(client, monkeypatch):
+    submitted = []
+    monkeypatch.setattr(
+        conversation_api,
+        "submit",
+        lambda tid, rid, msg, **kw: submitted.append((tid, rid, msg, kw))
+        or {"status": "completed", "reply": "管理者として実行しました"},
+    )
+    headers = {"Authorization": "Bearer " + TOKEN}
+    new_admin = "777777777"
+
+    # Non-owner cannot register admins
+    r_forbid = client.post(
+        "/api/channels/discord/admins",
+        json={"action": "add", "actor_id": new_admin, "target_user_id": new_admin},
+        headers=headers,
+    )
+    assert r_forbid.status_code == 200
+    assert r_forbid.json()["status"] == "forbidden"
+
+    # Before registration, user in guild is not owner
+    r_before = client.post(
+        "/api/channels/discord/events",
+        json={"event_id": "201", "channel_id": "301", "guild_id": "999", "author_id": new_admin, "message": "pcみて"},
+        headers=headers,
+    )
+    assert r_before.json()["mode"] == "guest"
+    assert submitted == []
+
+    # Initial owner adds user via mention format
+    r_add = client.post(
+        "/api/channels/discord/admins",
+        json={"action": "add", "actor_id": OWNER, "target_user_id": f"<@{new_admin}>"},
+        headers=headers,
+    )
+    assert r_add.status_code == 200
+    assert "登録しました" in r_add.json()["reply"]
+
+    # Registered admin gets owner mode (full Core tools) in any guild
+    r_after = client.post(
+        "/api/channels/discord/events",
+        json={"event_id": "202", "channel_id": "301", "guild_id": "999", "author_id": new_admin, "message": "pcみて"},
+        headers=headers,
+    )
+    assert r_after.status_code == 200
+    assert r_after.json()["mode"] == "owner"
+    assert r_after.json()["reply"] == "管理者として実行しました"
+    assert submitted and submitted[0][3]["is_admin"] is True
+
+    # List and remove
+    r_list = client.post(
+        "/api/channels/discord/admins",
+        json={"action": "list", "actor_id": OWNER},
+        headers=headers,
+    )
+    assert new_admin in r_list.json()["reply"]
+    r_rem = client.post(
+        "/api/channels/discord/admins",
+        json={"action": "remove", "actor_id": OWNER, "target_user_id": new_admin},
+        headers=headers,
+    )
+    assert "解除しました" in r_rem.json()["reply"]
+
+
+def test_slash_admin_dispatch():
+    sent = []
+
+    class FakeCore:
+        async def admin_command(self, body):
+            sent.append(body)
+            return {"reply": "ok"}
+
+    reply = asyncio.run(
+        bot.dispatch_slash_interaction(
+            FakeCore(),
+            interaction_id="100",
+            guild_id="999",
+            author_id=OWNER,
+            display_name="soso",
+            manage_guild=True,
+            permissions=None,
+            data={"name": "petit", "options": [{"name": "admin", "options": [{"name": "action", "value": "add"}, {"name": "user", "value": "555"}]}]},
+        )
+    )
+    assert reply == "ok"
+    assert sent == [{"action": "add", "actor_id": OWNER, "target_user_id": "555"}]

@@ -158,6 +158,16 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 - `PETIT_DISCORD_GUILD_MODE`（既定 off）。off の間、owner 以外・指定外サーバーの発話には空の返答（`status=ignored`）を返し、Bot は何も送らない。Brain / DeepSeek は 0 回。`/api/guild/setup`・`/api/guild/me`・`/api/guild/messages` は 403「このプティは持ち主専用です。」。`reset`・`forget-me` は削除のため常に使える。
 - `/petit digest`（owner のみ・DM か指定サーバー）で、チャンネル・フォーラム・スレッドに毎日の進捗投稿を登録する。Core の `backend/discord_digest.py` が時刻を判定して `backend/life_log.py` のまとめを作り、Bot が `GET /api/channels/discord/digests` で取りに来て送る。仕組みと設定は [../life/activity-digest.md](../life/activity-digest.md)。
 
+## 5.5 管理者登録と非管理者向け 2 段階アーカイブ検索（v0.70.0・#510）
+
+- **管理者登録コマンド（`/petit admin`）**: 初期管理者（`PETIT_DISCORD_OWNER_ID`）が `@メンション` でユーザーを指定し、`discord_admins` テーブルへ追加・解除・一覧表示できる（`POST /api/channels/discord/admins`）。
+- **管理者の全サーバー横断＋フル機能**: 登録された管理者は、DM やどのサーバーから話しかけても `mode=owner`（`is_admin=True`）として Core の全機能（PC ディレクトリ操作・開発ジョブ・承認フロー）を利用でき、その場へそのまま返答する。また、`search_discord_archive` は `guild_id` 未指定時に `personal.sqlite` と存在する全 `guild_*.sqlite` を横断して検索する。
+- **一般メンバー（非管理者）の 2 段階 DeepSeek 検索フロー**:
+  - 会話の流れとして、そのチャンネルの直近 **6 チャット前まで**（`HISTORY_LIMIT = 6`）をプロンプトに含める。
+  - 1 回目の DeepSeek 呼び出しでは `search_guild_archive` のみ許可し、サーバー内の話題について質問された場合に検索キーワードを要求させる。
+  - サーバー側 Python（`guild_api._search_guild_archive`）が該当サーバー専用の `guild_<guild_id>.sqlite` を FTS5 + trigram（RRF スコア）で検索し、**マッチ度上位 5 件のチャット本文を省略せず全文**返す。
+  - 2 回目の DeepSeek 呼び出し（`tools=None`）へ検索結果と元の質問を渡し、回答可能なら回答し、該当情報がない場合は「Discordの中に引っかかる情報がありませんでした。」等を返す。
+
 ## 6. どこで動かすか — 自宅PC＋Cloudflare（検討）
 
 **決定（2026-11-08）: 基本は自宅PC。** Cloudflare は無料枠に収まる場合だけ、PC 停止中に止まると困る部分に使う。

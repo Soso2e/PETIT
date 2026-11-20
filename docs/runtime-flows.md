@@ -253,7 +253,7 @@ flowchart TD
     Post --> Auth{トークン一致?}
     Auth -->|未設定| E503[503]
     Auth -->|不一致| E401[401]
-    Auth --> Mode{発話者 = OWNER_ID かつ<br/>DM か OWNER_GUILD_IDS?}
+    Auth --> Mode{発話者 = 登録管理者<br/>または (OWNER_ID かつ DM/指定サーバー)?}
     Mode -->|no| GuildOn{PETIT_DISCORD_GUILD_MODE=on?<br/>既定 off・#504}
     GuildOn -->|no| Ignore[空の返答 status=ignored<br/>Bot は何も送らない・Brain 0 回]
     GuildOn -->|yes| GuildCheck{guild_id あり かつ<br/>guild_api.is_configured?}
@@ -322,8 +322,11 @@ flowchart TD
     Idem -->|yes| Saved[保存済み返答を再利用<br/>DeepSeek 0 回]
     Idem -->|no| Budget{1日上限（回数/トークン）<br/>・ユーザー1時間上限内?}
     Budget -->|超過| Stop["「今日はここまで」を返す<br/>DeepSeek 0 回"]
-    Budget -->|上限内| DS["DeepSeek API のみ (tools=None)<br/>サーバー専用 DB のメンバー・直近会話だけ参照"]
-    DS --> Redact[秘密値を伏せて guild_conversations と<br/>guild_usage_log に記録し返信]
+    Budget -->|上限内| DS["DeepSeek (1回目)<br/>直近6件の会話履歴 + search_guild_archive ツールのみ"]
+    DS -->|ツール要求なし| Redact[秘密値を伏せて guild_conversations と<br/>guild_usage_log に記録し返信]
+    DS -->|search_guild_archive| PySearch["Python: guild_&lt;id&gt;.sqlite をマッチ度検索<br/>(FTS5 + trigram・上位5件・本文全文)"]
+    PySearch --> DS2["DeepSeek (2回目・tools=None)<br/>検索結果5件 + 元の質問から回答生成<br/>該当なしなら情報がない旨を回答"]
+    DS2 --> Redact
 ```
 
 ## PETIT MCP bridge（v0.46.0開発版・#398）
