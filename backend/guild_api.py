@@ -10,6 +10,7 @@ Strict isolation guarantees:
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -44,15 +45,40 @@ DEFAULT_TIMEZONE = "Asia/Tokyo"
 DEFAULT_DAILY_CALL_LIMIT = 50
 DEFAULT_DAILY_TOKEN_LIMIT = 60000
 DEFAULT_USER_HOURLY_LIMIT = 15
-HISTORY_LIMIT = 10
+HISTORY_LIMIT = 6
 HISTORY_MAX_CHARS = 4000
 MAX_REPLY_TOKENS = 800
+GUILD_ARCHIVE_SEARCH_LIMIT = 5
+
+GUILD_SEARCH_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "search_guild_archive",
+        "description": (
+            "このサーバー内のDiscord過去ログ（アーカイブ）を単語・キーワードで類似検索し、"
+            "マッチ度上位5件のチャット文章を全文取得する。サーバー内の情報・過去の会話・決定事項を調べる際に使う。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "検索したい単語やキーワード（スペース区切りで複数指定可）",
+                }
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 GUILD_SYSTEM_PROMPT = (
     CORE_SYSTEM_PROMPT
     + "\n\n【Discord サーバー（Guild）モードの原則】\n"
     "- いまはサーバー共有のアシスタント（Guild モード）として話しています。\n"
-    "- このサーバーの会話履歴と登録されたメンバー情報だけを使って答えてください。\n"
+    "- このサーバーのアーカイブ過去ログ、直近の会話履歴、登録されたメンバー情報だけを使って答えてください。\n"
+    "- サーバー内の出来事・仕様・過去の発言について質問された場合は、まず `search_guild_archive` を呼んで単語検索を行ってください。\n"
+    "- 検索結果が空、または質問に答えられる情報が含まれていない場合は、推測や創作をせず「Discordの中に引っかかる情報がありませんでした。」と正直に答えてください。\n"
     "- PETIT の持ち主（owner）の個人データ・予定・タスク・記憶・開発環境には一切アクセスできません。\n"
     "- 簡潔で親しみやすい日本語で答えてください。\n"
 )
@@ -215,45 +241,129 @@ def _redact_secrets(text: str, api_key: str) -> str:
     return cleaned
 
 
-def call_deepseek(messages: list[dict[str, str]]) -> tuple[str, dict[str, int]]:
-    """Call DeepSeek directly for Guild mode with tools=None. Never calls CLI or owner Brain."""
+def _search_guild_archive(guild_id: str, query: str) -> dict[str, Any]:
+    """Search only the caller guild's Discord archive and return top 5 full-text matches."""
+    if not request_context.is_guild_mode() or request_context.current_guild_id() != str(guild_id):
+        raise lmstudio_client.LMStudioError("Guild 境界が一致しないため検索できません。")
+    from .tools.discord_search import get_searcher
+
+    searcher = get_searcher(zone=f"guild_{guild_id}")
+    if searcher is None:
+        return {"query": query, "count": 0, "matches": [], "note": "このサーバーのアーカイブはまだありません。"}
+
+    raw_matches = searcher.search(query, limit=GUILD_ARCHIVE_SEARCH_LIMIT, guild_id=str(guild_id))
+    matches = []
+    for m in raw_matches:
+        attachments_info = [
+            {
+                "filename": a.get("filename"),
+                "extracted_text": a.get("extracted_text"),
+            }
+            for a in m.get("attachments", [])
+            if a.get("filename") or a.get("extracted_text")
+        ]
+        matches.append(
+            {
+                "message_id": m.get("message_id"),
+                "channel_name": m.get("channel_name"),
+                "thread_name": m.get("thread_name"),
+                "author_name": m.get("author_name"),
+                "content": m.get("content"),
+                "created_at": m.get("created_at"),
+                "discord_url": m.get("discord_url"),
+                "score": m.get("search_score"),
+                "attachments": attachments_info,
+            }
+        )
+    return {"query": query, "count": len(matches), "matches": matches}
+
+
+def _extract_usage(usage_raw: dict[str, Any], messages: list[dict[str, Any]], reply: str) -> dict[str, int]:
+    prompt_tokens = int(usage_raw.get("prompt_tokens") or 0)
+    completion_tokens = int(usage_raw.get("completion_tokens") or 0)
+    total_tokens = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
+    if total_tokens <= 0:
+        msg_chars = sum(len(str(m.get("content") or "")) for m in messages)
+        total_tokens = max(1, (msg_chars + len(reply)) // 2)
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+def call_deepseek(messages: list[dict[str, Any]], *, guild_id: str | None = None) -> tuple[str, dict[str, int]]:
+    """Call DeepSeek for Guild mode with 2-step archive search. Never calls CLI or owner Brain."""
     if not request_context.is_guild_mode():
         raise RuntimeError("guild_deepseek_requires_guild_mode")
     target = _deepseek_target()
     api_key = str(target.get("api_key") or "")
     if not target["configured"]:
         raise lmstudio_client.LMStudioError("DeepSeek APIキーが設定されていないため、いまは返答できません。")
-    try:
-        with lmstudio_client.observe_turn() as metrics:
-            response = lmstudio_client.chat_completion(
-                messages,
-                tools=None,
-                temperature=0.5,
-                max_tokens=MAX_REPLY_TOKENS,
-                route="guild",
-                target_override=target,
-            )
-            usage_list = (metrics or {}).get("usage") or []
-            usage_raw = usage_list[-1] if usage_list else {}
-    except Exception as exc:  # noqa: BLE001
-        safe_msg = _redact_secrets(str(exc), api_key)
-        log.warning("guild deepseek call failed: %s", type(exc).__name__)
-        raise lmstudio_client.LMStudioError(safe_msg) from None
 
-    if response.get("tool_calls"):
-        raise lmstudio_client.LMStudioError("Guild モードでは Tool 呼び出しは許可されていません。")
+    tools = [GUILD_SEARCH_TOOL] if guild_id else None
+    working_messages: list[dict[str, Any]] = list(messages)
+    total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+    def _invoke(msgs: list[dict[str, Any]], *, allow_tools: list[dict[str, Any]] | None) -> tuple[dict[str, Any], dict[str, int]]:
+        try:
+            with lmstudio_client.observe_turn() as metrics:
+                resp = lmstudio_client.chat_completion(
+                    msgs,
+                    tools=allow_tools,
+                    temperature=0.3,
+                    max_tokens=MAX_REPLY_TOKENS,
+                    route="guild",
+                    target_override=target,
+                )
+                usage_list = (metrics or {}).get("usage") or []
+                usage_raw = usage_list[-1] if usage_list else {}
+        except Exception as exc:  # noqa: BLE001
+            safe_msg = _redact_secrets(str(exc), api_key)
+            log.warning("guild deepseek call failed: %s", type(exc).__name__)
+            raise lmstudio_client.LMStudioError(safe_msg) from None
+        step_reply = str(resp.get("content") or "").strip()
+        return resp, _extract_usage(usage_raw, msgs, step_reply)
+
+    response, u1 = _invoke(working_messages, allow_tools=tools)
+    for k in total_usage:
+        total_usage[k] += u1[k]
+
+    tool_calls = response.get("tool_calls") or []
+    if tool_calls:
+        if not guild_id:
+            raise lmstudio_client.LMStudioError("Guild モードでは Tool 呼び出しは許可されていません。")
+        working_messages.append({
+            "role": "assistant",
+            "content": response.get("content") or "",
+            "tool_calls": tool_calls,
+        })
+        for tc in tool_calls:
+            fn = tc.get("function") or {}
+            name = fn.get("name")
+            if name != "search_guild_archive":
+                raise lmstudio_client.LMStudioError("Guild モードでは search_guild_archive 以外の Tool 呼び出しは許可されていません。")
+            raw_args = fn.get("arguments") or "{}"
+            try:
+                parsed_args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
+            except (TypeError, ValueError):
+                parsed_args = {}
+            query = str(parsed_args.get("query") or "").strip()
+            search_result = _search_guild_archive(guild_id, query) if query else {"query": "", "count": 0, "matches": []}
+            working_messages.append({
+                "role": "tool",
+                "tool_call_id": tc.get("id") or "search_guild_archive_0",
+                "content": json.dumps(search_result, ensure_ascii=False),
+            })
+
+        response, u2 = _invoke(working_messages, allow_tools=None)
+        for k in total_usage:
+            total_usage[k] += u2[k]
+        if response.get("tool_calls"):
+            raise lmstudio_client.LMStudioError("Guild モードでは追加の Tool 呼び出しは許可されていません。")
+
     reply = _redact_secrets(str(response.get("content") or "").strip(), api_key)
-    prompt_tokens = int(usage_raw.get("prompt_tokens") or 0)
-    completion_tokens = int(usage_raw.get("completion_tokens") or 0)
-    total_tokens = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
-    if total_tokens <= 0:
-        # Fallback estimate when provider omits token usage
-        total_tokens = max(1, (sum(len(m.get("content", "")) for m in messages) + len(reply)) // 2)
-    return reply, {
-        "prompt_tokens": prompt_tokens,
-        "completion_tokens": completion_tokens,
-        "total_tokens": total_tokens,
-    }
+    return reply, total_usage
 
 
 class GuildSetupRequest(BaseModel):
@@ -556,7 +666,7 @@ def handle_mention(body: GuildMessageRequest) -> dict:
         messages.append({"role": "user", "content": f"{speaker_prefix}{body.message}"})
 
         try:
-            reply, usage = call_deepseek(messages)
+            reply, usage = call_deepseek(messages, guild_id=body.guild_id)
         except lmstudio_client.LMStudioError as exc:
             return {
                 "mode": "guild",

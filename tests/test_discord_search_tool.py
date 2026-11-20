@@ -62,3 +62,26 @@ def test_tool_dispatch_in_guild_mode_is_blocked(setup_archive: Path):
     with request_context.guild_mode(guild_id="200"):
         with pytest.raises(GuildIsolationError):
             dispatch("search_discord_archive", {"query": "旅行計画"})
+
+
+def test_admin_search_spans_personal_and_all_guilds(setup_archive: Path):
+    # Add messages in two separate guild zone databases
+    for gid, mid, text in [("200", "21", "Guild200の旅行計画メモ"), ("300", "31", "Guild300の旅行計画アイデア")]:
+        zone = f"guild_{gid}"
+        archive = DiscordArchive(setup_archive / f"{zone}.sqlite", zone=zone)
+        set_registrations(setup_archive, zone, gid, [f"{gid}1"], True)
+        archive.upsert_message({
+            "message_id": mid,
+            "guild_id": gid,
+            "guild_name": f"Guild {gid}",
+            "channel_id": f"{gid}1",
+            "channel_name": "general",
+            "author_id": "10",
+            "author_name": "Member",
+            "content": text,
+            "created_at": "2026-11-10T10:00:00Z",
+        })
+
+    result = search_discord_archive(query="旅行計画", limit=10)
+    mids = {m["message_id"] for m in result["matches"]}
+    assert {"1", "21", "31"}.issubset(mids)

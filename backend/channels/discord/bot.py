@@ -103,6 +103,9 @@ class CoreClient:
     async def report_digest(self, post_id: int, status: str, error: str | None = None) -> None:
         await self._call("POST", f"/api/channels/discord/digests/{post_id}", json={"status": status, "error": error})
 
+    async def admin_command(self, body: dict) -> dict:
+        return await self._call("POST", "/api/channels/discord/admins", json=body) or {"reply": UNAVAILABLE}
+
     async def close(self) -> None:
         await self._client.aclose()
 
@@ -307,6 +310,16 @@ async def dispatch_slash_interaction(
     parsed = parse_slash(data)
     if parsed is None:
         return None
+    if parsed[0] == "admin":
+        params = parsed[1]
+        target_user = params.get("user")
+        body = {
+            "action": str(params.get("action") or "list"),
+            "actor_id": author_id,
+            "target_user_id": str(target_user) if target_user else None,
+        }
+        result = await core.admin_command(body)
+        return str(result.get("reply") or "")
     if parsed[0] == "digest":
         # Owner-only; Core checks the owner and the place. Works in DMs too.
         params = parsed[1]
@@ -579,6 +592,15 @@ def build_client(core: CoreClient):
     async def _cmd_digest(interaction: discord.Interaction, action: str = "register", time: str = "10:00",
                           day: str = "yesterday",
                           channel: discord.TextChannel | discord.ForumChannel | discord.Thread | None = None):
+        pass
+
+    @petit_group.command(name="admin", description="PETIT管理者の追加・解除・一覧確認を行います（初期管理者のみ）")
+    @app_commands.describe(action="add=管理者に追加 / remove=管理者から解除 / list=一覧表示",
+                           user="追加・解除するユーザー（メンションで選択）")
+    @app_commands.choices(
+        action=[app_commands.Choice(name=n, value=n) for n in ("add", "remove", "list")])
+    async def _cmd_admin(interaction: discord.Interaction, action: str = "list",
+                         user: discord.User | None = None):
         pass
 
     client.tree.add_command(petit_group)
