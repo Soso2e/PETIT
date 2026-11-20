@@ -256,22 +256,40 @@
       .trim();
   }
 
+  function isReplyMetaNode(node) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+    if (typeof node.matches === "function" && node.matches(".tools, .action-confirm, .turn-author-badge, .turn-details, [data-developer-only]")) {
+      return true;
+    }
+    return node.tagName === "SECTION";
+  }
+
   function directReplyText(bubble) {
-    return Array.from(bubble.childNodes)
+    const directText = Array.from(bubble.childNodes)
       .filter((node) => node.nodeType === Node.TEXT_NODE)
       .map((node) => node.textContent || "")
       .join("")
+      .trim();
+    if (directText) return directText;
+    return Array.from(bubble.childNodes)
+      .filter((node) => !isReplyMetaNode(node))
+      .map((node) => node.textContent || "")
+      .join("\n")
       .trim();
   }
 
   function replaceDirectReplyText(bubble, text) {
     const textNodes = Array.from(bubble.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE);
-    if (!textNodes.length) {
-      bubble.prepend(document.createTextNode(text));
+    if (textNodes.length) {
+      textNodes[0].textContent = text;
+      for (const node of textNodes.slice(1)) node.remove();
       return;
     }
-    textNodes[0].textContent = text;
-    for (const node of textNodes.slice(1)) node.remove();
+    for (const node of Array.from(bubble.childNodes)) {
+      if (!isReplyMetaNode(node)) node.remove();
+    }
+    bubble.classList?.remove("petit-markdown");
+    bubble.prepend(document.createTextNode(text));
   }
 
   function naturalizeCompletedAction(bubble) {

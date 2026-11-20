@@ -170,3 +170,31 @@ test('20-second continuous idle returns to Wake by hiding Desktop overlay', asyn
   assert.equal(hidden, 1);
   assert.equal(env.submits, 0);
 });
+
+test('directReplyText and naturalizeCompletedAction handle petit-markdown bubbles without reading meta nodes', () => {
+  const env = environment();
+  env.context.Node = { TEXT_NODE: 3, ELEMENT_NODE: 1 };
+  env.context.document.createTextNode = text => ({ nodeType: 3, textContent: text, remove() {} });
+  let removedClasses = [];
+  let prepended = [];
+  const p = { nodeType: 1, tagName: 'P', textContent: '確認された内容を実行しました。', matches: () => false, remove() { p.removed = true; } };
+  const tools = { nodeType: 1, tagName: 'DIV', textContent: '🔧 add_schedule', matches: s => s.includes('.tools'), remove() { tools.removed = true; } };
+  const badge = { nodeType: 1, tagName: 'DIV', textContent: '⚡ 回答: PETIT System', matches: s => s.includes('.turn-author-badge'), remove() { badge.removed = true; } };
+  const bubble = {
+    childNodes: [p, tools, badge],
+    classList: { remove(cls) { removedClasses.push(cls); } },
+    querySelector: s => (s === '.tools' ? tools : null),
+    prepend(node) { prepended.push(node); },
+  };
+  vm.runInContext(
+    source('voice.js').replace(/\}\)\(\);\s*$/, 'window.replyTest = { directReplyText, naturalizeCompletedAction }; })();'),
+    env.context,
+  );
+  assert.equal(env.context.window.replyTest.directReplyText(bubble), '確認された内容を実行しました。');
+  assert.equal(env.context.window.replyTest.naturalizeCompletedAction(bubble), '予定を追加しました。');
+  assert.equal(p.removed, true);
+  assert.notEqual(tools.removed, true);
+  assert.notEqual(badge.removed, true);
+  assert.deepEqual(removedClasses, ['petit-markdown']);
+  assert.equal(prepended[0].textContent, '予定を追加しました。');
+});
