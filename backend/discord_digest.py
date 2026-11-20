@@ -206,7 +206,12 @@ def command(body: DigestCommand, authorization: str | None = Header(default=None
         return {"reply": "進捗投稿の登録:\n" + "\n".join("- " + _describe(r) for r in rows)}
     if body.action == "preview":
         digest = life_log.generate(body.day)
-        return {"reply": digest["text"], "status": digest["status"]}
+        reply = digest["text"]
+        warnings = digest.get("warnings") or []
+        if warnings:
+            # Preview is ephemeral, so file names can be shown; scheduled posts never include them.
+            reply += "\n\n⚠️ **取り込みの注意**\n" + "\n".join("- " + note for note in warnings)
+        return {"reply": reply, "status": digest["status"], "warnings": warnings}
     if not body.channel_id:
         raise HTTPException(400, "投稿先のチャンネルが分かりませんでした。")
     now = db.now_iso()

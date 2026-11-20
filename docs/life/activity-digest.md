@@ -47,6 +47,14 @@ flowchart LR
 - 出典名（`origin`）は front matter の `source:`、なければ inbox 直下のフォルダ名（`chatgpt/` `claude/` など）。
 - 隠しファイル・シンボリックリンク・1MB を超えるファイルは読まない。1ファイルは `PETIT_LIFELOG_MAX_FILE_CHARS`（既定 20000 文字）まで。
 - 取り込んだ内容は `storage/app.db` の `lifelog_entries` に残る（内容ハッシュが同じなら更新しない）。
+- **読めなかったファイルの警告**: 取り込みのたびに、使えなかったファイルを記録し、`/petit digest action:preview`（自分にだけ見える）と Tool `get_activity_digest` の `inbox_warnings` に出す。定時投稿には出さない（ファイル名がチャンネルに出ないように）。
+
+  | 警告 | 原因 | 対処 |
+  | --- | --- | --- |
+  | Googleドキュメント形式（`.gdoc` など） | PC 上はショートカットだけで本文がない | `.md` / `.txt` で保存し直す |
+  | 読み込めなかった | Google Drive のストリーミングで実体がない・オフライン | inbox を「オフラインで使用可能にする」 |
+  | 1MB超 | 大きすぎる | 日ごとに分ける |
+  | フォルダが見つからない | パス違い・同期停止 | `PETIT_LIFELOG_INBOX_DIRS` と同期を確認 |
 
 ### ChatGPT / Claude 側の書き出し（推奨フォーマット）
 

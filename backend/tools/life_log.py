@@ -26,7 +26,8 @@ from .registry import tool
 def get_activity_digest(day: str = "yesterday", include_entries: bool = False):
     digest = life_log.generate(day)
     result = {"day": digest["day"], "status": digest["status"], "text": digest["text"],
-              "sources": digest["sources"], "structured": digest.get("payload") or {}}
+              "sources": digest["sources"], "structured": digest.get("payload") or {},
+              "inbox_warnings": digest.get("warnings") or []}
     if include_entries:
         result["entries"] = life_log.entries_for(digest["day"])
     return result

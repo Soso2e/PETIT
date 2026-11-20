@@ -306,3 +306,47 @@ def test_bot_command_tree_builds_with_digest():
     digest = client.tree.get_command("petit").get_command("digest")
     channel = [o for o in digest.to_dict(client.tree)["options"] if o["name"] == "channel"][0]
     assert 15 in channel["channel_types"]  # forum channels can be chosen
+
+
+# ---------------------------------------------------------------- inbox warnings
+
+
+def test_inbox_warnings_name_skipped_files(env, monkeypatch, tmp_path):
+    write(env, "chatgpt/2026-11-19.md", "- 読める")
+    write(env, "chatgpt/会議メモ.gdoc", '{"doc_id": "abc"}')
+    write(env, "claude/offline.md", "- 実体がない")
+    (env / "big.md").write_text("x" * (life_log.MAX_FILE_BYTES + 1), encoding="utf-8")
+    real_read = type(env).read_text
+
+    def flaky_read(self, *args, **kwargs):
+        if self.name == "offline.md":
+            raise OSError("cloud file not available")
+        return real_read(self, *args, **kwargs)
+
+    monkeypatch.setattr(type(env), "read_text", flaky_read)
+    monkeypatch.setenv("PETIT_LIFELOG_INBOX_DIRS", f"{env};{tmp_path / 'gone'}")
+    scan = life_log.scan_inbox()
+    assert scan["changed"] == 1
+    notes = "\n".join(life_log.inbox_warnings(scan))
+    assert "chatgpt/会議メモ.gdoc" in notes and "Markdown" in notes
+    assert "claude/offline.md" in notes and "オフラインで使用可能" in notes
+    assert "big.md" in notes and "1MB" in notes
+    assert "フォルダが見つかりません" in notes
+
+
+def test_clean_inbox_has_no_warnings(env):
+    write(env, "chatgpt/2026-11-19.md", "- 読める")
+    assert life_log.inbox_warnings(life_log.scan_inbox()) == []
+
+
+def test_preview_shows_warnings_but_scheduled_post_does_not(api, env, llm):
+    write(env, "chatgpt/2026-11-19.md", "- 進めた")
+    write(env, "chatgpt/メモ.gdoc", "{}")
+    preview = command(api, action="preview", day="yesterday").json()
+    assert "取り込みの注意" in preview["reply"] and "メモ.gdoc" in preview["reply"]
+
+    command(api, time="10:00")
+    _set_created("2026-11-18T00:00:00+00:00")
+    discord_digest.run_due(datetime(2026, 11, 20, 1, 0, tzinfo=timezone.utc))
+    posts = api.get("/api/channels/discord/digests", headers=HEADERS).json()["posts"]
+    assert posts and "gdoc" not in posts[0]["body"] and "取り込みの注意" not in posts[0]["body"]

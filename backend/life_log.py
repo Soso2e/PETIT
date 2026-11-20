@@ -207,19 +207,39 @@ def _origin(path: Path, root: Path, meta: dict[str, str]) -> str:
     return (relative[0].lower() if len(relative) > 1 else "inbox")[:40]
 
 
-def _iter_inbox_files(root: Path):
+GOOGLE_NATIVE_SUFFIXES = {".gdoc", ".gsheet", ".gslides", ".gdraw", ".gform", ".gmap", ".gsite", ".gjam", ".gscript"}
+_last_scan: dict[str, Any] = {}
+
+
+def _iter_inbox_files(root: Path, issues: list[dict[str, str]]):
+    """Yield readable text files; record what was skipped so the owner can be told why."""
     count = 0
     for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if any(part.startswith(".") for part in relative.parts) or path.is_symlink():
+            continue
+        name = str(relative).replace("\\", "/")
+        suffix = path.suffix.lower()
+        if suffix in GOOGLE_NATIVE_SUFFIXES:
+            # A Google Docs file is only a shortcut on disk; the text lives in Drive.
+            issues.append({"kind": "google_native", "path": name})
+            continue
+        if suffix not in TEXT_SUFFIXES:
+            continue
+        try:
+            if not path.is_file():
+                continue
+            size = path.stat().st_size
+        except OSError:
+            issues.append({"kind": "unreadable", "path": name})
+            continue
+        if size > MAX_FILE_BYTES:
+            issues.append({"kind": "too_large", "path": name})
+            continue
         if count >= MAX_INBOX_FILES:
+            issues.append({"kind": "too_many", "path": name})
             log.warning("life log inbox has more than %d files; the rest are skipped", MAX_INBOX_FILES)
             return
-        relative = path.relative_to(root).parts
-        if any(part.startswith(".") for part in relative) or path.is_symlink():
-            continue
-        if path.suffix.lower() not in TEXT_SUFFIXES or not path.is_file():
-            continue
-        if path.stat().st_size > MAX_FILE_BYTES:
-            continue
         count += 1
         yield path
 
@@ -244,14 +264,16 @@ def scan_inbox() -> dict[str, Any]:
     """Ingest new or changed inbox files. Unchanged files are skipped by content hash."""
     ensure_schema()
     roots = inbox_dirs()
-    result = {"roots": len(roots), "missing": 0, "seen": 0, "changed": 0, "errors": 0}
+    result: dict[str, Any] = {"roots": len(roots), "missing": 0, "seen": 0, "changed": 0, "errors": 0}
+    issues: list[dict[str, str]] = []
     max_chars = max(1000, int(os.getenv("PETIT_LIFELOG_MAX_FILE_CHARS", "20000") or 20000))
     with db.get_connection() as conn:
         for root in roots:
             if not root.is_dir():
                 result["missing"] += 1
+                issues.append({"kind": "missing_root", "path": str(root)})
                 continue
-            for path in _iter_inbox_files(root):
+            for path in _iter_inbox_files(root, issues):
                 result["seen"] += 1
                 try:
                     meta, body = _front_matter(path.read_text(encoding="utf-8", errors="replace"))
@@ -263,8 +285,35 @@ def scan_inbox() -> dict[str, Any]:
                         result["changed"] += 1
                 except (OSError, ValueError) as exc:
                     result["errors"] += 1
+                    issues.append({"kind": "unreadable", "path": str(path.relative_to(root)).replace("\\", "/")})
                     log.warning("life log inbox read failed: %s", type(exc).__name__)
+    result["issues"] = issues
+    _last_scan.clear()
+    _last_scan.update(result)
     return result
+
+
+_ISSUE_TEXT = {
+    "missing_root": ("取り込み先のフォルダが見つかりません", "PETIT_LIFELOG_INBOX_DIRS のパスと、Google Drive の同期が動いているかを確認してください。"),
+    "google_native": ("Googleドキュメント形式のファイルは中身を読めません", ".md か .txt で保存し直してください（ドキュメントなら「ファイル → ダウンロード → Markdown」）。"),
+    "unreadable": ("読み込めなかったファイルがあります", "Google Drive で inbox フォルダを「オフラインで使用可能にする」にしてください。"),
+    "too_large": ("1MBを超えたため読まなかったファイルがあります", "日ごとのファイルに分けてください。"),
+    "too_many": (f"ファイルが{MAX_INBOX_FILES}件を超えたため、残りを読んでいません", "inbox だけを指定し、古いファイルは別の場所へ移してください。"),
+}
+
+
+def inbox_warnings(scan: dict[str, Any] | None = None) -> list[str]:
+    """Human-readable notes about inbox files PETIT could not use (for the owner only)."""
+    issues = (scan if scan is not None else _last_scan).get("issues") or []
+    notes = []
+    for kind, (title, advice) in _ISSUE_TEXT.items():
+        paths = [item["path"] for item in issues if item["kind"] == kind]
+        if not paths:
+            continue
+        shown = "、".join(paths[:5]) + (f" ほか{len(paths) - 5}件" if len(paths) > 5 else "")
+        count = "" if kind == "too_many" else f"（{len(paths)}件）"
+        notes.append(f"{title}{count}: {shown}\n  → {advice}" if kind != "too_many" else f"{title}\n  → {advice}")
+    return notes
 
 
 # ---------------------------------------------------------------- other sources
@@ -650,7 +699,7 @@ def generate(day: str | date | None = None, *, force: bool = False) -> dict[str,
         fingerprint = _hash(PIPELINE_VERSION, *sorted(e["content_hash"] for e in entries))
         saved = get_digest(target)
         if saved and not force and saved["fingerprint"] == fingerprint and saved["status"] != "failed":
-            return {**saved, "cached": True}
+            return {**saved, "cached": True, "warnings": inbox_warnings()}
         sources: dict[str, int] = {}
         for entry in entries:
             label = entry["origin"] if entry["source"] == "inbox" else entry["source"]
@@ -676,7 +725,7 @@ def generate(day: str | date | None = None, *, force: bool = False) -> dict[str,
                  json.dumps(sources, ensure_ascii=False), json.dumps(stages), record["generated_at"]))
         if entries:
             _write_markdown(target, text, sources)
-        return {**record, "cached": False}
+        return {**record, "cached": False, "warnings": inbox_warnings()}
 
 
 def entries_for(day: str | date, limit: int = 50) -> list[dict[str, Any]]:
