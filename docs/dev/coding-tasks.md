@@ -32,6 +32,7 @@
 | 選択 | 実行 CLI | モデルと Effort |
 | --- | --- | --- |
 | Claude Opus 5.5 | Claude Code | `opus` と `--effort` |
+| Claude Sonnet 5.5 | Claude Code | `sonnet` と `--effort` |
 | Codex Sol 6.1 | Codex app-server | `gpt-6.1-sol` と `turn/start.effort` |
 | Antigravity Hydrogen | Antigravity CLI | `gemini-4-hydrogen-<effort>` |
 | Gemini 3.8 Flash | Antigravity CLI | `gemini-3.8-flash-<effort>` |

@@ -18,6 +18,7 @@ def test_auto_routes_lightweight_and_ranks_available_windows(monkeypatch):
 
     items = {
         "claude_opus": quota(0, 100, False),
+        "claude_sonnet": quota(0, 100, False),
         "codex_sol": quota(80, 54),
         "antigravity_hydrogen": quota(81, 54),
         "gemini_flash": quota(98, 96),
@@ -45,9 +46,23 @@ def test_auto_falls_back_when_hydrogen_unavailable(monkeypatch):
         "gemini_flash": {"available": True, "five_hour": 90, "weekly": 90},
         "codex_sol": {"available": True, "five_hour": 80, "weekly": 80},
         "claude_opus": {"available": False, "five_hour": 0, "weekly": 0},
+        "claude_sonnet": {"available": False, "five_hour": 0, "weekly": 0},
     })
     assert models.select("auto", "medium")[:2] == ("codex", "gpt-6.1-sol")
     assert models.select("auto", "medium", lightweight=True)[:2] == ("antigravity_cli", "gemini-3.8-flash-medium")
+
+
+def test_claude_sonnet_shares_estimated_quota_and_is_selectable(monkeypatch):
+    monkeypatch.setattr(models, "PROBES", {"claude_code": lambda: {"claude_opus": (True, 75, 90), "claude_sonnet": (True, 75, 90)}})
+    monkeypatch.setattr(models.setup_store, "load", lambda: {})
+    monkeypatch.setattr(models.brain_priority, "permitted", lambda provider, data: provider == "claude_code")
+    monkeypatch.setattr(models.brain_priority, "target", lambda provider, data=None: {"configured": True})
+    models.invalidate()
+    quotas = models.usage()
+    assert quotas["claude_sonnet"]["estimated"] is True
+    assert quotas["claude_sonnet"]["available"] is True
+    assert models.select("claude_sonnet", "medium")[:2] == ("claude_code", "sonnet")
+    models.invalidate()
 
 
 def test_development_request_accepts_all_configured_model_keys():
