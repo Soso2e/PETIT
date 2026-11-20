@@ -122,6 +122,30 @@ def test_extract_handles_dm_and_mentions_only():
     assert relay.extract(incoming(content="<@42>"), "42") is None
 
 
+@pytest.mark.parametrize("content", [
+    "ぷて、今日の予定は？",
+    "ぷてぃ",
+    "おーいペティット！",
+    "PETITおはよう",
+    "Hey petit, what's next?",
+])
+def test_extract_handles_wake_words_in_guild(content):
+    assert relay.extract(incoming(mentions_bot=False, content=content), "42") == content
+
+
+@pytest.mark.parametrize("content", [
+    "appetite is good",
+    "sign the petition",
+    "普通の雑談",
+])
+def test_extract_ignores_non_wake_words_in_guild(content):
+    assert relay.extract(incoming(mentions_bot=False, content=content), "42") is None
+
+
+def test_extract_ignores_bot_even_with_wake_word():
+    assert relay.extract(incoming(author_is_bot=True, mentions_bot=False, content="ぷてぃ"), "42") is None
+
+
 def test_split_respects_limit_and_keeps_all_text():
     text = ("段落A" * 300) + "\n\n" + ("行B" * 500) + "\n" + ("C" * 2500)
     chunks = relay.split(text)
@@ -520,3 +544,136 @@ def test_sync_guild_archive_registers_and_checkpoints():
     # 2nd run uses checkpoint and finds no new messages
     summary2 = asyncio.run(sync_guild_archive(core, guild, register_all=False, author_id="111"))
     assert summary2["fetched"] == 0
+
+
+def test_format_channel_context_and_payload():
+    from backend.channels.discord.relay import (
+        ContextMessage,
+        Incoming,
+        format_channel_context,
+        payload,
+    )
+
+    recent = [
+        ContextMessage(author_name="So", content="管理者の追加どうやってやるんだっけ？", message_id="101"),
+        ContextMessage(author_name="PETIT", content="", is_bot=True, message_id="102"),
+    ]
+    reply_to = ContextMessage(author_name="So", content="パス教えて", message_id="99")
+
+    ctx = format_channel_context(recent, reply_to)
+    assert "返信先メッセージ:\n- So: パス教えて" in ctx
+    assert "直近のチャンネル発言（古い順）:\n- So: 管理者の追加どうやってやるんだっけ？" in ctx
+    assert "- PETIT:" not in ctx
+
+    inc = Incoming("200", "300", "400", "500", "ぷて", False, False, display_name="So")
+    body_with_ctx = payload(inc, "ぷて", channel_context=ctx)
+    assert body_with_ctx["channel_context"] == ctx
+    body_no_ctx = payload(inc, "ぷて")
+    assert "channel_context" not in body_no_ctx
+
+    # Older messages are trimmed first while preserving reply_to when exceeding max_chars
+    many = [ContextMessage(author_name="So", content=f"msg-{i} " + ("x" * 120)) for i in range(10)]
+    clipped = format_channel_context(many, reply_to, max_chars=550)
+    assert "返信先メッセージ:\n- So: パス教えて" in clipped
+    assert "msg-9" in clipped
+    assert "msg-0" not in clipped
+
+
+def test_fetch_channel_context_collects_history_and_reply():
+    from types import SimpleNamespace
+    from backend.channels.discord.bot import fetch_channel_context
+
+    class FakeChannel:
+        def __init__(self, history_msgs, fetched_reply=None):
+            self._history_msgs = history_msgs
+            self._fetched_reply = fetched_reply
+
+        async def history(self, limit=10, before=None):
+            # discord.py yields newest-first
+            for item in self._history_msgs[:limit]:
+                yield item
+
+        async def fetch_message(self, message_id):
+            if isinstance(self._fetched_reply, Exception):
+                raise self._fetched_reply
+            return self._fetched_reply
+
+    so = SimpleNamespace(display_name="So", name="so", bot=False)
+    petit = SimpleNamespace(display_name="PETIT", name="petit", bot=True)
+    m_prev1 = SimpleNamespace(id="10", author=so, content="古い発言", attachments=[])
+    m_prev2 = SimpleNamespace(id="11", author=petit, content="前回の返答", attachments=[])
+    m_prev3 = SimpleNamespace(id="12", author=so, content="管理者の追加どうやってやるんだっけ？", attachments=[])
+    ref_msg = SimpleNamespace(id="5", author=so, content="リプライ元の質問", attachments=[])
+
+    # 1. Resolved reference + newest-first history -> reversed to chronological
+    ch1 = FakeChannel([m_prev3, m_prev2, m_prev1])
+    msg1 = SimpleNamespace(
+        id="13",
+        channel=ch1,
+        reference=SimpleNamespace(message_id="5", resolved=ref_msg),
+    )
+    ctx1 = asyncio.run(fetch_channel_context(msg1))
+    assert "返信先メッセージ:\n- So: リプライ元の質問" in ctx1
+    idx1 = ctx1.index("- So: 古い発言")
+    idx2 = ctx1.index("- PETIT: 前回の返答")
+    idx3 = ctx1.index("- So: 管理者の追加どうやってやるんだっけ？")
+    assert idx1 < idx2 < idx3
+
+    # 2. Unresolved reference falls back to fetch_message; errors degrade safely
+    ch2 = FakeChannel([m_prev3], fetched_reply=RuntimeError("forbidden"))
+    msg2 = SimpleNamespace(
+        id="14",
+        channel=ch2,
+        reference=SimpleNamespace(message_id="5", resolved=None),
+    )
+    ctx2 = asyncio.run(fetch_channel_context(msg2))
+    assert "返信先メッセージ" not in ctx2
+    assert "- So: 管理者の追加どうやってやるんだっけ？" in ctx2
+
+
+def test_discord_event_passes_channel_context_to_brain_without_polluting_history(monkeypatch):
+    from fastapi.testclient import TestClient
+    from backend import brain, conversation_store, main
+
+    monkeypatch.setenv("PETIT_DISCORD_SERVICE_TOKEN", TOKEN)
+    monkeypatch.setenv("PETIT_DISCORD_OWNER_ID", OWNER)
+    monkeypatch.setenv("PETIT_DISCORD_OWNER_GUILD_IDS", GUILD)
+
+    captured_messages = []
+    monkeypatch.setattr(brain, "check_provider", lambda thread: {"provider": "lmstudio", "model": "test"})
+
+    def fake_chat_completion(messages, **kwargs):
+        captured_messages.append(list(messages))
+        return {"content": "管理者の追加は /petit admin add でできます！", "tool_calls": []}
+
+    monkeypatch.setattr(brain.lmstudio_client, "chat_completion", fake_chat_completion)
+
+    tc = TestClient(main.app)
+    ctx_text = "[Discordチャンネルの参考文脈（直近の発言・返信先）]\n- So: 管理者の追加どうやってやるんだっけ？"
+    r = tc.post(
+        "/api/channels/discord/events",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        json={
+            "event_id": "9001",
+            "channel_id": "8888",
+            "guild_id": GUILD,
+            "author_id": OWNER,
+            "display_name": "So",
+            "message": "ぷて",
+            "channel_context": ctx_text,
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["reply"] == "管理者の追加は /petit admin add でできます！"
+    assert len(captured_messages) == 1
+    sent_contents = [m["content"] for m in captured_messages[0]]
+    assert ctx_text in sent_contents
+    assert sent_contents[-1] == "ぷて"
+    assert sent_contents.index(ctx_text) == len(sent_contents) - 2
+
+    # Stored conversation history keeps only the pure user message, not channel_context
+    hist = conversation_store.history("discord:8888")
+    assert hist == [
+        {"role": "user", "content": "ぷて"},
+        {"role": "assistant", "content": "管理者の追加は /petit admin add でできます！"},
+    ]

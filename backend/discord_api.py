@@ -31,6 +31,7 @@ class DiscordEvent(BaseModel):
     author_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
     display_name: str = Field(default="", max_length=120)
     message: str = Field(min_length=1, max_length=20000)
+    channel_context: str = Field(default="", max_length=8000)
 
 
 def owner_id() -> str:
@@ -113,6 +114,7 @@ def receive(event: DiscordEvent, authorization: str | None = Header(default=None
                         author_id=event.author_id,
                         display_name=event.display_name,
                         message=event.message,
+                        channel_context=event.channel_context,
                     )
                 )
         return {"mode": "guest", "status": "completed", "reply": GUEST_GUIDE, "approvals": []}
@@ -120,7 +122,15 @@ def receive(event: DiscordEvent, authorization: str | None = Header(default=None
     # so a redelivered gateway event returns the saved result instead of re-running.
     thread_id = "discord:" + event.channel_id
     request_id = "discord:" + event.event_id
-    result = conversation_api.submit(thread_id, request_id, event.message, source="discord", is_admin=True)
+    submit_kwargs = {"channel_context": event.channel_context} if event.channel_context else {}
+    result = conversation_api.submit(
+        thread_id,
+        request_id,
+        event.message,
+        source="discord",
+        is_admin=True,
+        **submit_kwargs,
+    )
     return _reply({**result, "request_id": request_id})
 
 

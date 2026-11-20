@@ -48,7 +48,7 @@ owner が指定外のサーバーで話しかけた場合も Guild モードに�
 
 Concept §6 の「Discord Bot：自分専用に常駐」をここで実装する。
 
-- **会話**: DM と指定サーバーでメンション / `/petit`。`source=discord` で Core の Thread / Turn に入る（API は受付済み）。Discord のチャンネル（またはスレッド）ごとに Core の Thread を1つ対応させる。
+- **会話**: DM と指定サーバーでメンション / 呼びかけ語（`ぷて`・`ぷてぃ`・`ペティット`・`PETIT`） / `/petit`。`source=discord` で Core の Thread / Turn に入る（API は受付済み）。Discord のチャンネル（またはスレッド）ごとに Core の Thread を1つ対応させ、応答時はその場の直近チャンネル発言（最大10件）と返信先メッセージも参考文脈として Brain へ渡す（会話履歴には保存せずその場限りで参照）。
 - **長い返答と待ち時間**: 3秒以内に defer、Core の Turn 完了を待って 2000 文字単位で分割、またはファイル添付で返す。
 - **承認**: 確認カードを Discord のボタン（承認 / 取消）で出す。押せるのは owner だけ。承認の消費は既存 Core の仕組み。
 - **通知**: リマインダー・予定の前・Job 完了を DM へ配送（既存の通知イベントの配送先に Discord を追加。カテゴリは初期 OFF：Concept §8）。

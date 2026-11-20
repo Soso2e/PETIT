@@ -404,6 +404,7 @@ class GuildMessageRequest(BaseModel):
     author_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
     display_name: str = Field(default="", max_length=120)
     message: str = Field(min_length=1, max_length=20000)
+    channel_context: str = Field(default="", max_length=8000)
 
 
 @router.post("/api/guild/setup")
@@ -662,6 +663,8 @@ def handle_mention(body: GuildMessageRequest) -> dict:
                 budget_chars -= len(clipped_u)
         messages.extend(reversed(history_msgs))
 
+        if body.channel_context.strip():
+            messages.append({"role": "user", "content": body.channel_context.strip()})
         speaker_prefix = f"[{body.display_name.strip()}] " if body.display_name.strip() else ""
         messages.append({"role": "user", "content": f"{speaker_prefix}{body.message}"})
 

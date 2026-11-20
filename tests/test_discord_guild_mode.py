@@ -524,3 +524,24 @@ def test_guild_two_step_archive_search_top5_full_content_and_history_6(env, monk
     assert payload["count"] == 5
     assert len(payload["matches"]) == 5
     assert all(long_tail in m["content"] for m in payload["matches"])
+
+
+def test_guild_mention_includes_channel_context_without_storing_it_in_db(env):
+    """channel_context is passed to DeepSeek before the user message, not saved as user_text."""
+    setup_guild(env, GUILD_A)
+    env.deepseek_calls.clear()
+    ctx_text = "[Discordチャンネルの参考文脈（直近の発言・返信先）]\n- アリス: 明日の集合時間は？"
+    body = mention_event(event_id="9101", message="ぷて")
+    body["channel_context"] = ctx_text
+    resp = env.post("/api/channels/discord/events", json=body, headers=auth_headers())
+    assert resp.status_code == 200
+    assert len(env.deepseek_calls) == 1
+    sent = env.deepseek_calls[0]["payload"]["messages"]
+    assert sent[-2] == {"role": "user", "content": ctx_text}
+    assert sent[-1]["content"].endswith("ぷて")
+
+    with guild_api._connect(GUILD_A) as conn:
+        row = conn.execute(
+            "SELECT user_text FROM guild_conversations WHERE event_id='9101'"
+        ).fetchone()
+    assert row["user_text"] == "ぷて"

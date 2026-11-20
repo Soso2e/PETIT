@@ -23,10 +23,13 @@ import httpx
 
 from ...discord_archive import extract_attachment_text
 from .relay import (
+    RECENT_HISTORY_LIMIT,
+    ContextMessage,
     Incoming,
     approval_text,
     button_id,
     extract,
+    format_channel_context,
     notification_text,
     parse_button,
     parse_slash,
@@ -40,6 +43,57 @@ UNAVAILABLE = "いま PETIT 本体に繋がりません。PC が起動してい�
 
 TEXT_EXTENSIONS = {".txt", ".md", ".pdf", ".json", ".csv", ".py", ".sh", ".log", ".tsv"}
 MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+def _to_context_message(msg: Any) -> ContextMessage | None:
+    author = getattr(msg, "author", None)
+    if author is None:
+        return None
+    content = (getattr(msg, "content", None) or "").strip()
+    if not content:
+        attachments = getattr(msg, "attachments", None) or []
+        names = [getattr(att, "filename", "") for att in attachments if getattr(att, "filename", "")]
+        if names:
+            content = "[添付: " + ", ".join(names[:3]) + "]"
+    if not content:
+        return None
+    author_name = str(getattr(author, "display_name", None) or getattr(author, "name", None) or "")
+    return ContextMessage(
+        author_name=author_name,
+        content=content,
+        is_bot=bool(getattr(author, "bot", False)),
+        message_id=str(getattr(msg, "id", "") or ""),
+    )
+
+
+async def fetch_channel_context(message: Any, *, limit: int = RECENT_HISTORY_LIMIT) -> str:
+    """Fetch recent channel messages and reply target for conversational context."""
+    reply_to: ContextMessage | None = None
+    ref = getattr(message, "reference", None)
+    if ref is not None:
+        resolved = getattr(ref, "resolved", None)
+        if resolved is not None and hasattr(resolved, "content") and hasattr(resolved, "author"):
+            reply_to = _to_context_message(resolved)
+        elif getattr(ref, "message_id", None) and hasattr(message.channel, "fetch_message"):
+            try:
+                fetched = await message.channel.fetch_message(ref.message_id)
+                reply_to = _to_context_message(fetched)
+            except Exception as exc:
+                log.debug("failed to fetch referenced message: %s", type(exc).__name__)
+
+    recent: list[ContextMessage] = []
+    if hasattr(message.channel, "history"):
+        try:
+            items: list[ContextMessage] = []
+            async for hist_msg in message.channel.history(limit=limit, before=message):
+                ctx_msg = _to_context_message(hist_msg)
+                if ctx_msg is not None:
+                    items.append(ctx_msg)
+            recent = list(reversed(items))
+        except Exception as exc:
+            log.debug("failed to fetch channel history: %s", type(exc).__name__)
+
+    return format_channel_context(recent, reply_to)
 
 
 class CoreClient:
@@ -1038,7 +1092,8 @@ def build_client(core: CoreClient):
         if text is None:
             return
         async with message.channel.typing():
-            data = await core.relay(payload(incoming, text))
+            channel_context = await fetch_channel_context(message)
+            data = await core.relay(payload(incoming, text, channel_context=channel_context))
         await send_result(message.channel, data, first=lambda chunk: message.reply(chunk, mention_author=False))
 
     @client.event

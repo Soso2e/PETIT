@@ -249,7 +249,7 @@ Bot は別プロセスで、Gateway へ外向き接続するだけ。owner 判�
 flowchart TD
     Msg[Discord メッセージ] --> Extract{relay.extract<br/>Botの発言? / サーバーでメンションなし?}
     Extract -->|該当| Silent[何もしない]
-    Extract -->|DM・メンション| Post[POST /api/channels/discord/events<br/>Bearer サービストークン]
+    Extract -->|DM・メンション| Post[POST /api/channels/discord/events<br/>Bearer サービストークン<br/>直近チャンネル発言・返信先文脈を添付]
     Post --> Auth{トークン一致?}
     Auth -->|未設定| E503[503]
     Auth -->|不一致| E401[401]

@@ -237,6 +237,8 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             messages.append({"role": "user", "content": known["text"]})
             with db.get_connection() as c:
                 ambient.record(c, row["thread_id"], request_id, known)
+        if payload.get("channel_context"):
+            messages.append({"role": "user", "content": str(payload["channel_context"])})
         messages.append({"role": "user", "content": payload["message"]})
     from . import service_sync
     with db.get_connection() as c:

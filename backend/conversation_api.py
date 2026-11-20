@@ -106,12 +106,16 @@ def _process_claimed(request_id: str) -> dict:
 
 
 def submit(thread_id: str, request_id: str, message: str, *, source="web", conversation_mode="text",
-           attachment_ids: list[str] | None = None, is_admin: bool = False, background=False) -> dict:
+           attachment_ids: list[str] | None = None, is_admin: bool = False, background=False,
+           channel_context: str = "") -> dict:
     request_context.forbid_guild_mode("Core Turn")
     store.create_thread(thread_id, source=source)
-    row, created = store.accept(thread_id, request_id, {"message": message, "conversation_mode": conversation_mode,
-                                                     "source": source, "is_admin": is_admin,
-                                                     "attachment_ids": attachment_ids or []})
+    input_payload = {"message": message, "conversation_mode": conversation_mode,
+                     "source": source, "is_admin": is_admin,
+                     "attachment_ids": attachment_ids or []}
+    if channel_context.strip():
+        input_payload["channel_context"] = channel_context.strip()
+    row, created = store.accept(thread_id, request_id, input_payload)
     if created:
         if background:
             _executor.submit(process, request_id)
