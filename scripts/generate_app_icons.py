@@ -46,6 +46,8 @@ def run() -> None:
             '3fs0/Ak3WSH2EisQ8/5JfAoybgCn7ZKq6ToZc/36iy/6KPVt7v195D/tmPrT75ARCGwu4+GiA3E9w3H9wk/LZ+q2RZOk0sHV4Dtr'
         )
         encoded = b64encode(raw).decode('ascii')
+        print('REPAIR HASH', hashlib.sha256(repaired_chunk.encode()).hexdigest(), len(repaired_chunk))
+        print('TAIL HASH', hashlib.sha256(tail.encode()).hexdigest(), len(tail))
         restored = b64decode(encoded[:3200] + repaired_chunk + encoded[4000:5600] + tail)
         if hashlib.sha1(prefix + restored).hexdigest() != expected:
             encoded = b64encode(raw).decode('ascii')
