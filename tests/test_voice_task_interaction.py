@@ -29,7 +29,7 @@ class VoiceTaskInteractionTests(unittest.TestCase):
         _source, module = _module("backend/petit_prompt.py")
         prompt = _literal_assignment(module, "CORE_SYSTEM_PROMPT")
         self.assertIn("PETIT", prompt)
-        self.assertIn("読み上げやすいプレーンテキスト", prompt)
+        self.assertIn("読みやすいプレーンテキスト", prompt)
         # The shared prompt seeds PETIT Home, and every Brain reads the persona from there.
         self.assertIn("CORE_SYSTEM_PROMPT", (ROOT / "backend" / "petit_home.py").read_text(encoding="utf-8"))
         self.assertIn("petit_home.persona()", (ROOT / "backend" / "brain.py").read_text(encoding="utf-8"))
