@@ -159,6 +159,13 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 - `PETIT_DISCORD_GUILD_MODE`（既定 off）。off の間、owner 以外・指定外サーバーの発話には空の返答（`status=ignored`）を返し、Bot は何も送らない。Brain / DeepSeek は 0 回。`/api/guild/setup`・`/api/guild/me`・`/api/guild/messages` は 403「このプティは持ち主専用です。」。`reset`・`forget-me` は削除のため常に使える。
 - `/petit digest`（owner のみ・DM か指定サーバー）で、チャンネル・フォーラム・スレッドに毎日の進捗投稿を登録する。Core の `backend/discord_digest.py` が時刻を判定して `backend/life_log.py` のまとめを作り、Bot が `GET /api/channels/discord/digests` で取りに来て送る。仕組みと設定は [../life/activity-digest.md](../life/activity-digest.md)。
 
+## 5.5 Discord専用チャンネルリマインダー（#514）
+
+- 既存の個人リマインダー（Web Push / DM / Web UI）とは分離した、Discord チャンネル専用の単発リマインダー。Owner モード（`discord_reminders` テーブル）と Guild モード（`storage/guilds/<guild_id>.db` の `guild_reminders` テーブル）の両方に対応する。
+- 会話ツール `create_discord_reminder` / `list_discord_reminders` / `cancel_discord_reminder`（承認ボタンなしで即時登録）。日付のみ指定（`YYYY-MM-DD`）時は該当タイムゾーン（既定 `Asia/Tokyo`）の `09:00` に登録する。
+- メンション対象 `mention_target` は既定が `user`（依頼した本人 `<@author_id>`）、全員指定時は `everyone`（`@everyone`）。Bot 側は `deliver_reminders` で `allowed_mentions` を対象のみに絞って送信する。
+- Bot が `PETIT_DISCORD_REMINDER_POLL_SECONDS`（既定 15 秒）ごとに `GET /api/channels/discord/reminders` で期限到来分を `claimed` として取得し、対象チャンネルへ投稿後 `POST /api/channels/discord/reminders/{scope}/{reminder_id}` で `sent` / `failed` を報告する。
+
 ## 5.5 管理者登録と非管理者向け 2 段階アーカイブ検索（v0.70.0・#510）
 
 - **管理者登録コマンド（`/petit admin`）**: 初期管理者（`PETIT_DISCORD_OWNER_ID`）が `@メンション` でユーザーを指定し、`discord_admins` テーブルへ追加・解除・一覧表示できる（`POST /api/channels/discord/admins`）。

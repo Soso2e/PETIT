@@ -21,6 +21,7 @@ PUBLIC_TOOLS = {
     "link_project_workspace", "unlink_project_workspace", "find_projects",
     "delegate_background_research", "get_background_research_status",
     "get_reminders", "create_reminder", "manage_reminder", "search_brain_notes",
+    "create_discord_reminder", "list_discord_reminders", "cancel_discord_reminder",
     "search_notion", "gmail_search", "gmail_get_message", "get_weather", "search_news",
     "get_persona", "update_persona_file",
     "open_worktree", "list_worktrees", "get_worktree_status", "run_worktree_check", "commit_worktree",

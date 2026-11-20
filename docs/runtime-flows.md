@@ -271,6 +271,9 @@ flowchart TD
     Claim --> Mark[配信記録 claimed を先に書く]
     Mark --> DM[owner へ DM]
     DM --> Report[sent / failed を報告<br/>未報告は claimed=不明のまま再送しない]
+    RemPoll[Bot 15秒ごと] --> RemClaim[GET /api/channels/discord/reminders<br/>Owner DB + Guild DB から期限到来を claimed]
+    RemClaim --> RemSend[対象チャンネルへ送信<br/>@everyone または user メンションのみ許可]
+    RemSend --> RemReport[POST /api/channels/discord/reminders/scope/id<br/>sent / failed を報告]
 ```
 
 ### 毎日の進捗投稿（v0.68.0開発版・#504）
@@ -322,10 +325,12 @@ flowchart TD
     Idem -->|yes| Saved[保存済み返答を再利用<br/>DeepSeek 0 回]
     Idem -->|no| Budget{1日上限（回数/トークン）<br/>・ユーザー1時間上限内?}
     Budget -->|超過| Stop["「今日はここまで」を返す<br/>DeepSeek 0 回"]
-    Budget -->|上限内| DS["DeepSeek (1回目)<br/>直近6件の会話履歴 + search_guild_archive ツールのみ"]
+    Budget -->|上限内| DS["DeepSeek (1回目)<br/>直近6件の会話履歴 + search_guild_archive / discord_reminders ツール"]
     DS -->|ツール要求なし| Redact[秘密値を伏せて guild_conversations と<br/>guild_usage_log に記録し返信]
     DS -->|search_guild_archive| PySearch["Python: guild_&lt;id&gt;.sqlite をマッチ度検索<br/>(FTS5 + trigram・上位5件・本文全文)"]
-    PySearch --> DS2["DeepSeek (2回目・tools=None)<br/>検索結果5件 + 元の質問から回答生成<br/>該当なしなら情報がない旨を回答"]
+    DS -->|create / list / cancel_discord_reminder| PyRem["Python: guild_&lt;id&gt;.sqlite の<br/>guild_reminders を操作"]
+    PySearch --> DS2["DeepSeek (2回目・tools=None)<br/>検索・操作結果 + 元の質問から回答生成"]
+    PyRem --> DS2
     DS2 --> Redact
 ```
 

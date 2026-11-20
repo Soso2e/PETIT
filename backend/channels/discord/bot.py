@@ -34,6 +34,7 @@ from .relay import (
     parse_button,
     parse_slash,
     payload,
+    reminder_text,
     split,
 )
 
@@ -174,6 +175,22 @@ class CoreClient:
 
     async def report_digest(self, post_id: int, status: str, error: str | None = None) -> None:
         await self._call("POST", f"/api/channels/discord/digests/{post_id}", json={"status": status, "error": error})
+
+    async def claim_reminders(self) -> dict:
+        return await self._call("GET", "/api/channels/discord/reminders") or {"reminders": []}
+
+    async def report_reminder(
+        self,
+        scope: str,
+        reminder_id: int,
+        status: str,
+        error: str | None = None,
+        guild_id: str | None = None,
+    ) -> None:
+        body: dict[str, Any] = {"status": status, "error": error}
+        if guild_id:
+            body["guild_id"] = str(guild_id)
+        await self._call("POST", f"/api/channels/discord/reminders/{scope}/{reminder_id}", json=body)
 
     async def admin_command(self, body: dict) -> dict:
         return await self._call("POST", "/api/channels/discord/admins", json=body) or {"reply": UNAVAILABLE}
@@ -362,6 +379,32 @@ async def deliver_digests(core: CoreClient, get_channel) -> int:
             await core.report_digest(post["post_id"], "failed", type(exc).__name__)
         else:
             await core.report_digest(post["post_id"], "sent")
+            sent += 1
+    return sent
+
+
+async def deliver_reminders(core: CoreClient, get_channel, *, allowed_mentions_for=None) -> int:
+    """One poll: send each claimed Discord channel reminder with targeted mention and report."""
+    data = await core.claim_reminders()
+    sent = 0
+    for item in data.get("reminders") or []:
+        scope = str(item.get("scope") or "owner")
+        reminder_id = int(item["reminder_id"])
+        guild_id = item.get("guild_id")
+        try:
+            channel = await get_channel(int(item["channel_id"]))
+            text = reminder_text(item)
+            send_kwargs: dict[str, Any] = {}
+            if allowed_mentions_for is not None:
+                send_kwargs["allowed_mentions"] = allowed_mentions_for(item)
+            if is_forum(channel):
+                await channel.create_thread(name=str(item.get("title") or "リマインダー")[:100], content=text, **send_kwargs)
+            else:
+                await channel.send(text, **send_kwargs)
+        except Exception as exc:  # noqa: BLE001 - report every failure to Core
+            await core.report_reminder(scope, reminder_id, "failed", type(exc).__name__, guild_id=guild_id)
+        else:
+            await core.report_reminder(scope, reminder_id, "sent", guild_id=guild_id)
             sent += 1
     return sent
 
@@ -938,6 +981,7 @@ def build_client(core: CoreClient):
             await archive_buffer.start()
             self.loop.create_task(self.notification_loop())
             self.loop.create_task(self.digest_loop())
+            self.loop.create_task(self.reminder_loop())
             self.loop.create_task(self.archive_sync_loop())
 
         async def close(self):
@@ -965,6 +1009,25 @@ def build_client(core: CoreClient):
                     await deliver_digests(core, self.resolve_channel)
                 except Exception as exc:  # noqa: BLE001 - keep polling
                     log.warning("digest poll failed: %s", type(exc).__name__)
+                await asyncio.sleep(interval)
+
+        async def reminder_loop(self):
+            await self.wait_until_ready()
+            interval = max(5, int(os.environ.get("PETIT_DISCORD_REMINDER_POLL_SECONDS", "15") or 15))
+
+            def _allowed_mentions(item: dict) -> discord.AllowedMentions:
+                if item.get("mention_target") == "everyone":
+                    return discord.AllowedMentions(everyone=True)
+                author_id = str(item.get("author_id") or "")
+                if author_id.isdigit():
+                    return discord.AllowedMentions(users=[discord.Object(id=int(author_id))])
+                return discord.AllowedMentions.none()
+
+            while not self.is_closed():
+                try:
+                    await deliver_reminders(core, self.resolve_channel, allowed_mentions_for=_allowed_mentions)
+                except Exception as exc:  # noqa: BLE001 - keep polling
+                    log.warning("reminder poll failed: %s", type(exc).__name__)
                 await asyncio.sleep(interval)
 
         async def archive_sync_loop(self):

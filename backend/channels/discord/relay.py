@@ -176,6 +176,17 @@ def notification_text(item: dict) -> str:
     return f"**{item.get('title', '')}**\n{item.get('body', '')}"[:LIMIT]
 
 
+def reminder_text(item: dict) -> str:
+    mention = "@everyone" if item.get("mention_target") == "everyone" else f"<@{item.get('author_id', '')}>"
+    title = str(item.get("title") or "").strip()
+    message = str(item.get("message") or "").strip()
+    if message and message != title:
+        body = f"{mention}\n⏰ **{title}**\n{message}"
+    else:
+        body = f"{mention}\n⏰ **{title}**"
+    return body[:LIMIT]
+
+
 SLASH_SUBCOMMANDS = {"setup", "reset", "me", "forget-me", "archive", "digest", "admin"}
 
 
