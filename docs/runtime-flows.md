@@ -254,7 +254,9 @@ flowchart TD
     Auth -->|未設定| E503[503]
     Auth -->|不一致| E401[401]
     Auth --> Mode{発話者 = OWNER_ID かつ<br/>DM か OWNER_GUILD_IDS?}
-    Mode -->|no| GuildCheck{guild_id あり かつ<br/>guild_api.is_configured?}
+    Mode -->|no| GuildOn{PETIT_DISCORD_GUILD_MODE=on?<br/>既定 off・#504}
+    GuildOn -->|no| Ignore[空の返答 status=ignored<br/>Bot は何も送らない・Brain 0 回]
+    GuildOn -->|yes| GuildCheck{guild_id あり かつ<br/>guild_api.is_configured?}
     GuildCheck -->|no| Guide[固定の案内のみ<br/>Brain / DeepSeek 呼び出し 0 回]
     GuildCheck -->|yes| GuildMention[guild_api.handle_mention<br/>Guild モードへ]
     Mode -->|yes| Submit[conversation_api.submit<br/>thread=discord:channel / request=discord:message<br/>source=discord・is_admin]
@@ -271,14 +273,40 @@ flowchart TD
     DM --> Report[sent / failed を報告<br/>未報告は claimed=不明のまま再送しない]
 ```
 
+### 毎日の進捗投稿（v0.68.0開発版・#504）
+
+詳細は [life/activity-digest.md](life/activity-digest.md)。
+
+```mermaid
+flowchart TD
+    Cmd["/petit digest here・off・list・preview"] --> CmdAPI[POST /api/channels/discord/digests/command]
+    CmdAPI --> Owner{owner かつ DM か指定サーバー?}
+    Owner -->|no| D403[403]
+    Owner -->|preview| Gen
+    Owner -->|here / off / list| Subs[(discord_digest_subscriptions<br/>channel・時刻・TZ・前日/当日)]
+    Tick[DigestScheduler 1分ごと] --> Due{予定時刻〜6時間以内 かつ<br/>登録後の枠 かつ 未作成の日?}
+    Subs --> Due
+    Due -->|yes| Gen[life_log.generate<br/>取り込み → ①extract ②merge ③compose<br/>元の記録が同じなら保存済みを再利用]
+    Gen --> Ready[(discord_digest_posts ready<br/>登録×日で一意)]
+    BotPoll[Bot 30秒ごと] --> ClaimD[GET /api/channels/discord/digests<br/>ready → claimed]
+    Ready --> ClaimD
+    ClaimD --> Kind{フォーラム?}
+    Kind -->|yes| Forum[日付タイトルの新規投稿]
+    Kind -->|no| Send[チャンネル / スレッドへ送信]
+    Forum --> ReportD[sent / failed を報告<br/>claimed のままは不明・再送しない]
+    Send --> ReportD
+```
+
 ## Discord Guild モード（v0.48.0開発版・#403）
 
-owner 以外、または owner 指定外のサーバーでは、管理者が `/petit setup` を実行したサーバーだけ Guild モードで動く。データは `storage/guilds/<guild_id>.db` に完全分離し、request_context の `guild_mode` によって owner の DB・Tool Registry・PETIT Home・CLI Brain への到達を遮断する。詳細は [channels/discord-bot.md](channels/discord-bot.md) §3・§5.3。
+`PETIT_DISCORD_GUILD_MODE=on` のときだけ（既定 off・#504）、owner 以外、または owner 指定外のサーバーでは、管理者が `/petit setup` を実行したサーバーだけ Guild モードで動く。データは `storage/guilds/<guild_id>.db` に完全分離し、request_context の `guild_mode` によって owner の DB・Tool Registry・PETIT Home・CLI Brain への到達を遮断する。詳細は [channels/discord-bot.md](channels/discord-bot.md) §3・§5.3。
 
 ```mermaid
 flowchart TD
     Slash["/petit setup・reset・me・forget-me"] --> RelaySlash["Bot: dispatch_slash_interaction<br/>POST /api/guild/* (Bearer サービストークン)"]
-    RelaySlash --> Perm{setup / reset ?}
+    RelaySlash --> GMode{"GUILD_MODE=on?<br/>（reset・forget-me は常に可）"}
+    GMode -->|no| Private[403 持ち主専用]
+    GMode -->|yes| Perm{setup / reset ?}
     Perm -->|Manage Server 権限なし| Deny403[403 拒否]
     Perm -->|setup・権限あり| InitDB[("storage/guilds/&lt;guild_id&gt;.db<br/>guild_settings を保存・有効化")]
     Perm -->|reset・権限あり| DropDB["&lt;guild_id&gt;.db を削除"]

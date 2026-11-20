@@ -86,7 +86,7 @@ def notification_text(item: dict) -> str:
     return f"**{item.get('title', '')}**\n{item.get('body', '')}"[:LIMIT]
 
 
-SLASH_SUBCOMMANDS = {"setup", "reset", "me", "forget-me", "archive"}
+SLASH_SUBCOMMANDS = {"setup", "reset", "me", "forget-me", "archive", "digest"}
 
 
 def parse_slash(data: dict | None) -> tuple[str, dict] | None:

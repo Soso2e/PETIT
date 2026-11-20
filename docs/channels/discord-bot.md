@@ -5,6 +5,8 @@
 > 関連: Concept.md §2・§6・§9・§10、[multimodal-discord-plan.md](multimodal-discord-plan.md)（旧計画。PR3/PR4 の Discord 部分を本書が引き継ぐ）、[../brain/agent-home.md](../brain/agent-home.md)
 >
 > Guild モード（§3）は Concept §2 に「副産物」として追記済み（2026-11-08）。owner データとの完全分離が条件。
+>
+> **2026-11-20（#504）**: 当面は本人専用で使う。Guild モードは `PETIT_DISCORD_GUILD_MODE=on` のときだけ動き、既定 off では owner 以外に何も返さない。毎日の進捗投稿（`/petit digest`）は [../life/activity-digest.md](../life/activity-digest.md)。
 
 ---
 
@@ -150,6 +152,11 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 - サーバー別 SQLite: `storage/guilds/<guild_id>.db`（owner の `storage/app.db` とは別ファイル）。テーブルは `guild_settings`・`guild_members`・`guild_conversations`・`guild_usage_log`。`/petit reset` で DB ファイルごと削除する。
 - 完全分離ガード: `request_context.guild_mode(guild_id=...)` 実行中は `mode=guild` となり、owner の SQLite（`backend/db.py`）・Tool Registry（`backend/tools/registry.py`）・PETIT Home（`backend/petit_home.py`）・owner Brain / CLI（`backend/brain_priority.py`・`backend/conversation_api.py`）へ触れようとすると即座に `GuildIsolationError` で失敗する。
 - 会話と予算: `POST /api/channels/discord/events` で owner モード以外のサーバーメンションを受けたとき、そのサーバーが `/petit setup` 済みなら `guild_api.handle_mention` へ渡す（未設定サーバーは従来通り `GUEST_GUIDE` を返し DeepSeek 呼び出し 0 回）。設定済みサーバーではそのサーバーの DB のメンバー情報・直近会話だけを使って **DeepSeek のみ**（`tools=None`）で返答する。サーバーごとの1日上限（回数・トークン）およびユーザーごとの1時間あたりレート制限を超えた場合は、DeepSeek を呼ばずに「今日はここまで」を返す。秘密値（DeepSeek API キー・サービストークン）は返答・エラーから自動で伏せる。
+
+## 5.4 本人専用モードと毎日の進捗投稿（v0.68.0・#504）
+
+- `PETIT_DISCORD_GUILD_MODE`（既定 off）。off の間、owner 以外・指定外サーバーの発話には空の返答（`status=ignored`）を返し、Bot は何も送らない。Brain / DeepSeek は 0 回。`/api/guild/setup`・`/api/guild/me`・`/api/guild/messages` は 403「このプティは持ち主専用です。」。`reset`・`forget-me` は削除のため常に使える。
+- `/petit digest`（owner のみ・DM か指定サーバー）で、チャンネル・フォーラム・スレッドに毎日の進捗投稿を登録する。Core の `backend/discord_digest.py` が時刻を判定して `backend/life_log.py` のまとめを作り、Bot が `GET /api/channels/discord/digests` で取りに来て送る。仕組みと設定は [../life/activity-digest.md](../life/activity-digest.md)。
 
 ## 6. どこで動かすか — 自宅PC＋Cloudflare（検討）
 

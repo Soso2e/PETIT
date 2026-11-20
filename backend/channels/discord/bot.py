@@ -94,6 +94,15 @@ class CoreClient:
             params["zone"] = str(zone)
         return await self._call("GET", "/api/channels/discord/archive/allowlist", params=params) or {}
 
+    async def digest_command(self, body: dict) -> dict:
+        return await self._call("POST", "/api/channels/discord/digests/command", json=body) or {"reply": UNAVAILABLE}
+
+    async def claim_digests(self) -> dict:
+        return await self._call("GET", "/api/channels/discord/digests") or {"posts": []}
+
+    async def report_digest(self, post_id: int, status: str, error: str | None = None) -> None:
+        await self._call("POST", f"/api/channels/discord/digests/{post_id}", json={"status": status, "error": error})
+
     async def close(self) -> None:
         await self._client.aclose()
 
@@ -253,6 +262,35 @@ async def deliver_notifications(core: CoreClient, fetch_user) -> int:
     return sent
 
 
+def is_forum(channel) -> bool:
+    return str(getattr(channel, "type", "")) == "forum"
+
+
+async def deliver_digests(core: CoreClient, get_channel) -> int:
+    """One poll: post each queued daily digest and report the outcome to Core.
+
+    A forum channel gets a new post per day; a text channel or thread gets plain messages.
+    """
+    data = await core.claim_digests()
+    sent = 0
+    for post in data.get("posts") or []:
+        try:
+            channel = await get_channel(int(post["channel_id"]))
+            chunks = split(str(post.get("body") or "")) or [str(post.get("title") or "")]
+            target = channel
+            if is_forum(channel):
+                created = await channel.create_thread(name=str(post.get("title") or "進捗")[:100], content=chunks[0])
+                target, chunks = getattr(created, "thread", created), chunks[1:]
+            for chunk in chunks:
+                await target.send(chunk)
+        except Exception as exc:  # noqa: BLE001 - report every failure to Core
+            await core.report_digest(post["post_id"], "failed", type(exc).__name__)
+        else:
+            await core.report_digest(post["post_id"], "sent")
+            sent += 1
+    return sent
+
+
 async def dispatch_slash_interaction(
     core: CoreClient,
     *,
@@ -263,11 +301,21 @@ async def dispatch_slash_interaction(
     manage_guild: bool,
     permissions: int | None,
     data: dict | None,
+    channel_id: str | None = None,
 ) -> str | None:
     """Relay a `/petit` slash command to Core and return the reply text."""
     parsed = parse_slash(data)
     if parsed is None:
         return None
+    if parsed[0] == "digest":
+        # Owner-only; Core checks the owner and the place. Works in DMs too.
+        params = parsed[1]
+        target = params.get("channel") or channel_id
+        body = {"action": str(params.get("action") or "here"), "author_id": author_id, "guild_id": guild_id,
+                "channel_id": str(target) if target else None, "time": str(params.get("time") or "10:00"),
+                "day": str(params.get("day") or "yesterday")}
+        result = await core.digest_command(body)
+        return str(result.get("reply") or "")
     if not guild_id:
         return "このコマンドはサーバー内でのみ使えます。"
     sub, params = parsed
@@ -338,6 +386,11 @@ async def dispatch_slash_interaction(
 def build_client(core: CoreClient):
     import discord  # optional dependency: requirements-discord.txt
     from discord import app_commands
+
+    # Slash command parameters are string annotations (``from __future__ import annotations``);
+    # discord.py evaluates them against this module's globals, so the lazily imported module
+    # must be visible there or building the command tree raises NameError.
+    globals().setdefault("discord", discord)
 
     intents = discord.Intents.default()
     intents.dm_messages = True
@@ -462,6 +515,7 @@ def build_client(core: CoreClient):
                 log.warning("command tree sync failed: %s", type(exc).__name__)
             await archive_buffer.start()
             self.loop.create_task(self.notification_loop())
+            self.loop.create_task(self.digest_loop())
 
         async def close(self):
             await archive_buffer.stop()
@@ -475,6 +529,19 @@ def build_client(core: CoreClient):
                     await deliver_notifications(core, self.fetch_user)
                 except Exception as exc:  # noqa: BLE001 - keep polling
                     log.warning("notification poll failed: %s", type(exc).__name__)
+                await asyncio.sleep(interval)
+
+        async def resolve_channel(self, channel_id: int):
+            return self.get_channel(channel_id) or await self.fetch_channel(channel_id)
+
+        async def digest_loop(self):
+            await self.wait_until_ready()
+            interval = max(10, int(os.environ.get("PETIT_DISCORD_POLL_SECONDS", "30") or 30))
+            while not self.is_closed():
+                try:
+                    await deliver_digests(core, self.resolve_channel)
+                except Exception as exc:  # noqa: BLE001 - keep polling
+                    log.warning("digest poll failed: %s", type(exc).__name__)
                 await asyncio.sleep(interval)
 
     client = PetitClient(intents=intents, allowed_mentions=discord.AllowedMentions.none())
@@ -500,6 +567,18 @@ def build_client(core: CoreClient):
     @petit_group.command(name="archive", description="このサーバーのDiscordログ保存対象を設定・確認します（管理者のみ）")
     async def _cmd_archive(interaction: discord.Interaction, action: str = "list",
                            scope: str = "channel", channel: discord.TextChannel | None = None):
+        pass
+
+    @petit_group.command(name="digest", description="毎日の進捗投稿を登録・停止・確認します（持ち主のみ）")
+    @app_commands.describe(action="here=ここに登録 / off=停止 / list=一覧 / preview=今すぐ自分だけに表示",
+                           time="投稿する時刻（HH:MM）", day="まとめる日",
+                           channel="投稿先（省略時はこの場所。フォーラムなら毎日新しい投稿を作ります）")
+    @app_commands.choices(
+        action=[app_commands.Choice(name=n, value=n) for n in ("here", "off", "list", "preview")],
+        day=[app_commands.Choice(name="前日", value="yesterday"), app_commands.Choice(name="当日", value="today")])
+    async def _cmd_digest(interaction: discord.Interaction, action: str = "here", time: str = "10:00",
+                          day: str = "yesterday",
+                          channel: discord.TextChannel | discord.ForumChannel | discord.Thread | None = None):
         pass
 
     client.tree.add_command(petit_group)
@@ -577,6 +656,7 @@ def build_client(core: CoreClient):
                 manage_guild=manage_guild,
                 permissions=perm_value if isinstance(perm_value, int) else None,
                 data=interaction.data,
+                channel_id=str(interaction.channel_id) if interaction.channel_id else None,
             )
             if reply:
                 for chunk in split(reply):

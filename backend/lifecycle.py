@@ -42,9 +42,15 @@ def startup() -> None:
     service_sync.start()
     from . import coding_jobs
     coding_jobs.start()
+    from . import discord_digest
+    if discord_digest.enabled():
+        discord_digest.get_scheduler().start()
 
 
 def shutdown() -> None:
+    from . import discord_digest
+    if discord_digest.enabled():
+        discord_digest.get_scheduler().stop()
     from . import coding_jobs
     coding_jobs.stop()
     from . import service_sync, codex_brain
