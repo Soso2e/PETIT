@@ -266,6 +266,9 @@ const server = http.createServer(async (request, response) => {
     await voicePage.locator('#mic').waitFor();
     assert.equal(await voicePage.locator('#input').inputValue(), '設定変更をまたぐ下書き');
     await voicePage.locator('#input').fill('');
+    // Voice/Wake acceptance is optional while the wake model is not production-ready.
+    // Run `npm run test:smoke:voice` to exercise microphone, STT and TTS flows.
+    if (process.argv.includes('--voice')) {
     // A generated tone replaces the microphone; the actual AudioWorklet, WAV upload,
     // transcription adapter, shared voice.js and confirmation UI still execute.
     await voicePage.evaluate(() => {
@@ -330,6 +333,7 @@ const server = http.createServer(async (request, response) => {
     await voicePage.waitForFunction(() => window.fixtureAudioPlaying);
     assert.equal(ttsRequests, 2, 'restored replies retain manual playback');
     await voicePage.evaluate(() => window.fixtureAudio.onended());
+    }
     // Sleep and screen lock overlap: resume alone must not permit activation.
     await instance.evaluate(({ powerMonitor }) => { powerMonitor.emit('lock-screen'); powerMonitor.emit('suspend'); powerMonitor.emit('resume'); });
     await instance.evaluate(({ app }) => app.emit('activate'));
