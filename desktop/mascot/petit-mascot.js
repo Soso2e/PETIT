@@ -54,7 +54,8 @@
     for (const key of Object.keys(DEFAULT_COLORS)) if (isHex(opts[key])) c[key] = opts[key];
     // 輪だけ指定されたら葉も輪に寄せる（葉は輪と同系色がデザイン上の基準）。
     if (isHex(opts.ring) && !isHex(opts.leaf)) c.leaf = mixHex(opts.ring, '#000000', 0.05);
-    c.bodyHi = mixHex(c.body, '#FFFFFF', 0.45);
+    // ベタ塗りを維持し、下側の柔らかい影だけを残す。
+    c.mouth = c.ring;
     c.bodyLo = mixHex(c.body, '#F2A35A', 0.18);
     c.shade = mixHex(c.body, '#C9762E', 0.45);
     c.vein = mixHex(c.body, '#FFFFFF', 0.2);
@@ -68,11 +69,11 @@
   // paint(kind) はライブ時はCSS変数のclass、静的出力時は実際の色属性になる。
   const PARTS = dict({
     eyes: dict({
-      open: (p) => `<path ${p('ink')} d="${ell(211, 298, 19, 29)}${ell(306, 298, 19, 29)}"/>` +
-        `<path ${p('white')} d="${ell(218, 285, 8, 12)}${ell(313, 285, 8, 12)}${ell(206, 309, 4, 4)}${ell(301, 309, 4, 4)}"/>`,
+      open: (p) => `<path ${p('ink')} d="${ell(211, 297, 19, 19)}${ell(306, 297, 19, 19)}"/>` +
+        `<path ${p('white')} d="${ell(217, 289, 6, 6)}${ell(312, 289, 6, 6)}"/>`,
       happy: (p) => `<path ${p('ink', 10)} d="M192 306Q211 276 230 306M287 306Q306 276 325 306"/>`,
       closed: (p) => `<path ${p('ink', 9)} d="M192 300Q211 314 230 300M287 300Q306 314 325 300"/>`,
-      wink: (p) => `<path ${p('ink')} d="${ell(211, 298, 19, 29)}"/><path ${p('white')} d="${ell(218, 285, 8, 12)}${ell(206, 309, 4, 4)}"/>` +
+      wink: (p) => `<path ${p('ink')} d="${ell(211, 297, 19, 19)}"/><path ${p('white')} d="${ell(217, 289, 6, 6)}"/>` +
         `<path ${p('ink', 10)} d="M287 304Q306 280 325 304"/>`,
       dizzy: (p) => `<path ${p('ink', 8)} d="M197 284L225 312M225 284L197 312M292 284L320 312M320 284L292 312"/>`,
     }),
@@ -114,7 +115,7 @@
   // ---------------------------------------------------------------- emotions
   // eyes/mouth/brows/fx は PARTS のキー。lid は目の開き具合（CSS変形）、look は視線の既定値。
   const EMOTIONS = dict({
-    neutral:   { eyes: 'open', mouth: 'soft' },
+    neutral:   { eyes: 'open', mouth: 'soft', cheeks: true },
     happy:     { eyes: 'open', mouth: 'open', cheeks: true },
     joy:       { eyes: 'happy', mouth: 'grin', cheeks: true, fx: 'sparkle' },
     love:      { eyes: 'happy', mouth: 'soft', cheeks: true, fx: 'heart' },
@@ -189,22 +190,19 @@
   }
 
   function buildMarkup({ uid, paint, filter, colors }) {
-    const grad = `pm-g-${uid}`, clip = `pm-c-${uid}`;
-    const stop = (offset, key) => colors ? `<stop offset="${offset}" stop-color="${colors[key]}"/>` : `<stop offset="${offset}" class="pm-stop-${key}"/>`;
+    const clip = `pm-c-${uid}`;
     const ringAttrs = colors ? `fill="none" stroke="${colors.ring}"` : 'class="pm-ring-line" fill="none"';
     const ring = `<ellipse ${ringAttrs} cx="256" cy="327" rx="216" ry="54" stroke-width="23"/>`;
-    const bodyFill = `fill="url(#${grad})"`;
-    return `<defs><linearGradient id="${grad}" x1="0" y1="0" x2=".95" y2="1">${stop(0, 'bodyHi')}${stop(0.56, 'body')}${stop(1, 'bodyLo')}</linearGradient>` +
-      `<clipPath id="${clip}"><rect x="0" y="327" width="512" height="185"/></clipPath></defs>` +
+    const bodyFill = colors ? `fill="${colors.body}"` : 'class="pm-f-body"';
+    return `<defs><clipPath id="${clip}"><rect x="0" y="327" width="512" height="185"/></clipPath></defs>` +
       `<path class="pm-shadow" ${paint('ink')} opacity=".14" d="${ell(256, 462, 112, 12)}"/>` +
       `<g class="pm-char">` +
         `<g class="pm-ring pm-ring-back"><g transform="rotate(-12 256 327)">${ring}</g></g>` +
-        `<g class="pm-foot pm-foot-l"><path ${paint('ink')} transform="rotate(-13 202 423)" d="${ell(202, 423, 24, 34)}"/></g>` +
-        `<g class="pm-foot pm-foot-r"><path ${paint('ink')} transform="rotate(13 318 423)" d="${ell(318, 423, 24, 34)}"/></g>` +
+        `<g class="pm-foot pm-foot-l"><path ${paint('body')} transform="rotate(-13 202 423)" d="${ell(202, 423, 24, 34)}"/></g>` +
+        `<g class="pm-foot pm-foot-r"><path ${paint('body')} transform="rotate(13 318 423)" d="${ell(318, 423, 24, 34)}"/></g>` +
         `<g class="pm-body">` +
           `<path ${bodyFill} d="M256 132C300 130 317 171 336 222C349 260 377 286 395 324C411 356 413 381 400 405C381 441 331 447 258 448C185 448 137 440 117 406C101 380 104 351 119 324C138 288 168 260 181 221C199 167 216 132 256 132Z"/>` +
           `<path ${paint('shade')} opacity=".2" d="M395 323C414 356 413 383 400 405C381 441 331 447 258 448C194 448 151 441 127 421C199 440 339 416 393 350Z"/>` +
-          `<path ${paint('white')} opacity=".9" transform="rotate(-28 307 175)" d="${ell(307, 175, 12, 22)}${ell(324, 202, 6, 6)}"/>` +
         `</g>` +
         `<g class="pm-face">` +
           `<g class="pm-look">${SLOT_ORDER.map((s) => `<g class="pm-${s}">${partsMarkup(s, paint, filter)}</g>`).join('')}</g>` +

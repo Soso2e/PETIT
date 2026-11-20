@@ -74,3 +74,19 @@ test('chat and voice only emit display hints, never message text', () => {
   assert.match(web, /visibilitychange/);
   assert.doesNotMatch(web, /fetch\(|XMLHttpRequest|sendBeacon/, 'the mascot never talks to the network');
 });
+
+
+test('flat shaded mascot preserves shadow, cheeks, round eyes, ring mouth and body-color feet', () => {
+  const c = M.resolveColors({ preset: 'mint', ring: '#123456' });
+  assert.equal(c.mouth, c.ring);
+  const svg = M.toStaticSVG({ emotion: 'neutral', colors: { preset: 'pear' } });
+  assert.doesNotMatch(svg, /linearGradient|pm-g-|opacity=".9" transform="rotate\(-28/);
+  assert.match(svg, /class="pm-shadow"/);
+  assert.match(svg, /class="pm-body"><path fill="#FFE9B9"/);
+  assert.match(svg, /data-slot="cheeks" data-variant="on"/);
+  assert.match(svg, /data-slot="eyes" data-variant="open"/);
+  assert.match(svg, /M192 297a19 19/);
+  assert.match(svg, /M211 289a6 6/);
+  assert.match(svg, /class="pm-foot pm-foot-l"><path fill="#FFE9B9"/);
+  assert.match(svg, /data-slot="mouth" data-variant="soft"><path fill="none" stroke="#F37865"/);
+});
