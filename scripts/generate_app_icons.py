@@ -19,26 +19,26 @@ def save_png(image: Image.Image, path: Path, size: int) -> None:
     image.resize((size, size), Image.Resampling.LANCZOS).convert('RGB').save(path, format='PNG', optimize=True)
 
 def run() -> None:
-    # Recover an omitted byte in the initial GitHub blob transfer, verified
-    # against the SHA-1 of the locally generated user-approved PNG.
+    # Restore the exact transfer tail and verify against the original Git blob SHA.
+    # The initial transfer lost one base64 character near the tail; the
+    # first 5600 encoded characters were transferred intact.
+    from base64 import b64encode, b64decode
     expected = 'e361a8144bf651dd352935747f24f35a53ee0e66'
     raw = SOURCE.read_bytes()
-    prefix = b'blob 4462\x00'
+    prefix = b'blob 4462\\x00'
     if hashlib.sha1(prefix + raw).hexdigest() != expected:
-        repaired = None
-        if len(raw) == 4461:
-            for i in range(len(raw) + 1):
-                before, after = raw[:i], raw[i:]
-                for byte in range(256):
-                    candidate = before + bytes([byte]) + after
-                    if hashlib.sha1(prefix + candidate).hexdigest() == expected:
-                        repaired = candidate
-                        break
-                if repaired is not None:
-                    break
-        if repaired is None:
+        tail = (
+            'joLD9yZP7eXGH0RAwkPSEzZ7CG9qdn46l/uEKchLwJ+4X4h7SmLNN5CUUf++BnjW'
+            'e85LAbDFuFHd04sl1G+0CRxPTX76JEg+J/BuNXmDRCH1E1lA2v4kH82S7VpkjNDY'
+            '+fOc8DX6sGjLKngxhhf9CLTME8J3je5G5Xw678UY+EChmUskcsEn+Fty7Wdfy0B/'
+            'FDcaxxnojXZ72Klwtwq1gkWdaHX0zBMm0KyndWVtv/eoGSy8MO0j+47RNloXSvbj'
+            'CrIPQNCmyLKU9ooe1TOPhN5o/c35sIVcR1Cwp0K8Xvzpdlvtldks+naLYF9YuR93'
+            '8X+EU3RySY+SggAAAABJRU5ErkJggg=='
+        )
+        restored = b64decode(b64encode(raw).decode('ascii')[:5600] + tail)
+        if hashlib.sha1(prefix + restored).hexdigest() != expected:
             raise ValueError('icon source transfer checksum mismatch')
-        SOURCE.write_bytes(repaired)
+        SOURCE.write_bytes(restored)
     src = Image.open(SOURCE).convert('RGB')
     if src.width != src.height:
         raise ValueError('icon source must be square')
