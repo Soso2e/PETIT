@@ -2,6 +2,7 @@
 """Regenerate PETIT app icons from the approved pear-and-Saturn illustration."""
 from __future__ import annotations
 from base64 import b64encode
+import hashlib
 from io import BytesIO
 from pathlib import Path
 import json
@@ -18,6 +19,26 @@ def save_png(image: Image.Image, path: Path, size: int) -> None:
     image.resize((size, size), Image.Resampling.LANCZOS).convert('RGB').save(path, format='PNG', optimize=True)
 
 def run() -> None:
+    # Recover an omitted byte in the initial GitHub blob transfer, verified
+    # against the SHA-1 of the locally generated user-approved PNG.
+    expected = 'e361a8144bf651dd352935747f24f35a53ee0e66'
+    raw = SOURCE.read_bytes()
+    prefix = b'blob 4462\\x00'
+    if hashlib.sha1(prefix + raw).hexdigest() != expected:
+        repaired = None
+        if len(raw) == 4461:
+            for i in range(len(raw) + 1):
+                before, after = raw[:i], raw[i:]
+                for byte in range(256):
+                    candidate = before + bytes([byte]) + after
+                    if hashlib.sha1(prefix + candidate).hexdigest() == expected:
+                        repaired = candidate
+                        break
+                if repaired is not None:
+                    break
+        if repaired is None:
+            raise ValueError('icon source transfer checksum mismatch')
+        SOURCE.write_bytes(repaired)
     src = Image.open(SOURCE).convert('RGB')
     if src.width != src.height:
         raise ValueError('icon source must be square')
