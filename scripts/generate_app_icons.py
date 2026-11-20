@@ -35,7 +35,18 @@ def run() -> None:
             'CrIPQNCmyLKU9ooe1TOPhN5o/c35sIVcR1Cwp0K8Xvzpdlvtldks+naLYF9YuR93'
             '8X+EU3RySY+SggAAAABJRU5ErkJggg=='
         )
-        restored = b64decode(b64encode(raw).decode('ascii')[:5600] + tail)
+        repaired_chunk = (
+            'yowHNpsZmH+m7XSAys2vG/J1eqUTIF3/zci8sTCA/OVEOUdkEF9udb3vmmmNF1SHtMhmKNVkd+xm77RwhCPqEAj9NMhBAKo7ehdf'
+            'f5w8kxNdigjzgGpHkQnXTAQ4jtt2nNjbW6n40SRzWoW4vjIPhhFuMiIhVcBhRjFbLYKZTcju9XVub++J3N66Ige2Ggj+o+vTdQYB'
+            'DGdgGsDvD5KB2cIubkm7bTJjme7CIiVs8deM4Pvgb30WfF5yjENThPFWHI/9gOlTixs1hE/EyFcwJe2N4bCNEx3QRBv1nfvWbSj3'
+            't/e8DYwWDh20J+D374ECab7/Gt1m12+Z0nKDk3dAsUcJxi+6I7EIwU9xM8ITMIKFG7ico6RrlIA88+zYn0BO2px44rTv9+BgNPel'
+            '/zKQaeC2xcEXTGAYbaIhDF/jl8hsUqbXMVz22BmA/iglNKO1LRzhN0cvPT1UNCIEZJ/gCPq/veeyheOSOMYz8WpAHW1hyvoAnG35'
+            'CYxxesFU6VoQGXJbUQCYgxf9ZUw6bRK1g5eXft+QpXoBfiwIDOPuxzSOH8tXaDB+veLrnf6dMU68uLNUa3HBdtPEbfov+sj9bunk'
+            'q57UgwQChIEQ/sb3VcJ1pBv5EhNci+VO/8wxU7Jy+BGZOegRBkR6lAmS/2yqB2mmMdBjdyIwlyiBuPcL6qcR4JYa//qeQ+XlJc0F'
+            '3fs0/Ak3WSH2EisQ8/5JfAoybgCn7ZKq6ToZc/36iy/6KPVt7v195D/tmPrT75ARCGwu4+GiA3E9w3H9wk/LZ+q2RZOk0sHV4Dtr'
+        )
+        encoded = b64encode(raw).decode('ascii')
+        restored = b64decode(encoded[:3200] + repaired_chunk + encoded[4000:5600] + tail)
         if hashlib.sha1(prefix + restored).hexdigest() != expected:
             encoded = b64encode(raw).decode('ascii')
             for i in range(0, 5600, 800):
