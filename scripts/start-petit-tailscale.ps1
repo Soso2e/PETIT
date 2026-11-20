@@ -73,7 +73,8 @@ Write-Host ""
 Write-Host "[2/5] Starting PETIT..."
 $uvicornArgs = @(
     "-m", "uvicorn", "backend.main:app",
-    "--host", "127.0.0.1", "--port", $Port
+    "--host", "127.0.0.1", "--port", $Port,
+    "--env-file", ".env"
 )
 if ($mode -eq "1") {
     $uvicornArgs += @("--reload", "--reload-dir", "backend")
@@ -122,10 +123,7 @@ if ($existingBot) {
 else {
     $discordConfigured = & $PythonPath -c "import os; from dotenv import load_dotenv; load_dotenv(); print('1' if os.environ.get('DISCORD_BOT_TOKEN') and len(os.environ.get('PETIT_DISCORD_SERVICE_TOKEN','')) >= 32 else '0')"
     if ($discordConfigured -eq "1") {
-        $botArgs = @(
-            "-c",
-            "from dotenv import load_dotenv; load_dotenv(); from backend.channels.discord.bot import main; main()"
-        )
+        $botArgs = @("-m", "backend.channels.discord")
         $botProcess = Start-Process -FilePath $PythonPath -ArgumentList $botArgs -WorkingDirectory $ProjectPath -WindowStyle Minimized -PassThru
         Write-Host "[OK] Discord Bot started (PID: $($botProcess.Id))"
     }
