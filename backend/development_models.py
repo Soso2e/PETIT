@@ -12,6 +12,7 @@ from . import antigravity_cli, antigravity_cli_brain, brain_priority, claude_cod
 
 MODELS = {
     "claude_opus": ("claude_code", "opus", "Claude Opus 5.5"),
+    "claude_sonnet": ("claude_code", "sonnet", "Claude Sonnet 5.5"),
     "codex_sol": ("codex", "gpt-6.1-sol", "Codex Sol 6.1"),
     "antigravity_hydrogen": ("antigravity_cli", "gemini-4-hydrogen", "Antigravity Hydrogen"),
     "gemini_flash": ("antigravity_cli", "gemini-3.8-flash", "Gemini 3.8 Flash"),
@@ -98,7 +99,8 @@ def _claude():
 
     five, limited = remaining(5, 40)
     weekly, _ = remaining(168, 200)
-    return {"claude_opus": (True, 0 if limited else five, weekly)}
+    limits = (True, 0 if limited else five, weekly)
+    return {"claude_opus": limits, "claude_sonnet": limits}
 
 
 PROBES = {"antigravity_cli": _agy, "codex": _codex, "claude_code": _claude}
@@ -121,7 +123,7 @@ def _collect(eligible):
     for key, (provider, _, label) in MODELS.items():
         authenticated, five, weekly = accounts.get(key, (None, None, None))
         result[key] = {"provider": provider, "label": label, "authenticated": authenticated,
-                       "five_hour": five, "weekly": weekly, "estimated": key == "claude_opus",
+                       "five_hour": five, "weekly": weekly, "estimated": provider == "claude_code",
                        "available": provider in eligible and authenticated is True and five != 0 and weekly != 0}
     return result
 
