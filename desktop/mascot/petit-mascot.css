@@ -17,6 +17,7 @@
 .pm-root[data-facing="left"] .pm-svg { transform: scaleX(-1); }
 
 /* ---- paint (CSS変数) */
+.pm-f-body { fill: var(--pm-body); }
 .pm-f-ink { fill: var(--pm-ink); } .pm-s-ink { stroke: var(--pm-ink); }
 .pm-f-white { fill: var(--pm-white); }
 .pm-f-mouth { fill: var(--pm-mouth); } .pm-s-mouth { stroke: var(--pm-mouth); }
