@@ -131,12 +131,13 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 
 起動手順:
 
-1. Discord Developer Portal で Application と Bot を作り、Bot token を控える。Privileged Gateway Intents はすべて OFF のままでよい。OAuth2 URL Generator で `bot` スコープと権限「Send Messages / Read Message History」を選び、自分のサーバーに招待する。
+1. Discord Developer Portal で Application と Bot を作り、Bot token を控える。過去ログ収集（アーカイブ）を行う場合は Privileged Gateway Intents の **Message Content Intent** を ON にする（DM とメンションだけなら OFF でも可）。OAuth2 URL Generator で `bot`・`applications.commands` スコープと権限「Send Messages / Read Message History」を選び、自分のサーバーに招待する。
 2. Discord の開発者モードで、自分の user ID と指定するサーバーの ID をコピーする。
 3. Core を起動する環境に設定する: `PETIT_DISCORD_OWNER_ID`、`PETIT_DISCORD_OWNER_GUILD_IDS`（カンマ区切り・空なら DM のみ）、`PETIT_DISCORD_SERVICE_TOKEN`（`python -c "import secrets;print(secrets.token_urlsafe(32))"` で作った値）。
 4. 通知も DM で受けるなら、Core 側に `PETIT_DISCORD_NOTIFICATIONS=on` を設定し、Web の通知設定で受けたいカテゴリを ON にする。
 5. Bot を起動する: `pip install -r requirements-discord.txt` のあと、`DISCORD_BOT_TOKEN`・`PETIT_DISCORD_SERVICE_TOKEN`（Core と同じ値）・`PETIT_CORE_URL`（既定 `http://127.0.0.1:8000`）を設定して `python -m backend.channels.discord`。
-6. Bot に DM するか、指定サーバーで `@Bot名 今日なにある？` と送る。
+6. サーバーの過去ログを全チャンネル一括登録・初回スキャンし、毎朝定期同期（既定 `05:00`）を有効にするには、サーバー上で `/petit archive action:init` を実行する。
+7. Bot に DM するか、指定サーバーで `@Bot名 今日なにある？` と送る。
 
 ## 5.2 D2 の実装（v0.46.0・#399）
 
@@ -167,6 +168,12 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
   - 1 回目の DeepSeek 呼び出しでは `search_guild_archive` のみ許可し、サーバー内の話題について質問された場合に検索キーワードを要求させる。
   - サーバー側 Python（`guild_api._search_guild_archive`）が該当サーバー専用の `guild_<guild_id>.sqlite` を FTS5 + trigram（RRF スコア）で検索し、**マッチ度上位 5 件のチャット本文を省略せず全文**返す。
   - 2 回目の DeepSeek 呼び出し（`tools=None`）へ検索結果と元の質問を渡し、回答可能なら回答し、該当情報がない場合は「Discordの中に引っかかる情報がありませんでした。」等を返す。
+
+## 5.6 `/petit archive` による初期一括スキャンと毎朝定期同期（v0.70.1・#512）
+
+- **初期セットアップ（`/petit archive action:init`）**: サーバー内の読み取り可能な全テキストチャンネル・フォーラム・公開スレッド（アーカイブ済み含む）を一括で保存対象へ登録し、バックグラウンドで全期間の過去ログスキャンを実行する。同時に毎朝定期同期（既定 `05:00`）を有効化する（プライベートスレッドはプライバシー保護のため自動登録から除外）。
+- **手動同期（`/petit archive action:sync`）**: 指定チャンネルまたは登録済み全チャンネルの過去ログをバックグラウンドで同期する（`days=0` でチェックポイント以降の差分または全期間、`days>0` で直近 N 日を取得）。
+- **毎朝・起動時定期同期（`archive_sync_loop`）**: Bot 常駐プロセスが起動直後に1回、および毎朝指定時刻（`sync_time`、既定 `05:00`）に `archive_checkpoints` 以降の差分を `channel.history()` で取得し、`POST /api/channels/discord/archive/events/batch` へ一括送信する。`/petit archive action:schedule` で時刻変更や ON/OFF 切替が可能。
 
 ## 6. どこで動かすか — 自宅PC＋Cloudflare（検討）
 

@@ -1,6 +1,13 @@
 """Discord Archive & Knowledge Gateway package for PETIT."""
 from .archive import DiscordArchive, FIELDS, utc_iso
-from .allowlist import effective_policy, set_registrations, allowlist_path, read_state
+from .allowlist import (
+    effective_policy,
+    set_registrations,
+    allowlist_path,
+    read_state,
+    get_sync_configs,
+    set_sync_config,
+)
 from .ingest import ArchiveIngestor, extract_attachment_text
 from .policy import ArchivePolicy
 from .reconcile import ArchiveReconciler, message_to_dto
@@ -20,4 +27,6 @@ __all__ = [
     "set_registrations",
     "allowlist_path",
     "read_state",
+    "get_sync_configs",
+    "set_sync_config",
 ]

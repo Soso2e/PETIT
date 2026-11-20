@@ -359,3 +359,164 @@ def test_slash_admin_dispatch():
     )
     assert reply == "ok"
     assert sent == [{"action": "add", "actor_id": OWNER, "target_user_id": "555"}]
+
+
+def test_archive_init_sync_and_schedule_dispatch():
+    from types import SimpleNamespace
+    from backend.channels.discord.bot import dispatch_slash_interaction
+
+    calls = []
+    scheduled = []
+
+    class FakeCore:
+        async def archive_set_sync_config(self, body):
+            calls.append(("sync_config", body))
+            return {"status": "ok", "enabled": body["enabled"], "sync_time": body["sync_time"]}
+
+        async def archive_allowlist(self, guild_id=None, zone=None):
+            return {"allow_guilds": {guild_id: {"channels": ["10", "20"]}}}
+
+        async def archive_sync_config(self, guild_id=None):
+            return {"config": {"enabled": True, "sync_time": "05:30"}}
+
+    def fake_schedule(guild, **kwargs):
+        scheduled.append((guild, kwargs))
+        return True
+
+    fake_guild = SimpleNamespace(id="999")
+
+    # init
+    reply = asyncio.run(
+        dispatch_slash_interaction(
+            FakeCore(),
+            interaction_id="101",
+            guild_id="999",
+            author_id=OWNER,
+            display_name="soso",
+            manage_guild=True,
+            permissions=None,
+            data={"name": "petit", "options": [{"name": "archive", "options": [{"name": "action", "value": "init"}, {"name": "time", "value": "05:30"}]}]},
+            guild=fake_guild,
+            schedule_sync=fake_schedule,
+        )
+    )
+    assert "全チャンネル" in reply
+    assert "05:30" in reply
+    assert calls[0][0] == "sync_config"
+    assert scheduled[0][1]["register_all"] is True
+
+    # list
+    reply_list = asyncio.run(
+        dispatch_slash_interaction(
+            FakeCore(),
+            interaction_id="102",
+            guild_id="999",
+            author_id=OWNER,
+            display_name="soso",
+            manage_guild=True,
+            permissions=None,
+            data={"name": "petit", "options": [{"name": "archive", "options": [{"name": "action", "value": "list"}]}]},
+        )
+    )
+    assert "保存対象チャンネル（2件）" in reply_list
+    assert "毎日 05:30" in reply_list
+
+
+def test_sync_guild_archive_registers_and_checkpoints():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from backend.channels.discord.bot import sync_guild_archive
+
+    class FakeAuthor:
+        def __init__(self, uid, name, bot=False):
+            self.id = uid
+            self.name = name
+            self.display_name = name
+            self.bot = bot
+
+    class FakeMsg:
+        def __init__(self, mid, ch, author, content, created_at):
+            self.id = mid
+            self.channel = ch
+            self.guild = ch.guild
+            self.author = author
+            self.content = content
+            self.created_at = created_at
+            self.edited_at = None
+            self.reference = None
+            self.attachments = []
+
+    class FakeChannel:
+        def __init__(self, cid, name, guild, messages, parent_id=None, private=False, readable=True):
+            self.id = cid
+            self.name = name
+            self.guild = guild
+            self.parent_id = parent_id
+            self.parent = None
+            self._messages = messages
+            self._private = private
+            self._readable = readable
+
+        def is_private(self):
+            return self._private
+
+        def permissions_for(self, member):
+            return SimpleNamespace(view_channel=self._readable, read_message_history=self._readable)
+
+        async def history(self, limit=None, after=None, before=None, oldest_first=True):
+            for m in self._messages:
+                if after and m.created_at <= after:
+                    continue
+                yield m
+
+    class FakeGuild:
+        def __init__(self):
+            self.id = "999"
+            self.name = "MyServer"
+            self.me = object()
+            self.text_channels = []
+            self.forums = []
+            self.threads = []
+
+    guild = FakeGuild()
+    t1 = datetime(2026, 11, 20, 10, 0, tzinfo=timezone.utc)
+    ch1 = FakeChannel("10", "general", guild, [])
+    ch1._messages = [FakeMsg("1001", ch1, FakeAuthor("111", "soso"), "hello", t1)]
+    ch_secret = FakeChannel("20", "secret", guild, [], readable=False)
+    th_priv = FakeChannel("30", "priv-thread", guild, [], parent_id="10", private=True)
+    guild.text_channels = [ch1, ch_secret]
+    guild.threads = [th_priv]
+
+    registered = []
+    batches = []
+    checkpoints = {}
+
+    class FakeCore:
+        async def archive_register(self, body):
+            registered.append(body)
+            return {"status": "ok"}
+
+        async def archive_checkpoints(self, guild_id=None):
+            return {"checkpoints": dict(checkpoints)}
+
+        async def archive_events_batch(self, events):
+            batches.extend(events)
+            return {"status": "ok", "saved": len(events)}
+
+        async def archive_set_checkpoint(self, body):
+            checkpoints[body["channel_id"]] = body["completed_at"]
+            return {"status": "ok"}
+
+        async def archive_allowlist(self, guild_id=None, zone=None):
+            return {"allow_guilds": {"999": {"channels": ["10"]}}}
+
+    core = FakeCore()
+    summary = asyncio.run(sync_guild_archive(core, guild, register_all=True, author_id="111", manage_guild=True))
+    assert registered[0]["channel_ids"] == ["10"]  # secret and private thread excluded
+    assert summary["channels"] == 1
+    assert summary["saved"] == 1
+    assert "10" in checkpoints
+
+    # 2nd run uses checkpoint and finds no new messages
+    summary2 = asyncio.run(sync_guild_archive(core, guild, register_all=False, author_id="111"))
+    assert summary2["fetched"] == 0

@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import tempfile
 import threading
 from typing import Any
@@ -54,6 +55,23 @@ def effective_policy(base_policy: ArchivePolicy, archive_dir: Path | str) -> Arc
     return ArchivePolicy(config, zone=base_policy.zone)
 
 
+_SYNC_TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+
+
+def _write_state_atomic(path: Path, state: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temp_path = tempfile.mkstemp(dir=path.parent, prefix=".allowlist-", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, path)
+    finally:
+        if Path(temp_path).exists():
+            Path(temp_path).unlink()
+
+
 def set_registrations(archive_dir: Path | str, zone: str, guild_id: str | int,
                       channel_ids: list[str | int], enabled: bool) -> None:
     g_id = str(guild_id)
@@ -62,22 +80,50 @@ def set_registrations(archive_dir: Path | str, zone: str, guild_id: str | int,
         return
 
     path = allowlist_path(archive_dir, zone)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
     with _lock:
         state = read_state(path, zone)
         entries = state.setdefault("guilds", {}).setdefault(g_id, {})
         for c in c_ids:
             entries[c] = bool(enabled)
+        _write_state_atomic(path, state)
 
-        # Atomic write
-        descriptor, temp_path = tempfile.mkstemp(dir=path.parent, prefix=".allowlist-", suffix=".tmp")
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as f:
-                json.dump(state, f, ensure_ascii=False, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(temp_path, path)
-        finally:
-            if Path(temp_path).exists():
-                Path(temp_path).unlink()
+
+def validate_sync_time(sync_time: str) -> str:
+    value = str(sync_time or "").strip()
+    if not _SYNC_TIME_RE.fullmatch(value):
+        raise ValueError("時刻は HH:MM（00:00〜23:59）の形式で指定してください。")
+    return value
+
+
+def get_sync_configs(archive_dir: Path | str, zone: str) -> dict[str, dict[str, Any]]:
+    path = allowlist_path(archive_dir, zone)
+    with _lock:
+        state = read_state(path, zone)
+    raw = state.get("sync_schedules")
+    if not isinstance(raw, dict):
+        return {}
+    result: dict[str, dict[str, Any]] = {}
+    for g_id, cfg in raw.items():
+        if isinstance(cfg, dict):
+            result[str(g_id)] = {
+                "enabled": bool(cfg.get("enabled", False)),
+                "sync_time": str(cfg.get("sync_time") or "05:00"),
+            }
+    return result
+
+
+def set_sync_config(archive_dir: Path | str, zone: str, guild_id: str | int,
+                    enabled: bool, sync_time: str = "05:00") -> dict[str, Any]:
+    g_id = str(guild_id)
+    if not g_id.isdigit():
+        raise ValueError("guild_id が不正です。")
+    valid_time = validate_sync_time(sync_time)
+
+    path = allowlist_path(archive_dir, zone)
+    with _lock:
+        state = read_state(path, zone)
+        schedules = state.setdefault("sync_schedules", {})
+        entry = {"enabled": bool(enabled), "sync_time": valid_time}
+        schedules[g_id] = entry
+        _write_state_atomic(path, state)
+    return entry
