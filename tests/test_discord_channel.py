@@ -47,7 +47,12 @@ def test_owner_dm_goes_to_core_thread_as_admin(client):
                     "approvals": []}
     thread_id, request_id, message, kwargs = client.calls[0]
     assert (thread_id, request_id) == ("discord:777", "discord:555")
-    assert kwargs == {"source": "discord", "is_admin": True}
+    assert kwargs == {
+        "source": "discord",
+        "is_admin": True,
+        "discord_author_id": "1001",
+        "discord_guild_id": None,
+    }
 
 
 def test_owner_in_designated_guild_is_owner(client):

@@ -167,7 +167,12 @@ def test_guild_mention_uses_only_deepseek_without_tools_and_never_touches_app_db
     call = env.deepseek_calls[0]
     assert call["target"]["provider"] == "deepseek"
     tool_names = [t["function"]["name"] for t in call["payload"].get("tools") or []]
-    assert tool_names == ["search_guild_archive"]
+    assert tool_names == [
+        "search_guild_archive",
+        "create_discord_reminder",
+        "list_discord_reminders",
+        "cancel_discord_reminder",
+    ]
 
     # Owner app.db has 0 guild conversations
     with db.get_connection() as conn:
@@ -513,7 +518,12 @@ def test_guild_two_step_archive_search_top5_full_content_and_history_6(env, monk
     assert "過去質問2" not in first_contents
     assert "過去質問3" in first_contents
     assert "過去質問8" in first_contents
-    assert [t["function"]["name"] for t in calls[0]["tools"]] == ["search_guild_archive"]
+    assert [t["function"]["name"] for t in calls[0]["tools"]] == [
+        "search_guild_archive",
+        "create_discord_reminder",
+        "list_discord_reminders",
+        "cancel_discord_reminder",
+    ]
 
     # 2nd call has tools=None and tool result containing at most 5 full-text matches
     assert calls[1]["tools"] is None

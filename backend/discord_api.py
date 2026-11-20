@@ -129,6 +129,8 @@ def receive(event: DiscordEvent, authorization: str | None = Header(default=None
         event.message,
         source="discord",
         is_admin=True,
+        discord_author_id=event.author_id,
+        discord_guild_id=event.guild_id,
         **submit_kwargs,
     )
     return _reply({**result, "request_id": request_id})
