@@ -567,8 +567,8 @@ def gather(day: date) -> list[dict[str, Any]]:
 
 def _llm(profile: str, system: str, user: str, max_tokens: int) -> str:
     """One DeepSeek call. Tests replace this function."""
-    from . import lmstudio_client, model_routing
-    target = model_routing._deepseek_target(profile)  # noqa: SLF001 - shared DeepSeek target builder
+    from . import lmstudio_client
+    target = _deepseek_target(profile)
     if not target.get("configured"):
         raise RuntimeError("deepseek_not_configured")
     response = lmstudio_client.chat_completion(
@@ -577,9 +577,22 @@ def _llm(profile: str, system: str, user: str, max_tokens: int) -> str:
     return str(response.get("content") or "").strip()
 
 
+def _deepseek_target(profile: str) -> dict[str, Any]:
+    """DeepSeek target from .env, falling back to the key saved on the setup screen."""
+    from . import model_routing, setup_store
+    target = model_routing._deepseek_target(profile)  # noqa: SLF001 - shared DeepSeek target builder
+    if not target.get("api_key"):
+        try:
+            key = setup_store.load().get("secrets", {}).get("deepseek_key") or ""
+        except Exception:  # noqa: BLE001
+            key = ""
+        if key:
+            target = {**target, "api_key": key, "configured": bool(target.get("base_url") and target.get("model"))}
+    return target
+
+
 def deepseek_configured() -> bool:
-    from . import model_routing
-    return bool(model_routing._deepseek_target("deepseek_flash").get("configured"))  # noqa: SLF001
+    return bool(_deepseek_target("deepseek_flash").get("configured"))
 
 
 def _profile(stage: str) -> str:

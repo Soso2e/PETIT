@@ -434,3 +434,13 @@ def test_drive_export_text_reads_metadata_then_exports_plain_text(monkeypatch):
     assert seen[1][1] == {"mimeType": "text/plain"}
     with pytest.raises(ValueError):
         google_services.drive_export_text("../x")
+
+
+def test_deepseek_key_from_setup_screen_is_used(monkeypatch):
+    from backend import setup_store
+    monkeypatch.delenv("PETIT_DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setattr(setup_store, "load", lambda: {"secrets": {"deepseek_key": "sk-from-setup"}})
+    target = life_log._deepseek_target("deepseek_flash")
+    assert target["configured"] and target["api_key"] == "sk-from-setup"
+    assert life_log.deepseek_configured()
