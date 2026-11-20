@@ -77,7 +77,8 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "../frontend/petit-app.ico"
     },
     "nsis": {
       "oneClick": false,
