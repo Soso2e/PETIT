@@ -19,43 +19,13 @@ def save_png(image: Image.Image, path: Path, size: int) -> None:
     image.resize((size, size), Image.Resampling.LANCZOS).convert('RGB').save(path, format='PNG', optimize=True)
 
 def run() -> None:
-    # Restore the exact transfer tail and verify against the original Git blob SHA.
-    # The initial transfer lost one base64 character near the tail; the
-    # first 5600 encoded characters were transferred intact.
-    from base64 import b64encode, b64decode
-    expected = 'e361a8144bf651dd352935747f24f35a53ee0e66'
     raw = SOURCE.read_bytes()
-    prefix = b'blob 4462\x00'
-    if hashlib.sha1(prefix + raw).hexdigest() != expected:
-        tail = (
-            'joLD9yZP7eXGH0RAwkPSEzZ7CG9qdn46l/uEKchLwJ+4X4h7SmLNN5CUUf++BnjW'
-            'e85LAbDFuFHd04sl1G+0CRxPTX76JEg+J/BuNXmDRCH1E1lA2v4kH82S7VpkjNDY'
-            '+fOc8DX6sGjLKngxhhf9CLTME8J3je5G5Xw678UY+EChmUskcsEn+Fty7Wdfy0B/'
-            'FDcaxxnojXZ72Klwtwq1gkWdaHX0zBMm0KyndWVtv/eoGSy8MO0j+47RNloXSvbj'
-            'CrIPQNCmyLKU9ooe1TOPhN5o/c35sIVcR1Cwp0K8Xvzpdlvtldks+naLYF9YuR93'
-            '8X+EU3RySY+SggAAAABJRU5ErkJggg=='
-        )
-        repaired_chunk = (
-            'yowHNpsZmH+m7XSAys2vG/J1eqUTIF3/zci8sTCA/OVEOUdkEF9udb3vmmmNF1SHtMhmKNVkd+xm77RwhCPqEAj9NMhBAKo7ehdf'
-            'f5w8kxNdigjzgGpHkQnXTAQ4jtt2nNjbW6n40SRzWoW4vjIPhhFuMiIhVcBhRjFbLYKZTcju9XVub++J3N66Ige2Ggj+o+vTdQYB'
-            'DGdgGsDvD5KB2cIubkm7bTJjme7CIiVs8deM4Pvgb30WfF5yjENThPFWHI/9gOlTixs1hE/EyFcwJe2N4bCNEx3QRBv1nfvWbSj3'
-            't/e8DYwWDh20J+D374ECab7/Gt1m12+Z0nKDk3dAsUcJxi+6I7EIwU9xM8ITMIKFG7ico6RrlIA88+zYn0BO2px44rTv9+BgNPel'
-            '/zKQaeC2xcEXTGAYbaIhDF/jl8hsUqbXMVz22BmA/iglNKO1LRzhN0cvPT1UNCIEZJ/gCPq/veeyheOSOMYz8WpAHW1hyvoAnG35'
-            'CYxxesFU6VoQGXJbUQCYgxf9ZUw6bRK1g5eXft+QpXoBfiwIDOPuxzSOH8tXaDB+veLrnf6dMU68uLNUa3HBdtPEbfov+sj9bunk'
-            'q57UgwQChIEQ/sb3VcJ1pBv5EhNci+VO/8wxU7Jy+BGZOegRBkR6lAmS/2yqB2mmMdBjdyIwlyiBuPcL6qcR4JYa//qeQ+XlJc0F'
-            '3fs0/Ak3WSH2EisQ8/5JfAoybgCn7ZKq6ToZc/36iy/6KPVt7v195D/tmPrT75ARCGwu4+GiA3E9w3H9wk/LZ+q2RZOk0sHV4Dtr'
-        )
-        encoded = b64encode(raw).decode('ascii')
-        print('REPAIR HASH', hashlib.sha256(repaired_chunk.encode()).hexdigest(), len(repaired_chunk))
-        print('TAIL HASH', hashlib.sha256(tail.encode()).hexdigest(), len(tail))
-        restored = b64decode(encoded[:3200] + repaired_chunk + encoded[4000:5600] + tail)
-        if hashlib.sha1(prefix + restored).hexdigest() != expected:
-            encoded = b64encode(raw).decode('ascii')
-            for i in range(0, 5600, 800):
-                print('ICON CHUNK', i // 800, hashlib.sha256(encoded[i:i+800].encode()).hexdigest())
-            print('restored length', len(restored), 'sha', hashlib.sha1(prefix + restored).hexdigest())
-            raise ValueError('icon source transfer checksum mismatch')
-        SOURCE.write_bytes(restored)
+    # The checked-in source is the approved PETIT artwork; never silently
+    # substitute a different character or corrupt raster on regeneration.
+    expected_sha = 'e361a8144bf651dd352935747f24f35a53ee0e66'
+    header = b'blob ' + str(len(raw)).encode('ascii') + bytes([0])
+    if hashlib.sha1(header + raw).hexdigest() != expected_sha:
+        raise ValueError('PETIT icon source checksum mismatch')
     src = Image.open(SOURCE).convert('RGB')
     if src.width != src.height:
         raise ValueError('icon source must be square')
