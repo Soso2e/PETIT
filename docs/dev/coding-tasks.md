@@ -50,6 +50,7 @@ Codex は OS 標準の CLI 認証を参照する。明示的に分離する場�
 - PC のフォルダ一覧取得（`list_pc_dir`）・検索・テキスト読み取りと、ジョブ専用の `storage/coding-scratch/` へのコピー・作業は開始確認の範囲に含む。読み取った本文は選択した CLI に渡り得る。
 - 元ファイルへの書き込み・移動・削除、元フォルダでのコマンド実行は L2 の操作カードを作る。承認対象は登録済みのパス、引数と書き込み元のハッシュに固定する。元ファイルが変わった場合は適用しない。操作の承認は30分有効で、取消や不明結果からの自動再実行は行わない。コマンドは承認した argv をホストで実行する。
 - Git開発はCodexのフルアクセス、Claude Codeの承認スキップ、AntigravityのAutoモード＋承認スキップ（`--dangerously-skip-permissions`）を使う。各CLIのプロセスはホスト上の実行ユーザーの権限で動く。CLIへの指示では指定のリポジトリ内での実行を指示し、Push・PR作成・mergeはユーザー依頼に含まれる場合に実行する。CLIで実行した検査は最終報告で読み、Coreは静的検査結果とGit差分を記録する。PC操作はCore Toolと承認を使う。
+- `run_pc_command` は既定の読み取り専用コマンドおよびユーザーが「今後も許可」で追加したホワイトリスト（`pc_command_whitelist`）に一致する場合は即座に実行して出力をCLIへ返す。未登録コマンドは承認待ち（`waiting_approval`）となり、承認後はコマンド出力を保持してジョブを再開（`queued`）し、CLIへ結果を渡して調査を継続する。
 
 公式 CLI の認証を使用し、PETIT の API キーや認証トークンを抽出しない。個人契約を外部アプリから使う条件については各提供元の利用条件を参照する。[Claude Code の利用条件](https://code.claude.com/docs/en/legal-and-compliance)・[Antigravity CLI の接続条件](../brain/antigravity-cli.md)
 

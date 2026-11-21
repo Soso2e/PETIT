@@ -29,9 +29,206 @@ PROTECTED_EXTENSIONS = {".pem", ".key", ".pfx", ".p12", ".kdbx", ".ppk"}
 ACTION_SCHEMA = """
 CREATE TABLE IF NOT EXISTS coding_pc_actions (
  id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES coding_jobs(id), operation TEXT NOT NULL,
- parameters TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL
+ parameters TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, result_json TEXT
 )
 """
+
+MAX_COMMAND_STDOUT = 32768
+MAX_COMMAND_STDERR = 16384
+
+# 安全な読み取り専用の PowerShell コマンドレット（初期ホワイトリスト）
+DEFAULT_READONLY_PS_CMDLETS = {
+    "get-winevent", "get-eventlog", "get-computerinfo", "get-ciminstance", "get-wmiobject",
+    "get-hotfix", "get-service", "get-process", "get-disk", "get-volume", "get-partition",
+    "get-physicaldisk", "get-netadapter", "get-netipaddress", "get-netipconfiguration",
+    "get-netroute", "get-dnsclientserveraddress", "get-childitem", "get-item",
+    "get-itemproperty", "get-content", "get-date", "get-timezone", "get-uptime",
+    "get-scheduledtask", "get-scheduledtaskinfo", "get-appxpackage", "get-package",
+    "test-connection", "test-netconnection", "resolve-dnsname",
+}
+
+# パイプの後ろで許可する純粋な整形・フィルタ用コマンドレット
+_SAFE_PS_PIPE_CMDLETS = {
+    "select-object", "select", "where-object", "where", "sort-object", "sort",
+    "format-list", "format-table", "fl", "ft", "out-string", "measure-object",
+    "group-object", "convertto-json",
+}
+
+# 破壊的・変更系の PowerShell トークン／演算子（文字列・ハッシュテーブル外の `;` はパーサ側で拒否）
+_UNSAFE_PS_PATTERN = re.compile(
+    r"(?:&&|\|\||>>|>|\$\(|`|\b(?:invoke-|iex|irm|iwr|start-|stop-|restart-|remove-|set-|new-|clear-|disable-|enable-|register-|unregister-|write-|out-file|tee-object|export-|import-module|add-|rename-|move-|copy-|del|erase|rmdir|rm|mv|cp)\b)",
+    re.IGNORECASE,
+)
+
+# 引数不問で安全な読み取り系コマンド（ベース名小文字）
+DEFAULT_READONLY_EXES = {
+    "systeminfo.exe", "whoami.exe", "hostname.exe", "ver.exe", "tasklist.exe",
+    "driverquery.exe", "ipconfig.exe", "getmac.exe", "quser.exe", "qwinsta.exe",
+    "where.exe", "chcp.com",
+}
+
+# 第1引数（サブコマンド）が安全な読み取り系の場合のみ許可するコマンド
+DEFAULT_READONLY_SUBCOMMANDS = {
+    "wevtutil.exe": {"qe", "query-events", "gl", "get-log", "el", "enum-logs", "gli", "get-loginfo"},
+    "powercfg.exe": {"/lastwake", "-lastwake", "/requests", "-requests", "/availablesleepstates", "/a", "-a", "/devicequery", "-devicequery", "/sleepstudy", "-sleepstudy", "/batteryreport", "-batteryreport", "/systempowerreport", "-systempowerreport"},
+    "sc.exe": {"query", "queryex", "qc", "qdescription", "getdisplayname"},
+    "git.exe": {"status", "log", "diff", "show", "branch", "rev-parse"},
+}
+
+
+def ensure_schema(connection):
+    connection.executescript(ACTION_SCHEMA)
+    cols = {row[1] for row in connection.execute("PRAGMA table_info(coding_pc_actions)").fetchall()}
+    if "result_json" not in cols:
+        connection.execute("ALTER TABLE coding_pc_actions ADD COLUMN result_json TEXT")
+
+
+def _extract_ps_command(argv):
+    if not argv:
+        return None
+    exe = Path(argv[0]).name.casefold()
+    if exe not in {"powershell.exe", "pwsh.exe"}:
+        return None
+    i = 1
+    while i < len(argv):
+        arg = argv[i].casefold()
+        if arg in {"-command", "-c"} and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg in {"-encodedcommand", "-enc", "-file", "-f"}:
+            return None
+        i += 1
+    return None
+
+
+def _ps_segments_and_head(script):
+    if not script or _UNSAFE_PS_PATTERN.search(script):
+        return None, None
+    # 文字列リテラルおよび @{...} 外のパイプで分割し、外の ';' は拒否する
+    segments = []
+    buf = []
+    quote = None
+    brace_depth = 0
+    for idx, ch in enumerate(script):
+        if quote:
+            buf.append(ch)
+            if ch == quote:
+                quote = None
+        elif ch in {"'", '"'}:
+            quote = ch
+            buf.append(ch)
+        elif ch == "{" and idx > 0 and script[idx - 1] == "@":
+            brace_depth += 1
+            buf.append(ch)
+        elif ch == "{" and brace_depth > 0:
+            brace_depth += 1
+            buf.append(ch)
+        elif ch == "}" and brace_depth > 0:
+            brace_depth -= 1
+            buf.append(ch)
+        elif ch == ";" and brace_depth == 0:
+            return None, None
+        elif ch == "|" and brace_depth == 0:
+            segments.append("".join(buf).strip())
+            buf = []
+        else:
+            buf.append(ch)
+    if quote is not None or brace_depth != 0:
+        return None, None
+    segments.append("".join(buf).strip())
+    if not segments or not segments[0]:
+        return None, None
+    heads = []
+    for seg in segments:
+        if not seg:
+            return None, None
+        token = seg.split(None, 1)[0].casefold()
+        if not re.fullmatch(r"[a-z0-9_.-]+", token):
+            return None, None
+        heads.append(token)
+    return heads, heads[0]
+
+
+def whitelist_signature(argv):
+    if not argv:
+        return None
+    exe = Path(argv[0]).name.casefold()
+    script = _extract_ps_command(argv)
+    if script is not None:
+        heads, head = _ps_segments_and_head(script)
+        if heads and all(h in _SAFE_PS_PIPE_CMDLETS for h in heads[1:]):
+            return f"ps:{head}"
+        digest = hashlib.sha256(script.strip().encode("utf-8")).hexdigest()[:16]
+        return f"ps_exact:{digest}"
+    if exe in {"powershell.exe", "pwsh.exe", "cmd.exe"}:
+        # Arbitrary shell invocations (-File, -EncodedCommand, /c) must match exact arguments.
+        digest = hashlib.sha256(json.dumps([exe, *argv[1:]], ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+        return f"shell_exact:{exe}:{digest}"
+    if exe in DEFAULT_READONLY_SUBCOMMANDS and len(argv) >= 2:
+        return f"exe:{exe}:{argv[1].casefold()}"
+    if exe == "netsh.exe" and len(argv) >= 3 and "show" in [a.casefold() for a in argv[1:4]]:
+        return f"exe:netsh.exe:show:{argv[1].casefold()}"
+    if len(argv) >= 2 and not argv[1].startswith(("/", "-")):
+        return f"exe:{exe}:{argv[1].casefold()}"
+    return f"exe:{exe}"
+
+
+def is_whitelisted_command(argv):
+    if not argv:
+        return False
+    exe = Path(argv[0]).name.casefold()
+    script = _extract_ps_command(argv)
+    if script is not None:
+        heads, head = _ps_segments_and_head(script)
+        if heads and all(h in _SAFE_PS_PIPE_CMDLETS for h in heads[1:]):
+            if head in DEFAULT_READONLY_PS_CMDLETS:
+                return True
+    elif exe in DEFAULT_READONLY_EXES:
+        return True
+    elif exe in DEFAULT_READONLY_SUBCOMMANDS and len(argv) >= 2:
+        if argv[1].casefold() in DEFAULT_READONLY_SUBCOMMANDS[exe]:
+            return True
+    elif exe == "netsh.exe" and "show" in [a.casefold() for a in argv[1:4]]:
+        return True
+
+    sig = whitelist_signature(argv)
+    if not sig:
+        return False
+    from . import setup_store as settings
+    user_list = settings.load().get("pc_command_whitelist") or []
+    return sig in user_list
+
+
+def list_whitelist():
+    from . import setup_store as settings
+    return {
+        "default_ps_cmdlets": sorted(DEFAULT_READONLY_PS_CMDLETS),
+        "default_exes": sorted(DEFAULT_READONLY_EXES),
+        "default_subcommands": {k: sorted(v) for k, v in DEFAULT_READONLY_SUBCOMMANDS.items()},
+        "user_whitelist": list(settings.load().get("pc_command_whitelist") or []),
+    }
+
+
+def add_to_whitelist(argv):
+    sig = whitelist_signature(argv)
+    if not sig:
+        return None
+    from . import setup_store as settings
+    with settings._guard():
+        current = list(settings.load().get("pc_command_whitelist") or [])
+        if sig not in current:
+            current.append(sig)
+            settings.update({"pc_command_whitelist": current})
+    return sig
+
+
+def remove_from_whitelist(signature):
+    from . import setup_store as settings
+    with settings._guard():
+        current = list(settings.load().get("pc_command_whitelist") or [])
+        updated = [item for item in current if item != signature]
+        if len(updated) != len(current):
+            settings.update({"pc_command_whitelist": updated})
+    return updated
 
 
 def permitted_path(path):
@@ -235,6 +432,23 @@ def copy_to_scratch(source, destination):
     return {"copied": True, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
+def _decode_output(raw, limit):
+    if not raw:
+        return ""
+    chunk = raw[:limit]
+    for encoding in ("utf-8", "cp932"):
+        try:
+            text = chunk.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            text = None
+    if text is None:
+        text = chunk.decode("utf-8", errors="replace")
+    if len(raw) > limit:
+        text += "\n... (出力が上限に達したため省略しました)"
+    return text
+
+
 def propose(job, operation, args, scratch_path):
     root = job["repository"] or None
     if operation == "command":
@@ -247,6 +461,17 @@ def propose(job, operation, args, scratch_path):
             raise ValueError("実行可能なコマンドが見つかりません。")
         binary = Path(executable).resolve(strict=True)
         parameters = {"path": str(cwd), "argv": [str(binary), *argv[1:]], "executable_stamp": _executable_stamp(binary)}
+        if is_whitelisted_command(parameters["argv"]):
+            result = _execute(job, "command", parameters)
+            key = json.dumps(parameters, ensure_ascii=False, sort_keys=True)
+            result_json = json.dumps(result, ensure_ascii=False)
+            action_id = uuid4().hex
+            with db.write_transaction() as connection:
+                connection.execute(
+                    "INSERT INTO coding_pc_actions(id,job_id,operation,parameters,status,created_at,result_json) VALUES(?,?,?,?,?,?,?)",
+                    (action_id, job["id"], "command", key, "applied", time.time(), result_json),
+                )
+            return {"executed": True, "whitelisted": True, "action_id": action_id, **result}
     else:
         path = host_path(args["path"], root, missing=operation == "write")
         parameters = {"path": str(path), "sha256": _stamp(path)}
@@ -266,19 +491,45 @@ def propose(job, operation, args, scratch_path):
             "SELECT id FROM coding_pc_actions WHERE job_id=? AND operation=? AND parameters=? AND status='proposed'",
             (job["id"], operation, key)).fetchone()
         if previous:
-            return {"approval_required": True, "action_id": previous[0]}
+            res = {"approval_required": True, "action_id": previous[0]}
+            if operation == "command":
+                res["whitelist_candidate"] = whitelist_signature(parameters["argv"])
+            return res
         action_id = uuid4().hex
-        connection.execute("INSERT INTO coding_pc_actions VALUES(?,?,?,?,?,?)",
-                           (action_id, job["id"], operation, key, "proposed", time.time()))
-    return {"approval_required": True, "action_id": action_id}
+        connection.execute(
+            "INSERT INTO coding_pc_actions(id,job_id,operation,parameters,status,created_at,result_json) VALUES(?,?,?,?,?,?,?)",
+            (action_id, job["id"], operation, key, "proposed", time.time(), None),
+        )
+    res = {"approval_required": True, "action_id": action_id}
+    if operation == "command":
+        res["whitelist_candidate"] = whitelist_signature(parameters["argv"])
+    return res
 
 
 def actions(connection, job_id):
-    return [{**dict(row), "parameters": json.loads(row["parameters"])} for row in connection.execute(
-        "SELECT id,operation,parameters,status FROM coding_pc_actions WHERE job_id=? ORDER BY created_at", (job_id,))]
+    items = []
+    for row in connection.execute(
+        "SELECT id,operation,parameters,status,result_json FROM coding_pc_actions WHERE job_id=? ORDER BY created_at", (job_id,)
+    ):
+        params = json.loads(row["parameters"])
+        item = {
+            "id": row["id"],
+            "operation": row["operation"],
+            "parameters": params,
+            "status": row["status"],
+        }
+        if row["result_json"]:
+            try:
+                item["result"] = json.loads(row["result_json"])
+            except ValueError:
+                item["result"] = None
+        if row["operation"] == "command" and isinstance(params.get("argv"), list):
+            item["whitelist_candidate"] = whitelist_signature(params["argv"])
+        items.append(item)
+    return items
 
 
-def resolve(job, action_id, approve):
+def resolve(job, action_id, approve, *, remember=False):
     from . import coding_jobs
     with db.write_transaction() as connection:
         row = connection.execute(
@@ -299,24 +550,44 @@ def resolve(job, action_id, approve):
         else:
             status = "running"
         connection.execute("UPDATE coding_pc_actions SET status=? WHERE id=?", (status, action_id))
+    params = json.loads(row["parameters"])
+    added_whitelist = None
+    exec_result = None
     if status == "running":
         try:
             if job["repository"]:
                 coding_jobs.require_repository(job["repository"])
-            _execute(job, row["operation"], json.loads(row["parameters"]))
+            exec_result = _execute(job, row["operation"], params)
             status = "applied"
+            if remember and row["operation"] == "command" and isinstance(params.get("argv"), list):
+                added_whitelist = add_to_whitelist(params["argv"])
         except (OSError, ValueError, subprocess.SubprocessError):
             # A timeout or failure can occur after an external effect.
             status = "unknown"
+        result_json = json.dumps(exec_result, ensure_ascii=False) if exec_result is not None else None
         with db.get_connection() as connection:
-            connection.execute("UPDATE coding_pc_actions SET status=? WHERE id=?", (status, action_id))
+            connection.execute(
+                "UPDATE coding_pc_actions SET status=?, result_json=? WHERE id=?",
+                (status, result_json, action_id),
+            )
+    should_resume = row["operation"] == "command" and status == "applied"
     with db.write_transaction() as connection:
         pending = connection.execute(
             "SELECT 1 FROM coding_pc_actions WHERE job_id=? AND status IN ('proposed','running')", (job["id"],)).fetchone()
         if not pending:
-            connection.execute("UPDATE coding_jobs SET status='ready_for_review',updated_at=? "
-                               "WHERE id=? AND status='waiting_approval'", (db.now_iso(), job["id"]))
-    return {"status": status}
+            next_status = "queued" if should_resume else "ready_for_review"
+            connection.execute(
+                "UPDATE coding_jobs SET status=?,updated_at=? WHERE id=? AND status='waiting_approval'",
+                (next_status, db.now_iso(), job["id"]),
+            )
+            if should_resume:
+                coding_jobs.event(job["id"], "resumed_after_approval", action_id)
+    response = {"status": status, "resumed": bool(not pending and should_resume)}
+    if added_whitelist:
+        response["whitelisted"] = added_whitelist
+    if exec_result is not None:
+        response["result"] = exec_result
+    return response
 
 
 def preview(job, action_id):
@@ -350,20 +621,23 @@ def _execute(job, operation, parameters):
         if _executable_stamp(binary) != parameters["executable_stamp"]:
             raise ValueError("承認対象の実行ファイルが変更されました。")
         process = subprocess.Popen(parameters["argv"], cwd=cwd, env=antigravity_cli_brain.environment(),
-                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}))
         owned = None
         try:
             owned = ProcessJob(process)
-            if process.wait(timeout=120):
-                raise ValueError("command_failed")
+            stdout_raw, stderr_raw = process.communicate(timeout=120)
+            return {
+                "returncode": process.returncode,
+                "stdout": _decode_output(stdout_raw, MAX_COMMAND_STDOUT),
+                "stderr": _decode_output(stderr_raw, MAX_COMMAND_STDERR),
+            }
         finally:
             if owned:
                 owned.close()
             elif process.poll() is None:
                 process.kill()
             process.wait()
-        return
     path = host_path(parameters["path"], root, missing=operation == "write")
     if _stamp(path) != parameters["sha256"]:
         raise ValueError("承認後に元ファイルが変更されました。")
