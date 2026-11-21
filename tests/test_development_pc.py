@@ -44,3 +44,36 @@ def test_list_dir_empty_path_returns_roots(tmp_path, monkeypatch):
     listed = development_pc.list_dir("", None, lambda: None)
     assert listed["directories"] == [str(tmp_path)]
     assert listed["files"] == []
+
+
+def test_readonly_command_whitelist_allows_safe_and_blocks_unsafe():
+    assert development_pc.is_whitelisted_command([
+        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "-NoProfile", "-Command",
+        "Get-WinEvent -FilterHashtable @{LogName='System'; Id=41,1074} -MaxEvents 10 | Select-Object TimeCreated, Id | Format-List",
+    ])
+    assert not development_pc.is_whitelisted_command([
+        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "-NoProfile", "-Command",
+        "Get-WinEvent -MaxEvents 1; Remove-Item C:\\temp\\x.txt",
+    ])
+    assert not development_pc.is_whitelisted_command([
+        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "-NoProfile", "-Command",
+        "Get-Process | Out-File C:\\temp\\p.txt",
+    ])
+    assert development_pc.is_whitelisted_command(["C:\\Windows\\System32\\systeminfo.exe"])
+    assert development_pc.is_whitelisted_command(["C:\\Windows\\System32\\wevtutil.exe", "qe", "System", "/c:5"])
+    assert not development_pc.is_whitelisted_command(["C:\\Windows\\System32\\wevtutil.exe", "cl", "System"])
+    assert development_pc.is_whitelisted_command(["C:\\Windows\\System32\\powercfg.exe", "/lastwake"])
+    assert not development_pc.is_whitelisted_command(["C:\\Windows\\System32\\powercfg.exe", "/hibernate", "off"])
+
+    sig_cmd_dir = development_pc.whitelist_signature(["C:\\Windows\\System32\\cmd.exe", "/c", "dir"])
+    sig_cmd_del = development_pc.whitelist_signature(["C:\\Windows\\System32\\cmd.exe", "/c", "del", "x.txt"])
+    assert sig_cmd_dir.startswith("shell_exact:cmd.exe:")
+    assert sig_cmd_dir != sig_cmd_del
+
+    sig_ps_file = development_pc.whitelist_signature(["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-File", "a.ps1"])
+    sig_ps_enc = development_pc.whitelist_signature(["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-EncodedCommand", "AAAA"])
+    assert sig_ps_file.startswith("shell_exact:powershell.exe:")
+    assert sig_ps_file != sig_ps_enc

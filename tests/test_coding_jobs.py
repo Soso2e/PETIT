@@ -599,3 +599,71 @@ def test_complete_ignores_unrelated_whitespace_after_head_advances(repository, c
     response = client.post(f"/api/coding/jobs/{job_id}/complete")
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "completed"
+
+
+def test_pc_command_approval_resumes_with_output_and_grows_whitelist(repository, client, development_quota, monkeypatch, tmp_path):
+    import sys
+    admin(client)
+    folder = tmp_path / "pc-cmd"
+    folder.mkdir()
+    assert client.post("/api/coding/config/root", json={"path": str(folder)}).status_code == 200
+
+    seen_goals = []
+
+    def agent(provider, target, goal, invoke, check, progress, **kwargs):
+        seen_goals.append(goal)
+        if len(seen_goals) == 1:
+            proposed = invoke("run_pc_command", {
+                "path": str(folder),
+                "argv": [sys.executable, "-c", "print('pc-diag-output')"],
+            })
+            assert proposed["approval_required"] is True
+            assert proposed["whitelist_candidate"].startswith("exe:")
+            return "承認待ち"
+        assert "pc-diag-output" in goal
+        return "調査完了"
+
+    monkeypatch.setattr(coding_agents, "run", agent)
+    job = client.post("/api/coding/jobs/start", json={"request_id": "pc-cmd-1", "repository": str(folder), "goal": "診断"}).json()
+    jobs.pump()
+    detail = jobs.get(job["id"])
+    assert detail["status"] == "waiting_approval"
+    action_id = detail["actions"][0]["id"]
+
+    resumed = client.post(f"/api/coding/jobs/{job['id']}/actions/{action_id}/approve_always")
+    assert resumed.status_code == 200
+    payload = resumed.json()
+    assert payload["status"] == "applied"
+    assert payload["resumed"] is True
+    assert payload["whitelisted"]
+    assert "pc-diag-output" in payload["result"]["stdout"]
+    assert jobs.get(job["id"])["status"] == "queued"
+
+    jobs.pump()
+    finished = jobs.get(job["id"])
+    assert finished["status"] == "ready_for_review"
+    assert finished["summary"] == "調査完了"
+
+    # Second job with the same command signature runs immediately without approval.
+    seen_goals.clear()
+
+    def agent_whitelisted(provider, target, goal, invoke, check, progress, **kwargs):
+        res = invoke("run_pc_command", {
+            "path": str(folder),
+            "argv": [sys.executable, "-c", "print('pc-diag-second')"],
+        })
+        assert res["executed"] is True
+        assert res["whitelisted"] is True
+        assert "pc-diag-second" in res["stdout"]
+        return "即実行完了"
+
+    monkeypatch.setattr(coding_agents, "run", agent_whitelisted)
+    job2 = client.post("/api/coding/jobs/start", json={"request_id": "pc-cmd-2", "repository": str(folder), "goal": "再診断"}).json()
+    jobs.pump()
+    assert jobs.get(job2["id"])["status"] == "ready_for_review"
+
+    wl = client.get("/api/coding/config/pc-whitelist").json()
+    assert payload["whitelisted"] in wl["user_whitelist"]
+    deleted = client.request("DELETE", "/api/coding/config/pc-whitelist", params={"signature": payload["whitelisted"]})
+    assert deleted.status_code == 200
+    assert payload["whitelisted"] not in deleted.json()["user_whitelist"]

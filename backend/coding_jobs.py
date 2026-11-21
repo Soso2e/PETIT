@@ -97,9 +97,11 @@ def ensure_schema():
             _migrate_task_id_nullable(connection)
             connection.execute(SESSION_SCHEMA)
             connection.execute(HEAD_SCHEMA)
+            development_pc.ensure_schema(connection)
             return
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_jobs'").fetchone():
-            connection.executescript(SCHEMA + SESSION_SCHEMA + HEAD_SCHEMA + development_pc.ACTION_SCHEMA)
+            connection.executescript(SCHEMA + SESSION_SCHEMA + HEAD_SCHEMA)
+            development_pc.ensure_schema(connection)
             _migrate_task_id_nullable(connection)
             return
         if db._transaction.get() is not None:
@@ -646,6 +648,31 @@ def development_context(job, continued=None, resumed=False):
     )
 
 
+def _pc_action_context(job):
+    actions = [a for a in job.get("actions") or [] if a["status"] in {"applied", "rejected", "unknown"}]
+    if not actions:
+        return ""
+    lines = ["【承認・実行済みのPC操作結果】"]
+    for item in actions[-8:]:
+        op = item["operation"]
+        status = item["status"]
+        params = item.get("parameters") or {}
+        if op == "command":
+            argv = " ".join(str(x) for x in (params.get("argv") or []))
+            lines.append(f"- [command] status={status} argv={argv}")
+            res = item.get("result") or {}
+            if res:
+                lines.append(f"  returncode: {res.get('returncode')}")
+                if res.get("stdout"):
+                    lines.append("  stdout:\n" + str(res["stdout"])[:12000])
+                if res.get("stderr"):
+                    lines.append("  stderr:\n" + str(res["stderr"])[:4000])
+        else:
+            lines.append(f"- [{op}] status={status} path={params.get('path', '')}")
+    lines.append("上記の実行結果を確認し、元の依頼の調査・作業を続けて最終回答を日本語で報告してください。")
+    return "\n".join(lines)
+
+
 def run_job(job_id):
     job = get(job_id)
     modern = "mode" in job
@@ -673,8 +700,8 @@ def run_job(job_id):
             workspace = storage / "coding-scratch" / job_id
             workspace.parent.mkdir(parents=True, exist_ok=True)
             project_workspaces._safe_root(workspace.parent)
-            if workspace.exists():raise ValueError("既存作業場所は上書きしません。")
-            workspace.mkdir()
+            if not workspace.exists():
+                workspace.mkdir()
         elif modern:
             workspace = checkout = root
             branch = git(root, "branch", "--show-current").strip() or "HEAD"
@@ -724,6 +751,10 @@ def run_job(job_id):
                 summary = native(None)
         else:
             goal = development_context(job) if modern else job["goal"]
+            if pc:
+                pc_context = _pc_action_context(job)
+                if pc_context:
+                    goal = goal + "\n\n" + pc_context
             catalog = coding_agents.PC_CATALOG if pc else coding_agents.CATALOG
             invoke = toolbox(job, check, catalog)
             args = (job["provider"], target, goal, invoke, check, progress)

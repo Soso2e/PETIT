@@ -168,11 +168,12 @@ flowchart TD
     Native -.-> Session[(coding_job_sessions にCLIのセッションIDを保存)]
     Check -->|成功| Review[ready_for_review]
     Check -->|失敗| FailedChecks[checks_failed]
-    Mode -->|PC| PC[範囲内の検索・読み取りと scratch へのコピー]
-    PC -->|元ファイルやフォルダへの直接操作| Pending[waiting_approval と操作カード]
-    Pending -->|承認を一度消費| Effect[対象と内容を再検証し Core が実行]
+    Mode -->|PC| PC[範囲内の検索・読み取りと scratch へのコピー / 許可済みコマンドは即実行]
+    PC -->|未登録コマンドや元ファイルへの直接操作| Pending[waiting_approval と操作カード]
+    Pending -->|承認を一度消費 / 今後も許可はホワイトリスト追加| Effect[対象と内容を再検証し Core が実行]
     Pending -->|拒否・期限切れ| Review
-    Effect -->|操作の結果を記録| Review
+    Effect -->|コマンド実行成功 / 出力を保持| Queued
+    Effect -->|ファイル操作または実行失敗| Review
     PC -->|承認対象なし| Review
     Review -->|利用者のレビュー| Completed[completed]
     Run -->|再起動| Interrupted[interrupted / 作業場所のHEADを記録]
