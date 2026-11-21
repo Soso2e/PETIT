@@ -11,6 +11,9 @@ _session_id: ContextVar[str | None] = ContextVar("petit_session_id", default=Non
 _is_admin: ContextVar[bool] = ContextVar("petit_is_admin", default=False)
 _mode: ContextVar[str] = ContextVar("petit_mode", default="owner")
 _guild_id: ContextVar[str | None] = ContextVar("petit_guild_id", default=None)
+_discord_author_id: ContextVar[str | None] = ContextVar("petit_discord_author_id", default=None)
+_discord_guild_id: ContextVar[str | None] = ContextVar("petit_discord_guild_id", default=None)
+_source: ContextVar[str] = ContextVar("petit_source", default="web")
 
 
 class GuildIsolationError(PermissionError):
@@ -19,12 +22,18 @@ class GuildIsolationError(PermissionError):
 
 @contextmanager
 def bind(*, request_id: str | None, session_id: str | None, conversation_mode: str = "text",
-         is_admin: bool = False, mode: str = "owner") -> Iterator[None]:
+         is_admin: bool = False, mode: str = "owner",
+         discord_author_id: str | None = None,
+         discord_guild_id: str | None = None,
+         source: str = "web") -> Iterator[None]:
     request_token = _request_id.set(request_id)
     session_token = _session_id.set(session_id)
     mode_token = _conversation_mode.set(conversation_mode)
     admin_token = _is_admin.set(is_admin)
     runtime_mode_token = _mode.set(mode)
+    author_token = _discord_author_id.set(discord_author_id)
+    dguild_token = _discord_guild_id.set(discord_guild_id)
+    source_token = _source.set(source)
     try:
         yield
     finally:
@@ -33,6 +42,9 @@ def bind(*, request_id: str | None, session_id: str | None, conversation_mode: s
         _conversation_mode.reset(mode_token)
         _is_admin.reset(admin_token)
         _mode.reset(runtime_mode_token)
+        _discord_author_id.reset(author_token)
+        _discord_guild_id.reset(dguild_token)
+        _source.reset(source_token)
 
 
 @contextmanager
@@ -77,6 +89,18 @@ def current_conversation_mode() -> str:
 
 def current_is_admin() -> bool:
     return _is_admin.get()
+
+
+def current_discord_author_id() -> str | None:
+    return _discord_author_id.get()
+
+
+def current_discord_guild_id() -> str | None:
+    return _discord_guild_id.get()
+
+
+def current_source() -> str:
+    return _source.get()
 
 
 def local_only() -> bool:

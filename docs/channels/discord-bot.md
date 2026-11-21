@@ -48,7 +48,7 @@ owner が指定外のサーバーで話しかけた場合も Guild モードに�
 
 Concept §6 の「Discord Bot：自分専用に常駐」をここで実装する。
 
-- **会話**: DM と指定サーバーでメンション / `/petit`。`source=discord` で Core の Thread / Turn に入る（API は受付済み）。Discord のチャンネル（またはスレッド）ごとに Core の Thread を1つ対応させる。
+- **会話**: DM と指定サーバーでメンション / 呼びかけ語（`ぷて`・`ぷてぃ`・`ペティット`・`PETIT`） / `/petit`。`source=discord` で Core の Thread / Turn に入る（API は受付済み）。Discord のチャンネル（またはスレッド）ごとに Core の Thread を1つ対応させ、応答時はその場の直近チャンネル発言（最大10件）と返信先メッセージも参考文脈として Brain へ渡す（会話履歴には保存せずその場限りで参照）。
 - **長い返答と待ち時間**: 3秒以内に defer、Core の Turn 完了を待って 2000 文字単位で分割、またはファイル添付で返す。
 - **承認**: 確認カードを Discord のボタン（承認 / 取消）で出す。押せるのは owner だけ。承認の消費は既存 Core の仕組み。
 - **通知**: リマインダー・予定の前・Job 完了を DM へ配送（既存の通知イベントの配送先に Discord を追加。カテゴリは初期 OFF：Concept §8）。
@@ -131,12 +131,13 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 
 起動手順:
 
-1. Discord Developer Portal で Application と Bot を作り、Bot token を控える。Privileged Gateway Intents はすべて OFF のままでよい。OAuth2 URL Generator で `bot` スコープと権限「Send Messages / Read Message History」を選び、自分のサーバーに招待する。
+1. Discord Developer Portal で Application と Bot を作り、Bot token を控える。過去ログ収集（アーカイブ）を行う場合は Privileged Gateway Intents の **Message Content Intent** を ON にする（DM とメンションだけなら OFF でも可）。OAuth2 URL Generator で `bot`・`applications.commands` スコープと権限「Send Messages / Read Message History」を選び、自分のサーバーに招待する。
 2. Discord の開発者モードで、自分の user ID と指定するサーバーの ID をコピーする。
 3. Core を起動する環境に設定する: `PETIT_DISCORD_OWNER_ID`、`PETIT_DISCORD_OWNER_GUILD_IDS`（カンマ区切り・空なら DM のみ）、`PETIT_DISCORD_SERVICE_TOKEN`（`python -c "import secrets;print(secrets.token_urlsafe(32))"` で作った値）。
 4. 通知も DM で受けるなら、Core 側に `PETIT_DISCORD_NOTIFICATIONS=on` を設定し、Web の通知設定で受けたいカテゴリを ON にする。
 5. Bot を起動する: `pip install -r requirements-discord.txt` のあと、`DISCORD_BOT_TOKEN`・`PETIT_DISCORD_SERVICE_TOKEN`（Core と同じ値）・`PETIT_CORE_URL`（既定 `http://127.0.0.1:8000`）を設定して `python -m backend.channels.discord`。
-6. Bot に DM するか、指定サーバーで `@Bot名 今日なにある？` と送る。
+6. サーバーの過去ログを全チャンネル一括登録・初回スキャンし、毎朝定期同期（既定 `05:00`）を有効にするには、サーバー上で `/petit archive action:init` を実行する。
+7. Bot に DM するか、指定サーバーで `@Bot名 今日なにある？` と送る。
 
 ## 5.2 D2 の実装（v0.46.0・#399）
 
@@ -157,6 +158,29 @@ D1〜D2 は agent-home（H1〜H3）と並行できる。D6 は H4 の後。
 
 - `PETIT_DISCORD_GUILD_MODE`（既定 off）。off の間、owner 以外・指定外サーバーの発話には空の返答（`status=ignored`）を返し、Bot は何も送らない。Brain / DeepSeek は 0 回。`/api/guild/setup`・`/api/guild/me`・`/api/guild/messages` は 403「このプティは持ち主専用です。」。`reset`・`forget-me` は削除のため常に使える。
 - `/petit digest`（owner のみ・DM か指定サーバー）で、チャンネル・フォーラム・スレッドに毎日の進捗投稿を登録する。Core の `backend/discord_digest.py` が時刻を判定して `backend/life_log.py` のまとめを作り、Bot が `GET /api/channels/discord/digests` で取りに来て送る。仕組みと設定は [../life/activity-digest.md](../life/activity-digest.md)。
+
+## 5.5 Discord専用チャンネルリマインダー（#514）
+
+- 既存の個人リマインダー（Web Push / DM / Web UI）とは分離した、Discord チャンネル専用の単発リマインダー。Owner モード（`discord_reminders` テーブル）と Guild モード（`storage/guilds/<guild_id>.db` の `guild_reminders` テーブル）の両方に対応する。
+- 会話ツール `create_discord_reminder` / `list_discord_reminders` / `cancel_discord_reminder`（承認ボタンなしで即時登録）。日付のみ指定（`YYYY-MM-DD`）時は該当タイムゾーン（既定 `Asia/Tokyo`）の `09:00` に登録する。
+- メンション対象 `mention_target` は既定が `user`（依頼した本人 `<@author_id>`）、全員指定時は `everyone`（`@everyone`）。Bot 側は `deliver_reminders` で `allowed_mentions` を対象のみに絞って送信する。
+- Bot が `PETIT_DISCORD_REMINDER_POLL_SECONDS`（既定 15 秒）ごとに `GET /api/channels/discord/reminders` で期限到来分を `claimed` として取得し、対象チャンネルへ投稿後 `POST /api/channels/discord/reminders/{scope}/{reminder_id}` で `sent` / `failed` を報告する。
+
+## 5.5 管理者登録と非管理者向け 2 段階アーカイブ検索（v0.70.0・#510）
+
+- **管理者登録コマンド（`/petit admin`）**: 初期管理者（`PETIT_DISCORD_OWNER_ID`）が `@メンション` でユーザーを指定し、`discord_admins` テーブルへ追加・解除・一覧表示できる（`POST /api/channels/discord/admins`）。
+- **管理者の全サーバー横断＋フル機能**: 登録された管理者は、DM やどのサーバーから話しかけても `mode=owner`（`is_admin=True`）として Core の全機能（PC ディレクトリ操作・開発ジョブ・承認フロー）を利用でき、その場へそのまま返答する。また、`search_discord_archive` は `guild_id` 未指定時に `personal.sqlite` と存在する全 `guild_*.sqlite` を横断して検索する。
+- **一般メンバー（非管理者）の 2 段階 DeepSeek 検索フロー**:
+  - 会話の流れとして、そのチャンネルの直近 **6 チャット前まで**（`HISTORY_LIMIT = 6`）をプロンプトに含める。
+  - 1 回目の DeepSeek 呼び出しでは `search_guild_archive` のみ許可し、サーバー内の話題について質問された場合に検索キーワードを要求させる。
+  - サーバー側 Python（`guild_api._search_guild_archive`）が該当サーバー専用の `guild_<guild_id>.sqlite` を FTS5 + trigram（RRF スコア）で検索し、**マッチ度上位 5 件のチャット本文を省略せず全文**返す。
+  - 2 回目の DeepSeek 呼び出し（`tools=None`）へ検索結果と元の質問を渡し、回答可能なら回答し、該当情報がない場合は「Discordの中に引っかかる情報がありませんでした。」等を返す。
+
+## 5.6 `/petit archive` による初期一括スキャンと毎朝定期同期（v0.70.1・#512）
+
+- **初期セットアップ（`/petit archive action:init`）**: サーバー内の読み取り可能な全テキストチャンネル・フォーラム・公開スレッド（アーカイブ済み含む）を一括で保存対象へ登録し、バックグラウンドで全期間の過去ログスキャンを実行する。同時に毎朝定期同期（既定 `05:00`）を有効化する（プライベートスレッドはプライバシー保護のため自動登録から除外）。
+- **手動同期（`/petit archive action:sync`）**: 指定チャンネルまたは登録済み全チャンネルの過去ログをバックグラウンドで同期する（`days=0` でチェックポイント以降の差分または全期間、`days>0` で直近 N 日を取得）。
+- **毎朝・起動時定期同期（`archive_sync_loop`）**: Bot 常駐プロセスが起動直後に1回、および毎朝指定時刻（`sync_time`、既定 `05:00`）に `archive_checkpoints` 以降の差分を `channel.history()` で取得し、`POST /api/channels/discord/archive/events/batch` へ一括送信する。`/petit archive action:schedule` で時刻変更や ON/OFF 切替が可能。
 
 ## 6. どこで動かすか — 自宅PC＋Cloudflare（検討）
 

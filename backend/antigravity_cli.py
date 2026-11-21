@@ -125,7 +125,7 @@ class Protocol:
             step = payload.get("step_type")
             state = payload.get("state")
             index = payload.get("step_index")
-            if state not in {"ACTIVE", "DONE"} or type(index) is not int or index < 0:
+            if state not in {"ACTIVE", "DONE", "ERROR"} or type(index) is not int or index < 0:
                 raise ValueError("invalid_cli_step")
             update = {"kind": "step", "state": state, "index": index}
             if step == "agent_response":

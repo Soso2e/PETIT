@@ -20,7 +20,8 @@ PUBLIC_TOOLS = {
     "get_local_development_status", "search_conversations", "list_project_workspaces",
     "link_project_workspace", "unlink_project_workspace", "find_projects",
     "delegate_background_research", "get_background_research_status",
-    "get_reminders", "create_reminder", "manage_reminder", "search_brain_notes",
+    "get_reminders", "create_reminder", "manage_reminder", "search_brain_notes", "search_petit_docs",
+    "create_discord_reminder", "list_discord_reminders", "cancel_discord_reminder",
     "search_notion", "gmail_search", "gmail_get_message", "get_weather", "search_news",
     "get_persona", "update_persona_file",
     "open_worktree", "list_worktrees", "get_worktree_status", "run_worktree_check", "commit_worktree",
@@ -53,6 +54,7 @@ Toolのない作業を、後でやる・自動で進めると約束しない。
 プロジェクトとフォルダは確認済みの紐付けだけ使い、似た名前から推測しない。
 文書の記述・更新日時、観測時点のGit状態、テスト実行の証拠はそれぞれ別の情報として扱う。
 ローカルbranch同士の差をリモートとの差と表現しない。upstream未設定・unknown・欠損を0や成功に補完しない。
+PETIT自身の使い方・機能・仕様・設定について聞かれたら、推測せず search_petit_docs で調べてから答える。目標・未実装と実装済みを区別する。
 """
 
 
@@ -175,6 +177,34 @@ def execute(request_id: str, call: dict, arguments: dict) -> str:
     return raw
 
 
+def _model_route(target: dict, used: list, llm_call_count: int) -> dict:
+    return {
+        "kind": "brain",
+        "actual_route": "chat",
+        "llm_call_count": llm_call_count,
+        "provider": target.get("provider"),
+        "model": target.get("model"),
+        "transport": "cli" if target.get("provider") in {"antigravity_cli", "claude_code"} else "api",
+        "fallback": bool(target.get("fallback_reason")),
+        "fallback_reason": target.get("fallback_reason"),
+        "tools": [x["name"] for x in used],
+    }
+
+
+def _format_direct_job_reply(job: dict) -> str:
+    status = job.get("status")
+    summary = str(job.get("summary") or "").strip()
+    error = str(job.get("error") or "").strip()
+    if status == "waiting_approval":
+        note = "承認が必要な操作があります。PETITの開発タブで確認してください。"
+        return (summary + "\n\n" + note) if summary else note
+    if status in {"failed", "cancelled", "interrupted"}:
+        return error or summary or "CLIの実行に失敗しました。"
+    if status in {"proposed", "queued", "running"}:
+        return f"CLIで実行中です（job_id: {job['id']}）。完了したらPETITの開発タブで結果を確認できます。"
+    return summary or "CLIの実行が完了しました。"
+
+
 def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: list | None = None) -> dict:
     row = store.load_turn(request_id)
     thread = store.thread(row["thread_id"])
@@ -237,6 +267,8 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             messages.append({"role": "user", "content": known["text"]})
             with db.get_connection() as c:
                 ambient.record(c, row["thread_id"], request_id, known)
+        if payload.get("channel_context"):
+            messages.append({"role": "user", "content": str(payload["channel_context"])})
         messages.append({"role": "user", "content": payload["message"]})
     from . import service_sync
     with db.get_connection() as c:
@@ -282,11 +314,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
                 raise lmstudio_client.LMStudioError("モデルから返答を取得できませんでした。")
             reply += delegations.turn_notice(request_id)
             return store.finish(request_id, {"reply": reply, "used_tools": used,
-                "model_route": {"kind": "brain", "actual_route": "chat", "llm_call_count": _round + 1,
-                                "provider": target.get("provider"), "model": target.get("model"),
-                                "transport": "cli" if target.get("provider") in {"antigravity_cli", "claude_code"} else "api",
-                                "fallback": bool(target.get("fallback_reason")), "fallback_reason": target.get("fallback_reason"),
-                                "tools": [x["name"] for x in used]}})
+                "model_route": _model_route(target, used, _round + 1)})
         if len(used) + len(calls) > MAX_CALLS:
             raise lmstudio_client.LMStudioError("Tool呼出しの上限に達しました。依頼を絞ってください。")
         # Preserve the provider's native assistant call and reasoning_content.
@@ -294,6 +322,7 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         assistant["role"] = "assistant"
         messages.append(assistant)
         waiting = False
+        direct_job_id = None
         for index, call in enumerate(calls):
             name = call.get("function", {}).get("name", "")
             call_id = call.get("id")
@@ -321,6 +350,13 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
                     raw = store.encode({"status": "awaiting_user_approval"})
                 else:
                     raw = execute(request_id, call, arguments)
+                    if name == "propose_development_job" and not failed(raw):
+                        try:
+                            parsed = json.loads(raw)
+                        except ValueError:
+                            parsed = {}
+                        if isinstance(parsed, dict) and parsed.get("direct") and parsed.get("job_id"):
+                            direct_job_id = str(parsed["job_id"])
                 used.append({"name": name, "arguments": store.encode(arguments)})
             except (ValueError, TypeError) as exc:
                 raw = store.encode({"error": str(exc)})
@@ -333,6 +369,19 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             # Approval is a structured state; no action-specific reply template.
             return store.finish(request_id, {"reply": str(response.get("content") or ""),
                                             "used_tools": used}, status="waiting_approval")
+        if direct_job_id:
+            from . import coding_jobs
+            turn_stream.phase(request_id, "tool", tool="propose_development_job")
+            try:
+                job = coding_jobs.wait_for_job(
+                    direct_job_id,
+                    should_cancel=lambda: bool(store.load_turn(request_id)["cancel_requested"]),
+                )
+            except InterruptedError as exc:
+                raise TurnCancelled(str(exc)) from None
+            reply = _format_direct_job_reply(job)
+            return store.finish(request_id, {"reply": reply, "used_tools": used,
+                "model_route": _model_route(target, used, _round + 1)})
     raise lmstudio_client.LMStudioError("会話処理の上限に達しました。実行結果は保存されています。")
 
 

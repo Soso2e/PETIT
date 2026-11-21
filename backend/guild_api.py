@@ -10,6 +10,7 @@ Strict isolation guarantees:
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -24,7 +25,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from . import config, discord_api, lmstudio_client, request_context, setup_store
+from . import config, discord_api, discord_reminders, lmstudio_client, request_context, setup_store
 from .petit_prompt import CORE_SYSTEM_PROMPT
 
 router = APIRouter()
@@ -44,15 +45,126 @@ DEFAULT_TIMEZONE = "Asia/Tokyo"
 DEFAULT_DAILY_CALL_LIMIT = 50
 DEFAULT_DAILY_TOKEN_LIMIT = 60000
 DEFAULT_USER_HOURLY_LIMIT = 15
-HISTORY_LIMIT = 10
+HISTORY_LIMIT = 6
 HISTORY_MAX_CHARS = 4000
 MAX_REPLY_TOKENS = 800
+GUILD_ARCHIVE_SEARCH_LIMIT = 5
+
+GUILD_SEARCH_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "search_guild_archive",
+        "description": (
+            "このサーバー内のDiscord過去ログ（アーカイブ）を単語・キーワードで類似検索し、"
+            "マッチ度上位5件のチャット文章を全文取得する。サーバー内の情報・過去の会話・決定事項を調べる際に使う。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "検索したい単語やキーワード（スペース区切りで複数指定可）",
+                }
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+GUILD_CREATE_REMINDER_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "create_discord_reminder",
+        "description": (
+            "このDiscordチャンネル宛に指定日時でリマインダーを登録する（即時登録）。"
+            "日付のみ（例: 2026-12-01）で時刻が省略された場合は朝09:00として登録される。"
+            "メンション先 mention_target は指定がなければ 'user'（本人）、全員・everyone指定時は 'everyone' を使う。"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "リマインドする内容・件名（例: 定例MTG、提出期限）",
+                },
+                "trigger_at": {
+                    "type": "string",
+                    "description": "通知日時。YYYY-MM-DD（09:00扱い）または ISO 8601 日時（例: 2026-12-01T15:00:00+09:00）。",
+                },
+                "delay_minutes": {
+                    "type": "integer",
+                    "description": "現在から何分後に通知するか（相対指定用）。trigger_atと同時指定しない。",
+                    "minimum": 1,
+                },
+                "message": {
+                    "type": "string",
+                    "description": "通知本文。省略時はtitleが使われる。",
+                },
+                "mention_target": {
+                    "type": "string",
+                    "enum": ["user", "everyone"],
+                    "default": "user",
+                    "description": "通知時のメンション先。指定がなければ 'user'（本人）。全員宛なら 'everyone'。",
+                },
+            },
+            "required": ["title"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+GUILD_LIST_REMINDERS_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "list_discord_reminders",
+        "description": "このサーバーまたは現在のチャンネルに登録済みのリマインダー一覧を取得する。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "channel_only": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Trueなら現在のチャンネルのみ、Falseならサーバー全体を取得。",
+                },
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 20},
+            },
+            "additionalProperties": False,
+        },
+    },
+}
+
+GUILD_CANCEL_REMINDER_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "cancel_discord_reminder",
+        "description": "登録済みのリマインダーをキャンセルする（自分が登録したもののみ）。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "reminder_id": {"type": "integer", "description": "キャンセルするリマインダーID"},
+            },
+            "required": ["reminder_id"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+GUILD_TOOLS: list[dict[str, Any]] = [
+    GUILD_SEARCH_TOOL,
+    GUILD_CREATE_REMINDER_TOOL,
+    GUILD_LIST_REMINDERS_TOOL,
+    GUILD_CANCEL_REMINDER_TOOL,
+]
 
 GUILD_SYSTEM_PROMPT = (
     CORE_SYSTEM_PROMPT
     + "\n\n【Discord サーバー（Guild）モードの原則】\n"
     "- いまはサーバー共有のアシスタント（Guild モード）として話しています。\n"
-    "- このサーバーの会話履歴と登録されたメンバー情報だけを使って答えてください。\n"
+    "- このサーバーのアーカイブ過去ログ、直近の会話履歴、登録されたメンバー情報だけを使って答えてください。\n"
+    "- サーバー内の出来事・仕様・過去の発言について質問された場合は、まず `search_guild_archive` を呼んで単語検索を行ってください。\n"
+    "- 検索結果が空、または質問に答えられる情報が含まれていない場合は、推測や創作をせず「Discordの中に引っかかる情報がありませんでした。」と正直に答えてください。\n"
+    "- チャンネルへのリマインダー登録・確認・キャンセルを頼まれた場合は、`create_discord_reminder` / `list_discord_reminders` / `cancel_discord_reminder` を使ってください。日付のみで時刻の指定がない場合は朝09:00として登録されます。メンション先は指定がなければ `user`（本人）、全員宛なら `everyone` を指定してください。\n"
     "- PETIT の持ち主（owner）の個人データ・予定・タスク・記憶・開発環境には一切アクセスできません。\n"
     "- 簡潔で親しみやすい日本語で答えてください。\n"
 )
@@ -106,7 +218,7 @@ CREATE TABLE IF NOT EXISTS guild_usage_log (
 );
 CREATE INDEX IF NOT EXISTS idx_guild_usage_day ON guild_usage_log(day_key);
 CREATE INDEX IF NOT EXISTS idx_guild_usage_user_ts ON guild_usage_log(user_id, created_ts);
-"""
+""" + discord_reminders.GUILD_REMINDER_SCHEMA
 
 
 def guilds_dir() -> Path:
@@ -215,45 +327,211 @@ def _redact_secrets(text: str, api_key: str) -> str:
     return cleaned
 
 
-def call_deepseek(messages: list[dict[str, str]]) -> tuple[str, dict[str, int]]:
-    """Call DeepSeek directly for Guild mode with tools=None. Never calls CLI or owner Brain."""
+def _search_guild_archive(guild_id: str, query: str) -> dict[str, Any]:
+    """Search only the caller guild's Discord archive and return top 5 full-text matches."""
+    if not request_context.is_guild_mode() or request_context.current_guild_id() != str(guild_id):
+        raise lmstudio_client.LMStudioError("Guild 境界が一致しないため検索できません。")
+    from .tools.discord_search import get_searcher
+
+    searcher = get_searcher(zone=f"guild_{guild_id}")
+    if searcher is None:
+        return {"query": query, "count": 0, "matches": [], "note": "このサーバーのアーカイブはまだありません。"}
+
+    raw_matches = searcher.search(query, limit=GUILD_ARCHIVE_SEARCH_LIMIT, guild_id=str(guild_id))
+    matches = []
+    for m in raw_matches:
+        attachments_info = [
+            {
+                "filename": a.get("filename"),
+                "extracted_text": a.get("extracted_text"),
+            }
+            for a in m.get("attachments", [])
+            if a.get("filename") or a.get("extracted_text")
+        ]
+        matches.append(
+            {
+                "message_id": m.get("message_id"),
+                "channel_name": m.get("channel_name"),
+                "thread_name": m.get("thread_name"),
+                "author_name": m.get("author_name"),
+                "content": m.get("content"),
+                "created_at": m.get("created_at"),
+                "discord_url": m.get("discord_url"),
+                "score": m.get("search_score"),
+                "attachments": attachments_info,
+            }
+        )
+    return {"query": query, "count": len(matches), "matches": matches}
+
+
+def _extract_usage(usage_raw: dict[str, Any], messages: list[dict[str, Any]], reply: str) -> dict[str, int]:
+    prompt_tokens = int(usage_raw.get("prompt_tokens") or 0)
+    completion_tokens = int(usage_raw.get("completion_tokens") or 0)
+    total_tokens = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
+    if total_tokens <= 0:
+        msg_chars = sum(len(str(m.get("content") or "")) for m in messages)
+        total_tokens = max(1, (msg_chars + len(reply)) // 2)
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
+def _execute_guild_tool(
+    name: str,
+    parsed_args: dict[str, Any],
+    *,
+    guild_id: str,
+    channel_id: str | None,
+    author_id: str | None,
+    tz_name: str,
+) -> dict[str, Any]:
+    if not request_context.is_guild_mode() or request_context.current_guild_id() != str(guild_id):
+        raise lmstudio_client.LMStudioError("Guild 境界が一致しないため操作できません。")
+    if name == "search_guild_archive":
+        query = str(parsed_args.get("query") or "").strip()
+        return _search_guild_archive(guild_id, query) if query else {"query": "", "count": 0, "matches": []}
+
+    if name == "create_discord_reminder":
+        if not channel_id or not author_id:
+            return {"created": False, "error": "チャンネルまたは発信者を特定できませんでした。"}
+        try:
+            with closing(_connect(guild_id)) as conn, conn:
+                item = discord_reminders.create_guild_reminder(
+                    conn,
+                    channel_id=channel_id,
+                    author_id=author_id,
+                    title=str(parsed_args.get("title") or ""),
+                    trigger_at=parsed_args.get("trigger_at"),
+                    delay_minutes=parsed_args.get("delay_minutes"),
+                    message=parsed_args.get("message"),
+                    mention_target=str(parsed_args.get("mention_target") or "user"),
+                    tz_name=tz_name,
+                )
+        except ValueError as exc:
+            return {"created": False, "error": str(exc)}
+        mention_label = "@everyone" if item["mention_target"] == "everyone" else f"<@{item['author_id']}>"
+        return {
+            "created": True,
+            "reminder": item,
+            "message": f"{item['trigger_at_local']} にこのチャンネル（<#{channel_id}>）へ {mention_label} 宛で『{item['title']}』をリマインドします。",
+        }
+
+    if name == "list_discord_reminders":
+        channel_only = bool(parsed_args.get("channel_only", True))
+        limit = int(parsed_args.get("limit") or 20)
+        with closing(_connect(guild_id)) as conn:
+            items = discord_reminders.list_guild_reminders(
+                conn,
+                channel_id=channel_id if channel_only else None,
+                limit=limit,
+                tz_name=tz_name,
+            )
+        return {"count": len(items), "items": items}
+
+    if name == "cancel_discord_reminder":
+        if not author_id:
+            return {"cancelled": False, "error": "発信者を特定できませんでした。"}
+        try:
+            reminder_id = int(parsed_args.get("reminder_id"))
+            with closing(_connect(guild_id)) as conn, conn:
+                item = discord_reminders.cancel_guild_reminder(
+                    conn,
+                    reminder_id,
+                    author_id=author_id,
+                    channel_id=channel_id,
+                )
+        except (TypeError, ValueError) as exc:
+            return {"cancelled": False, "error": str(exc)}
+        return {"cancelled": True, "reminder": item}
+
+    raise lmstudio_client.LMStudioError(f"Guild モードでは {name} の呼び出しは許可されていません。")
+
+
+def call_deepseek(
+    messages: list[dict[str, Any]],
+    *,
+    guild_id: str | None = None,
+    channel_id: str | None = None,
+    author_id: str | None = None,
+    tz_name: str = DEFAULT_TIMEZONE,
+) -> tuple[str, dict[str, int]]:
+    """Call DeepSeek for Guild mode with 2-step tools. Never calls CLI or owner Brain."""
     if not request_context.is_guild_mode():
         raise RuntimeError("guild_deepseek_requires_guild_mode")
     target = _deepseek_target()
     api_key = str(target.get("api_key") or "")
     if not target["configured"]:
         raise lmstudio_client.LMStudioError("DeepSeek APIキーが設定されていないため、いまは返答できません。")
-    try:
-        with lmstudio_client.observe_turn() as metrics:
-            response = lmstudio_client.chat_completion(
-                messages,
-                tools=None,
-                temperature=0.5,
-                max_tokens=MAX_REPLY_TOKENS,
-                route="guild",
-                target_override=target,
-            )
-            usage_list = (metrics or {}).get("usage") or []
-            usage_raw = usage_list[-1] if usage_list else {}
-    except Exception as exc:  # noqa: BLE001
-        safe_msg = _redact_secrets(str(exc), api_key)
-        log.warning("guild deepseek call failed: %s", type(exc).__name__)
-        raise lmstudio_client.LMStudioError(safe_msg) from None
 
-    if response.get("tool_calls"):
-        raise lmstudio_client.LMStudioError("Guild モードでは Tool 呼び出しは許可されていません。")
+    tools = GUILD_TOOLS if guild_id else None
+    working_messages: list[dict[str, Any]] = list(messages)
+    total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+    def _invoke(msgs: list[dict[str, Any]], *, allow_tools: list[dict[str, Any]] | None) -> tuple[dict[str, Any], dict[str, int]]:
+        try:
+            with lmstudio_client.observe_turn() as metrics:
+                resp = lmstudio_client.chat_completion(
+                    msgs,
+                    tools=allow_tools,
+                    temperature=0.3,
+                    max_tokens=MAX_REPLY_TOKENS,
+                    route="guild",
+                    target_override=target,
+                )
+                usage_list = (metrics or {}).get("usage") or []
+                usage_raw = usage_list[-1] if usage_list else {}
+        except Exception as exc:  # noqa: BLE001
+            safe_msg = _redact_secrets(str(exc), api_key)
+            log.warning("guild deepseek call failed: %s", type(exc).__name__)
+            raise lmstudio_client.LMStudioError(safe_msg) from None
+        step_reply = str(resp.get("content") or "").strip()
+        return resp, _extract_usage(usage_raw, msgs, step_reply)
+
+    response, u1 = _invoke(working_messages, allow_tools=tools)
+    for k in total_usage:
+        total_usage[k] += u1[k]
+
+    tool_calls = response.get("tool_calls") or []
+    if tool_calls:
+        if not guild_id:
+            raise lmstudio_client.LMStudioError("Guild モードでは Tool 呼び出しは許可されていません。")
+        working_messages.append({
+            "role": "assistant",
+            "content": response.get("content") or "",
+            "tool_calls": tool_calls,
+        })
+        for tc in tool_calls:
+            fn = tc.get("function") or {}
+            name = str(fn.get("name") or "")
+            raw_args = fn.get("arguments") or "{}"
+            try:
+                parsed_args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)
+            except (TypeError, ValueError):
+                parsed_args = {}
+            tool_result = _execute_guild_tool(
+                name,
+                parsed_args,
+                guild_id=guild_id,
+                channel_id=channel_id,
+                author_id=author_id,
+                tz_name=tz_name,
+            )
+            working_messages.append({
+                "role": "tool",
+                "tool_call_id": tc.get("id") or f"{name}_0",
+                "content": json.dumps(tool_result, ensure_ascii=False),
+            })
+
+        response, u2 = _invoke(working_messages, allow_tools=None)
+        for k in total_usage:
+            total_usage[k] += u2[k]
+        if response.get("tool_calls"):
+            raise lmstudio_client.LMStudioError("Guild モードでは追加の Tool 呼び出しは許可されていません。")
+
     reply = _redact_secrets(str(response.get("content") or "").strip(), api_key)
-    prompt_tokens = int(usage_raw.get("prompt_tokens") or 0)
-    completion_tokens = int(usage_raw.get("completion_tokens") or 0)
-    total_tokens = int(usage_raw.get("total_tokens") or (prompt_tokens + completion_tokens))
-    if total_tokens <= 0:
-        # Fallback estimate when provider omits token usage
-        total_tokens = max(1, (sum(len(m.get("content", "")) for m in messages) + len(reply)) // 2)
-    return reply, {
-        "prompt_tokens": prompt_tokens,
-        "completion_tokens": completion_tokens,
-        "total_tokens": total_tokens,
-    }
+    return reply, total_usage
 
 
 class GuildSetupRequest(BaseModel):
@@ -294,6 +572,7 @@ class GuildMessageRequest(BaseModel):
     author_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
     display_name: str = Field(default="", max_length=120)
     message: str = Field(min_length=1, max_length=20000)
+    channel_context: str = Field(default="", max_length=8000)
 
 
 @router.post("/api/guild/setup")
@@ -552,11 +831,29 @@ def handle_mention(body: GuildMessageRequest) -> dict:
                 budget_chars -= len(clipped_u)
         messages.extend(reversed(history_msgs))
 
+        tz_name = str(settings_row["timezone"] or DEFAULT_TIMEZONE)
+        try:
+            now_local = datetime.now(ZoneInfo(tz_name))
+        except Exception:  # noqa: BLE001
+            now_local = datetime.now(timezone.utc)
+        weekday_ja = ["月", "火", "水", "木", "金", "土", "日"][now_local.weekday()]
+        messages.append({
+            "role": "user",
+            "content": f"現在日時（参考メタデータ）: {now_local.isoformat(timespec='seconds')} ({weekday_ja}曜日, {tz_name})",
+        })
+        if body.channel_context.strip():
+            messages.append({"role": "user", "content": body.channel_context.strip()})
         speaker_prefix = f"[{body.display_name.strip()}] " if body.display_name.strip() else ""
         messages.append({"role": "user", "content": f"{speaker_prefix}{body.message}"})
 
         try:
-            reply, usage = call_deepseek(messages)
+            reply, usage = call_deepseek(
+                messages,
+                guild_id=body.guild_id,
+                channel_id=body.channel_id,
+                author_id=body.author_id,
+                tz_name=tz_name,
+            )
         except lmstudio_client.LMStudioError as exc:
             return {
                 "mode": "guild",

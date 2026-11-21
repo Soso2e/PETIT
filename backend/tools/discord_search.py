@@ -73,7 +73,10 @@ def search_discord_archive(query: str, limit: int = 5, permitted_channels: list[
     is_guild = request_context.is_guild_mode()
     current_guild_id = request_context.current_guild_id()
 
-    zone = "personal"
+    limit = max(1, min(20, int(limit or 5)))
+    if permitted_channels is not None:
+        filters["permitted_channels"] = permitted_channels
+
     if is_guild:
         if not current_guild_id:
             # Cannot verify caller guild context -> deny search
@@ -84,28 +87,50 @@ def search_discord_archive(query: str, limit: int = 5, permitted_channels: list[
             }
         # In guild mode, force filter to caller guild
         filters["guild_id"] = str(current_guild_id)
-        zone = f"guild_{current_guild_id}"
-        searcher = get_searcher(zone=zone)
+        searcher = get_searcher(zone=f"guild_{current_guild_id}")
+        raw_matches = searcher.search(query, limit=limit, **filters) if searcher else []
     else:
         req_gid = filters.get("guild_id")
-        if req_gid and get_searcher(zone=f"guild_{req_gid}") is not None:
-            zone = f"guild_{req_gid}"
-            searcher = get_searcher(zone=zone)
+        if req_gid:
+            searcher = get_searcher(zone=f"guild_{req_gid}") or get_searcher(zone="personal")
+            raw_matches = searcher.search(query, limit=limit, **filters) if searcher else []
         else:
-            searcher = get_searcher(zone="personal")
+            # Admin without guild_id filter searches across personal and all guild archives.
+            archive_dir = get_archive_dir()
+            zones: list[str] = ["personal"]
+            if archive_dir.is_dir():
+                for p in sorted(archive_dir.glob("guild_*.sqlite")):
+                    zones.append(p.stem)
+            combined: list[dict[str, Any]] = []
+            seen_ids: set[str] = set()
+            for zone in zones:
+                searcher = get_searcher(zone=zone)
+                if searcher is None:
+                    continue
+                for m in searcher.search(query, limit=limit, **filters):
+                    mid = str(m.get("message_id") or "")
+                    if mid and mid in seen_ids:
+                        continue
+                    if mid:
+                        seen_ids.add(mid)
+                    combined.append(m)
+            if not combined and not (archive_dir / "personal.sqlite").exists() and len(zones) == 1:
+                return {
+                    "query": query,
+                    "count": 0,
+                    "matches": [],
+                    "note": "Discordアーカイブがまだ作成されていないか、登録チャンネルがありません。",
+                }
+            combined.sort(key=lambda m: (-float(m.get("search_score") or 0.0), str(m.get("message_id") or "")))
+            raw_matches = combined[:limit]
 
-    if searcher is None:
+    if not raw_matches and is_guild and searcher is None:
         return {
             "query": query,
             "count": 0,
             "matches": [],
             "note": "Discordアーカイブがまだ作成されていないか、登録チャンネルがありません。",
         }
-
-    if permitted_channels is not None:
-        filters["permitted_channels"] = permitted_channels
-
-    raw_matches = searcher.search(query, limit=limit, **filters)
     matches = []
     for m in raw_matches:
         attachments_info = [

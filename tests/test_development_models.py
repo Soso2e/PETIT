@@ -150,3 +150,17 @@ def test_stale_result_never_turns_a_request_down_without_asking_the_cli(monkeypa
     models.invalidate()
     with models._lock:
         models._refreshing = False
+
+
+def test_auto_prefers_claude_sonnet_over_opus_when_tied(monkeypatch):
+    monkeypatch.setattr(models, "usage", lambda: {
+        "antigravity_hydrogen": {"available": False, "five_hour": 0, "weekly": 0},
+        "gemini_flash": {"available": False, "five_hour": 0, "weekly": 0},
+        "codex_sol": {"available": False, "five_hour": 0, "weekly": 0},
+        "claude_opus": {"available": True, "five_hour": 100, "weekly": 100},
+        "claude_sonnet": {"available": True, "five_hour": 100, "weekly": 100},
+    })
+    provider, model, selection = models.select("auto", "medium")
+    assert provider == "claude_code"
+    assert model == "sonnet"
+    assert selection["model_key"] == "claude_sonnet"

@@ -17,7 +17,9 @@ from .discord_archive import (
     ArchiveSearch,
     DiscordArchive,
     effective_policy,
+    get_sync_configs,
     set_registrations,
+    set_sync_config,
 )
 
 log = logging.getLogger("petit.archive_api")
@@ -103,6 +105,39 @@ class ArchiveRegisterRequest(BaseModel):
     zone: str | None = None
 
 
+class ArchiveBatchEventsRequest(BaseModel):
+    events: list[ArchiveMessageEvent] = Field(default_factory=list, max_length=200)
+
+
+class ArchiveCheckpointRequest(BaseModel):
+    guild_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
+    channel_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
+    completed_at: str = Field(min_length=1, max_length=64)
+    author_id: str | None = Field(default=None, max_length=40)
+    zone: str | None = None
+
+
+class ArchiveSyncConfigRequest(BaseModel):
+    guild_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
+    author_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
+    enabled: bool = True
+    sync_time: str = Field(default="05:00", max_length=10)
+    manage_guild: bool = False
+    permissions: int | None = None
+    zone: str | None = None
+
+
+def _verify_archive_admin(target_zone: str, author_id: str, manage_guild: bool, permissions: int | None) -> None:
+    if target_zone == "personal":
+        owner = owner_id()
+        if not (owner and hmac.compare_digest(author_id, owner)):
+            raise HTTPException(403, "Personal Zone の登録変更は Owner のみ許可されています。")
+    else:
+        has_perm = manage_guild or bool(permissions and (permissions & 0x20))
+        if not has_perm:
+            raise HTTPException(403, "サーバーの管理権限（Manage Server）が必要です。")
+
+
 @router.post("/events")
 async def receive_message_event(
     event: ArchiveMessageEvent,
@@ -116,6 +151,33 @@ async def receive_message_event(
         return {"status": "ok", "saved": saved, "zone": zone}
     except Exception as exc:
         log.warning("Archive message event failed (%s)", type(exc).__name__)
+        return {"status": "error", "error": type(exc).__name__}
+
+
+@router.post("/events/batch")
+async def receive_message_events_batch(
+    req: ArchiveBatchEventsRequest,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(authorization)
+    if not req.events:
+        return {"status": "ok", "received": 0, "saved": 0}
+    try:
+        cache: dict[str, ArchiveIngestor] = {}
+        saved_count = 0
+        last_zone = "personal"
+        for event in req.events:
+            zone = resolve_zone(event.guild_id, event.zone, event.author_id)
+            last_zone = zone
+            ingestor = cache.get(zone)
+            if ingestor is None:
+                _, _, ingestor, _ = get_components(zone=zone)
+                cache[zone] = ingestor
+            if ingestor.save_message(event.model_dump()):
+                saved_count += 1
+        return {"status": "ok", "received": len(req.events), "saved": saved_count, "zone": last_zone}
+    except Exception as exc:
+        log.warning("Archive batch event failed (%s)", type(exc).__name__)
         return {"status": "error", "error": type(exc).__name__}
 
 
@@ -142,17 +204,7 @@ async def register_channels(
 ) -> dict[str, Any]:
     _authorize(authorization)
     target_zone = resolve_zone(req.guild_id, req.zone, req.author_id)
-
-    # Permission verification:
-    if target_zone == "personal":
-        owner = owner_id()
-        if not (owner and hmac.compare_digest(req.author_id, owner)):
-            raise HTTPException(403, "Personal Zone の登録変更は Owner のみ許可されています。")
-    else:
-        # Guild zone requires Manage Server permission
-        has_perm = req.manage_guild or bool(req.permissions and (req.permissions & 0x20))
-        if not has_perm:
-            raise HTTPException(403, "サーバーの管理権限（Manage Server）が必要です。")
+    _verify_archive_admin(target_zone, req.author_id, req.manage_guild, req.permissions)
 
     archive_dir = get_archive_dir()
     set_registrations(archive_dir, target_zone, req.guild_id, req.channel_ids, req.enabled)
@@ -162,6 +214,73 @@ async def register_channels(
         "zone": target_zone,
         "updated": len(req.channel_ids),
         "enabled": req.enabled,
+    }
+
+
+@router.get("/checkpoints")
+async def get_checkpoints(
+    guild_id: str | None = None,
+    zone: str | None = None,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(authorization)
+    resolved_zone = resolve_zone(guild_id, zone, author_id=None)
+    archive, _, _, _ = get_components(zone=resolved_zone)
+    with archive.connect() as db:
+        rows = db.execute("SELECT channel_id, completed_at FROM archive_checkpoints").fetchall()
+    checkpoints = {str(r["channel_id"]): str(r["completed_at"]) for r in rows}
+    return {"zone": resolved_zone, "checkpoints": checkpoints}
+
+
+@router.post("/checkpoints")
+async def set_checkpoint(
+    req: ArchiveCheckpointRequest,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(authorization)
+    resolved_zone = resolve_zone(req.guild_id, req.zone, req.author_id)
+    archive, _, _, _ = get_components(zone=resolved_zone)
+    with archive.connect() as db:
+        db.execute(
+            "INSERT OR REPLACE INTO archive_checkpoints (channel_id, completed_at) VALUES (?, ?)",
+            (req.channel_id, req.completed_at),
+        )
+    return {"status": "ok", "zone": resolved_zone, "channel_id": req.channel_id, "completed_at": req.completed_at}
+
+
+@router.get("/sync-config")
+async def get_sync_config(
+    guild_id: str | None = None,
+    zone: str | None = None,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(authorization)
+    resolved_zone = resolve_zone(guild_id, zone, author_id=None)
+    configs = get_sync_configs(get_archive_dir(), resolved_zone)
+    result: dict[str, Any] = {"zone": resolved_zone, "configs": configs}
+    if guild_id:
+        result["config"] = configs.get(str(guild_id), {"enabled": False, "sync_time": "05:00"})
+    return result
+
+
+@router.post("/sync-config")
+async def update_sync_config(
+    req: ArchiveSyncConfigRequest,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    _authorize(authorization)
+    target_zone = resolve_zone(req.guild_id, req.zone, req.author_id)
+    _verify_archive_admin(target_zone, req.author_id, req.manage_guild, req.permissions)
+    try:
+        entry = set_sync_config(get_archive_dir(), target_zone, req.guild_id, req.enabled, req.sync_time)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {
+        "status": "ok",
+        "guild_id": req.guild_id,
+        "zone": target_zone,
+        "enabled": entry["enabled"],
+        "sync_time": entry["sync_time"],
     }
 
 

@@ -11,8 +11,8 @@ import time
 from . import antigravity_cli, antigravity_cli_brain, brain_priority, claude_code_brain, codex_brain, db, setup_store
 
 MODELS = {
-    "claude_opus": ("claude_code", "opus", "Claude Opus 5.5"),
     "claude_sonnet": ("claude_code", "sonnet", "Claude Sonnet 5.5"),
+    "claude_opus": ("claude_code", "opus", "Claude Opus 5.5"),
     "codex_sol": ("codex", "gpt-6.1-sol", "Codex Sol 6.1"),
     "antigravity_hydrogen": ("antigravity_cli", "gemini-4-hydrogen", "Antigravity Hydrogen"),
     "gemini_flash": ("antigravity_cli", "gemini-3.8-flash", "Gemini 3.8 Flash"),

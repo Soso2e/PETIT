@@ -246,8 +246,24 @@ def cancel(job_id: str):return call(jobs.cancel, job_id)
 
 
 @router.post("/jobs/{job_id}/actions/{action_id}/{decision}", dependencies=[Depends(setup_api._same_origin)])
-def resolve_action(job_id: str, action_id: str, decision: Literal["approve", "reject"]):
-    return call(development_pc.resolve, call(jobs.get, job_id), action_id, decision == "approve")
+def resolve_action(job_id: str, action_id: str, decision: Literal["approve", "approve_always", "reject"]):
+    return call(
+        development_pc.resolve,
+        call(jobs.get, job_id),
+        action_id,
+        decision in {"approve", "approve_always"},
+        remember=decision == "approve_always",
+    )
+
+
+@router.get("/config/pc-whitelist")
+def get_pc_whitelist():
+    return development_pc.list_whitelist()
+
+
+@router.delete("/config/pc-whitelist", dependencies=[Depends(setup_api._same_origin)])
+def delete_pc_whitelist(signature: str):
+    return {"user_whitelist": development_pc.remove_from_whitelist(signature)}
 
 
 @router.get("/jobs/{job_id}/actions/{action_id}/preview")

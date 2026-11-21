@@ -219,6 +219,12 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at);
+
+CREATE TABLE IF NOT EXISTS discord_admins (
+    user_id     TEXT PRIMARY KEY,
+    added_by    TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
 """
 
 
@@ -732,3 +738,51 @@ def mark_jobs_delivered(job_ids: list[int], session_id: str | None = None) -> No
                 f"UPDATE jobs SET delivered = 1, delivered_at = ?, updated_at = ? WHERE id IN ({placeholders})",
                 [delivered_at, delivered_at, *job_ids],
             )
+
+
+def is_discord_admin(user_id: str) -> bool:
+    """Return True if the Discord user ID is registered as a PETIT admin."""
+    if not user_id:
+        return False
+    try:
+        with get_connection() as conn:
+            row = conn.execute("SELECT 1 FROM discord_admins WHERE user_id = ?", (user_id,)).fetchone()
+            return row is not None
+    except sqlite3.OperationalError:
+        return False
+
+
+def add_discord_admin(user_id: str, added_by: str) -> bool:
+    """Register a Discord user ID as a PETIT admin. Returns True if newly added."""
+    now = now_iso()
+    with write_transaction() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS discord_admins (user_id TEXT PRIMARY KEY, added_by TEXT NOT NULL, created_at TEXT NOT NULL)"
+        )
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO discord_admins(user_id, added_by, created_at) VALUES(?, ?, ?)",
+            (user_id, added_by, now),
+        )
+        return cur.rowcount > 0
+
+
+def remove_discord_admin(user_id: str) -> bool:
+    """Remove a Discord user ID from PETIT admins. Returns True if removed."""
+    with write_transaction() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS discord_admins (user_id TEXT PRIMARY KEY, added_by TEXT NOT NULL, created_at TEXT NOT NULL)"
+        )
+        cur = conn.execute("DELETE FROM discord_admins WHERE user_id = ?", (user_id,))
+        return cur.rowcount > 0
+
+
+def list_discord_admins() -> list[dict[str, Any]]:
+    """List registered Discord admin user IDs."""
+    try:
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT user_id, added_by, created_at FROM discord_admins ORDER BY created_at ASC, user_id ASC"
+            ).fetchall()
+            return [dict(r) for r in rows]
+    except sqlite3.OperationalError:
+        return []

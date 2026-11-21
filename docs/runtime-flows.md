@@ -168,11 +168,12 @@ flowchart TD
     Native -.-> Session[(coding_job_sessions にCLIのセッションIDを保存)]
     Check -->|成功| Review[ready_for_review]
     Check -->|失敗| FailedChecks[checks_failed]
-    Mode -->|PC| PC[範囲内の検索・読み取りと scratch へのコピー]
-    PC -->|元ファイルやフォルダへの直接操作| Pending[waiting_approval と操作カード]
-    Pending -->|承認を一度消費| Effect[対象と内容を再検証し Core が実行]
+    Mode -->|PC| PC[範囲内の検索・読み取りと scratch へのコピー / 許可済みコマンドは即実行]
+    PC -->|未登録コマンドや元ファイルへの直接操作| Pending[waiting_approval と操作カード]
+    Pending -->|承認を一度消費 / 今後も許可はホワイトリスト追加| Effect[対象と内容を再検証し Core が実行]
     Pending -->|拒否・期限切れ| Review
-    Effect -->|操作の結果を記録| Review
+    Effect -->|コマンド実行成功 / 出力を保持| Queued
+    Effect -->|ファイル操作または実行失敗| Review
     PC -->|承認対象なし| Review
     Review -->|利用者のレビュー| Completed[completed]
     Run -->|再起動| Interrupted[interrupted / 作業場所のHEADを記録]
@@ -201,7 +202,7 @@ flowchart TD
     Native -->|テキスト| Reply[回答・確認質問]
     Native -->|PETIT Tool| Gate[既存の検証・risk・承認・receipt]
     Gate --> Native
-    Native -->|propose_development_job| DevJob[開発ジョブの proposed へ]
+    Native -->|propose_development_job| DevJob[開発ジョブの proposed へ / Discord は direct で即実行し結果をそのまま返す]
     Native -->|delegate_to_agent| Create[同じ transaction で receipt・作業用Thread・queued Turn・delegations]
     Create --> Notice[返答末尾に Core が「…に任せました」を追記]
     Create -.->|2秒ごと| Worker[委譲 Worker / 同時1件 / 会話用Workerを使わない]
@@ -249,11 +250,11 @@ Bot は別プロセスで、Gateway へ外向き接続するだけ。owner 判�
 flowchart TD
     Msg[Discord メッセージ] --> Extract{relay.extract<br/>Botの発言? / サーバーでメンションなし?}
     Extract -->|該当| Silent[何もしない]
-    Extract -->|DM・メンション| Post[POST /api/channels/discord/events<br/>Bearer サービストークン]
+    Extract -->|DM・メンション| Post[POST /api/channels/discord/events<br/>Bearer サービストークン<br/>直近チャンネル発言・返信先文脈を添付]
     Post --> Auth{トークン一致?}
     Auth -->|未設定| E503[503]
     Auth -->|不一致| E401[401]
-    Auth --> Mode{発話者 = OWNER_ID かつ<br/>DM か OWNER_GUILD_IDS?}
+    Auth --> Mode{発話者 = 登録管理者<br/>または (OWNER_ID かつ DM/指定サーバー)?}
     Mode -->|no| GuildOn{PETIT_DISCORD_GUILD_MODE=on?<br/>既定 off・#504}
     GuildOn -->|no| Ignore[空の返答 status=ignored<br/>Bot は何も送らない・Brain 0 回]
     GuildOn -->|yes| GuildCheck{guild_id あり かつ<br/>guild_api.is_configured?}
@@ -271,6 +272,9 @@ flowchart TD
     Claim --> Mark[配信記録 claimed を先に書く]
     Mark --> DM[owner へ DM]
     DM --> Report[sent / failed を報告<br/>未報告は claimed=不明のまま再送しない]
+    RemPoll[Bot 15秒ごと] --> RemClaim[GET /api/channels/discord/reminders<br/>Owner DB + Guild DB から期限到来を claimed]
+    RemClaim --> RemSend[対象チャンネルへ送信<br/>@everyone または user メンションのみ許可]
+    RemSend --> RemReport[POST /api/channels/discord/reminders/scope/id<br/>sent / failed を報告]
 ```
 
 ### 毎日の進捗投稿（v0.68.0開発版・#504）
@@ -322,8 +326,13 @@ flowchart TD
     Idem -->|yes| Saved[保存済み返答を再利用<br/>DeepSeek 0 回]
     Idem -->|no| Budget{1日上限（回数/トークン）<br/>・ユーザー1時間上限内?}
     Budget -->|超過| Stop["「今日はここまで」を返す<br/>DeepSeek 0 回"]
-    Budget -->|上限内| DS["DeepSeek API のみ (tools=None)<br/>サーバー専用 DB のメンバー・直近会話だけ参照"]
-    DS --> Redact[秘密値を伏せて guild_conversations と<br/>guild_usage_log に記録し返信]
+    Budget -->|上限内| DS["DeepSeek (1回目)<br/>直近6件の会話履歴 + search_guild_archive / discord_reminders ツール"]
+    DS -->|ツール要求なし| Redact[秘密値を伏せて guild_conversations と<br/>guild_usage_log に記録し返信]
+    DS -->|search_guild_archive| PySearch["Python: guild_&lt;id&gt;.sqlite をマッチ度検索<br/>(FTS5 + trigram・上位5件・本文全文)"]
+    DS -->|create / list / cancel_discord_reminder| PyRem["Python: guild_&lt;id&gt;.sqlite の<br/>guild_reminders を操作"]
+    PySearch --> DS2["DeepSeek (2回目・tools=None)<br/>検索・操作結果 + 元の質問から回答生成"]
+    PyRem --> DS2
+    DS2 --> Redact
 ```
 
 ## PETIT MCP bridge（v0.46.0開発版・#398）

@@ -6,7 +6,7 @@ DISCOVER = "discover_tools"
 # A small useful first-call set, independent of utterance spelling or provider.
 DIRECT = {"get_current_time", "get_tasks", "get_schedule", "get_weather", "search_news",
           # Concept §11 morning: "今日どうしよう？" answers with 今やる1個 without a discovery round.
-          "create_daily_briefing"}
+          "create_daily_briefing", "create_discord_reminder"}
 DISCOVERY_SCHEMA = {"type":"function", "function": {"name":DISCOVER,
     "description":"必要なToolの詳細schemaを取得する。候補名はCapability一覧を参照。雑談では呼ばない。複数名をまとめて指定できる。操作自体は実行しない。",
     "parameters":{"type":"object", "properties":{"names":{"type":"array", "items":{"type":"string"}, "minItems":1,"maxItems":8}},
@@ -19,6 +19,9 @@ def available(schema: dict, *, local_only: bool, setup: dict) -> bool:
         return False
     from . import delegations
     work_thread = delegations.is_work_thread(request_context.current_ids()[1])
+    session_id = request_context.current_ids()[1]
+    if name in {"create_discord_reminder", "list_discord_reminders", "cancel_discord_reminder"}:
+        return bool(session_id and session_id.startswith("discord:"))
     if name == "propose_development_job":
         return not (local_only or work_thread)
     if name in {"open_worktree", "run_worktree_check", "commit_worktree", "push_worktree",

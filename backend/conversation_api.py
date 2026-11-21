@@ -63,7 +63,10 @@ def _process_claimed(request_id: str) -> dict:
     try:
         with request_context.bind(request_id=request_id, session_id=row["thread_id"],
                                   conversation_mode=payload.get("conversation_mode", "text"),
-                                  is_admin=is_admin):
+                                  is_admin=is_admin,
+                                  discord_author_id=payload.get("discord_author_id"),
+                                  discord_guild_id=payload.get("discord_guild_id"),
+                                  source=payload.get("source", "web")):
             with lmstudio_client.observe_turn():
                 attachment_ids = payload.get("attachment_ids") or []
                 if attachment_ids:
@@ -106,12 +109,21 @@ def _process_claimed(request_id: str) -> dict:
 
 
 def submit(thread_id: str, request_id: str, message: str, *, source="web", conversation_mode="text",
-           attachment_ids: list[str] | None = None, is_admin: bool = False, background=False) -> dict:
+           attachment_ids: list[str] | None = None, is_admin: bool = False, background=False,
+           channel_context: str = "", discord_author_id: str | None = None,
+           discord_guild_id: str | None = None) -> dict:
     request_context.forbid_guild_mode("Core Turn")
     store.create_thread(thread_id, source=source)
-    row, created = store.accept(thread_id, request_id, {"message": message, "conversation_mode": conversation_mode,
-                                                     "source": source, "is_admin": is_admin,
-                                                     "attachment_ids": attachment_ids or []})
+    input_payload = {"message": message, "conversation_mode": conversation_mode,
+                     "source": source, "is_admin": is_admin,
+                     "attachment_ids": attachment_ids or []}
+    if channel_context.strip():
+        input_payload["channel_context"] = channel_context.strip()
+    if discord_author_id:
+        input_payload["discord_author_id"] = str(discord_author_id)
+    if discord_guild_id:
+        input_payload["discord_guild_id"] = str(discord_guild_id)
+    row, created = store.accept(thread_id, request_id, input_payload)
     if created:
         if background:
             _executor.submit(process, request_id)

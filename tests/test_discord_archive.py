@@ -8,7 +8,9 @@ from backend.discord_archive import (
     ArchivePolicy,
     ArchiveSearch,
     ArchiveIngestor,
+    get_sync_configs,
     set_registrations,
+    set_sync_config,
     effective_policy,
     extract_attachment_text,
 )
@@ -164,3 +166,91 @@ def test_extract_attachment_text():
     raw_txt = b"Hello, world!\nLine 2"
     assert extract_attachment_text(raw_txt, "readme.txt") == "Hello, world!\nLine 2"
     assert extract_attachment_text(b"some binary data", "image.png") is None
+
+
+def test_sync_config_validation_and_persistence(tmp_path: Path):
+    archive_dir = tmp_path / "archive"
+    set_sync_config(archive_dir, "personal", "100", True, "05:30")
+    configs = get_sync_configs(archive_dir, "personal")
+    assert configs["100"] == {"enabled": True, "sync_time": "05:30"}
+
+    # Allowlist update preserves sync_schedules
+    set_registrations(archive_dir, "personal", "100", ["200"], True)
+    assert get_sync_configs(archive_dir, "personal")["100"] == {"enabled": True, "sync_time": "05:30"}
+
+    with pytest.raises(ValueError):
+        set_sync_config(archive_dir, "personal", "100", True, "25:99")
+
+
+def test_archive_api_batch_checkpoints_and_sync_config(tmp_path: Path, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from backend import archive_api
+
+    monkeypatch.setenv("PETIT_ARCHIVE_DIR", str(tmp_path / "archive"))
+    monkeypatch.setenv("PETIT_DISCORD_SERVICE_TOKEN", "s" * 32)
+    monkeypatch.setenv("PETIT_DISCORD_OWNER_ID", "111")
+    monkeypatch.setenv("PETIT_DISCORD_OWNER_GUILD_IDS", "999")
+
+    app = FastAPI()
+    app.include_router(archive_api.router)
+    client = TestClient(app)
+    headers = {"Authorization": f"Bearer {'s' * 32}"}
+
+    # Register channel
+    r = client.post(
+        "/api/channels/discord/archive/register",
+        json={"guild_id": "999", "author_id": "111", "channel_ids": ["10"], "enabled": True, "manage_guild": True},
+        headers=headers,
+    )
+    assert r.status_code == 200
+
+    # Batch events
+    r = client.post(
+        "/api/channels/discord/archive/events/batch",
+        json={
+            "events": [
+                {
+                    "message_id": "1001",
+                    "guild_id": "999",
+                    "channel_id": "10",
+                    "author_id": "111",
+                    "content": "一括テスト1",
+                    "created_at": "2026-11-20T10:00:00Z",
+                },
+                {
+                    "message_id": "1002",
+                    "guild_id": "999",
+                    "channel_id": "10",
+                    "author_id": "111",
+                    "content": "一括テスト2",
+                    "created_at": "2026-11-20T10:01:00Z",
+                },
+            ]
+        },
+        headers=headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["saved"] == 2
+
+    # Checkpoints
+    r = client.post(
+        "/api/channels/discord/archive/checkpoints",
+        json={"guild_id": "999", "channel_id": "10", "completed_at": "2026-11-21T00:00:00Z", "author_id": "111"},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    r = client.get("/api/channels/discord/archive/checkpoints", params={"guild_id": "999"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["checkpoints"]["10"] == "2026-11-21T00:00:00Z"
+
+    # Sync config
+    r = client.post(
+        "/api/channels/discord/archive/sync-config",
+        json={"guild_id": "999", "author_id": "111", "enabled": True, "sync_time": "06:00", "manage_guild": True},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    r = client.get("/api/channels/discord/archive/sync-config", params={"guild_id": "999"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["config"] == {"enabled": True, "sync_time": "06:00"}

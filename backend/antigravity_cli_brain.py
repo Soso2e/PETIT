@@ -320,5 +320,6 @@ def result_error(reason):
         "timeout": "Antigravity CLIがタイムアウトしました。",
         "temporarily_unavailable": "Antigravity CLIの接続先で一時的なエラーが発生しました。",
         "cancelled": "Antigravity CLI側で処理が取り消されました。",
+        "invalid_cli_protocol": "Antigravity CLIの出力を検証できませんでした。",
     }
     return CLIError(reason, messages.get(reason, "Antigravity CLIが応答を完了できませんでした。"))

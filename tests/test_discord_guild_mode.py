@@ -162,11 +162,17 @@ def test_guild_mention_uses_only_deepseek_without_tools_and_never_touches_app_db
     assert "こんにちは" in data["reply"]
     assert owner_submit_calls == []
 
-    # DeepSeek was called once, with no tools
+    # DeepSeek was called once, with only the read-only guild archive search tool
     assert len(env.deepseek_calls) == 1
     call = env.deepseek_calls[0]
     assert call["target"]["provider"] == "deepseek"
-    assert "tools" not in call["payload"]
+    tool_names = [t["function"]["name"] for t in call["payload"].get("tools") or []]
+    assert tool_names == [
+        "search_guild_archive",
+        "create_discord_reminder",
+        "list_discord_reminders",
+        "cancel_discord_reminder",
+    ]
 
     # Owner app.db has 0 guild conversations
     with db.get_connection() as conn:
@@ -440,3 +446,112 @@ def test_slash_command_parsing_and_bot_dispatch(env):
     assert "Guild モードを有効にしました" in ok
     assert "進行役" in me_reply
     assert "すべて消去しました" in forget_reply
+
+
+def test_guild_two_step_archive_search_top5_full_content_and_history_6(env, monkeypatch, tmp_path):
+    """Guild mentions keep up to 6 prior turns and run 2-step archive search returning top 5 full messages."""
+    from backend import lmstudio_client
+    from backend.discord_archive import DiscordArchive, set_registrations
+
+    archive_dir = tmp_path / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("PETIT_ARCHIVE_DIR", str(archive_dir))
+
+    # Populate 7 matching messages in GUILD_A archive with long full text (no truncation)
+    db_file = archive_dir / f"guild_{GUILD_A}.sqlite"
+    archive = DiscordArchive(db_file, zone=f"guild_{GUILD_A}")
+    set_registrations(archive_dir, f"guild_{GUILD_A}", GUILD_A, ["300"], True)
+    long_tail = "【末尾マーカー_省略されないこと】"
+    for i in range(1, 8):
+        archive.upsert_message({
+            "message_id": str(5000 + i),
+            "guild_id": GUILD_A,
+            "guild_name": "Guild A",
+            "channel_id": "300",
+            "channel_name": "general",
+            "author_id": MEMBER_USER,
+            "author_name": "アリス",
+            "content": f"開発プロジェクトの定例議事録パート{i}です。" + ("詳細メモ。" * 40) + long_tail,
+            "created_at": f"2026-11-20T10:0{i}:00+09:00",
+        })
+
+    assert setup_guild(env, GUILD_A).status_code == 200
+
+    # Insert 8 prior turns into guild_conversations to verify only last 6 turns are included
+    with guild_api._connect(GUILD_A) as conn, conn:
+        for idx in range(1, 9):
+            conn.execute(
+                "INSERT INTO guild_conversations(event_id,channel_id,author_id,user_text,assistant_text,created_at) "
+                "VALUES(?,?,?,?,?,?)",
+                (f"hist_{idx}", "300", MEMBER_USER, f"過去質問{idx}", f"過去回答{idx}", f"2026-11-20T09:0{idx}:00+09:00"),
+            )
+
+    calls = []
+
+    def fake_chat_completion(messages, tools=None, **kwargs):
+        calls.append({"messages": list(messages), "tools": tools})
+        if len(calls) == 1:
+            return {
+                "content": "",
+                "tool_calls": [{
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "search_guild_archive", "arguments": '{"query": "開発プロジェクト 定例議事録"}'},
+                }],
+            }
+        return {"content": "定例議事録が見つかりました。"}
+
+    monkeypatch.setattr(lmstudio_client, "chat_completion", fake_chat_completion)
+
+    resp = env.post(
+        "/api/channels/discord/events",
+        json=mention_event(event_id="9001", guild_id=GUILD_A, channel_id="300", message="定例議事録の内容を教えて"),
+        headers=auth_headers(),
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["reply"] == "定例議事録が見つかりました。"
+    assert len(calls) == 2
+
+    # 1st call has only last 6 turns (hist 3..8, not 1..2) + current user msg
+    first_contents = "\n".join(str(m.get("content") or "") for m in calls[0]["messages"])
+    assert "過去質問2" not in first_contents
+    assert "過去質問3" in first_contents
+    assert "過去質問8" in first_contents
+    assert [t["function"]["name"] for t in calls[0]["tools"]] == [
+        "search_guild_archive",
+        "create_discord_reminder",
+        "list_discord_reminders",
+        "cancel_discord_reminder",
+    ]
+
+    # 2nd call has tools=None and tool result containing at most 5 full-text matches
+    assert calls[1]["tools"] is None
+    tool_msgs = [m for m in calls[1]["messages"] if m.get("role") == "tool"]
+    assert len(tool_msgs) == 1
+    import json as _json
+    payload = _json.loads(tool_msgs[0]["content"])
+    assert payload["count"] == 5
+    assert len(payload["matches"]) == 5
+    assert all(long_tail in m["content"] for m in payload["matches"])
+
+
+def test_guild_mention_includes_channel_context_without_storing_it_in_db(env):
+    """channel_context is passed to DeepSeek before the user message, not saved as user_text."""
+    setup_guild(env, GUILD_A)
+    env.deepseek_calls.clear()
+    ctx_text = "[Discordチャンネルの参考文脈（直近の発言・返信先）]\n- アリス: 明日の集合時間は？"
+    body = mention_event(event_id="9101", message="ぷて")
+    body["channel_context"] = ctx_text
+    resp = env.post("/api/channels/discord/events", json=body, headers=auth_headers())
+    assert resp.status_code == 200
+    assert len(env.deepseek_calls) == 1
+    sent = env.deepseek_calls[0]["payload"]["messages"]
+    assert sent[-2] == {"role": "user", "content": ctx_text}
+    assert sent[-1]["content"].endswith("ぷて")
+
+    with guild_api._connect(GUILD_A) as conn:
+        row = conn.execute(
+            "SELECT user_text FROM guild_conversations WHERE event_id='9101'"
+        ).fetchone()
+    assert row["user_text"] == "ぷて"

@@ -27,6 +27,7 @@
     read_pc_file: "PCファイルを読み取りました",
     copy_pc_file_to_workspace: "作業場所へコピーしました",
     tool_result: "ツール実行が完了しました",
+    resumed_after_approval: "承認された操作を実行して再開しました",
     cli_tool: "CLIがツールを実行中…",
     repository_check: "テスト・検査結果を受け取りました",
   };
@@ -328,11 +329,15 @@
     const notice = append(box, "p", "");
     notice.setAttribute("role", "status");
     const onError = (message) => { notice.textContent = message; };
-    const decide = (path, label, parent = actions) => button(parent, label, async () => {
-      await api(route + path, "POST");
-      notifyIsland();
-      await refresh();
-    }, onError);
+    const decide = (path, label, parent = actions, className = "") => {
+      const btn = button(parent, label, async () => {
+        await api(route + path, "POST");
+        notifyIsland();
+        await refresh();
+      }, onError);
+      if (className) btn.className = className;
+      return btn;
+    };
     if (job.status === "proposed") {
       decide("/approve", "この内容で開発を依頼する");
       decide("/cancel", "キャンセル");
@@ -360,23 +365,35 @@
     }
     for (const item of job.actions || []) {
       const panel = append(box, "section", "");
-      panel.className = "development-action";
+      const isPending = item.status === "proposed" && job.status === "waiting_approval";
+      panel.className = isPending ? "development-action development-action--pending" : "development-action";
       const params = item.parameters;
-      append(panel, "h4", "PC操作の確認 · " + operations[item.operation]);
-      append(panel, "pre", JSON.stringify({
-        対象: params.path, 移動先: params.destination, 作業ファイル: params.source, コマンド: params.argv,
-      }, null, 2));
-      if (item.status === "proposed" && job.status === "waiting_approval") {
+      append(panel, "h4", (isPending ? "⚠️ PC操作の承認が必要です · " : "PC操作の確認 · ") + operations[item.operation]);
+      const summary = item.operation === "command"
+        ? { 実行フォルダ: params.path, コマンド: (params.argv || []).join(" ") }
+        : { 対象: params.path, 移動先: params.destination, 作業ファイル: params.source };
+      append(panel, "pre", JSON.stringify(summary, null, 2));
+      if (isPending) {
+        if (item.operation === "command" && item.whitelist_candidate) {
+          const hint = append(panel, "p", `「今後も許可」を選ぶと、種別 (${item.whitelist_candidate}) がホワイトリストに追加され、次回から確認なしで実行されます。`);
+          hint.className = "development-action-hint";
+        }
         if (item.operation === "write") {
-          button(panel, "書き込み内容を見る", async () => {
+          const previewBtn = button(panel, "書き込み内容を見る", async () => {
             const result = await api(route + "/actions/" + item.id + "/preview");
             const preview = panel.querySelector(".diff") || append(panel, "pre", "");
             preview.className = "diff";
             preview.textContent = result.preview;
           }, onError);
+          previewBtn.className = "development-btn";
         }
-        decide("/actions/" + item.id + "/approve", "このPC操作を許可する", panel);
-        decide("/actions/" + item.id + "/reject", "拒否する", panel);
+        const btnWrap = append(panel, "div", "");
+        btnWrap.className = "development-action-buttons";
+        decide("/actions/" + item.id + "/approve", "今回だけ許可して実行", btnWrap, "development-btn development-btn--primary");
+        if (item.operation === "command") {
+          decide("/actions/" + item.id + "/approve_always", "今後も許可して実行（ホワイトリストに追加）", btnWrap, "development-btn development-btn--whitelist");
+        }
+        decide("/actions/" + item.id + "/reject", "拒否する", btnWrap, "development-btn development-btn--danger");
       } else {
         const actionState = { proposed: "準備中", running: "実行中", applied: "実行済み", rejected: "拒否・取消",
           expired: "期限切れ", unknown: "結果不明・要確認" };

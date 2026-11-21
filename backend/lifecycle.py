@@ -6,7 +6,7 @@ import threading
 
 from fastapi import FastAPI
 
-from . import chroma_client, config, db, notifications, scheduler, vault_indexer, worker
+from . import chroma_client, config, db, notifications, petit_docs, scheduler, vault_indexer, worker
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +67,13 @@ def shutdown() -> None:
 
 
 def _chroma_sync() -> None:
-    """Incrementally index SQLite memory/episodes and configured vaults."""
+    """Incrementally index SQLite memory/episodes, configured vaults, and PETIT docs."""
+    try:
+        docs_counts = petit_docs.sync_petit_docs()
+        if docs_counts.get("added") or docs_counts.get("updated") or docs_counts.get("deleted"):
+            log.info("PETIT docs sync: %s", docs_counts)
+    except Exception as exc:  # noqa: BLE001
+        log.debug("PETIT docs startup sync skipped: %s", exc)
     try:
         mem_rows = db.all_memory()
         counts = chroma_client.sync_structured_data(mem_rows, db.all_episodes())

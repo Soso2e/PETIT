@@ -31,6 +31,7 @@ class DiscordEvent(BaseModel):
     author_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
     display_name: str = Field(default="", max_length=120)
     message: str = Field(min_length=1, max_length=20000)
+    channel_context: str = Field(default="", max_length=8000)
 
 
 def owner_id() -> str:
@@ -55,11 +56,14 @@ def owner_guild_ids() -> set[str]:
 
 def mode_for(event: DiscordEvent) -> str:
     owner = owner_id()
-    if not owner or not hmac.compare_digest(event.author_id, owner):
+    if owner and hmac.compare_digest(event.author_id, owner):
+        guilds = owner_guild_ids()
+        if event.guild_id is None or "*" in guilds or event.guild_id in guilds:
+            return "owner"
+        # The owner speaking in an undesignated guild still gets no personal data.
         return "guest"
-    if event.guild_id is None or event.guild_id in owner_guild_ids():
+    if db.is_discord_admin(event.author_id):
         return "owner"
-    # The owner speaking in an undesignated guild still gets no personal data.
     return "guest"
 
 
@@ -110,6 +114,7 @@ def receive(event: DiscordEvent, authorization: str | None = Header(default=None
                         author_id=event.author_id,
                         display_name=event.display_name,
                         message=event.message,
+                        channel_context=event.channel_context,
                     )
                 )
         return {"mode": "guest", "status": "completed", "reply": GUEST_GUIDE, "approvals": []}
@@ -117,7 +122,17 @@ def receive(event: DiscordEvent, authorization: str | None = Header(default=None
     # so a redelivered gateway event returns the saved result instead of re-running.
     thread_id = "discord:" + event.channel_id
     request_id = "discord:" + event.event_id
-    result = conversation_api.submit(thread_id, request_id, event.message, source="discord", is_admin=True)
+    submit_kwargs = {"channel_context": event.channel_context} if event.channel_context else {}
+    result = conversation_api.submit(
+        thread_id,
+        request_id,
+        event.message,
+        source="discord",
+        is_admin=True,
+        discord_author_id=event.author_id,
+        discord_guild_id=event.guild_id,
+        **submit_kwargs,
+    )
     return _reply({**result, "request_id": request_id})
 
 
@@ -207,3 +222,55 @@ def report_notification(event_id: int, body: DeliveryReport, authorization: str 
     if not updated:
         raise HTTPException(404, "確保済みの通知がありません。")
     return {"event_id": event_id, "status": body.status}
+
+
+class AdminCommandRequest(BaseModel):
+    action: str = Field(pattern=r"^(add|remove|list)$")
+    actor_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
+    target_user_id: str | None = Field(default=None, max_length=64)
+
+
+def _normalize_snowflake(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    cleaned = raw.strip().lstrip("<@!").rstrip(">").strip()
+    if cleaned.isdigit() and 1 <= len(cleaned) <= 40:
+        return cleaned
+    return None
+
+
+@router.post("/api/channels/discord/admins")
+def manage_admins(body: AdminCommandRequest, authorization: str | None = Header(default=None)) -> dict:
+    """Register, remove, or list Discord PETIT admins (initial owner only)."""
+    _authorize(authorization)
+    owner = owner_id()
+    if not owner or not hmac.compare_digest(body.actor_id, owner):
+        return {"status": "forbidden", "reply": "このコマンドは初期管理者（持ち主）のみが実行できます。"}
+
+    if body.action == "list":
+        admins = db.list_discord_admins()
+        lines = [f"- 初期管理者: <@{owner}> (`{owner}`)"]
+        for row in admins:
+            uid = row["user_id"]
+            if uid != owner:
+                lines.append(f"- 登録管理者: <@{uid}> (`{uid}`)")
+        return {"status": "ok", "admins": admins, "reply": "現在の管理者一覧:\n" + "\n".join(lines)}
+
+    target = _normalize_snowflake(body.target_user_id)
+    if not target:
+        return {"status": "invalid", "reply": "対象のユーザーをメンションまたはユーザーIDで指定してください。"}
+
+    if body.action == "add":
+        if hmac.compare_digest(target, owner):
+            return {"status": "ok", "reply": f"<@{target}> はすでに初期管理者です。"}
+        added = db.add_discord_admin(target, added_by=body.actor_id)
+        if added:
+            return {"status": "ok", "reply": f"<@{target}> を管理者に登録しました。すべてのサーバー情報と PETIT Core 機能が利用できます。"}
+        return {"status": "ok", "reply": f"<@{target}> はすでに管理者として登録されています。"}
+
+    if hmac.compare_digest(target, owner):
+        return {"status": "invalid", "reply": "初期管理者（持ち主）は削除できません。"}
+    removed = db.remove_discord_admin(target)
+    if removed:
+        return {"status": "ok", "reply": f"<@{target}> を管理者から解除しました。"}
+    return {"status": "ok", "reply": f"<@{target}> は登録管理者ではありません。"}
