@@ -65,7 +65,8 @@ def _process_claimed(request_id: str) -> dict:
                                   conversation_mode=payload.get("conversation_mode", "text"),
                                   is_admin=is_admin,
                                   discord_author_id=payload.get("discord_author_id"),
-                                  discord_guild_id=payload.get("discord_guild_id")):
+                                  discord_guild_id=payload.get("discord_guild_id"),
+                                  source=payload.get("source", "web")):
             with lmstudio_client.observe_turn():
                 attachment_ids = payload.get("attachment_ids") or []
                 if attachment_ids:

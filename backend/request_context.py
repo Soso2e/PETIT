@@ -13,6 +13,7 @@ _mode: ContextVar[str] = ContextVar("petit_mode", default="owner")
 _guild_id: ContextVar[str | None] = ContextVar("petit_guild_id", default=None)
 _discord_author_id: ContextVar[str | None] = ContextVar("petit_discord_author_id", default=None)
 _discord_guild_id: ContextVar[str | None] = ContextVar("petit_discord_guild_id", default=None)
+_source: ContextVar[str] = ContextVar("petit_source", default="web")
 
 
 class GuildIsolationError(PermissionError):
@@ -23,7 +24,8 @@ class GuildIsolationError(PermissionError):
 def bind(*, request_id: str | None, session_id: str | None, conversation_mode: str = "text",
          is_admin: bool = False, mode: str = "owner",
          discord_author_id: str | None = None,
-         discord_guild_id: str | None = None) -> Iterator[None]:
+         discord_guild_id: str | None = None,
+         source: str = "web") -> Iterator[None]:
     request_token = _request_id.set(request_id)
     session_token = _session_id.set(session_id)
     mode_token = _conversation_mode.set(conversation_mode)
@@ -31,6 +33,7 @@ def bind(*, request_id: str | None, session_id: str | None, conversation_mode: s
     runtime_mode_token = _mode.set(mode)
     author_token = _discord_author_id.set(discord_author_id)
     dguild_token = _discord_guild_id.set(discord_guild_id)
+    source_token = _source.set(source)
     try:
         yield
     finally:
@@ -41,6 +44,7 @@ def bind(*, request_id: str | None, session_id: str | None, conversation_mode: s
         _mode.reset(runtime_mode_token)
         _discord_author_id.reset(author_token)
         _discord_guild_id.reset(dguild_token)
+        _source.reset(source_token)
 
 
 @contextmanager
@@ -93,6 +97,10 @@ def current_discord_author_id() -> str | None:
 
 def current_discord_guild_id() -> str | None:
     return _discord_guild_id.get()
+
+
+def current_source() -> str:
+    return _source.get()
 
 
 def local_only() -> bool:

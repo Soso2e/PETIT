@@ -55,9 +55,10 @@ def propose_development_job(repository: str, goal: str, model_key="auto", effort
         raise ValueError("管理者の通常会話で開発ジョブを提案できます。")
     if not request_id or not thread_id:
         raise ValueError("request_id_required")
+    direct = request_context.current_source() == "discord"
     job = jobs.create_development("chat:" + request_id, repository, goal, model_key, effort, lightweight,
-                                  thread_id=thread_id, turn_id=request_id)
-    return {"job_id": job["id"], "status": job["status"], "selection": job["selection"]}
+                                  direct=direct, thread_id=thread_id, turn_id=request_id)
+    return {"job_id": job["id"], "status": job["status"], "selection": job["selection"], "direct": direct}
 
 
 @tool(name="delegate_coding_task", description="明示された開発依頼をCodex CLIかAntigravity CLIの別タスクへ渡す。確認画面で対象repository・目的・providerを確認する。元フォルダは変更せず開始時HEADのコピーで実装し、進捗は開発タスク画面で確認する。Push/PR/merge/任意Shellはしない。",

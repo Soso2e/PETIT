@@ -33,6 +33,7 @@ _BUILTIN_MODULES = (
     "backend.tools.notion_projects",
     "backend.tools.notion_search",
     "backend.tools.persona",
+    "backend.tools.petit_docs",
     "backend.tools.project_completion",
     "backend.tools.project_registration",
     "backend.tools.project_status",
