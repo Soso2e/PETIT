@@ -365,6 +365,23 @@ def cancel(job_id):
     return {"job_id": job_id, "cancel_requested": True}
 
 
+def wait_for_job(job_id: str, *, timeout: float = 540.0, poll_interval: float = 0.5, should_cancel=None) -> dict:
+    """Poll until a direct development job leaves active states or times out."""
+    active = {"proposed", "queued", "running"}
+    deadline = time.monotonic() + timeout
+    while True:
+        job = get(job_id)
+        if job["status"] not in active:
+            return job
+        if should_cancel and should_cancel():
+            cancel(job_id)
+            raise InterruptedError("取消要求を受け付けました。")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return job
+        time.sleep(min(poll_interval, remaining))
+
+
 def finish(job_id, status, *, summary="", checks=None, error=None):
     with db.write_transaction() as connection:
         if status in {"ready_for_review", "checks_failed", "waiting_approval"}:

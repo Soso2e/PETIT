@@ -202,7 +202,7 @@ flowchart TD
     Native -->|テキスト| Reply[回答・確認質問]
     Native -->|PETIT Tool| Gate[既存の検証・risk・承認・receipt]
     Gate --> Native
-    Native -->|propose_development_job| DevJob[開発ジョブの proposed へ]
+    Native -->|propose_development_job| DevJob[開発ジョブの proposed へ / Discord は direct で即実行し結果をそのまま返す]
     Native -->|delegate_to_agent| Create[同じ transaction で receipt・作業用Thread・queued Turn・delegations]
     Create --> Notice[返答末尾に Core が「…に任せました」を追記]
     Create -.->|2秒ごと| Worker[委譲 Worker / 同時1件 / 会話用Workerを使わない]
