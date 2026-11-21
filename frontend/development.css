@@ -311,8 +311,8 @@
 /* Develop #479: always-reachable way back while a repository or thread is open. */
 .development-nav {
   position: sticky;
-  /* Below the fixed corner status and Island so the three never overlap. */
-  top: 76px;
+  /* Below the fixed corner status and Island (including max height & safe-area) so they never overlap. */
+  top: calc(max(10px, env(safe-area-inset-top)) + 66px);
   z-index: 20;
   display: flex;
   align-items: center;
@@ -486,7 +486,6 @@ body .development-file-row:disabled { cursor: default; opacity: 1; }
 #development-thread-attach select { max-width: 100%; }
 #development-job-notice { max-width: 1100px; margin: .75rem auto; }
 @media (max-width: 600px) {
-  .development-nav { top: 60px; }
   .development-review-bar .development-primary { width: 100%; }
   .development-hero { padding: .85rem; }
   .development-options { grid-template-columns: 1fr; gap: .25rem; }
