@@ -281,3 +281,26 @@ def test_protocol_captures_thinking_step_delta():
         },
     }))
     assert step["thought_delta"] == "フォルダを確認します"
+
+
+def test_protocol_allows_tool_error_step_and_completes_result():
+    parser = cli.Protocol()
+    parser.feed(lines()[0])
+    active = parser.feed(json.dumps({
+        "event": "step_update",
+        "step_update": {
+            "conversation_id": CID, "step_index": 2, "state": "ACTIVE",
+            "step_type": "tool", "tool_name": "read_file",
+        },
+    }))
+    errored = parser.feed(json.dumps({
+        "event": "step_update",
+        "step_update": {
+            "conversation_id": CID, "step_index": 2, "state": "ERROR",
+            "step_type": "tool", "tool_name": "read_file",
+        },
+    }))
+    parser.feed(lines()[-1])
+    assert active == {"kind": "step", "state": "ACTIVE", "index": 2, "tool": "read_file"}
+    assert errored == {"kind": "step", "state": "ERROR", "index": 2, "tool": "read_file"}
+    assert parser.finish()["status"] == "SUCCESS"
