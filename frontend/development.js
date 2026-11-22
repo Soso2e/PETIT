@@ -899,6 +899,9 @@
         root.changed == null ? "変更 未確認" : "変更 " + root.changed + "件",
         "会話 " + root.thread_count + "件",
       ];
+      if ((root.extra_folders || []).length) {
+        parts.push("追加フォルダ " + root.extra_folders.length + "件");
+      }
       append(control, "span", parts.join(" · ")).className = "development-repository-meta";
       if (root.latest_job) append(control, "span",
         shorten(root.latest_job.summary || root.latest_job.goal, 120) +
@@ -943,6 +946,30 @@
       recent ? "最後の依頼 " + statusLabel(recent.status) + "（" + timestamp(recent.updated_at) + "）" : "開発依頼はまだありません",
       "確認 " + timestamp(root.observed_at),
     ].join(" · ");
+    renderRepositoryExtras(root);
+  }
+
+  function renderRepositoryExtras(root) {
+    const extras = root?.extra_folders || [];
+    const count = $("development-repo-extra-count");
+    if (count) count.textContent = extras.length ? extras.length + "件" : "なし";
+    const list = $("development-repo-extra-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (!extras.length) {
+      empty(list, "このリポジトリに紐付けた追加フォルダはありません。");
+      return;
+    }
+    for (const extra of extras) {
+      const row = append(list, "li", "");
+      append(row, "span", extra.path + (extra.error ? " · " + extra.error : ""));
+      button(row, "外す", async () => {
+        await api("/config/root/extra", "DELETE", { repository: root.path, path: extra.path });
+        report("追加フォルダの紐付けを外しました。");
+        await refreshConfig();
+        await refreshWorkspace();
+      }, report);
+    }
   }
 
   async function openRepository(path) {
@@ -1222,6 +1249,18 @@
         await refreshConfig();
         await refreshWorkspace();
       }, report);
+      if ((root.extra_folders || []).length) {
+        const sub = append(row, "ul", "");
+        sub.className = "development-extra-sublist";
+        for (const extra of root.extra_folders) {
+          const extraRow = append(sub, "li", extra.path + (extra.error ? " · " + extra.error : ""));
+          button(extraRow, "外す", async () => {
+            await api("/config/root/extra", "DELETE", { repository: root.path, path: extra.path });
+            await refreshConfig();
+            await refreshWorkspace();
+          }, report);
+        }
+      }
     }
   }
 
@@ -1288,6 +1327,23 @@
       await refreshWorkspace();
     } catch (error) { report(error.message); }
   });
+  const extraForm = $("development-repo-extra-form");
+  if (extraForm) {
+    extraForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!currentRepo) return;
+      try {
+        await api("/config/root/extra", "POST", {
+          repository: currentRepo,
+          path: extraForm.elements.path.value.trim(),
+        });
+        extraForm.reset();
+        report("追加フォルダを紐付けました。");
+        await refreshConfig();
+        await refreshWorkspace();
+      } catch (error) { report(error.message); }
+    });
+  }
   const goHome = () => {
     currentRepo = ""; currentThread = null; newThreadId = undefined;
     show("home"); void refreshWorkspace();

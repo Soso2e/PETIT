@@ -112,7 +112,7 @@ def _resume_unavailable(label):
     return antigravity_cli_brain.CLIError("resume_unavailable", label + "の前回セッションを再開できませんでした。")
 
 
-def run_git(provider, target, goal, workspace, check, progress, *, resume=None, on_session=None):
+def run_git(provider, target, goal, workspace, check, progress, *, resume=None, on_session=None, extra_dirs=()):
     """One native CLI turn in the job checkout.
 
     ``resume`` is the CLI's own session ID from an earlier job in the same checkout.
@@ -120,10 +120,11 @@ def run_git(provider, target, goal, workspace, check, progress, *, resume=None, 
     """
     prompt = goal + GIT_NATIVE_NOTE
     session = on_session or (lambda _id: None)
+    extra_kw = {"extra_dirs": extra_dirs} if extra_dirs else {}
     if provider == "antigravity_cli":
-        return _run_antigravity_git(target, prompt, workspace, check, progress, resume, session)
+        return _run_antigravity_git(target, prompt, workspace, check, progress, resume, session, **extra_kw)
     if provider == "claude_code":
-        return _run_claude_git(target, prompt, workspace, check, progress, resume, session)
+        return _run_claude_git(target, prompt, workspace, check, progress, resume, session, **extra_kw)
     if provider == "codex":
         check()
         client = codex_brain.RPC(workspace=workspace, development=True)
@@ -135,13 +136,15 @@ def run_git(provider, target, goal, workspace, check, progress, *, resume=None, 
     raise ValueError("unsupported_coding_provider")
 
 
-def _run_claude_git(target, prompt, workspace, check, progress, resume=None, on_session=lambda _id: None):
+def _run_claude_git(target, prompt, workspace, check, progress, resume=None, on_session=lambda _id: None, *, extra_dirs=()):
     binary = claude_code_brain.executable()
     label = claude_code_brain.LABEL
     if not binary:
         raise antigravity_cli_brain.CLIError("not_configured", label + "が見つかりません。")
     command = [binary, "-p", "--output-format", "stream-json", "--verbose",
                "--permission-mode", "bypassPermissions"]
+    for extra in extra_dirs:
+        command += ["--add-dir", str(extra)]
     if resume:
         command += ["--resume", resume]
     if target.get("model"):
@@ -220,13 +223,15 @@ def _run_claude_git(target, prompt, workspace, check, progress, resume=None, on_
     return summary.strip()
 
 
-def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None, on_session=lambda _id: None):
+def _run_antigravity_git(target, prompt, workspace, check, progress, resume=None, on_session=lambda _id: None, *, extra_dirs=()):
     binary = antigravity_cli.executable()
     if not binary:
         raise antigravity_cli_brain.CLIError("not_configured", "公式Antigravity CLIが見つかりません。")
 
     command = [binary, "--input-format", "stream-json", "--output-format", "stream-json",
                "--mode=auto", "--dangerously-skip-permissions"]
+    for extra in extra_dirs:
+        command += ["--add-dir", str(extra)]
     if resume:
         command += ["--conversation", antigravity_cli.conversation_id(resume)]
     if target.get("model"):

@@ -25,6 +25,7 @@ DEFAULTS = {"completed": False, "brain_enabled": False, "priority": ["antigravit
             "claude_code_agent_mode": False, "claude_code_agent_bash": False, "codex_agent_mode": False,
             "front_brain_deepseek": False, "delegate_priority": ["antigravity_cli", "codex", "claude_code"], "delegate_claude_model": "sonnet",
             "coding_roots": [],
+            "coding_root_extras": {},
             "pc_command_whitelist": [],
             "paid_allowed": [], "connected": [], "calendar": "local", "google_calendar_id": "primary",
             "notion_tasks_db": "", "notion_projects_db": "", "notion_pages": [],
