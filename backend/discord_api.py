@@ -7,13 +7,16 @@ owner in a DM or an owner-designated guild gets a fixed guide and no Brain call.
 from __future__ import annotations
 
 import hmac
+import json
 import os
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from . import conversation_api, conversation_store as store, db
+from . import conversation_api, conversation_store as store, db, discord_files
 
 router = APIRouter()
 
@@ -85,6 +88,28 @@ def _approvals(result: dict) -> list[dict]:
     return items
 
 
+def _attachments(result: dict) -> list[dict]:
+    items: list[dict] = []
+    seen: set[str] = set()
+    for effect in result.get("effects") or []:
+        if effect.get("tool") != "send_discord_file" or effect.get("status") != "applied":
+            continue
+        try:
+            payload = json.loads(effect.get("result") or "{}")
+        except (TypeError, ValueError):
+            continue
+        attachment_id = payload.get("attachment_id")
+        if not isinstance(attachment_id, str) or not attachment_id or attachment_id in seen:
+            continue
+        seen.add(attachment_id)
+        items.append({
+            "attachment_id": attachment_id,
+            "filename": str(payload.get("filename") or "attachment.bin"),
+            "size_bytes": int(payload.get("size_bytes") or 0),
+        })
+    return items
+
+
 def _reply(result: dict) -> dict:
     status = result.get("status")
     text = str(result.get("reply") or "")
@@ -92,8 +117,17 @@ def _reply(result: dict) -> dict:
         text = (text + "\n\n" if text else "") + APPROVAL_NOTE
     elif status in {"failed", "cancelled"}:
         text = result.get("error") or "うまく処理できませんでした。"
-    return {"mode": "owner", "status": status, "reply": text, "request_id": result.get("request_id"),
-            "approvals": _approvals(result) if status == "waiting_approval" else []}
+    payload = {
+        "mode": "owner",
+        "status": status,
+        "reply": text,
+        "request_id": result.get("request_id"),
+        "approvals": _approvals(result) if status == "waiting_approval" else [],
+    }
+    attachments = _attachments(result)
+    if attachments:
+        payload["attachments"] = attachments
+    return payload
 
 
 @router.post("/api/channels/discord/events")
@@ -143,6 +177,21 @@ def result(event_id: str, authorization: str | None = Header(default=None)) -> d
         raise HTTPException(400, "event_id が不正です。")
     request_id = "discord:" + event_id
     return _reply({**store.result(request_id), "request_id": request_id})
+
+
+@router.get("/api/channels/discord/attachments/{attachment_id}")
+def download_attachment(attachment_id: str, authorization: str | None = Header(default=None)) -> Response:
+    _authorize(authorization)
+    try:
+        content, filename = discord_files.read_attachment(attachment_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, str(exc)) from None
+    encoded = quote(filename)
+    return Response(
+        content=content,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
+    )
 
 
 class ApprovalDecision(BaseModel):

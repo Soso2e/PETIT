@@ -283,7 +283,16 @@ def decide(approval_id: str, approved: bool) -> dict | None:
     call = {"id": item["call_id"], "function": {"name": item["tool"]}}
     arguments = json.loads(item["arguments_json"])
     try:
-        with request_context.bind(request_id=request_id, session_id=row["thread_id"], is_admin=True):
+        payload = json.loads(row["input_json"] or "{}")
+        source = payload.get("source") or ("discord" if str(row["thread_id"]).startswith("discord:") else "web")
+        with request_context.bind(
+            request_id=request_id,
+            session_id=row["thread_id"],
+            is_admin=True,
+            discord_author_id=payload.get("discord_author_id"),
+            discord_guild_id=payload.get("discord_guild_id"),
+            source=source,
+        ):
             messages = json.loads(row["messages_json"] or "[]")
             raw = brain.execute(request_id, call, arguments) if approved else store.encode({"status": "cancelled_by_user"})
             # Replace only the matching pending result; retain every other call.

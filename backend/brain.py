@@ -21,7 +21,7 @@ PUBLIC_TOOLS = {
     "link_project_workspace", "unlink_project_workspace", "find_projects",
     "delegate_background_research", "get_background_research_status",
     "get_reminders", "create_reminder", "manage_reminder", "search_brain_notes", "search_petit_docs",
-    "create_discord_reminder", "list_discord_reminders", "cancel_discord_reminder",
+    "create_discord_reminder", "list_discord_reminders", "cancel_discord_reminder", "send_discord_file",
     "search_notion", "gmail_search", "gmail_get_message", "get_weather", "search_news",
     "get_persona", "update_persona_file",
     "open_worktree", "list_worktrees", "get_worktree_status", "run_worktree_check", "commit_worktree",
@@ -35,7 +35,7 @@ LOCAL_WRITES = {
     "update_task", "complete_task", "set_task_parent", "retry_task_sync",
     "create_internal_project", "add_internal_project_alias", "activate_internal_project",
     "save_project_completion", "link_project_workspace", "unlink_project_workspace",
-    "register_project",
+    "register_project", "send_discord_file",
 }
 MAX_CALLS = 12
 # PETIT Home (L0) and worktrees (L1) are reachable from every Brain through Core Tools.
