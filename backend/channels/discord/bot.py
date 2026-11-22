@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+import io
 import json
 import logging
 import os
@@ -120,6 +121,15 @@ class CoreClient:
 
     async def relay(self, body: dict) -> dict:
         return await self._call("POST", "/api/channels/discord/events", json=body) or {"reply": UNAVAILABLE, "approvals": []}
+
+    async def fetch_attachment(self, attachment_id: str) -> bytes | None:
+        try:
+            response = await self._client.get(f"/api/channels/discord/attachments/{attachment_id}")
+            response.raise_for_status()
+            return response.content
+        except httpx.HTTPError as exc:
+            log.warning("core GET attachment %s failed: %s", attachment_id, type(exc).__name__)
+            return None
 
     async def decide(self, body: dict) -> dict:
         return await self._call("POST", "/api/channels/discord/approvals", json=body) or {"reply": UNAVAILABLE, "approvals": []}
@@ -908,6 +918,22 @@ def build_client(core: CoreClient):
                 await first(chunk)
             else:
                 await channel.send(chunk)
+        attachments = data.get("attachments") or []
+        if attachments:
+            files = []
+            failed_names = []
+            for item in attachments:
+                attachment_id = str(item.get("attachment_id") or "")
+                filename = str(item.get("filename") or "attachment.bin")
+                raw = await core.fetch_attachment(attachment_id) if attachment_id else None
+                if raw is None:
+                    failed_names.append(filename)
+                else:
+                    files.append(discord.File(io.BytesIO(raw), filename=filename))
+            if files:
+                await channel.send(files=files)
+            if failed_names:
+                await channel.send("ファイルの添付送信に失敗しました: " + ", ".join(failed_names))
         for item in data.get("approvals") or []:
             await channel.send(approval_text(item), view=approval_view(item))
 

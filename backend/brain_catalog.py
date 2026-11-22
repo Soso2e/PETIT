@@ -22,6 +22,8 @@ def available(schema: dict, *, local_only: bool, setup: dict) -> bool:
     session_id = request_context.current_ids()[1]
     if name in {"create_discord_reminder", "list_discord_reminders", "cancel_discord_reminder"}:
         return bool(session_id and session_id.startswith("discord:"))
+    if name == "send_discord_file":
+        return request_context.current_source() == "discord" and request_context.current_is_admin()
     if name == "propose_development_job":
         return not (local_only or work_thread)
     if name in {"open_worktree", "run_worktree_check", "commit_worktree", "push_worktree",

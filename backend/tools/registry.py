@@ -44,6 +44,7 @@ class Tool:
     risk: ToolRisk = "safe_read"
     # Core-computed text for the approval card (e.g. a diff). Never model-supplied.
     preview: Callable[[dict[str, Any]], str] | None = None
+    confirm_if: Callable[[], bool] | None = None
 
 
 _REGISTRY: dict[str, Tool] = {}
@@ -74,6 +75,7 @@ def tool(
     requires_confirmation: bool = False,
     risk: ToolRisk | None = None,
     preview: Callable[[dict[str, Any]], str] | None = None,
+    confirm_if: Callable[[], bool] | None = None,
 ) -> Callable[[Handler], Handler]:
     """Decorator that registers a function as a callable tool.
 
@@ -93,6 +95,7 @@ def tool(
                 requires_confirmation=requires_confirmation,
             ),
             preview=preview,
+            confirm_if=confirm_if,
         )
         return func
 
@@ -129,6 +132,9 @@ def preview_for(name: str, arguments: dict[str, Any]) -> str | None:
 
 
 def requires_confirmation(name: str) -> bool:
+    tool_obj = _REGISTRY.get(name)
+    if tool_obj is not None and tool_obj.confirm_if is not None:
+        return bool(tool_obj.confirm_if())
     return risk_for(name) in {"confirm_write", "destructive"}
 
 

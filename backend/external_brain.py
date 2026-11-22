@@ -45,7 +45,16 @@ def tool_bridge(request_id: str, target: dict, used: list):
         # Every attempted Tool is durable, including reads. Runtime failover must not replay a loop.
         with db.get_connection() as c:
             store.event(c, row["thread_id"], request_id, "external_tool_started", {"tool": name})
-        with request_context.bind(request_id=request_id, session_id=row["thread_id"], is_admin=True):
+        payload = json.loads(row["input_json"] or "{}")
+        source = payload.get("source") or ("discord" if str(row["thread_id"]).startswith("discord:") else "web")
+        with request_context.bind(
+            request_id=request_id,
+            session_id=row["thread_id"],
+            is_admin=True,
+            discord_author_id=payload.get("discord_author_id"),
+            discord_guild_id=payload.get("discord_guild_id"),
+            source=source,
+        ):
             if tools.requires_confirmation(name):
                 store.propose(request_id, call, arguments)
                 raw = store.encode({"status": "awaiting_user_approval", "stop": True})
