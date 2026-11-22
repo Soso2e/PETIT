@@ -468,7 +468,7 @@
   let updatingUsage = false;
   let lastUsage = 0;
   let workspaceLoading = false;
-  let threadLoading = false;
+  let threadRequestSeq = 0;
 
   function moveComposer(slot, repo = "") {
     if (composer.parentElement !== slot) {
@@ -1149,11 +1149,11 @@
   }
 
   async function openThread(id) {
-    if (threadLoading) return;
-    threadLoading = true;
+    const reqSeq = ++threadRequestSeq;
     const threadChanged = currentThread?.thread_id !== id;
     try {
       const data = await api("/threads/" + encodeURIComponent(id));
+      if (reqSeq !== threadRequestSeq) return;
       currentThread = data;
       currentRepo = data.repository;
       show("thread");
@@ -1177,8 +1177,9 @@
       for (const root of repositories.filter((item) => !item.error)) {
         select.add(new Option(root.name + " (" + root.path + ")", root.path));
       }
-    } catch (error) { report(error.message); }
-    finally { threadLoading = false; }
+    } catch (error) {
+      if (reqSeq === threadRequestSeq) report(error.message);
+    }
   }
 
   async function refreshJobs() {
@@ -1404,7 +1405,9 @@
       const all = await api("/threads");
       const threads = all.threads || [];
       const exact = jobId ? threads.find((item) => item.latest_job?.id === jobId) : null;
-      const fallback = exact || threads.find((item) => Object.hasOwn(attentionPriority, item.latest_job?.status));
+      const fallback = exact
+        || threads.find((item) => item.latest_job?.status === "running")
+        || threads.find((item) => Object.hasOwn(attentionPriority, item.latest_job?.status));
       if (fallback) await openThread(fallback.thread_id);
     } catch (error) { report(error.message); }
   }
