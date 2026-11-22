@@ -80,3 +80,10 @@ def test_develop_thread_long_press_context_menu_and_motion():
     assert ".development-context-menu" in css
     assert "devMenuSpringIn" in css
     assert "prefers-reduced-motion: reduce" in css
+
+
+def test_island_click_opens_running_thread_without_lock_collision():
+    script = read("development.js")
+    assert "let threadRequestSeq = 0;" in script
+    assert "if (reqSeq !== threadRequestSeq) return;" in script
+    assert 'threads.find((item) => item.latest_job?.status === "running")' in script

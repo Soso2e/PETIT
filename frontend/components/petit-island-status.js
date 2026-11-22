@@ -7,7 +7,9 @@
   if (window.PetitIslandStatus || !window.PetitMorphIsland) return;
   if (!document.querySelector('.universe-shell')) return;
 
-  const ACTIVE_JOB_STATUSES = new Set(['running', 'queued', 'ready_for_review', 'proposed', 'waiting_approval']);
+  // Only actively running work, approval waits, and review/stop notices belong in the Island;
+  // queued/proposed jobs are waiting to start and are not "開発中".
+  const ACTIVE_JOB_STATUSES = new Set(['running', 'ready_for_review', 'waiting_approval']);
   // Jobs that stopped without a result are announced for a day, like a finished one.
   const STOPPED_JOB_STATUSES = new Set(['failed', 'checks_failed', 'interrupted']);
   const STOPPED_NOTICE_MS = 24 * 60 * 60 * 1000;
@@ -101,9 +103,9 @@
     }
 
     const jobs = visibleJobs();
-    // A job waiting for the user's decision comes first; then work in progress; then results.
+    // A job waiting for the user's decision comes first; then running work; then results.
     const runningJob = jobs.find((j) => j.status === 'waiting_approval')
-      || jobs.find((j) => j.status === 'running' || j.status === 'queued')
+      || jobs.find((j) => j.status === 'running')
       || jobs[0];
     if (runningJob) {
       const statusText = JOB_LABELS[runningJob.status] || '開発提案';
@@ -257,7 +259,7 @@
           navigateTo(current.view);
           if (current.view === 'development') {
             acknowledgeReviews();
-            if (current.jobId) void window.PetitDevelopment?.openJobThread?.(current.jobId);
+            void window.PetitDevelopment?.openJobThread?.(current.jobId);
           }
         } else {
           void refresh();
