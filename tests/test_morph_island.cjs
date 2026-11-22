@@ -198,6 +198,16 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
   assert.equal(sessionLayer.children[1].children[0].textContent, '設計レビュー');
   assert.match(sessionLayer.children[2].textContent, /^01:0[4-9]$/);
 
+  // Queued and proposed jobs are waiting to start, not actively developing.
+  mockFetchData['/api/coding/activity?limit=10'] = {
+    jobs: [
+      { id: 'job-queued', provider: 'Codex', status: 'queued', summary: '順番待ち' },
+      { id: 'job-proposed', provider: 'Antigravity CLI', status: 'proposed', summary: '提案中' },
+    ],
+  };
+  await ctx.window.PetitIslandStatus.refresh();
+  assert.equal(islandEl.dataset.state, 'session');
+
   mockFetchData['/api/coding/activity?limit=10'] = {
     jobs: [
       { id: 'job1', provider: 'Codex', status: 'running', summary: 'UI実装中' },
@@ -209,6 +219,12 @@ test('petit-island-status prioritizes ephemeral chat/voice, coding jobs, notific
   const devLayer = islandEl.children[0].children.find((l) => l.classList.contains('is-on'));
   assert.equal(devLayer.children[1].children[0].textContent, '開発中');
   assert.equal(devLayer.children[2].hidden, true);
+
+  islandEl.listeners.get('click')({});
+  assert.deepEqual(navCalls, ['development']);
+  assert.deepEqual(openedJobs, ['job1']);
+  navCalls.length = 0;
+  openedJobs.length = 0;
 
   mockFetchData['/api/coding/activity?limit=10'] = {
     jobs: [{ id: 'job1', provider: 'Antigravity CLI', status: 'ready_for_review', summary: '' }],
