@@ -9,7 +9,7 @@ def test_agy_windows_use_hydrogen_gemini_limits():
         "Gemini Models\tFive Hour Limit Remaining\t98%\t2026-11-09T12:43:45Z\n"
         "Claude and GPT models\tFive Hour Limit Remaining\t0%\t2026-11-09T09:22:46Z\n"
     )
-    assert models.parse_agy(raw) == {"antigravity_hydrogen": (98, 96), "gemini_flash": (98, 96)}
+    assert models.parse_agy(raw) == {"antigravity_hydrogen": (98, 96), "antigravity_neon": (98, 96)}
 
 
 def test_auto_routes_lightweight_and_ranks_available_windows(monkeypatch):
@@ -21,11 +21,12 @@ def test_auto_routes_lightweight_and_ranks_available_windows(monkeypatch):
         "claude_sonnet": quota(0, 100, False),
         "codex_sol": quota(80, 54),
         "antigravity_hydrogen": quota(81, 54),
-        "gemini_flash": quota(98, 96),
+        "antigravity_neon": quota(81, 54),
     }
     monkeypatch.setattr(models, "usage", lambda: items)
     assert models.select("auto", "high")[:2] == ("antigravity_cli", "gemini-4-hydrogen-high")
     assert models.select("auto", "medium", lightweight=True)[:2] == ("antigravity_cli", "gemini-4-hydrogen-medium")
+    assert models.select("antigravity_neon", "medium")[:2] == ("antigravity_cli", "gemini-4-neon-medium")
     assert models.select("codex_sol", "low")[:2] == ("codex", "gpt-6.1-sol")
 
 
@@ -43,13 +44,13 @@ def test_codex_reads_cli_account_and_inverts_used_percent(monkeypatch):
 def test_auto_falls_back_when_hydrogen_unavailable(monkeypatch):
     monkeypatch.setattr(models, "usage", lambda: {
         "antigravity_hydrogen": {"available": False, "five_hour": 0, "weekly": 0},
-        "gemini_flash": {"available": True, "five_hour": 90, "weekly": 90},
+        "antigravity_neon": {"available": False, "five_hour": 0, "weekly": 0},
         "codex_sol": {"available": True, "five_hour": 80, "weekly": 80},
         "claude_opus": {"available": False, "five_hour": 0, "weekly": 0},
         "claude_sonnet": {"available": False, "five_hour": 0, "weekly": 0},
     })
     assert models.select("auto", "medium")[:2] == ("codex", "gpt-6.1-sol")
-    assert models.select("auto", "medium", lightweight=True)[:2] == ("antigravity_cli", "gemini-3.8-flash-medium")
+    assert models.select("auto", "medium", lightweight=True)[:2] == ("codex", "gpt-6.1-sol")
 
 
 def test_claude_sonnet_shares_estimated_quota_and_is_selectable(monkeypatch):
@@ -155,7 +156,7 @@ def test_stale_result_never_turns_a_request_down_without_asking_the_cli(monkeypa
 def test_auto_prefers_claude_sonnet_over_opus_when_tied(monkeypatch):
     monkeypatch.setattr(models, "usage", lambda: {
         "antigravity_hydrogen": {"available": False, "five_hour": 0, "weekly": 0},
-        "gemini_flash": {"available": False, "five_hour": 0, "weekly": 0},
+        "antigravity_neon": {"available": False, "five_hour": 0, "weekly": 0},
         "codex_sol": {"available": False, "five_hour": 0, "weekly": 0},
         "claude_opus": {"available": True, "five_hour": 100, "weekly": 100},
         "claude_sonnet": {"available": True, "five_hour": 100, "weekly": 100},
