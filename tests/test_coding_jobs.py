@@ -667,3 +667,54 @@ def test_pc_command_approval_resumes_with_output_and_grows_whitelist(repository,
     deleted = client.request("DELETE", "/api/coding/config/pc-whitelist", params={"signature": payload["whitelisted"]})
     assert deleted.status_code == 200
     assert payload["whitelisted"] not in deleted.json()["user_whitelist"]
+
+
+def test_repository_extra_folders_lifecycle_and_job_context(repository, client, development_quota, tmp_path, monkeypatch):
+    admin(client)
+    extra = tmp_path / "shared_assets"
+    extra.mkdir()
+
+    # Self-reference is rejected
+    self_res = client.post("/api/coding/config/root/extra", json={"repository": str(repository), "path": str(repository)})
+    assert self_res.status_code == 400
+
+    # Add extra folder
+    added = client.post("/api/coding/config/root/extra", json={"repository": str(repository), "path": str(extra)})
+    assert added.status_code == 200
+    repos = added.json()["repositories"]
+    assert len(repos) == 1
+    assert [e["path"] for e in repos[0]["extra_folders"]] == [str(extra.resolve())]
+
+    # Workspaces endpoint exposes extra_folders too
+    ws = client.get("/api/coding/workspaces").json()["repositories"]
+    assert [e["path"] for e in ws[0]["extra_folders"]] == [str(extra.resolve())]
+
+    # Running a git job passes extra_dirs to coding_agents.run_git and prompt
+    seen = {}
+
+    def fake_run_git(provider, target, goal, workspace, check, progress, *, resume=None, on_session=None, extra_dirs=()):
+        seen["goal"] = goal
+        seen["extra_dirs"] = list(extra_dirs)
+        return "完了"
+
+    monkeypatch.setattr(coding_agents, "run_git", fake_run_git)
+    started = client.post("/api/coding/jobs/start", json={
+        "request_id": "extra-1",
+        "repository": str(repository),
+        "goal": "共有アセットも確認して",
+        "model_key": "codex_sol",
+    })
+    assert started.status_code == 200
+    assert jobs.pump()
+    assert seen["extra_dirs"] == [str(extra.resolve())]
+    assert str(extra.resolve()) in seen["goal"]
+
+    # Remove extra folder
+    removed = client.request("DELETE", "/api/coding/config/root/extra", json={"repository": str(repository), "path": str(extra)})
+    assert removed.status_code == 200
+    assert removed.json()["repositories"][0]["extra_folders"] == []
+
+    # Re-add and verify removing the repository cleans up coding_root_extras
+    assert client.post("/api/coding/config/root/extra", json={"repository": str(repository), "path": str(extra)}).status_code == 200
+    assert client.request("DELETE", "/api/coding/config/root", json={"path": str(repository)}).status_code == 200
+    assert settings.load().get("coding_root_extras") == {}

@@ -131,6 +131,34 @@ def validate_repository(path):
     return root
 
 
+def extra_folders(repository_path):
+    result = []
+    for path in development_roots.extra_folders(repository_path):
+        entry = {"path": path, "name": Path(path).name}
+        try:
+            root = project_workspaces._safe_root(Path(path))
+            development_pc.host_path(str(root), directory=True)
+            entry.update(path=str(root), name=root.name)
+        except (ValueError, OSError):
+            entry["error"] = "フォルダを参照できません。"
+        result.append(entry)
+    return result
+
+
+def valid_extra_paths(repository_path):
+    if not repository_path:
+        return []
+    repo_key = os.path.normcase(str(Path(repository_path).expanduser().absolute()))
+    paths = []
+    for entry in extra_folders(repository_path):
+        if entry.get("error"):
+            continue
+        if os.path.normcase(entry["path"]) == repo_key:
+            continue
+        paths.append(entry["path"])
+    return paths
+
+
 def roots():
     result = []
     for path, source in development_roots.configured():
@@ -142,6 +170,7 @@ def roots():
                 entry.update(mode="git", head=git(root, "rev-parse", "HEAD").strip())
         except (ValueError, OSError, subprocess.SubprocessError):
             entry["error"] = "フォルダまたは開始コミットを参照できません。"
+        entry["extra_folders"] = extra_folders(entry["path"])
         result.append(entry)
     return result
 
@@ -621,15 +650,27 @@ def continuation(job):
     return {"job_id": row["id"], "workspace": workspace, "branch": current_branch, "session_id": session}
 
 
-def development_context(job, continued=None, resumed=False):
+def _extra_dirs_note(extra_dirs):
+    items = [str(item) for item in (extra_dirs or ()) if str(item).strip()]
+    if not items:
+        return ""
+    lines = "\n".join("- " + item for item in items)
+    return (
+        "\n\n追加の作業対象フォルダ（このリポジトリと合わせて参照・作業対象に含めます）:\n"
+        + lines
+    )
+
+
+def development_context(job, continued=None, resumed=False, extra_dirs=()):
     """Bounded handoff for repeated CLI jobs in the same thread only.
 
     A resumed CLI session already holds the conversation, so it receives the request alone.
     Otherwise this is a conversation summary; it says whether the session continues from
     earlier jobs in this repository.
     """
+    extra_note = _extra_dirs_note(extra_dirs)
     if resumed:
-        return job["goal"]
+        return job["goal"] + extra_note
     route = None
     with db.get_connection() as connection:
         if connection.execute("SELECT 1 FROM sqlite_master WHERE name='coding_job_routes'").fetchone():
@@ -637,7 +678,7 @@ def development_context(job, continued=None, resumed=False):
                 "SELECT thread_id FROM coding_job_routes WHERE job_id=?", (job["id"],)
             ).fetchone()
         if not route or not route["thread_id"]:
-            return job["goal"]
+            return job["goal"] + extra_note
         rows = connection.execute(
             "SELECT j.goal,j.summary,j.error,j.status,j.provider FROM coding_jobs j "
             "JOIN coding_job_routes r ON r.job_id=j.id "
@@ -645,7 +686,7 @@ def development_context(job, continued=None, resumed=False):
             "ORDER BY j.rowid DESC LIMIT 6", (route["thread_id"], job["id"])
         ).fetchall()
     if not rows:
-        return job["goal"]
+        return job["goal"] + extra_note
     history = []
     for row in reversed(rows):
         history.append(
@@ -661,6 +702,7 @@ def development_context(job, continued=None, resumed=False):
         + "\n\n".join(history) +
         "\n\n" + note +
         "現行の作業ファイルとGitの状態を必ず確認してください。別スレッドの内容は参照していません。"
+        + extra_note +
         "\n\n今回のユーザーの依頼:\n" + job["goal"]
     )
 
@@ -746,16 +788,21 @@ def run_job(job_id):
             event(job_id, kind, detail)
 
         from . import coding_stream
+        extra_dirs = valid_extra_paths(str(root)) if root else []
         if modern and not pc:
             resume = continued["session_id"] if continued else None
 
             def native(session):
                 if session:
                     event(job_id, "session_resumed")
+                extra_kw = {"extra_dirs": extra_dirs} if extra_dirs else {}
                 with coding_stream.bind(job_id):
                     return coding_agents.run_git(
-                        job["provider"], target, development_context(job, continued, bool(session)), workspace,
-                        check, progress, resume=session, on_session=lambda value: remember_session(job_id, value))
+                        job["provider"], target,
+                        development_context(job, continued, bool(session), extra_dirs=extra_dirs),
+                        workspace, check, progress, resume=session,
+                        on_session=lambda value: remember_session(job_id, value),
+                        **extra_kw)
 
             try:
                 summary = native(resume)
@@ -767,7 +814,7 @@ def run_job(job_id):
                 event(job_id, "session_restarted")
                 summary = native(None)
         else:
-            goal = development_context(job) if modern else job["goal"]
+            goal = development_context(job, extra_dirs=extra_dirs) if modern else (job["goal"] + _extra_dirs_note(extra_dirs))
             if pc:
                 pc_context = _pc_action_context(job)
                 if pc_context:

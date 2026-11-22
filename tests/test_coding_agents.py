@@ -306,3 +306,32 @@ def test_native_request_reaches_the_cli_as_written_with_one_short_note(monkeypat
 def test_job_time_limit_is_configurable_and_longer_than_a_quick_fix():
     from backend import config
     assert config.CODING_JOB_TIMEOUT_SECONDS >= 3600 or "PETIT_CODING_JOB_TIMEOUT_MINUTES" in __import__("os").environ
+
+
+def test_git_clis_receive_add_dir_flags_for_extra_dirs(monkeypatch, tmp_path):
+    seen_commands = []
+
+    def fake_invoke(command, workspace, prompt, check, **kwargs):
+        seen_commands.append(list(command))
+        if "claude" in str(command[0]):
+            kwargs["on_line"]('{"type":"system","subtype":"init","session_id":"s1"}')
+            kwargs["on_line"]('{"type":"result","subtype":"success","is_error":false,"result":"ok"}')
+        else:
+            cid = "83d75605-0804-4d10-8787-fef77fe44190"
+            kwargs["on_line"](json.dumps({"event": "init", "conversation_id": cid, "init": {}}))
+            kwargs["on_line"](json.dumps({"event": "result", "result": {"conversation_id": cid, "status": "SUCCESS", "response": "ok", "error": ""}}))
+        return 0, "", ""
+
+    monkeypatch.setattr(coding_agents.claude_code_brain, "executable", lambda: "claude")
+    monkeypatch.setattr(coding_agents.antigravity_cli, "executable", lambda: "agy")
+    monkeypatch.setattr(coding_agents.antigravity_cli_brain, "invoke", fake_invoke)
+
+    extra_a = str(tmp_path / "extra_a")
+    extra_b = str(tmp_path / "extra_b")
+    coding_agents.run_git("claude_code", {}, "goal", tmp_path, lambda: None, lambda *a: None, extra_dirs=[extra_a, extra_b])
+    coding_agents.run_git("antigravity_cli", {}, "goal", tmp_path, lambda: None, lambda *a: None, extra_dirs=[extra_a])
+
+    assert seen_commands[0].count("--add-dir") == 2
+    assert extra_a in seen_commands[0] and extra_b in seen_commands[0]
+    assert seen_commands[1].count("--add-dir") == 1
+    assert extra_a in seen_commands[1]

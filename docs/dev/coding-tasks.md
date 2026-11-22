@@ -1,6 +1,6 @@
 # CLIによるローカル開発ジョブ（#418）
 
-管理者は Develop タブの「フォルダを管理」からサーバーPCの絶対パスを登録する。設定の `coding_roots` と既存の `PETIT_WORKSPACE_CONTEXT_DIRS` を合わせて表示する。環境変数の有効化フラグは Develop の利用条件に含まれない。観測を会話コンテキストへ注入する設定と、Develop の観測は別扱いとする。
+管理者は Develop タブの「フォルダを管理」からサーバーPCの絶対パスを登録する。設定の `coding_roots` と既存の `PETIT_WORKSPACE_CONTEXT_DIRS` を合わせて表示する。環境変数の有効化フラグは Develop の利用条件に含まれない。観測を会話コンテキストへ注入する設定と、Develop の観測は別扱いとする。また、登録済みリポジトリごとに「追加の作業対象フォルダ」（`coding_root_extras`）を紐付けられ、該当リポジトリでの開発ジョブ実行時に追加の作業対象として CLI（`--add-dir` 等）およびプロンプトへ渡される。
 
 ## 依頼と実行
 
@@ -35,9 +35,9 @@
 | Claude Sonnet 5.5 | Claude Code | `sonnet` と `--effort` |
 | Codex Sol 6.1 | Codex app-server | `gpt-6.1-sol` と `turn/start.effort` |
 | Antigravity Hydrogen | Antigravity CLI | `gemini-4-hydrogen-<effort>` |
-| Gemini 3.8 Flash | Antigravity CLI | `gemini-3.8-flash-<effort>` |
+| Antigravity Neon | Antigravity CLI | `gemini-4-neon-<effort>` |
 
-Effort は low / medium / high、既定は medium。自動選択は軽量調査で利用可能な Flash を優先し、通常の開発では認証を確認できた候補を週次、次いで5時間枠の残量順に比較する。0% の枠を持つ候補は除外し、不明な枠は既知の残量より後に置く。
+Effort は low / medium / high、既定は medium。自動選択は利用可能な Antigravity Hydrogen を優先し、利用できない場合は認証を確認できた候補を週次、次いで5時間枠の残量順に比較する。0% の枠を持つ候補は除外し、不明な枠は既知の残量より後に置く。
 
 利用枠と認証の確認結果（`GET /api/coding/usage` とジョブ作成時のモデル選択で共通）は公式 CLI から取得してキャッシュする。取得から60秒以内はそのまま使う。60秒を超え1時間以内なら、その値をすぐ返しつつ裏で1回だけ取り直す（ジョブ作成がCLIへの問い合わせを待たない。#485）。1時間を超えた場合と未取得の場合は、問い合わせの完了を待つ。古い値では選べるモデルがない・選択したモデルが使えないと判定された場合は、断る前にその場で取り直して判定し直す。Develop を開いた時にも裏で取り直す。設定の変更と利用制限エラーはキャッシュを即時に破棄する。Antigravity の `/usage` は Gemini 共通の5時間枠と週次枠を使う。Codex は `account/rateLimits/read` を使う。Claude は認証確認に加え、PETIT のジョブ履歴から5時間40リクエスト・7日200リクエストを目安に推定する。Anthropic の実契約枠や他のアプリからの消費は含まない。利用制限エラーから5時間は5時間枠を0%と扱う。
 

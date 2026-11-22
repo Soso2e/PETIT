@@ -276,6 +276,14 @@
           </nav>
           <div class="development-section-title"><h2 id="development-repo-title"></h2></div>
           <p id="development-repo-status" class="development-muted" role="status"></p>
+          <details id="development-repo-extras" class="development-request">
+            <summary>追加の作業対象フォルダ <span id="development-repo-extra-count" class="development-muted"></span></summary>
+            <ul id="development-repo-extra-list" class="development-extra-list"></ul>
+            <form id="development-repo-extra-form" class="development-extra-form">
+              <label>サーバーPC上の絶対パス<input name="path" required maxlength="1000" placeholder="C:\Projects\shared-assets"></label>
+              <button type="submit">追加フォルダを紐付け</button>
+            </form>
+          </details>
           <div id="development-repo-compose"></div>
           <div class="development-section-title"><h2>開発チャット履歴</h2></div>
           <div id="development-repo-threads" class="development-thread-list"></div>
@@ -509,7 +517,7 @@
         <button type="button" data-action="activate">作業開始</button>
         <button type="button" data-action="chat">PETITに相談</button>
       </div>
-      
+
       <div class="detail-grid detail-grid--simple" data-detail-view="read">
         <div><span>状態</span><strong data-detail="status"></strong></div>
         <div><span>分類</span><strong data-detail="bucket"></strong></div>

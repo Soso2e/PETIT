@@ -25,6 +25,12 @@ class Repository(BaseModel):
     path: str = Field(min_length=1, max_length=1000)
 
 
+class RepositoryExtra(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    repository: str = Field(min_length=1, max_length=1000)
+    path: str = Field(min_length=1, max_length=1000)
+
+
 class Proposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request_id: str = Field(min_length=1, max_length=200)
@@ -41,7 +47,7 @@ class DevelopmentRequest(BaseModel):
     request_id: str = Field(min_length=1, max_length=200)
     repository: str = Field(default="", max_length=1000)
     goal: str = Field(min_length=1, max_length=8000)
-    model_key: Literal["auto", "claude_opus", "claude_sonnet", "codex_sol", "antigravity_hydrogen", "gemini_flash"] = "auto"
+    model_key: Literal["auto", "claude_opus", "claude_sonnet", "codex_sol", "antigravity_hydrogen", "antigravity_neon"] = "auto"
     effort: Literal["low", "medium", "high"] = "medium"
     lightweight: bool = False
     thread_id: str | None = Field(default=None, min_length=1, max_length=200)
@@ -113,8 +119,56 @@ def add_folder(payload: Repository):
 def remove_folder(payload: Repository):
     key = os.path.normcase(str(Path(payload.path).absolute()))
     with settings._guard():
-        paths = [p for p in settings.load()["coding_roots"] if os.path.normcase(str(Path(p).absolute())) != key]
-        settings.update({"coding_roots": paths})
+        data = settings.load()
+        paths = [p for p in data["coding_roots"] if os.path.normcase(str(Path(p).absolute())) != key]
+        extras = {
+            repo: items
+            for repo, items in (data.get("coding_root_extras") or {}).items()
+            if os.path.normcase(str(Path(repo).absolute())) != key
+        }
+        settings.update({"coding_roots": paths, "coding_root_extras": extras})
+    return config()
+
+
+@router.post("/config/root/extra", dependencies=[Depends(setup_api._same_origin)])
+def add_extra_folder(payload: RepositoryExtra):
+    repo_path = str(call(jobs.require_repository, payload.repository))
+    extra_path = _folder(payload.path)
+    if os.path.normcase(extra_path) == os.path.normcase(repo_path):
+        raise HTTPException(400, "リポジトリ自身は追加フォルダに指定できません。")
+    repo_key = os.path.normcase(repo_path)
+    extra_key = os.path.normcase(extra_path)
+    with settings._guard():
+        raw_extras = dict(settings.load().get("coding_root_extras") or {})
+        existing_key = next(
+            (k for k in raw_extras if os.path.normcase(str(Path(k).expanduser().absolute())) == repo_key),
+            repo_path,
+        )
+        items = list(raw_extras.get(existing_key) or [])
+        if extra_key not in {os.path.normcase(str(Path(item).expanduser().absolute())) for item in items}:
+            if len(items) >= 16:
+                raise HTTPException(400, "1つのリポジトリに追加できるフォルダは16件までです。")
+            items.append(extra_path)
+        raw_extras[existing_key] = items
+        settings.update({"coding_root_extras": raw_extras})
+    return config()
+
+
+@router.delete("/config/root/extra", dependencies=[Depends(setup_api._same_origin)])
+def remove_extra_folder(payload: RepositoryExtra):
+    repo_key = os.path.normcase(str(Path(payload.repository).expanduser().absolute()))
+    extra_key = os.path.normcase(str(Path(payload.path).expanduser().absolute()))
+    with settings._guard():
+        raw_extras = dict(settings.load().get("coding_root_extras") or {})
+        updated = {}
+        for k, items in raw_extras.items():
+            if os.path.normcase(str(Path(k).expanduser().absolute())) == repo_key:
+                kept = [p for p in (items or []) if os.path.normcase(str(Path(p).expanduser().absolute())) != extra_key]
+                if kept:
+                    updated[k] = kept
+            else:
+                updated[k] = items
+        settings.update({"coding_root_extras": updated})
     return config()
 
 
