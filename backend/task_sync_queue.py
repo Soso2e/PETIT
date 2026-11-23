@@ -43,6 +43,7 @@ _TASK_COLUMNS = {
     "sync_attempts": "INTEGER NOT NULL DEFAULT 0",
     "last_synced_at": "TEXT",
     "remote_snapshot_json": "TEXT",
+    "remote_deleted_at": "TEXT",
 }
 
 
@@ -161,9 +162,11 @@ def enqueue_update(
     ensure_task_sync_schema()
     now = db.now_iso()
     with db.get_connection() as conn:
-        task = conn.execute("SELECT external_id FROM tasks_cache WHERE id=?", (task_id,)).fetchone()
+        task = conn.execute("SELECT external_id, remote_deleted_at FROM tasks_cache WHERE id=?", (task_id,)).fetchone()
         if task is None:
             raise ValueError("対象タスクが見つかりません。")
+        if task["remote_deleted_at"]:
+            raise ValueError("Notion側で削除済みのタスクは更新できません。")
 
         if not task["external_id"]:
             create = _active_operation(conn, task_id, "create")
@@ -246,6 +249,40 @@ def _mark_failed(operation: dict[str, Any], exc: Exception) -> None:
             operation_id=int(operation["id"]),
             error=error,
             attempts=attempts,
+        )
+
+
+def _is_remote_deleted_error(exc: Exception) -> bool:
+    if not isinstance(exc, NotionError):
+        return False
+    msg = str(exc).casefold()
+    return (
+        "notion api エラー 404" in msg
+        or "object_not_found" in msg
+        or "can't edit block that is archived" in msg
+        or "is archived" in msg
+    )
+
+
+def _discard_remote_deleted(
+    operation: dict[str, Any],
+    task: dict[str, Any],
+    *,
+    deleted_at: str | None = None,
+    reason: str = "Notion側で削除済みのため同期を終了しました。",
+) -> None:
+    now = db.now_iso()
+    effective_deleted_at = str(task.get("remote_deleted_at") or deleted_at or now)
+    with db.get_connection() as conn:
+        conn.execute(
+            "UPDATE task_sync_queue SET status='superseded', last_error=?, next_attempt_at=NULL, updated_at=? WHERE id=?",
+            (reason[:500], now, operation["id"]),
+        )
+        conn.execute(
+            "UPDATE tasks_cache SET remote_deleted_at=COALESCE(remote_deleted_at, ?), "
+            "sync_status='synced', sync_error=NULL, sync_operation_id=?, remote_snapshot_json=NULL, updated_at=? "
+            "WHERE id=?",
+            (effective_deleted_at, int(operation["id"]), now, int(task["id"])),
         )
 
 
@@ -375,6 +412,14 @@ def _execute(operation: dict[str, Any]) -> None:
         return
     if operation["operation"] != "update":
         raise ValueError(f"未対応のタスク同期操作です: {operation['operation']}")
+    if task.get("remote_deleted_at"):
+        _discard_remote_deleted(
+            operation,
+            task,
+            deleted_at=str(task["remote_deleted_at"]),
+            reason="すでにNotion側で削除済みのタスクのため同期を終了しました。",
+        )
+        return
     if task.get("sync_status") == "conflict":
         _mark_conflict(operation, task, task.get("sync_error") or "Notion側の更新と競合しています。")
         return
@@ -387,14 +432,35 @@ def _execute(operation: dict[str, Any]) -> None:
     external_id = str(task.get("external_id") or "").strip()
     if not external_id:
         raise NotionError("Notionページ作成が未完了のため、更新を後で再試行します。")
-    remote = notion_client.get_task_page(external_id)
+    try:
+        remote = notion_client.get_task_page(external_id)
+    except NotionError as exc:
+        if _is_remote_deleted_error(exc):
+            _discard_remote_deleted(operation, task, reason="Notion側で削除済み（404）のため同期を終了しました。")
+            return
+        raise
+    if remote.get("archived"):
+        _discard_remote_deleted(
+            operation,
+            task,
+            deleted_at=remote.get("source_updated_at"),
+            reason="Notion側でゴミ箱へ移動または削除されたため同期を終了しました。",
+        )
+        return
     if base and remote.get("source_updated_at") and str(base) != str(remote["source_updated_at"]):
         with db.get_connection() as conn:
             conn.execute("UPDATE tasks_cache SET remote_snapshot_json=?, source_updated_at=? WHERE id=?",
                          (_json(remote), remote["source_updated_at"], task["id"]))
         _mark_conflict(operation, task, "Notion側が再更新されました。最新の差分を確認してください。")
         return
-    _apply_remote_result(operation, _update_remote_task(external_id, payload))
+    try:
+        updated_remote = _update_remote_task(external_id, payload)
+    except NotionError as exc:
+        if _is_remote_deleted_error(exc):
+            _discard_remote_deleted(operation, task, reason="Notion側で削除済みのため同期を終了しました。")
+            return
+        raise
+    _apply_remote_result(operation, updated_remote)
 
 
 def process_next() -> bool:
