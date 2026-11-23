@@ -45,6 +45,14 @@
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="m7 7 10 10M17 7 7 17"></path>
       </svg>`,
+    arrowUp: `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 19V5M5 12l7-7 7 7"></path>
+      </svg>`,
+    arrowDown: `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 5v14M19 12l-7 7-7-7"></path>
+      </svg>`,
   };
 
   const iconMarkup = (name) => `<span class="petit-corner-icon">${ICONS[name] || ""}</span>`;
@@ -187,10 +195,110 @@
     });
   };
 
+  const installScrollJumpControls = () => {
+    if (document.querySelector(".petit-scroll-jump")) return;
+
+    const nav = document.createElement("aside");
+    nav.className = "petit-scroll-jump";
+    nav.setAttribute("aria-label", "ページの上下移動");
+    nav.hidden = true;
+    nav.innerHTML = `
+      <button type="button" class="petit-scroll-jump__btn" data-scroll-jump="top" aria-label="ページの一番上へ" title="一番上へ">
+        ${iconMarkup("arrowUp")}
+      </button>
+      <button type="button" class="petit-scroll-jump__btn" data-scroll-jump="bottom" aria-label="ページの一番下へ" title="一番下へ">
+        ${iconMarkup("arrowDown")}
+      </button>
+    `;
+    document.body.appendChild(nav);
+
+    const topBtn = nav.querySelector('[data-scroll-jump="top"]');
+    const bottomBtn = nav.querySelector('[data-scroll-jump="bottom"]');
+    const docScroller = () => document.scrollingElement || document.documentElement;
+
+    const getScrollTarget = () => {
+      if (document.body.classList.contains("petit-univ-screen") || document.body.classList.contains("petit-univ-active")) {
+        return null;
+      }
+      if (document.body.classList.contains("petit-chat-screen")) {
+        const messages = document.getElementById("messages");
+        if (messages && messages.scrollHeight - messages.clientHeight > 120) {
+          return messages;
+        }
+      }
+      return docScroller();
+    };
+
+    const scrollMetrics = (target) => {
+      if (!target) return { top: 0, max: 0 };
+      if (target === docScroller()) {
+        const top = window.scrollY || target.scrollTop || 0;
+        const max = Math.max(0, target.scrollHeight - window.innerHeight);
+        return { top, max };
+      }
+      return {
+        top: target.scrollTop || 0,
+        max: Math.max(0, target.scrollHeight - target.clientHeight),
+      };
+    };
+
+    let rafId = 0;
+    const sync = () => {
+      rafId = 0;
+      const target = getScrollTarget();
+      const { top, max } = scrollMetrics(target);
+      const scrollable = Boolean(target) && max >= 160;
+      nav.hidden = !scrollable;
+      if (!scrollable) return;
+      if (topBtn) topBtn.disabled = top <= 16;
+      if (bottomBtn) bottomBtn.disabled = top >= max - 16;
+    };
+
+    const scheduleSync = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(sync);
+    };
+
+    const jumpTo = (edge) => {
+      const target = getScrollTarget();
+      if (!target) return;
+      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+      const behavior = reduced ? "auto" : "smooth";
+      const { max } = scrollMetrics(target);
+      const nextTop = edge === "top" ? 0 : max;
+      if (target === docScroller()) {
+        window.scrollTo({ top: nextTop, behavior });
+      } else {
+        target.scrollTo({ top: nextTop, behavior });
+      }
+    };
+
+    topBtn?.addEventListener("click", () => jumpTo("top"));
+    bottomBtn?.addEventListener("click", () => jumpTo("bottom"));
+
+    window.addEventListener("scroll", scheduleSync, { passive: true });
+    window.addEventListener("resize", scheduleSync, { passive: true });
+    window.addEventListener("petit:area-change", scheduleSync);
+    window.addEventListener("petit:panel-change", scheduleSync);
+
+    const messages = document.getElementById("messages");
+    messages?.addEventListener("scroll", scheduleSync, { passive: true });
+
+    if (typeof ResizeObserver === "function") {
+      const ro = new ResizeObserver(scheduleSync);
+      const main = document.querySelector(".universe-main");
+      if (main) ro.observe(main);
+      if (messages) ro.observe(messages);
+    }
+
+    scheduleSync();
+  };
+
   const initialize = () => {
     ensureStylesheet();
     installStatus();
     decorateNavigation();
+    installScrollJumpControls();
     syncState();
     observeShell();
 

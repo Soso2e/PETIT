@@ -152,6 +152,58 @@
 .development-repository-card strong span { float: right; padding-left: 1rem; }
 .development-repository-meta { font-size: .85rem; }
 .development-thread-list { display: grid; gap: .65rem; }
+.development-threads-more {
+  margin-top: .15rem;
+}
+.development-threads-more > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+  min-height: 44px;
+  padding: .55rem .95rem;
+  border: 1px dashed var(--ui-line-strong, var(--line, #45516b));
+  border-radius: .85rem;
+  background: var(--ui-soft, rgba(145, 157, 183, .06));
+  color: var(--ui-muted, #a8b2c4);
+  font-size: .88rem;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+}
+.development-threads-more > summary::-webkit-details-marker { display: none; }
+.development-threads-more > summary::before {
+  content: "›";
+  flex: none;
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: transform .18s ease;
+}
+.development-threads-more[open] > summary::before {
+  transform: rotate(90deg);
+}
+.development-threads-more > summary > span:first-child {
+  flex: 1 1 auto;
+}
+.development-threads-more > summary:hover,
+.development-threads-more > summary:focus-visible {
+  background: var(--surface-hover, rgba(145, 157, 183, .14));
+  border-color: var(--ui-accent, var(--accent, #8eaef9));
+  color: var(--ui-text, #f0f0ed);
+}
+.development-threads-more-count {
+  flex: none;
+  padding: .12rem .55rem;
+  border-radius: 999px;
+  background: var(--ui-soft, rgba(145, 157, 183, .14));
+  font-size: .78rem;
+  color: inherit;
+}
+.development-threads-more-list {
+  margin-top: .65rem;
+}
 .development-thread-preview { font-size: .92rem; color: var(--text-muted, #a8b2c4); line-height: 1.45; }
 .development-thread-card strong { font-size: .98rem; }
 .development-thread-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .6rem; }
@@ -758,7 +810,9 @@ body .development-file-row:disabled { cursor: default; opacity: 1; }
   .development-context-backdrop,
   .development-context-menu,
   .development-context-item,
-  .development-context-rename {
+  .development-context-rename,
+  .development-threads-more > summary,
+  .development-threads-more > summary::before {
     animation: none !important;
     transition: none !important;
   }

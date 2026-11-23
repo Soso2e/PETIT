@@ -609,3 +609,74 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
     bottom: calc(90px + env(safe-area-inset-bottom));
   }
 }
+
+/* Floating page top / bottom jump controls on the right edge */
+.petit-scroll-jump {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(var(--petit-bottom-nav-height, 84px) + 18px);
+  z-index: 190;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--ui-line-strong, rgb(255 255 255 / 14%));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-surface-solid, #151618) 84%, transparent);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 28%), inset 0 1px 0 rgb(255 255 255 / 6%);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.petit-scroll-jump[hidden] {
+  display: none !important;
+}
+html[data-petit-theme="light"] .petit-scroll-jump,
+html[data-theme="light"] .petit-scroll-jump {
+  background: color-mix(in srgb, var(--ui-surface-solid, #ffffff) 90%, transparent);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 14%);
+}
+.petit-scroll-jump__btn {
+  width: 38px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ui-text, #f0f0ed);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, opacity .15s ease, transform .12s ease;
+}
+.petit-scroll-jump__btn .petit-corner-icon {
+  width: 18px;
+  height: 18px;
+  flex-basis: 18px;
+}
+.petit-scroll-jump__btn:hover:not(:disabled),
+.petit-scroll-jump__btn:focus-visible:not(:disabled) {
+  background: var(--ui-soft, rgb(255 255 255 / 10%));
+  outline: none;
+}
+.petit-scroll-jump__btn:active:not(:disabled) {
+  transform: scale(.93);
+}
+.petit-scroll-jump__btn:disabled {
+  opacity: .28;
+  cursor: default;
+}
+@media (max-width: 959px) {
+  body.petit-chat-input-focused .petit-scroll-jump,
+  body.petit-keyboard-open .petit-scroll-jump {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .petit-scroll-jump,
+  .petit-scroll-jump__btn {
+    transition: none !important;
+  }
+}

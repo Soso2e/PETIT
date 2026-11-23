@@ -128,6 +128,18 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertIn('window.PetitChatLog', universe_app)
         self.assertIn('history: () => [...state.history]', universe_app)
 
+    def test_scroll_jump_controls_installed_on_right_edge(self) -> None:
+        shell_js = (FRONTEND / "petit-corner-shell.js").read_text(encoding="utf-8")
+        shell_css = (FRONTEND / "petit-corner-shell.css").read_text(encoding="utf-8")
+        self.assertIn("installScrollJumpControls", shell_js)
+        self.assertIn('data-scroll-jump="top"', shell_js)
+        self.assertIn('data-scroll-jump="bottom"', shell_js)
+        self.assertIn("ページの一番上へ", shell_js)
+        self.assertIn("ページの一番下へ", shell_js)
+        self.assertIn(".petit-scroll-jump", shell_css)
+        self.assertIn(".petit-scroll-jump__btn", shell_css)
+        self.assertIn("right: max(12px, env(safe-area-inset-right));", shell_css)
+
 
 if __name__ == "__main__":
     unittest.main()
