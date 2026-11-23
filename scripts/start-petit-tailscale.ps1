@@ -113,19 +113,24 @@ if (-not $started) {
 Write-Host "[OK] PETIT is ready"
 
 Write-Host ""
-Write-Host "[4/5] Starting Discord Bot..."
-$existingBot = Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -like "*backend.channels.discord*" } |
-    Select-Object -First 1
+Write-Host "[4/5] Checking Discord Bot..."
+$existingBot = $null
+for ($i = 1; $i -le 10; $i++) {
+    $existingBot = Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -like "*backend.channels.discord*" } |
+        Select-Object -First 1
+    if ($existingBot) {
+        break
+    }
+    Start-Sleep -Milliseconds 500
+}
 if ($existingBot) {
-    Write-Host "[OK] Discord Bot is already running (PID: $($existingBot.ProcessId))"
+    Write-Host "[OK] Discord Bot is running (PID: $($existingBot.ProcessId))"
 }
 else {
     $discordConfigured = & $PythonPath -c "import os; from dotenv import load_dotenv; load_dotenv(); print('1' if os.environ.get('DISCORD_BOT_TOKEN') and len(os.environ.get('PETIT_DISCORD_SERVICE_TOKEN','')) >= 32 else '0')"
     if ($discordConfigured -eq "1") {
-        $botArgs = @("-m", "backend.channels.discord")
-        $botProcess = Start-Process -FilePath $PythonPath -ArgumentList $botArgs -WorkingDirectory $ProjectPath -WindowStyle Minimized -PassThru
-        Write-Host "[OK] Discord Bot started (PID: $($botProcess.Id))"
+        Write-Host "[INFO] PETIT manages Discord Bot startup after the Core health check."
     }
     else {
         Write-Host "[SKIP] Discord Bot settings not found in .env"

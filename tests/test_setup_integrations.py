@@ -128,8 +128,11 @@ def test_managed_core_reloads_in_development_and_restarts_in_normal_mode(monkeyp
     from backend import managed_core
 
     monkeypatch.setattr(managed_core.sys, "argv", ["managed_core", "--port", "8765", "--env-file", "test config.env", "--reload"])
+    monkeypatch.delenv("DISCORD_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("PETIT_DISCORD_SERVICE_TOKEN", raising=False)
     worker = Mock(side_effect=[managed_core.RELOAD_EXIT_CODE, managed_core.RESTART_EXIT_CODE, 0])
     monkeypatch.setattr(managed_core.subprocess, "call", worker)
+    monkeypatch.setattr(managed_core, "_find_discord_bot_pids", lambda: [])
 
     assert managed_core.main() == 0
     base = [managed_core.sys.executable, "-m", "backend.managed_core", "--worker",
@@ -137,6 +140,71 @@ def test_managed_core_reloads_in_development_and_restarts_in_normal_mode(monkeyp
     assert [call.args[0] for call in worker.call_args_list] == [
         [*base, "--reload"], [*base, "--reload"], base,
     ]
+
+
+def test_managed_core_starts_and_restarts_discord_bot_on_core_restart(monkeypatch, tmp_path):
+    from backend import managed_core
+
+    env_file = tmp_path / "petit.env"
+    env_file.write_text(
+        "DISCORD_BOT_TOKEN=test-discord-token\n"
+        "PETIT_DISCORD_SERVICE_TOKEN=0123456789abcdef0123456789abcdef\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        managed_core.sys,
+        "argv",
+        ["managed_core", "--port", "8765", "--env-file", str(env_file), "--reload"],
+    )
+    monkeypatch.delenv("PETIT_CORE_URL", raising=False)
+    monkeypatch.setattr(managed_core, "_wait_for_core_health", lambda port, stop_event: True)
+    monkeypatch.setattr(managed_core, "_find_discord_bot_pids", lambda: [])
+
+    started = []
+
+    def fake_start(env):
+        proc = Mock()
+        proc.poll.return_value = None
+        proc.env = env
+        started.append(proc)
+        return proc
+
+    monkeypatch.setattr(managed_core, "_start_discord_bot", fake_start)
+
+    events = [managed_core.RELOAD_EXIT_CODE, managed_core.RESTART_EXIT_CODE, 0]
+
+    def fake_worker(cmd):
+        # Give the bot watcher thread a brief moment to run before returning the exit code.
+        deadline = time.monotonic() + 2.0
+        expected_starts = 1 if len(events) >= 2 else 2
+        while len(started) < expected_starts and time.monotonic() < deadline:
+            time.sleep(0.01)
+        return events.pop(0)
+
+    import time
+    monkeypatch.setattr(managed_core.subprocess, "call", fake_worker)
+
+    assert managed_core.main() == 0
+    assert len(started) == 2
+    assert started[0].env["PETIT_CORE_URL"] == "http://127.0.0.1:8765"
+    assert started[0].terminate.call_count == 1
+    assert started[1].terminate.call_count == 1
+
+
+def test_managed_core_leaves_external_discord_bot_running(monkeypatch):
+    import threading
+    from backend import managed_core
+
+    monkeypatch.setattr(managed_core, "_wait_for_core_health", lambda port, stop_event: True)
+    monkeypatch.setattr(managed_core, "_find_discord_bot_pids", lambda: [4242])
+    start = Mock()
+    monkeypatch.setattr(managed_core, "_start_discord_bot", start)
+    managed = [None]
+
+    managed_core._ensure_discord_bot_when_ready(8765, {}, threading.Event(), managed)
+
+    start.assert_not_called()
+    assert managed == [None]
 
 
 def test_remote_bootstrap_requires_host_token(monkeypatch):

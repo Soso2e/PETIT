@@ -216,7 +216,7 @@ def test_develop_direct_reviews_committed_native_cli_changes(repository, client,
     assert client.post("/api/coding/jobs/start", json=payload).json()["id"] == job["id"]
     assert jobs.pump()
     detail = jobs.get(job["id"])
-    assert observed["target"] == ("gpt-6.1-sol", "high")
+    assert observed["target"] == ("gpt-6.2-sol", "high")
     assert detail["status"] == "ready_for_review" and detail["tests"] == "not_verified", detail["error"]
     result = client.get(f"/api/coding/jobs/{job['id']}/diff").json()
     assert result["files"] == ["main.py"] and "+VALUE = 2" in result["diff"]

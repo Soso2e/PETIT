@@ -162,6 +162,7 @@ flowchart TD
     Resume --> Native
     Git --> Executor{実行方式}
     Executor --> Native[Codex / Antigravity / Claude Codeがリポジトリで直接調査・編集・検査・commit]
+    Native -.-> RemoteGit[変更完了後にpushとPR作成を案内 / mergeは依頼時のみ]
     Native -->|自然文の終了応答| Check{Core静的検査<br/>通常のGit改行設定で差分を検査}
     Native -->|失敗した場合は差分を保持| Error
     Native -.-> Progress

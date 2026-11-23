@@ -27,7 +27,7 @@ def test_auto_routes_lightweight_and_ranks_available_windows(monkeypatch):
     assert models.select("auto", "high")[:2] == ("antigravity_cli", "gemini-4-hydrogen-high")
     assert models.select("auto", "medium", lightweight=True)[:2] == ("antigravity_cli", "gemini-4-hydrogen-medium")
     assert models.select("antigravity_neon", "medium")[:2] == ("antigravity_cli", "gemini-4-neon-medium")
-    assert models.select("codex_sol", "low")[:2] == ("codex", "gpt-6.1-sol")
+    assert models.select("codex_sol", "low")[:2] == ("codex", "gpt-6.2-sol")
 
 
 def test_codex_reads_cli_account_and_inverts_used_percent(monkeypatch):
@@ -35,10 +35,15 @@ def test_codex_reads_cli_account_and_inverts_used_percent(monkeypatch):
     client.request.side_effect = [
         {"account": {"type": "chatgpt"}},
         {"ordinaryUsageAllowed": True, "rateLimits": {"primary": {"usedPercent": 3}, "secondary": {"usedPercent": 73}}},
+        {"data": [{"model": "gpt-6.1-sol"}]},
     ]
     monkeypatch.setattr(models.codex_brain, "RPC", Mock(return_value=client))
-    assert models._codex() == {"codex_sol": (True, 97, 27)}
+    assert models._codex() == {"codex_sol": (True, 97, 27, "gpt-6.1-sol")}
     client.close.assert_called_once()
+    monkeypatch.setattr(models, "PROBES", {"codex": lambda: {"codex_sol": (True, 97, 27, "gpt-6.1-sol")}})
+    quotas = models._collect(("codex",))
+    provider, model, meta = models._choose("codex_sol", "high", False, quotas)
+    assert (provider, model, meta["label"]) == ("codex", "gpt-6.1-sol", "Codex Sol 6.1")
 
 
 def test_auto_falls_back_when_hydrogen_unavailable(monkeypatch):
@@ -49,8 +54,8 @@ def test_auto_falls_back_when_hydrogen_unavailable(monkeypatch):
         "claude_opus": {"available": False, "five_hour": 0, "weekly": 0},
         "claude_sonnet": {"available": False, "five_hour": 0, "weekly": 0},
     })
-    assert models.select("auto", "medium")[:2] == ("codex", "gpt-6.1-sol")
-    assert models.select("auto", "medium", lightweight=True)[:2] == ("codex", "gpt-6.1-sol")
+    assert models.select("auto", "medium")[:2] == ("codex", "gpt-6.2-sol")
+    assert models.select("auto", "medium", lightweight=True)[:2] == ("codex", "gpt-6.2-sol")
 
 
 def test_claude_sonnet_shares_estimated_quota_and_is_selectable(monkeypatch):
@@ -146,7 +151,7 @@ def test_stale_result_never_turns_a_request_down_without_asking_the_cli(monkeypa
     clock[0] += 900
     with models._lock:
         models._refreshing = True  # as if a background refresh were still running: only the stale value is at hand
-    assert models.select("codex_sol", "low")[:2] == ("codex", "gpt-6.1-sol")
+    assert models.select("codex_sol", "low")[:2] == ("codex", "gpt-6.2-sol")
     assert len(probes) == 2
     models.invalidate()
     with models._lock:
