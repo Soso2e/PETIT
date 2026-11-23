@@ -175,7 +175,8 @@ def remove_extra_folder(payload: RepositoryExtra):
 @router.get("/usage")
 def usage():
     jobs.ensure_schema()
-    return {"models": development_models.usage()}
+    quotas = development_models.usage()
+    return {"models": quotas, "providers": development_models.provider_usage(quotas)}
 
 
 @router.get("/activity")

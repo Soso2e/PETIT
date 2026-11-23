@@ -100,7 +100,10 @@ def _record_model_call(route: str, target: dict[str, Any], model: str) -> None:
     metrics["profiles"].append(target["profile"])
 
 
-def _record_usage(data: dict[str, Any], target: dict[str, Any]) -> None:
+def _record_usage(data: dict[str, Any], target: dict[str, Any], route: str = "") -> None:
+    if target.get("provider") == "deepseek":
+        from . import deepseek_usage
+        deepseek_usage.record(data.get("usage"), model=target.get("model") or data.get("model") or "", route=route)
     metrics = _turn_metrics.get()
     if metrics is None:
         return
@@ -425,7 +428,7 @@ def chat_completion(
                     log.info("stream unsupported; falling back route=%s profile=%s", route, target["profile"])
             if data is None:
                 data = _post_completion(url=url, payload=payload, headers=headers, route=route, target=target)
-            _record_usage(data, target)
+            _record_usage(data, target, route=route)
             message = _parse_choice(data, target)
         except LMStudioError:
             if retry_count == 0:

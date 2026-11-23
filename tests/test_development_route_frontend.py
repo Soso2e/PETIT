@@ -19,6 +19,9 @@ def test_develop_starts_jobs_inside_the_main_tab():
     assert 'api("/jobs/start", "POST"' in script
     assert 'title: ""' in script and 'input.goal.slice(0, 120)' not in script
     assert 'api("/usage")' in script and 'api("/config/root", "POST"' in script
+    assert 'id="development-provider-usage"' in universe
+    assert "renderProviderUsage" in script
+    assert ".development-usage-strip" in read("development.css")
 
 
 def test_chat_and_develop_share_the_proposal_and_host_action_controls():

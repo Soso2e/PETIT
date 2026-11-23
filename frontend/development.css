@@ -111,6 +111,53 @@
 /* Develop #428: the composer is shared by Home, Repository and Thread levels. */
 .development-level[hidden], #development-thread-attach[hidden] { display: none !important; }
 .development-level { max-width: 1100px; margin: 0 auto; }
+.development-usage-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .5rem;
+  margin-bottom: .75rem;
+}
+.development-usage-chip {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  min-width: 0;
+  padding: .48rem .65rem;
+  border: 1px solid var(--ui-line, var(--line, #45516b));
+  border-radius: .75rem;
+  background: var(--ui-surface, var(--surface, rgba(145, 157, 183, .06)));
+}
+.development-usage-chip-head {
+  display: flex;
+  align-items: center;
+  gap: .38rem;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--ui-text, inherit);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.development-usage-dot {
+  width: .45rem;
+  height: .45rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: var(--ui-dim, #7e889b);
+}
+.development-usage-chip[data-status="ok"] .development-usage-dot { background: #34d399; }
+.development-usage-chip[data-status="limit"] .development-usage-dot { background: #f87171; }
+.development-usage-chip[data-status="unknown"] .development-usage-dot { background: #fbbf24; }
+.development-usage-chip-value {
+  font-size: .74rem;
+  color: var(--ui-muted, var(--text-muted, #a8b2c4));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 680px) {
+  .development-usage-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .development-head { max-width: 1100px; margin-inline: auto; }
 .development-hero {
   padding: clamp(1rem, 2.8vw, 2rem);

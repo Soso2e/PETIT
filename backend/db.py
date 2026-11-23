@@ -225,6 +225,20 @@ CREATE TABLE IF NOT EXISTS discord_admins (
     added_by    TEXT NOT NULL,
     created_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS deepseek_usage_log (
+    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at               TEXT NOT NULL,
+    day_key                  TEXT NOT NULL,
+    model                    TEXT NOT NULL,
+    route                    TEXT NOT NULL DEFAULT '',
+    prompt_tokens            INTEGER NOT NULL DEFAULT 0,
+    prompt_cache_hit_tokens  INTEGER NOT NULL DEFAULT 0,
+    prompt_cache_miss_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens        INTEGER NOT NULL DEFAULT 0,
+    cost_usd                 REAL NOT NULL DEFAULT 0.0
+);
+CREATE INDEX IF NOT EXISTS idx_deepseek_usage_day ON deepseek_usage_log(day_key);
 """
 
 
