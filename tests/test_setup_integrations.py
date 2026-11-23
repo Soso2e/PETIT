@@ -124,6 +124,21 @@ def test_core_restart_requires_admin_same_origin_and_current_instance(client, mo
     assert client.get("/api/setup/core").json()["restarting"] is True
 
 
+def test_managed_core_reloads_in_development_and_restarts_in_normal_mode(monkeypatch):
+    from backend import managed_core
+
+    monkeypatch.setattr(managed_core.sys, "argv", ["managed_core", "--port", "8765", "--env-file", "test config.env", "--reload"])
+    worker = Mock(side_effect=[managed_core.RELOAD_EXIT_CODE, managed_core.RESTART_EXIT_CODE, 0])
+    monkeypatch.setattr(managed_core.subprocess, "call", worker)
+
+    assert managed_core.main() == 0
+    base = [managed_core.sys.executable, "-m", "backend.managed_core", "--worker",
+            "--port", "8765", "--env-file", "test config.env"]
+    assert [call.args[0] for call in worker.call_args_list] == [
+        [*base, "--reload"], [*base, "--reload"], base,
+    ]
+
+
 def test_remote_bootstrap_requires_host_token(monkeypatch):
     from fastapi import FastAPI
     app = FastAPI(); app.include_router(setup_api.router); setup_api.install(app)

@@ -494,9 +494,9 @@
     while (Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 1500));
       const current = await api('/core', 'GET', undefined, AbortSignal.timeout(3000)).catch(() => null);
-      if (current?.managed && current.instance !== previous && !current.restarting) {
+      if (current?.managed && current.instance !== previous && current.mode === 'normal' && !current.restarting) {
         core = current;
-        notice('Coreの再起動が完了し、接続が戻りました。');
+        notice('Coreが通常モードで再起動し、接続が戻りました。');
         return;
       }
     }
