@@ -1290,12 +1290,66 @@
     finally { updatingJobs = false; }
   }
 
-  async function refreshUsage() {
-    if (!advanced.open || updatingUsage || Date.now() - lastUsage < 60000) return;
+  function formatUsd(amount) {
+    const value = Number(amount || 0);
+    if (!Number.isFinite(value) || value <= 0) return "$0.00";
+    return value < 0.01 ? "$" + value.toFixed(4) : "$" + value.toFixed(2);
+  }
+
+  function providerUsageSummary(item) {
+    if (item.key === "deepseek") {
+      if (!item.configured) return { status: "off", text: "未設定" };
+      const costText = "今日 " + formatUsd(item.today_cost_usd);
+      if (!item.permitted) return { status: "off", text: costText + " · 無効" };
+      return { status: "ok", text: costText };
+    }
+    if (!item.configured) return { status: "off", text: "未設定" };
+    if (!item.permitted) return { status: "off", text: "無効" };
+    if (item.authenticated === false) return { status: "unknown", text: "未認証" };
+    if (item.five_hour == null && item.weekly == null) return { status: "unknown", text: "確認待ち" };
+    const pct = (value) => (value == null ? "-" : value + "%");
+    const text = "5h " + pct(item.five_hour) + " · 週 " + pct(item.weekly) + (item.estimated ? " 推定" : "");
+    if (item.five_hour === 0 || item.weekly === 0) return { status: "limit", text };
+    return { status: item.available ? "ok" : "unknown", text };
+  }
+
+  function renderProviderUsage(providers) {
+    const host = $("development-provider-usage");
+    if (!host) return;
+    if (!Array.isArray(providers) || !providers.length) {
+      host.replaceChildren();
+      return;
+    }
+    const chips = providers.map((item) => {
+      const summary = providerUsageSummary(item);
+      const chip = document.createElement("div");
+      chip.className = "development-usage-chip";
+      chip.dataset.provider = item.key || "";
+      chip.dataset.status = summary.status;
+      const head = document.createElement("div");
+      head.className = "development-usage-chip-head";
+      const dot = document.createElement("span");
+      dot.className = "development-usage-dot";
+      dot.setAttribute("aria-hidden", "true");
+      const label = document.createElement("span");
+      label.textContent = item.label || item.key || "";
+      head.append(dot, label);
+      const value = document.createElement("div");
+      value.className = "development-usage-chip-value";
+      value.textContent = summary.text;
+      chip.append(head, value);
+      return chip;
+    });
+    host.replaceChildren(...chips);
+  }
+
+  async function refreshUsage(force = false) {
+    if (panel.hidden || updatingUsage || (!force && Date.now() - lastUsage < 60000)) return;
     updatingUsage = true;
     try {
       const response = await api("/usage");
-      $("development-usage").textContent = Object.values(response.models).map((item) =>
+      renderProviderUsage(response.providers);
+      $("development-usage").textContent = Object.values(response.models || {}).map((item) =>
         item.label + " " + quotaText(item) + (item.available ? "" : " · 利用可否を確認")).join(" ｜ ");
       lastUsage = Date.now();
     } catch (error) { report(error.message); }
@@ -1498,22 +1552,14 @@
     window.history.replaceState(window.history.state, "", url);
     void openThread(id);
   };
-  // Opening Develop renews the CLI quota cache behind the scenes, so the first request does not wait for the probes.
-  let lastWarm = 0;
-  const warmUsage = () => {
-    if (Date.now() - lastWarm < 60000) return;
-    lastWarm = Date.now();
-    void api("/usage").catch(() => {});
-  };
-  const refresh = () => {
-    warmUsage();
+  const refresh = (forceUsage = false) => {
     void refreshConfig();
     void refreshWorkspace();
     void refreshJobs();
-    void refreshUsage();
+    void refreshUsage(forceUsage);
     if (currentView === "thread" && currentThread) void openThread(currentThread.thread_id);
   };
-  $("development-refresh").addEventListener("click", refresh);
+  $("development-refresh").addEventListener("click", () => refresh(true));
   advanced.addEventListener("toggle", () => {
     if (advanced.open) { void refreshJobs(); void refreshUsage(); }
   });

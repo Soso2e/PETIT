@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 
-from . import antigravity_cli, antigravity_cli_brain, brain_priority, claude_code_brain, codex_brain, db, setup_store
+from . import antigravity_cli, antigravity_cli_brain, brain_priority, claude_code_brain, codex_brain, db, deepseek_usage, setup_store
 
 MODELS = {
     "claude_sonnet": ("claude_code", "sonnet", "Claude Sonnet 5.5"),
@@ -217,3 +217,46 @@ def _choose(key, effort, lightweight, quotas):
     provider, model, label = MODELS[key]
     return provider, model + "-" + effort if provider == "antigravity_cli" else model, {
         "model_key": key, "label": label, "effort": effort, "quota": quotas[key]}
+
+
+_PROVIDER_SUMMARY_ORDER = (
+    ("antigravity_cli", "Antigravity CLI", "antigravity_hydrogen"),
+    ("codex", "Codex CLI", "codex_sol"),
+    ("claude_code", "Claude Code", "claude_sonnet"),
+)
+
+
+def provider_usage(quotas=None):
+    """Return compact per-provider quota/cost summaries for the 4 Develop providers."""
+    data = setup_store.load()
+    resolved = usage() if quotas is None else quotas
+    providers = []
+    for key, label, model_key in _PROVIDER_SUMMARY_ORDER:
+        item = resolved.get(model_key) or {}
+        configured = bool(brain_priority.target(key, data).get("configured"))
+        permitted = bool(brain_priority.permitted(key, data))
+        providers.append({
+            "key": key,
+            "label": label,
+            "configured": configured,
+            "permitted": permitted,
+            "authenticated": item.get("authenticated"),
+            "available": bool(item.get("available")),
+            "five_hour": item.get("five_hour"),
+            "weekly": item.get("weekly"),
+            "estimated": bool(item.get("estimated")),
+        })
+
+    ds_configured = bool(brain_priority.target("deepseek", data).get("configured"))
+    ds_permitted = bool(brain_priority.permitted("deepseek", data))
+    ds_summary = deepseek_usage.today_summary()
+    providers.append({
+        "key": "deepseek",
+        "label": "DeepSeek",
+        "configured": ds_configured,
+        "permitted": ds_permitted,
+        "available": ds_configured and ds_permitted,
+        "today_cost_usd": ds_summary["cost_usd"],
+        "today_requests": ds_summary["requests"],
+    })
+    return providers

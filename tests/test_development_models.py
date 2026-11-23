@@ -165,3 +165,24 @@ def test_auto_prefers_claude_sonnet_over_opus_when_tied(monkeypatch):
     assert provider == "claude_code"
     assert model == "sonnet"
     assert selection["model_key"] == "claude_sonnet"
+
+
+def test_provider_usage_returns_four_providers_with_deepseek_cost(monkeypatch):
+    monkeypatch.setattr(models.setup_store, "load", lambda: {})
+    monkeypatch.setattr(models.brain_priority, "permitted", lambda provider, data: provider in {"antigravity_cli", "deepseek"})
+    monkeypatch.setattr(models.brain_priority, "target", lambda provider, data=None: {"configured": provider != "codex"})
+    monkeypatch.setattr(models.deepseek_usage, "today_summary", lambda: {"cost_usd": 0.042, "requests": 3, "tokens": 1000, "day": "2026-11-23"})
+
+    quotas = {
+        "antigravity_hydrogen": {"authenticated": True, "available": True, "five_hour": 95, "weekly": 80, "estimated": False},
+        "antigravity_neon": {"authenticated": True, "available": True, "five_hour": 95, "weekly": 80, "estimated": False},
+        "codex_sol": {"authenticated": None, "available": False, "five_hour": None, "weekly": None, "estimated": False},
+        "claude_sonnet": {"authenticated": True, "available": False, "five_hour": 0, "weekly": 70, "estimated": True},
+        "claude_opus": {"authenticated": True, "available": False, "five_hour": 0, "weekly": 70, "estimated": True},
+    }
+    providers = models.provider_usage(quotas)
+    assert [item["key"] for item in providers] == ["antigravity_cli", "codex", "claude_code", "deepseek"]
+    assert providers[0]["five_hour"] == 95 and providers[0]["weekly"] == 80
+    assert providers[1]["configured"] is False
+    assert providers[2]["estimated"] is True and providers[2]["permitted"] is False
+    assert providers[3]["today_cost_usd"] == 0.042 and providers[3]["available"] is True
