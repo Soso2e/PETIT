@@ -105,8 +105,12 @@ def session(request: Request):
 
 @router.get("/core")
 def core_status():
-    return {"managed": core_restart.managed, "instance": core_restart.instance,
-            "restarting": core_restart.requested.is_set()}
+    return {
+        "managed": core_restart.managed,
+        "instance": core_restart.instance,
+        "mode": "development" if core_restart.development_mode else "normal",
+        "restarting": core_restart.requested.is_set(),
+    }
 
 
 @router.post("/core/restart", status_code=202)

@@ -169,7 +169,7 @@ Invoke-RestMethod http://127.0.0.1:8000/api/health
 
 Windowsでは、`scripts/start-petit-tailscale.ps1` をPowerShellから実行すると、起動モード選択、Tailscale接続、PETIT起動、ヘルスチェック、Tailscale Serve設定、ブラウザ起動まで連続実行できます。LM Studioは先に起動し、モデルをロードしておいてください。Tailscale Serve開始時には管理者権限の確認が表示されます。
 
-このランチャーで起動すると、管理者設定の下部に「Coreを再起動」が表示されます。押すとCoreの接続がいったん切れ、ホスト上の親プロセスがCoreを起動し直します。同じ画面で接続の復旧を確認できます。実行中の処理は中断します。ローカル起動でも同じ機能を使うには、プロジェクトルートで `python -m backend.managed_core --port 8000` を実行します。開発時は `--reload` を追加します。
+このランチャーで起動すると、管理者設定の下部に「Coreを再起動」が表示されます。押すとCoreの接続がいったん切れ、ホスト上の親プロセスがCoreを通常モード（0、reloadなし）で起動し直します。開発モード（1）のファイル変更による自動リロードは開発モードを維持します。同じ画面で接続の復旧を確認できます。実行中の処理は中断します。ローカル起動でも同じ機能を使うには、プロジェクトルートで `python -m backend.managed_core --port 8000` を実行します。開発時は `--reload` を追加します。
 
 ```powershell
 cd "C:\#Project\Server\PersonalAssistant_PETIT"

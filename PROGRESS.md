@@ -9,7 +9,7 @@
 
 ## 次の判断に関わる未確認事項
 
-- **Coreの再起動**。Windowsの隔離Coreで、管理者設定からの応答受付、Coreのプロセス交代、同じブラウザ画面での復旧表示を確認した。このPCでは新しいランチャーのローカル・Tailscale応答を確認済み。Tailscale経由でボタンを押した際の復旧表示と、次回Windowsログオン時の起動を確認する。[#526](https://github.com/Soso2e/PETIT/issues/526)。
+- **Coreの再起動**。Windowsの隔離Coreで、管理者設定からの応答受付、開発モードから通常モード（0）へのプロセス交代、同じブラウザ画面での復旧表示を確認した。このPCでは新しいランチャーのローカル・Tailscale応答を確認済み。Tailscale経由でボタンを押した際の復旧表示と、次回Windowsログオン時の起動を確認する。[#526](https://github.com/Soso2e/PETIT/issues/526)。
 - **会話の速度**。稼働中の記録では、DeepSeek担当のTurnはモデル呼び出しの合計が中央値2.7秒・90%が6.2秒以内。開発の依頼は、登録名を現在状況で渡して一覧取得の1往復を省くようにした（[#491](https://github.com/Soso2e/PETIT/issues/491)。実モデルでの確認は隔離環境で1回のみ）。CLI担当のTurn（中央値17秒）は件数が少なく、[#381](https://github.com/Soso2e/PETIT/issues/381) の評価には追加の計測が要る。
 - **記憶の取り込みと整理**。会話の自動要約は1件の雑談で1か月以上止まっていた（[#487](https://github.com/Soso2e/PETIT/issues/487) で修正）。反映後は溜まった会話の要約が再開し、長く使える知識と判定されたものが記憶（`source=auto_knowledge`）へ入る。`/health` の `auto_summary` で未整理の件数を確認し、昇格された記憶の内容が妥当かを本人が確認する。既存の自動抽出（`auto_episode`）を整理する候補の本人確認も残る。自動想起はその後。[#446](https://github.com/Soso2e/PETIT/issues/446)・[記憶の仕様と確認手順](docs/core/renaissance-memory.md)。
 - **配布版・iPhoneの受入**。実サービスを使った配布版・iPhone PWAの確認項目は [#343](https://github.com/Soso2e/PETIT/issues/343) と [Desktopの受入台帳](docs/desktop/desktop-readiness.md) を参照。Desktopを配布する際は、現在値が異なる `VERSION`・Web・Desktop のバージョンを揃えてからリリース検査を通す。

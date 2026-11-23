@@ -12,17 +12,20 @@ import uvicorn
 from . import core_restart
 
 RESTART_EXIT_CODE = 75
+RELOAD_EXIT_CODE = 76
 
 
 async def serve(args):
     core_restart.managed = True
+    core_restart.development_mode = args.reload
+    reload_requested = asyncio.Event()
     server = uvicorn.Server(uvicorn.Config(
         "backend.main:app", host="127.0.0.1", port=args.port, env_file=args.env_file,
         timeout_graceful_shutdown=15,
     ))
 
     async def wait_for_restart():
-        while not core_restart.requested.is_set():
+        while not (core_restart.requested.is_set() or reload_requested.is_set()):
             await asyncio.sleep(0.2)
         # Give the HTTP response time to reach the browser before shutting down.
         await asyncio.sleep(0.5)
@@ -31,7 +34,7 @@ async def serve(args):
     async def watch_backend():
         from watchfiles import PythonFilter, awatch
         async for _ in awatch(Path(__file__).resolve().parent, watch_filter=PythonFilter()):
-            core_restart.requested.set()
+            reload_requested.set()
             return
 
     tasks = [asyncio.create_task(wait_for_restart())]
@@ -45,7 +48,9 @@ async def serve(args):
         await asyncio.gather(*tasks, return_exceptions=True)
     if not server.started:
         return 1
-    return RESTART_EXIT_CODE if core_restart.requested.is_set() else 0
+    if core_restart.requested.is_set():
+        return RESTART_EXIT_CODE
+    return RELOAD_EXIT_CODE if reload_requested.is_set() else 0
 
 
 def main():
@@ -58,11 +63,17 @@ def main():
     if args.worker:
         return asyncio.run(serve(args))
 
-    command = [sys.executable, "-m", "backend.managed_core", *sys.argv[1:], "--worker"]
+    command = [sys.executable, "-m", "backend.managed_core", "--worker", "--port", str(args.port)]
+    if args.env_file is not None:
+        command.extend(["--env-file", args.env_file])
+    reload_enabled = args.reload
     try:
         while True:
-            code = subprocess.call(command)
-            if code != RESTART_EXIT_CODE:
+            worker_command = [*command, "--reload"] if reload_enabled else command
+            code = subprocess.call(worker_command)
+            if code == RESTART_EXIT_CODE:
+                reload_enabled = False
+            elif code != RELOAD_EXIT_CODE:
                 return code
     except KeyboardInterrupt:
         return 130
