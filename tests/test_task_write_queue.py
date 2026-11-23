@@ -321,6 +321,63 @@ class TaskWriteQueueTests(unittest.TestCase):
             self.assertIsNotNone(parent_prop)
             self.assertEqual(parent_prop["relation"], [{"id": "parent-ext-1"}])
 
+    def test_remote_deleted_task_cannot_be_updated_or_found_by_title(self) -> None:
+        task_sync_queue.upsert_tasks_with_conflict_guard(
+            [remote_task(external_id="remote-deleted-1", title="削除済みタスク")]
+        )
+        with db.get_connection() as conn:
+            row = conn.execute("SELECT id FROM tasks_cache WHERE external_id='remote-deleted-1'").fetchone()
+            task_id = int(row["id"])
+            conn.execute(
+                "UPDATE tasks_cache SET remote_deleted_at='2026-08-02T20:20:22+00:00' WHERE id=?",
+                (task_id,),
+            )
+
+        by_title = tasks_phase2.update_task(title_query="削除済みタスク", status="Done")
+        self.assertFalse(by_title["updated"])
+        self.assertEqual(by_title["candidates"], [])
+
+        by_id = tasks_phase2.update_task(task_id=task_id, status="Done")
+        self.assertFalse(by_id["updated"])
+        self.assertIn("削除済み", by_id["error"])
+        self.assertEqual(self._operations(task_id), [])
+
+        with self.assertRaises(ValueError):
+            task_sync_queue.enqueue_update(task_id, {"status": "Done"}, base_source_updated_at=None)
+
+    def test_queued_update_for_archived_or_404_remote_page_is_superseded(self) -> None:
+        task_sync_queue.upsert_tasks_with_conflict_guard(
+            [
+                remote_task(external_id="remote-archived", title="ゴミ箱行き"),
+                remote_task(external_id="remote-404", title="完全削除"),
+            ]
+        )
+        with patch.object(config, "notion_configured", return_value=True):
+            r1 = tasks_phase2.update_task(external_id="remote-archived", status="Done")
+            r2 = tasks_phase2.update_task(external_id="remote-404", status="Done")
+        id1 = int(r1["task"]["id"])
+        id2 = int(r2["task"]["id"])
+
+        archived_remote = remote_task(external_id="remote-archived", title="ゴミ箱行き")
+        archived_remote["archived"] = True
+        with patch.object(notion_client, "get_task_page", return_value=archived_remote):
+            self.assertTrue(task_sync_queue.process_next())
+
+        with patch.object(
+            notion_client,
+            "get_task_page",
+            side_effect=NotionError("Notion API エラー 404: Could not find page"),
+        ):
+            self.assertTrue(task_sync_queue.process_next())
+
+        for task_id in (id1, id2):
+            cached = self._task(task_id)
+            self.assertEqual(cached["sync_status"], "synced")
+            self.assertIsNone(cached["sync_error"])
+            self.assertTrue(cached["remote_deleted_at"])
+            ops = self._operations(task_id)
+            self.assertEqual(ops[0]["status"], "superseded")
+
 
 if __name__ == "__main__":
     unittest.main()

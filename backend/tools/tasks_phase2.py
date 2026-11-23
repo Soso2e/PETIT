@@ -86,7 +86,7 @@ def _find_task(
             return dict(row) if row else None
         if title_query:
             rows = conn.execute(
-                "SELECT * FROM tasks_cache WHERE title LIKE ? "
+                "SELECT * FROM tasks_cache WHERE title LIKE ? AND COALESCE(remote_deleted_at, '') = '' "
                 "ORDER BY (status = ?) ASC, (due_date IS NULL), due_date ASC, id DESC LIMIT 2",
                 (f"%{title_query}%", config.NOTION_DONE_STATUS),
             ).fetchall()
@@ -102,7 +102,7 @@ def _candidates(title_query: str | None) -> list[dict[str, Any]]:
     with db.get_connection() as conn:
         rows = conn.execute(
             "SELECT id, title, status, due_date, area, project_id, source, sync_status "
-            "FROM tasks_cache WHERE title LIKE ? ORDER BY id DESC LIMIT 5",
+            "FROM tasks_cache WHERE title LIKE ? AND COALESCE(remote_deleted_at, '') = '' ORDER BY id DESC LIMIT 5",
             (f"%{title_query}%",),
         ).fetchall()
     return [dict(row) for row in rows]
@@ -422,6 +422,12 @@ def update_task(
             "updated": False,
             "error": "対象タスクを1件に絞れませんでした。",
             "candidates": _candidates(title_query),
+        }
+    if task.get("remote_deleted_at"):
+        return {
+            "updated": False,
+            "error": "Notion側で削除済みのタスクは更新できません。",
+            "task": task,
         }
 
     normalized_status = _normalize_status(status) if status is not None else None
