@@ -13,10 +13,11 @@ from . import antigravity_cli, antigravity_cli_brain, brain_priority, claude_cod
 MODELS = {
     "claude_sonnet": ("claude_code", "sonnet", "Claude Sonnet 5.5"),
     "claude_opus": ("claude_code", "opus", "Claude Opus 5.5"),
-    "codex_sol": ("codex", "gpt-6.1-sol", "Codex Sol 6.1"),
+    "codex_sol": ("codex", "gpt-6.2-sol", "Codex Sol 6.2"),
     "antigravity_hydrogen": ("antigravity_cli", "gemini-4-hydrogen", "Antigravity Hydrogen"),
     "antigravity_neon": ("antigravity_cli", "gemini-4-neon", "Antigravity Neon"),
 }
+CODEX_SOL_MODELS = {"gpt-6.2-sol": "Codex Sol 6.2", "gpt-6.1-sol": "Codex Sol 6.1"}
 EFFORTS = ("low", "medium", "high")
 # Probing three CLIs takes seconds. A recent result is served as is; an older one is still served
 # at once while a single background probe replaces it, so creating a job does not wait for the CLIs.
@@ -71,6 +72,9 @@ def _codex():
             if account.get("type") != "chatgpt":
                 return {}
             result = client.request("account/rateLimits/read", timeout=8)
+            catalog = client.request("model/list", {"limit": 100}, timeout=8)
+            available = {item.get("model") or item.get("id") for item in catalog.get("data", [])}
+            model = next((model for model in CODEX_SOL_MODELS if model in available), None)
         finally:
             client.close()
     limits = result.get("rateLimits") or {}
@@ -80,7 +84,7 @@ def _codex():
         return 100 - used if type(used) in (float, int) and 0 <= used <= 100 else None
 
     return {"codex_sol": (True, 0 if result.get("ordinaryUsageAllowed") is False else remaining("primary"),
-                          remaining("secondary"))}
+                          remaining("secondary"), model)}
 
 
 def _claude():
@@ -122,10 +126,14 @@ def _collect(eligible):
                 accounts.update(result)
     result = {}
     for key, (provider, _, label) in MODELS.items():
-        authenticated, five, weekly = accounts.get(key, (None, None, None))
+        authenticated, five, weekly, *resolved = accounts.get(key, (None, None, None))
         result[key] = {"provider": provider, "label": label, "authenticated": authenticated,
                        "five_hour": five, "weekly": weekly, "estimated": provider == "claude_code",
                        "available": provider in eligible and authenticated is True and five != 0 and weekly != 0}
+        if resolved:
+            model = resolved[0]
+            result[key].update(model=model, label=CODEX_SOL_MODELS.get(model, "Codex Sol"))
+            result[key]["available"] &= model is not None
     return result
 
 
@@ -215,6 +223,8 @@ def _choose(key, effort, lightweight, quotas):
     if not quotas[key]["available"]:
         raise ValueError("選択したCLIの接続・認証または利用枠を確認してください。")
     provider, model, label = MODELS[key]
+    model = quotas[key].get("model", model)
+    label = quotas[key].get("label", label)
     return provider, model + "-" + effort if provider == "antigravity_cli" else model, {
         "model_key": key, "label": label, "effort": effort, "quota": quotas[key]}
 
