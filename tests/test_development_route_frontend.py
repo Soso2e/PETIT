@@ -87,3 +87,17 @@ def test_island_click_opens_running_thread_without_lock_collision():
     assert "let threadRequestSeq = 0;" in script
     assert "if (reqSeq !== threadRequestSeq) return;" in script
     assert 'threads.find((item) => item.latest_job?.status === "running")' in script
+
+
+def test_develop_threads_collapse_after_five_into_toggle_with_preserved_state():
+    script = read("development.js")
+    assert "const VISIBLE_THREAD_LIMIT = 5;" in script
+    assert "renderCollapsibleThreadList" in script
+    assert "development-threads-more" in script
+    assert "expandedThreadGroups" in script
+    assert "過去のスレッドを表示" in script and "過去のスレッドを折りたたむ" in script
+    assert "innerHTML" not in script
+
+    css = read("development.css")
+    assert ".development-threads-more" in css
+    assert ".development-threads-more-list" in css

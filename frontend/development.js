@@ -495,6 +495,43 @@
   }
 
   const attentionPriority = { waiting_approval: 0, proposed: 1, ready_for_review: 2, checks_failed: 3 };
+  const VISIBLE_THREAD_LIMIT = 5;
+  const expandedThreadGroups = new Set();
+
+  function renderCollapsibleThreadList(threads, target, options = {}) {
+    if (!target || !target.isConnected) return;
+    target.replaceChildren();
+    const items = Array.isArray(threads) ? threads : [];
+    const visible = items.slice(0, VISIBLE_THREAD_LIMIT);
+    const overflow = items.slice(VISIBLE_THREAD_LIMIT);
+    for (const item of visible) threadCard(target, item, options);
+    if (!overflow.length) return;
+
+    const groupKey = options.groupKey || target.id || "";
+    const details = append(target, "details", "");
+    details.className = "development-threads-more";
+    if (groupKey && expandedThreadGroups.has(groupKey)) details.open = true;
+
+    const summary = append(details, "summary", "");
+    const label = append(summary, "span", "");
+    const countBadge = append(summary, "span", overflow.length + "件");
+    countBadge.className = "development-threads-more-count";
+    const syncSummary = () => {
+      label.textContent = details.open ? "過去のスレッドを折りたたむ" : "過去のスレッドを表示";
+    };
+    syncSummary();
+    details.addEventListener("toggle", () => {
+      if (groupKey) {
+        if (details.open) expandedThreadGroups.add(groupKey);
+        else expandedThreadGroups.delete(groupKey);
+      }
+      syncSummary();
+    });
+
+    const list = append(details, "div", "");
+    list.className = "development-thread-list development-threads-more-list";
+    for (const item of overflow) threadCard(list, item, options);
+  }
 
   function repoLabel(repository) {
     if (!repository) return "PC全体";
@@ -862,22 +899,22 @@
     target.replaceChildren();
     section.hidden = items.length === 0;
     if (count) count.textContent = items.length ? items.length + "件" : "";
-    for (const item of items) threadCard(target, item, { showRepository: true });
+    renderCollapsibleThreadList(items, target, { showRepository: true, groupKey: "attention" });
   }
 
-  function renderThreadList(threads, target) {
+  function renderThreadList(threads, target, groupKey = "") {
     if (!target || !target.isConnected) return;
     target.replaceChildren();
     if (!threads.length) {
       empty(target, "開発チャットはまだありません。上の入力欄から始められます。");
       return;
     }
-    for (const item of threads) threadCard(target, item);
+    renderCollapsibleThreadList(threads, target, { groupKey: groupKey || target.id || "" });
   }
 
   async function loadThreads(repository, target) {
     const response = await api("/threads?repository=" + encodeURIComponent(repository));
-    renderThreadList(response.threads, target);
+    renderThreadList(response.threads, target, "repo:" + repository);
   }
 
   function renderRepositories() {
@@ -925,7 +962,7 @@
       if (currentView === "home") {
         const all = await api("/threads");
         renderAttentionThreads(all.threads);
-        renderThreadList(all.threads.filter((item) => !item.repository), $("development-loose-threads"));
+        renderThreadList(all.threads.filter((item) => !item.repository), $("development-loose-threads"), "loose");
       } else if (currentView === "repo") {
         renderCurrentRepository();
         await loadThreads(currentRepo, $("development-repo-threads"));
