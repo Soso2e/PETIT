@@ -71,20 +71,20 @@ Write-Host "[OK] Tailscale connected"
 
 Write-Host ""
 Write-Host "[2/5] Starting PETIT..."
-$uvicornArgs = @(
-    "-m", "uvicorn", "backend.main:app",
-    "--host", "127.0.0.1", "--port", $Port,
+$coreArgs = @(
+    "-m", "backend.managed_core",
+    "--port", $Port,
     "--env-file", ".env"
 )
 if ($mode -eq "1") {
-    $uvicornArgs += @("--reload", "--reload-dir", "backend")
+    $coreArgs += "--reload"
     Write-Host "Mode: DEVELOPMENT / reload ON (watch backend/ only)"
 }
 else {
     Write-Host "Mode: NORMAL / reload OFF"
 }
 
-$serverProcess = Start-Process -FilePath $PythonPath -ArgumentList $uvicornArgs -WorkingDirectory $ProjectPath -PassThru
+$serverProcess = Start-Process -FilePath $PythonPath -ArgumentList $coreArgs -WorkingDirectory $ProjectPath -PassThru
 Write-Host "[OK] PETIT process started (PID: $($serverProcess.Id))"
 
 Write-Host ""
@@ -106,7 +106,7 @@ for ($i = 1; $i -le 30; $i++) {
 Write-Host ""
 if (-not $started) {
     if (-not $serverProcess.HasExited) {
-        Stop-Process -Id $serverProcess.Id -Force
+        & taskkill.exe /PID $serverProcess.Id /T /F | Out-Null
     }
     Stop-WithMessage "PETIT health check failed: $LocalUrl/api/health"
 }

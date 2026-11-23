@@ -485,6 +485,20 @@ def test_schema_migration_task_id_nullable(tmp_path, monkeypatch):
         assert new_row == ("job-new", None)
 
 
+def test_checks_respect_global_autocrlf_and_still_detect_added_whitespace(repository, tmp_path, monkeypatch):
+    gitconfig = tmp_path / "gitconfig"
+    gitconfig.write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(gitconfig))
+    edited = repository / "notes.txt"
+    edited.write_bytes(b"unchanged trailing space  \nold text\n")
+    jobs.git(repository, "add", "--", edited.name)
+    jobs.git(repository, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "baseline whitespace")
+    edited.write_bytes(b"unchanged trailing space  \r\nnew text\r\n")
+    assert jobs.checks(repository)["ok"]
+    edited.write_bytes(b"unchanged trailing space  \r\nnew text  \r\n")
+    assert jobs.checks(repository)["static"] == [{"kind": "diff_whitespace", "ok": False}]
+
+
 def test_checks_and_diff_skip_protected_untracked_paths(repository, client):
     admin(client)
     head = jobs.git(repository, "rev-parse", "HEAD").strip()

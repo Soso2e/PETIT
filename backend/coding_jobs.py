@@ -115,12 +115,29 @@ def ensure_schema():
         _migrate_task_id_nullable(connection)
 
 
+class GitCommandError(ValueError):
+    def __init__(self, returncode):
+        super().__init__("Git操作に失敗しました。リポジトリと開始コミットを確認してください。")
+        self.returncode = returncode
+
+
 def git(root, *args):
     from .antigravity_cli_brain import environment
-    env = {**environment(), "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0"}
-    result = subprocess.run(["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-C", str(root), *args],
-        capture_output=True, timeout=45, env=env, **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
-    if result.returncode:raise ValueError("Git操作に失敗しました。リポジトリと開始コミットを確認してください。")
+    command = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-C", str(root)]
+    env = {**environment(), "GIT_TERMINAL_PROMPT": "0"}
+    options = {"capture_output": True, "timeout": 45}
+    if os.name == "nt":
+        options["creationflags"] = subprocess.CREATE_NO_WINDOW
+    # Read the user's line-ending setting without enabling their Git drivers or hooks.
+    if "diff" in args:
+        configured = subprocess.run([*command, "config", "--get", "core.autocrlf"], env=env, **options)
+        autocrlf = configured.stdout.strip().lower()
+        if configured.returncode == 0 and autocrlf in {b"true", b"false", b"input"}:
+            command += ["-c", f"core.autocrlf={autocrlf.decode('ascii')}"]
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+    result = subprocess.run([*command, *args], env=env, **options)
+    if result.returncode:
+        raise GitCommandError(result.returncode)
     return result.stdout.decode("utf-8", "replace")
 
 
@@ -495,8 +512,13 @@ def checks(workspace, base="HEAD"):
             proc = subprocess.run(["node", "--check", str(path)], cwd=workspace, env=environment(), capture_output=True, timeout=15,
                 **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
             result.append({"path": name, "ok": proc.returncode == 0, "kind": "javascript_syntax"})
-    try:git(workspace, "-c", "core.whitespace=cr-at-eol", "diff", "--no-ext-diff", "--check", base);result.append({"kind": "diff_whitespace", "ok": True})
-    except ValueError:result.append({"kind": "diff_whitespace", "ok": False})
+    try:
+        git(workspace, "-c", "core.whitespace=cr-at-eol", "diff", "--no-ext-diff", "--check", base, "--")
+        result.append({"kind": "diff_whitespace", "ok": True})
+    except GitCommandError as exc:
+        if exc.returncode != 2:
+            raise
+        result.append({"kind": "diff_whitespace", "ok": False})
     return {"ok": all(x["ok"] for x in result), "static": result, "tests": "not_run", "host": "not_verified"}
 
 

@@ -356,7 +356,10 @@
       link.href = "/static/universe.html?view=development";
     } else {
       const testLabel = { not_run: "未実施", not_verified: "CLIの報告を参照", passed: "成功", failed: "失敗" };
-      append(box, "p", "コマンド検証 " + (testLabel[job.tests] || "不明") + " / 実アプリ動作 未確認");
+      const staticChecks = job.checks?.static;
+      const staticLabel = Array.isArray(staticChecks) ? "Core静的チェック " +
+        (staticChecks.every(check => check.ok) ? "成功" : "失敗") + " / " : "";
+      append(box, "p", staticLabel + "コマンド検証 " + (testLabel[job.tests] || "不明") + " / 実アプリ動作 未確認");
       if (job.workspace && !external) mountChanges(box, job, onError);
       const details = append(box, "details", "");
       append(details, "summary", "進捗・チェック結果");

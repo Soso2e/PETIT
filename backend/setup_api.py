@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, ConfigDict
 
-from . import setup_store as settings, service_sync, google_services, brain_priority
+from . import setup_store as settings, service_sync, google_services, brain_priority, core_restart
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 _attempts: dict[str, list[float]] = {}
@@ -84,6 +84,10 @@ class Password(BaseModel):
     bootstrap_token: str = Field(default="", max_length=256)
 
 
+class CoreRestartRequest(BaseModel):
+    instance: str = Field(pattern="^[0-9a-f]{32}$")
+
+
 def _session_response(request, password):
     token = settings.authenticate(password)
     if not token:
@@ -97,6 +101,22 @@ def _session_response(request, password):
 def session(request: Request):
     return {"initialized": settings.initialized(), "completed": settings.load()["completed"],
             "authenticated": settings.valid_session(request.cookies.get("petit_admin", ""))}
+
+
+@router.get("/core")
+def core_status():
+    return {"managed": core_restart.managed, "instance": core_restart.instance,
+            "restarting": core_restart.requested.is_set()}
+
+
+@router.post("/core/restart", status_code=202)
+def restart_core(payload: CoreRestartRequest):
+    if not core_restart.managed:
+        raise HTTPException(409, "再起動対応のランチャーでPETIT Coreを起動してください。")
+    if payload.instance != core_restart.instance:
+        raise HTTPException(409, "Coreの起動状態が変わりました。画面を更新してください。")
+    core_restart.requested.set()
+    return core_status()
 
 
 @router.post("/bootstrap")

@@ -162,12 +162,13 @@ flowchart TD
     Resume --> Native
     Git --> Executor{実行方式}
     Executor --> Native[Codex / Antigravity / Claude Codeがリポジトリで直接調査・編集・検査・commit]
-    Native -->|自然文の終了応答| Check{検査結果}
+    Native -->|自然文の終了応答| Check{Core静的検査<br/>通常のGit改行設定で差分を検査}
     Native -->|失敗した場合は差分を保持| Error
     Native -.-> Progress
     Native -.-> Session[(coding_job_sessions にCLIのセッションIDを保存)]
     Check -->|成功| Review[ready_for_review]
-    Check -->|失敗| FailedChecks[checks_failed]
+    Check -->|構文・差分の問題| FailedChecks[checks_failed]
+    Check -->|Git実行エラー| Error
     Mode -->|PC| PC[範囲内の検索・読み取りと scratch へのコピー / 許可済みコマンドは即実行]
     PC -->|未登録コマンドや元ファイルへの直接操作| Pending[waiting_approval と操作カード]
     Pending -->|承認を一度消費 / 今後も許可はホワイトリスト追加| Effect[対象と内容を再検証し Core が実行]
