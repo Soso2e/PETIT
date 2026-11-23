@@ -494,16 +494,44 @@
     moveComposer(slot, view === "home" ? "" : currentRepo);
   }
 
-  const attentionPriority = { waiting_approval: 0, proposed: 1, ready_for_review: 2, checks_failed: 3 };
+  const attentionPriority = {
+    waiting_approval: 0, running: 1, queued: 2, proposed: 3, ready_for_review: 4, checks_failed: 5,
+  };
   const VISIBLE_THREAD_LIMIT = 5;
   const expandedThreadGroups = new Set();
+  const isActiveThread = (item) => active.has(item?.latest_job?.status);
+
+  function partitionVisibleThreads(threads, { limit = VISIBLE_THREAD_LIMIT, hoistActive = true } = {}) {
+    const items = Array.isArray(threads) ? threads : [];
+    if (hoistActive) {
+      const activeItems = [];
+      const restItems = [];
+      for (const item of items) {
+        if (isActiveThread(item)) activeItems.push(item);
+        else restItems.push(item);
+      }
+      const remainingSlots = Math.max(0, limit - activeItems.length);
+      return {
+        visible: [...activeItems, ...restItems.slice(0, remainingSlots)],
+        overflow: restItems.slice(remainingSlots),
+      };
+    }
+    const visible = [];
+    const overflow = [];
+    for (const item of items) {
+      if (visible.length < limit || isActiveThread(item)) visible.push(item);
+      else overflow.push(item);
+    }
+    return { visible, overflow };
+  }
 
   function renderCollapsibleThreadList(threads, target, options = {}) {
     if (!target || !target.isConnected) return;
     target.replaceChildren();
-    const items = Array.isArray(threads) ? threads : [];
-    const visible = items.slice(0, VISIBLE_THREAD_LIMIT);
-    const overflow = items.slice(VISIBLE_THREAD_LIMIT);
+    const { visible, overflow } = partitionVisibleThreads(threads, {
+      limit: VISIBLE_THREAD_LIMIT,
+      hoistActive: options.hoistActive !== false,
+    });
     for (const item of visible) threadCard(target, item, options);
     if (!overflow.length) return;
 
@@ -841,11 +869,15 @@
     const latest = data.latest_job;
     const status = latest?.status || "";
     const triage = data.triage_status || "active";
+    const isRunning = active.has(status);
     const needsAttention = Object.hasOwn(attentionPriority, status);
     const control = append(parent, "button", "");
     control.type = "button";
     control.className = "development-thread-card";
-    if (needsAttention) {
+    if (isRunning) {
+      control.dataset.active = "true";
+      control.dataset.status = status;
+    } else if (needsAttention) {
       control.dataset.attention = "true";
       control.dataset.status = status;
     }
@@ -855,7 +887,7 @@
     const head = append(control, "div", "");
     head.className = "development-thread-card-head";
     append(head, "strong", data.title || "名称未設定の開発チャット");
-    if (needsAttention || triageLabels[triage]) {
+    if (isRunning || needsAttention || triageLabels[triage]) {
       const badges = append(head, "div", "");
       badges.className = "development-thread-badges";
       if (triageLabels[triage]) {
@@ -863,7 +895,11 @@
         triageBadge.className = "development-triage-badge";
         triageBadge.dataset.triage = triage;
       }
-      if (needsAttention) {
+      if (isRunning) {
+        const activeBadge = append(badges, "span", statusLabel(status));
+        activeBadge.className = "development-active-badge";
+        activeBadge.dataset.status = status;
+      } else if (needsAttention) {
         const badge = append(badges, "span", statusLabel(status));
         badge.className = "development-attention-badge";
         badge.dataset.status = status;
@@ -899,7 +935,7 @@
     target.replaceChildren();
     section.hidden = items.length === 0;
     if (count) count.textContent = items.length ? items.length + "件" : "";
-    renderCollapsibleThreadList(items, target, { showRepository: true, groupKey: "attention" });
+    renderCollapsibleThreadList(items, target, { showRepository: true, groupKey: "attention", hoistActive: false });
   }
 
   function renderThreadList(threads, target, groupKey = "") {

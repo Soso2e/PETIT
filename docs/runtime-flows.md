@@ -513,7 +513,7 @@ flowchart TD
     Settings --> Models[公式agy models / Codex model list / 選択をPETIT設定へ保存]
     Priority --> Turn[既存Thread / Turn / Provider pin]
     Turn --> Step[Turn専用の空workspace / finish専用Agent / stdin NDJSON]
-    Step --> Official[未改変の公式agy / 本人のCLI管理認証]
+    Step --> Official[公式agy / 本人のCLI管理認証 / commandをCLI権限設定で拒否]
     Official --> JSON[content / PETIT Tool要求JSONを厳格検証]
     JSON -->|返答| Save[既存conversations / Events]
     JSON -->|Tool要求| Core[既存公開catalog / schema / risk / receipt]

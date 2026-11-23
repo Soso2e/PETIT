@@ -273,6 +273,7 @@ def completion(target: dict, messages: list, catalog: list, check, *, on_progres
         prepare(root)
         command = [binary, "--input-format", "stream-json", "--output-format", "stream-json",
                    "--agent", AGENT, "--mode=plan", "--sandbox",
+                   "--settings", '{"permissions":{"deny":["command(*)"]}}',
                    "--json-schema", store.encode(REPLY_SCHEMA)]
         if target.get("model"):
             command += ["--model", target["model"]]

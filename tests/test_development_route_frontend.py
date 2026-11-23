@@ -95,6 +95,7 @@ def test_island_click_opens_running_thread_without_lock_collision():
 def test_develop_threads_collapse_after_five_into_toggle_with_preserved_state():
     script = read("development.js")
     assert "const VISIBLE_THREAD_LIMIT = 5;" in script
+    assert "partitionVisibleThreads" in script
     assert "renderCollapsibleThreadList" in script
     assert "development-threads-more" in script
     assert "expandedThreadGroups" in script
@@ -104,3 +105,22 @@ def test_develop_threads_collapse_after_five_into_toggle_with_preserved_state():
     css = read("development.css")
     assert ".development-threads-more" in css
     assert ".development-threads-more-list" in css
+
+
+def test_active_developing_threads_stay_visible_and_highlighted_in_thread_lists():
+    universe = read("universe.html")
+    assert "<h2>開発中・確認待ち</h2>" in universe
+
+    script = read("development.js")
+    priority_block = script.split("const attentionPriority = {")[1].split("};")[0]
+    for status in ("waiting_approval", "running", "queued", "proposed", "ready_for_review", "checks_failed"):
+        assert status + ":" in priority_block
+    assert "const isActiveThread = (item) => active.has(item?.latest_job?.status);" in script
+    assert "if (visible.length < limit || isActiveThread(item)) visible.push(item);" in script
+    assert 'control.dataset.active = "true";' in script
+    assert 'activeBadge.className = "development-active-badge";' in script
+
+    css = read("development.css")
+    assert ".development-active-badge" in css
+    assert '.development-thread-card[data-active="true"]' in css
+    assert '.development-active-badge[data-status="running"]::before' in css
