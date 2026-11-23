@@ -17,6 +17,7 @@ const assetUrl = (path) => {
 const SHELL = [
   "/static/setup.html",
   "/static/setup.js",
+  "/static/core-restart.js",
   "/static/setup.css",
   "/static/setup-gate.js",
   "/static/markdown.js",

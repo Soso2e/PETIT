@@ -88,7 +88,7 @@
     const panels = document.createElement("div");
     panels.className = "petit-dock-panels";
     panels.innerHTML = `
-      <section class="petit-dock-panel" aria-label="Utilityメニュー" aria-hidden="true">
+      <section class="petit-dock-panel" aria-label="Moreメニュー" aria-hidden="true" inert>
         <div class="petit-dock-head petit-dock-it" style="--i:0">
           <h3>Utility</h3>
           <small data-dock-version>${window.PETIT_VERSION || ""}</small>
@@ -126,6 +126,17 @@
             </span>
             <span class="petit-dock-row__meta" data-dock-sync-label>確認中</span>
           </button>
+          <div class="petit-dock-it" style="--i:5">
+            <button type="button" class="petit-dock-row petit-dock-restart" data-dock-restart
+                    aria-describedby="petit-dock-restart-status">
+              <span class="petit-dock-row__left">${svg("sync")}<span>Coreを再起動</span></span>
+              <span class="petit-dock-row__meta">通常モード</span>
+            </button>
+            <div class="petit-dock-restart-feedback">
+              <span id="petit-dock-restart-status" role="status"></span>
+              <a href="/static/setup.html?next=/static/universe.html" data-dock-restart-login hidden>管理者ログインを開く</a>
+            </div>
+          </div>
         </div>
       </section>
     `;
@@ -196,7 +207,7 @@
 
     const cx = (i) => TAB_W / 2 + i * (TAB_W + GAP);
     const expW = () => Math.min(360, Math.max(COL_W, window.innerWidth - 24));
-    const measurePanelH = () => Math.min(320, utilityPanel.offsetHeight || 236);
+    const measurePanelH = () => utilityPanel.offsetHeight || 236;
 
     const L = S(cx(0) - TAB_W / 2);
     const R = S(cx(0) + TAB_W / 2);
@@ -311,6 +322,7 @@
       const utilBtn = btns[N - 1];
       utilBtn?.setAttribute("aria-expanded", String(v));
       utilityPanel.setAttribute("aria-hidden", String(!v));
+      utilityPanel.inert = !v;
 
       if (v) {
         syncUtilityMeta();
@@ -463,6 +475,30 @@
     panels.querySelector("[data-dock-sync]")?.addEventListener("click", () => {
       setExpanded(false);
       document.getElementById("sync-pill")?.click();
+    });
+
+    const restartButton = panels.querySelector("[data-dock-restart]");
+    const restartStatus = panels.querySelector("#petit-dock-restart-status");
+    const restartLogin = panels.querySelector("[data-dock-restart-login]");
+    const showRestartStatus = (message, loginRequired = false) => {
+      restartStatus.textContent = message;
+      restartLogin.hidden = !loginRequired;
+      if (expanded) {
+        H.t = DOCK_H + measurePanelH();
+        wake();
+      }
+    };
+    restartButton.addEventListener("click", async () => {
+      restartButton.disabled = true;
+      showRestartStatus("接続を確認しています…");
+      try {
+        await window.PetitCoreRestart.restart(() => showRestartStatus("Coreを再起動しています…"));
+        showRestartStatus("通常モードで復旧しました。");
+      } catch (error) {
+        showRestartStatus(error.message, error.status === 401);
+      } finally {
+        restartButton.disabled = false;
+      }
     });
 
     // Outside click & Escape

@@ -27,7 +27,6 @@
   };
 
   let state, session, step = 0, order = [], notionItems = [], notionCursor = null, dragging = null, acpState = null;
-  let core;
   let busyCount = 0;
   const noticeEl = $('notice');
   const nativeTextContent = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
@@ -60,13 +59,12 @@
     el.dataset.tone = tone;
   }
 
-  async function api(path, method = 'GET', body, signal) {
+  async function api(path, method = 'GET', body) {
     const response = await fetch('/api/setup' + path, {
       method,
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-PETIT-Request': '1' },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : data.error || '操作を完了できませんでした。接続・認証・入力を確認してください。');
@@ -476,31 +474,17 @@
     state = await api('/config');
     try { acpState = await api('/antigravity-acp'); } catch { acpState = null; }
     if ($('restart-core')) {
-      core = await api('/core').catch(() => null);
+      const core = await window.PetitCoreRestart?.status().catch(() => null);
       $('restart-core').hidden = !core?.managed;
     }
     render();
   }
 
   action($('restart-core'), async () => {
-    const previous = core.instance;
-    notice('Coreを再起動しています。接続が戻るまでこの画面でお待ちください。');
-    try {
-      await api('/core/restart', 'POST', { instance: previous }, AbortSignal.timeout(5000));
-    } catch (error) {
-      if (!(error instanceof TypeError) && error.name !== 'TimeoutError' && error.name !== 'AbortError') throw error;
-    }
-    const deadline = Date.now() + 90000;
-    while (Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const current = await api('/core', 'GET', undefined, AbortSignal.timeout(3000)).catch(() => null);
-      if (current?.managed && current.instance !== previous && current.mode === 'normal' && !current.restarting) {
-        core = current;
-        notice('Coreが通常モードで再起動し、接続が戻りました。');
-        return;
-      }
-    }
-    throw new Error('再起動後の接続を確認できませんでした。ホストのCore起動ログを確認してください。');
+    await window.PetitCoreRestart.restart(() => {
+      notice('Coreを再起動しています。接続が戻るまでこの画面でお待ちください。');
+    });
+    notice('Coreが通常モードで再起動し、接続が戻りました。');
   });
 
   action($('antigravity-cli-diagnose'), async () => {
