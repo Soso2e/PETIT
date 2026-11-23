@@ -36,6 +36,7 @@ def test_cli_chat_and_replay(selected, monkeypatch):
     assert invoke.call_count == 1
     command = invoke.call_args.args[0]
     assert "--agent" in command and "--sandbox" in command and "--mode=plan" in command
+    assert command[command.index("--settings") + 1] == '{"permissions":{"deny":["command(*)"]}}'
     assert "合成入力" not in " ".join(command) and "--dangerously-skip-permissions" not in command
     with db.get_connection() as connection:
         assert connection.execute("SELECT count(*) FROM turn_events WHERE type='antigravity_cli_step'").fetchone()[0] == 1
