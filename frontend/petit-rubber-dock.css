@@ -159,6 +159,9 @@ html[data-theme="light"] .petit-rubber-dock {
 
 .petit-dock-panel {
   padding: 18px 18px 8px;
+  max-height: min(360px, calc(100dvh - 84px - env(safe-area-inset-bottom)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   pointer-events: none;
 }
 
@@ -320,6 +323,24 @@ html[data-theme="light"] .petit-rubber-dock {
   font-size: 11.5px;
   color: var(--ui-muted);
   white-space: nowrap;
+}
+
+.petit-dock-restart {
+  width: 100%;
+}
+
+.petit-dock-restart:disabled {
+  cursor: wait;
+}
+
+.petit-dock-restart-feedback {
+  margin-inline: 10px;
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+
+.petit-dock-restart-feedback a {
+  color: var(--ui-accent);
 }
 
 .petit-dock-row kbd {

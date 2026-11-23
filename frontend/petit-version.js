@@ -1,5 +1,5 @@
-globalThis.PETIT_VERSION = "v0.76.1";
-globalThis.PETIT_ASSET_VERSION = "0.76.1";
+globalThis.PETIT_VERSION = "v0.76.2";
+globalThis.PETIT_ASSET_VERSION = "0.76.2";
 
 if (typeof window !== "undefined") {
   window.PETIT_VERSION = globalThis.PETIT_VERSION;
@@ -121,6 +121,7 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
       loadStylesheet("/static/universe-3d-foundation.css", "universe-3d-foundation");
       loadStylesheet("/static/petit-rubber-dock.css", "rubber-dock-style");
       loadScript("/static/petit-corner-shell.js", "corner-shell");
+      loadScript("/static/core-restart.js", "core-restart");
       loadScript("/static/petit-rubber-dock.js", "rubber-dock");
       installDeferredWebGL();
     };

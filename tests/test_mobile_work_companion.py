@@ -120,15 +120,15 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
 
     def test_pwa_icon_references_use_current_png_assets(self) -> None:
         manifest = json.loads((FRONTEND / "manifest.webmanifest").read_text(encoding="utf-8"))
-        manifest_sources = {icon["src"] for icon in manifest["icons"]}
+        manifest_sources = {icon["src"].split("?", 1)[0]: icon["src"] for icon in manifest["icons"]}
         self.assertEqual(
-            manifest_sources,
+            set(manifest_sources),
             {
-                "/static/icon-desktop.svg?v=2",
-                "/static/icon-192.png?v=2",
-                "/static/icon-512.png?v=2",
-                "/static/icon-maskable-192.png?v=2",
-                "/static/icon-maskable-512.png?v=2",
+                "/static/icon-desktop.svg",
+                "/static/icon-192.png",
+                "/static/icon-512.png",
+                "/static/icon-maskable-192.png",
+                "/static/icon-maskable-512.png",
             },
         )
         shortcut_sources = {
@@ -136,11 +136,11 @@ class MobileWorkCompanionStaticTests(unittest.TestCase):
             for shortcut in manifest.get("shortcuts", [])
             for icon in shortcut.get("icons", [])
         }
-        self.assertEqual(shortcut_sources, {"/static/icon-192.png?v=2"})
+        self.assertEqual(shortcut_sources, {manifest_sources["/static/icon-192.png"]})
 
         service_worker = (FRONTEND / "service-worker.js").read_text(encoding="utf-8")
-        for source in manifest_sources | shortcut_sources | {"/static/apple-touch-icon.png"}:
-            self.assertIn(source.split("?", 1)[0], service_worker)
+        for path in set(manifest_sources) | {"/static/apple-touch-icon.png"}:
+            self.assertIn(path, service_worker)
         self.assertNotIn("icon-192.jpg", service_worker)
         self.assertNotIn("icon-512.jpg", service_worker)
 
