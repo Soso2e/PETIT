@@ -105,6 +105,25 @@ def test_bootstrap_login_csrf_and_legacy_protection(client):
     assert client.post("/api/model-routing").status_code == 200
 
 
+def test_core_restart_requires_admin_same_origin_and_current_instance(client, monkeypatch):
+    from backend import core_restart
+
+    monkeypatch.setattr(core_restart, "requested", threading.Event())
+    monkeypatch.setattr(core_restart, "managed", False)
+    route = "/api/setup/core/restart"
+    payload = {"instance": core_restart.instance}
+    assert client.post(route, json=payload).status_code == 401
+    admin(client)
+    assert client.post(route, json=payload).status_code == 409
+    monkeypatch.setattr(core_restart, "managed", True)
+    assert client.post(route, json=payload, headers={"Origin": "https://evil.example"}).status_code == 403
+    assert client.post(route, json={"instance": "a" * 32}).status_code == 409
+    assert not core_restart.requested.is_set()
+    assert client.get("/api/setup/core").json()["restarting"] is False
+    assert client.post(route, json=payload).status_code == 202
+    assert client.get("/api/setup/core").json()["restarting"] is True
+
+
 def test_remote_bootstrap_requires_host_token(monkeypatch):
     from fastapi import FastAPI
     app = FastAPI(); app.include_router(setup_api.router); setup_api.install(app)
