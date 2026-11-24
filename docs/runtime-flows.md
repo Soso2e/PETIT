@@ -140,7 +140,7 @@ flowchart TD
     Proposed -->|承認| Queued[queued]
     Proposed -->|取消| Cancelled[cancelled]
     Entry -->|Develop| Queued
-    Queued -->|条件付き取得| Run[running]
+    Queued -->|同一リポジトリに running がないものを並列取得| Run[running]
     Chat -.-> Compact[Front Brainは委譲スキルで目的・制約・完了条件を短く渡す]
     PC --> Model[構造化応答または動的Toolを受信]
     Model -->|復旧可能なエラー| Retry[同一モデル応答だけを再試行 / 一段につき1回・ジョブ内で2回まで]

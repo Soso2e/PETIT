@@ -23,7 +23,9 @@ log = logging.getLogger(__name__)
 
 _lock = threading.RLock()
 _stop = threading.Event()
+_wakeup = threading.Event()
 _worker = None
+_job_threads: dict[str, threading.Thread] = {}
 TERMINAL = {"completed", "failed", "cancelled", "interrupted", "ready_for_review", "checks_failed"}
 _is_reserved = getattr(os.path, "isreserved", lambda value: Path(value).is_reserved())
 # States the owner has to act on or look at. The owner's own cancel and review completion are not announced.
@@ -875,14 +877,75 @@ def run_job(job_id):
             remember_head(job_id, checkout)
 
 
+def _repo_lock_key(repository):
+    raw = str(repository or "").strip()
+    if not raw:
+        return ""
+    return os.path.normcase(os.path.normpath(raw))
+
+
+def claim_next():
+    job_id = None
+    with _lock, db.write_transaction() as connection:
+        running_rows = connection.execute(
+            "SELECT repository FROM coding_jobs WHERE status='running'"
+        ).fetchall()
+        busy_repos = {key for row in running_rows if (key := _repo_lock_key(row["repository"]))}
+        queued_rows = connection.execute(
+            "SELECT id, repository FROM coding_jobs WHERE status='queued' AND cancel_requested=0 ORDER BY created_at, rowid"
+        ).fetchall()
+        for row in queued_rows:
+            repo_key = _repo_lock_key(row["repository"])
+            if repo_key and repo_key in busy_repos:
+                continue
+            cursor = connection.execute(
+                "UPDATE coding_jobs SET status='running',updated_at=? WHERE id=? AND status='queued'",
+                (db.now_iso(), row["id"]),
+            )
+            if cursor.rowcount == 1:
+                job_id = row["id"]
+                break
+    if job_id:
+        event(job_id, "running")
+    return job_id
+
+
 def pump():
-    with db.get_connection() as connection:
-        row = connection.execute("SELECT id FROM coding_jobs WHERE status='queued' AND cancel_requested=0 ORDER BY created_at LIMIT 1").fetchone()
-        if not row:return False
-        cursor = connection.execute("UPDATE coding_jobs SET status='running',updated_at=? WHERE id=? AND status='queued'", (db.now_iso(), row[0]))
-        claimed = cursor.rowcount == 1
-    if claimed:event(row[0], "running");run_job(row[0])
-    return claimed
+    job_id = claim_next()
+    if not job_id:
+        return False
+    run_job(job_id)
+    return True
+
+
+def _run_job_worker(job_id: str) -> None:
+    try:
+        run_job(job_id)
+    except Exception:
+        log.exception("Unhandled error in coding job worker job=%s", job_id)
+    finally:
+        with _lock:
+            _job_threads.pop(job_id, None)
+        _wakeup.set()
+
+
+def dispatch():
+    started = 0
+    while not _stop.is_set():
+        job_id = claim_next()
+        if not job_id:
+            break
+        worker = threading.Thread(
+            target=_run_job_worker,
+            args=(job_id,),
+            name=f"petit-coding-job-{job_id[:8]}",
+            daemon=True,
+        )
+        with _lock:
+            _job_threads[job_id] = worker
+        worker.start()
+        started += 1
+    return started
 
 
 def start():
@@ -903,14 +966,24 @@ def start():
             remember_head(row["id"], row["workspace"])
         notify(row["id"], "interrupted")
     _stop.clear()
+    _wakeup.clear()
     def loop():
-        while not _stop.wait(.5):
-            try:pump()
-            except Exception:continue
+        while not _stop.is_set():
+            try:
+                dispatch()
+            except Exception:
+                log.exception("Coding job dispatcher loop failed")
+            _wakeup.wait(.5)
+            _wakeup.clear()
     _worker = threading.Thread(target=loop, name="petit-coding-jobs", daemon=True)
     _worker.start()
 
 
 def stop():
     _stop.set()
+    _wakeup.set()
     if _worker:_worker.join(timeout=15)
+    with _lock:
+        threads = list(_job_threads.values())
+    for thread in threads:
+        thread.join(timeout=15)

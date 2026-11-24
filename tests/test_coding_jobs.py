@@ -4,6 +4,7 @@ import json
 from contextlib import closing
 from pathlib import Path
 import sqlite3
+import threading
 from unittest.mock import Mock
 
 from fastapi import FastAPI
@@ -732,3 +733,97 @@ def test_repository_extra_folders_lifecycle_and_job_context(repository, client, 
     assert client.post("/api/coding/config/root/extra", json={"repository": str(repository), "path": str(extra)}).status_code == 200
     assert client.request("DELETE", "/api/coding/config/root", json={"path": str(repository)}).status_code == 200
     assert settings.load().get("coding_root_extras") == {}
+
+
+def test_same_repository_waits_while_different_repositories_run_in_parallel(repository, tmp_path, development_quota, monkeypatch):
+    repo2 = tmp_path / "repo2"
+    repo2.mkdir()
+    jobs.git(repo2, "init")
+    jobs.git(repo2, "config", "user.name", "Fixture")
+    jobs.git(repo2, "config", "user.email", "fixture@example.invalid")
+    (repo2 / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+    jobs.git(repo2, "add", "app.py")
+    jobs.git(repo2, "commit", "-m", "initial")
+    settings.update({"coding_roots": [str(repository), str(repo2)]})
+
+    repo1_a_started = threading.Event()
+    repo2_started = threading.Event()
+    both_running_checked = threading.Event()
+    release_repo1_a = threading.Event()
+    release_repo2 = threading.Event()
+    repo1_a_second_observed_queued = []
+    order_lock = threading.Lock()
+    execution_order = []
+
+    job_a1 = jobs.create_development("par-a1", str(repository), "A1", "codex_sol", direct=True)
+    job_a2 = jobs.create_development("par-a2", str(repository), "A2", "codex_sol", direct=True)
+    job_b1 = jobs.create_development("par-b1", str(repo2), "B1", "codex_sol", direct=True)
+
+    def fake_run_git(provider, target, goal, workspace, check, progress, *, resume=None, on_session=None, extra_dirs=()):
+        with order_lock:
+            execution_order.append(goal)
+        if goal == "A1":
+            repo1_a_started.set()
+            assert repo2_started.wait(timeout=5), "Different repository job B1 should run in parallel with A1"
+            repo1_a_second_observed_queued.append(jobs.get(job_a2["id"])["status"])
+            both_running_checked.set()
+            assert release_repo1_a.wait(timeout=5)
+        elif goal == "B1":
+            repo2_started.set()
+            assert repo1_a_started.wait(timeout=5), "Different repository job A1 should run in parallel with B1"
+            assert release_repo2.wait(timeout=5)
+        return f"done:{goal}"
+
+    monkeypatch.setattr(coding_agents, "run_git", fake_run_git)
+    jobs.start()
+    try:
+        assert repo1_a_started.wait(timeout=5)
+        assert repo2_started.wait(timeout=5)
+        assert both_running_checked.wait(timeout=5)
+        assert repo1_a_second_observed_queued == ["queued"]
+        assert jobs.get(job_a2["id"])["status"] == "queued"
+
+        release_repo2.set()
+        release_repo1_a.set()
+
+        b1_done = jobs.wait_for_job(job_b1["id"], timeout=5, poll_interval=0.05)
+        a1_done = jobs.wait_for_job(job_a1["id"], timeout=5, poll_interval=0.05)
+        a2_done = jobs.wait_for_job(job_a2["id"], timeout=5, poll_interval=0.05)
+        assert b1_done["status"] == "ready_for_review"
+        assert a1_done["status"] == "ready_for_review"
+        assert a2_done["status"] == "ready_for_review"
+        assert execution_order.index("A1") < execution_order.index("A2")
+    finally:
+        release_repo1_a.set()
+        release_repo2.set()
+        jobs.stop()
+
+
+def test_claim_next_skips_busy_repository_and_allows_empty_repository_pc_jobs(repository, tmp_path, development_quota, monkeypatch):
+    repo2 = tmp_path / "repo2_sync"
+    repo2.mkdir()
+    jobs.git(repo2, "init")
+    jobs.git(repo2, "config", "user.name", "Fixture")
+    jobs.git(repo2, "config", "user.email", "fixture@example.invalid")
+    (repo2 / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+    jobs.git(repo2, "add", "app.py")
+    jobs.git(repo2, "commit", "-m", "initial")
+    settings.update({"coding_roots": [str(repository), str(repo2)]})
+
+    j1 = jobs.create_development("claim-1", str(repository), "R1-1", "codex_sol", direct=True)["id"]
+    j2 = jobs.create_development("claim-2", str(repository), "R1-2", "codex_sol", direct=True)["id"]
+    j3 = jobs.create_development("claim-3", str(repo2), "R2-1", "codex_sol", direct=True)["id"]
+    j4 = jobs.create_development("claim-4", "", "PC-1", "codex_sol", direct=True)["id"]
+    j5 = jobs.create_development("claim-5", "", "PC-2", "codex_sol", direct=True)["id"]
+
+    assert jobs.claim_next() == j1
+    # j2 shares repository with running j1, so claim_next skips j2 and picks j3
+    assert jobs.claim_next() == j3
+    # PC jobs without a repository are not blocked by each other
+    assert jobs.claim_next() == j4
+    assert jobs.claim_next() == j5
+    # Only j2 remains queued, and its repository is still running
+    assert jobs.claim_next() is None
+
+    jobs.finish(j1, "ready_for_review", summary="done")
+    assert jobs.claim_next() == j2
