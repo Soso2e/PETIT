@@ -67,7 +67,7 @@ ANTIGRAVITY_RETRYABLE = {
 # The request reaches the CLI as the user wrote it. How to investigate, edit, test and commit is the
 # CLI's own business and the repository's instructions'; Core adds only what the CLI cannot know.
 GIT_NATIVE_NOTE = (
-    "\n\n（PETITからの補足: 変更を伴う作業が終わったらpushしてPRを作成してください。"
+    "\n\n（PETITからの補足: 変更を伴う作業がひと段落したらpushしてPRを作成してください。"
     "mergeは依頼時のみ。結果は日本語で報告してください。）"
 )
 
