@@ -548,3 +548,99 @@ def test_slash_digest_defaults_to_register():
         core, interaction_id="1", guild_id=GUILD, author_id=OWNER, display_name="", manage_guild=False,
         permissions=None, data=data, channel_id="555"))
     assert core.commands[0]["action"] == "register"
+
+
+def test_notion_collects_daily_report_and_filters_hidden_or_non_report(monkeypatch):
+    from backend import notion_client, notion_search
+
+    monkeypatch.setattr(config, "NOTION_API_KEY", "secret-test-key")
+    monkeypatch.delenv("PETIT_LIFELOG_NOTION", raising=False)
+    monkeypatch.delenv("PETIT_LIFELOG_NOTION_DB_ID", raising=False)
+
+    calls = []
+
+    def fake_post(path, body, timeout=15):
+        calls.append((path, body))
+        if path == "/search":
+            return {
+                "results": [
+                    {
+                        "object": "database",
+                        "id": "db-act-schedule",
+                        "title": [{"plain_text": "Act Schedule"}],
+                    }
+                ]
+            }
+        if path == "/databases/db-act-schedule/query":
+            assert body["filter"] == {"property": "Date", "date": {"equals": "2026-11-22"}}
+            return {
+                "results": [
+                    {
+                        "id": "page-report",
+                        "properties": {
+                            "名前": {"type": "title", "title": [{"plain_text": "競馬予測とAI開発"}]},
+                            "Date": {"type": "date", "date": {"start": "2026-11-22"}},
+                            "States": {"type": "status", "status": {"name": "📓"}},
+                            "hide": {"type": "checkbox", "checkbox": False},
+                            "ditail": {"type": "rich_text", "rich_text": [{"plain_text": "PETIT開発を進めた"}]},
+                            "Cat": {"type": "multi_select", "multi_select": [{"name": "活動"}]},
+                        },
+                    },
+                    {
+                        "id": "page-task",
+                        "properties": {
+                            "名前": {"type": "title", "title": [{"plain_text": "未完了タスク"}]},
+                            "Date": {"type": "date", "date": {"start": "2026-11-22"}},
+                            "States": {"type": "status", "status": {"name": "yet"}},
+                            "hide": {"type": "checkbox", "checkbox": False},
+                        },
+                    },
+                    {
+                        "id": "page-hidden",
+                        "properties": {
+                            "名前": {"type": "title", "title": [{"plain_text": "非公開メモ"}]},
+                            "Date": {"type": "date", "date": {"start": "2026-11-22"}},
+                            "States": {"type": "status", "status": {"name": "📓"}},
+                            "hide": {"type": "checkbox", "checkbox": True},
+                        },
+                    },
+                ]
+            }
+        raise AssertionError(f"unexpected POST {path}")
+
+    monkeypatch.setattr(notion_client, "_post", fake_post)
+    monkeypatch.setattr(notion_search, "_page_text", lambda pid, max_chars: "日報\n- Discord連携を修正" if pid == "page-report" else "")
+
+    items = life_log._collect_notion(date(2026, 11, 22))
+    assert len(items) == 1
+    assert items[0]["source"] == "notion"
+    assert items[0]["day"] == "2026-11-22"
+    assert items[0]["title"] == "競馬予測とAI開発"
+    assert "PETIT開発を進めた" in items[0]["body"]
+    assert "Discord連携を修正" in items[0]["body"]
+    assert [c[0] for c in calls] == ["/search", "/databases/db-act-schedule/query"]
+
+
+def test_notion_shared_audience_includes_daily_report(env, llm, monkeypatch):
+    monkeypatch.setattr(life_log, "COLLECTORS", {
+        "notion": lambda day: [{
+            "source": "notion",
+            "origin": "notion",
+            "ref": f"page-1@{day.isoformat()}",
+            "day": day.isoformat(),
+            "title": "日報",
+            "body": "- PETIT の機能改善",
+        }]
+    })
+    digest = life_log.generate("2026-11-22", audience="shared")
+    assert digest["status"] == "ok"
+    assert digest["sources"] == {"notion": 1}
+
+
+def test_notion_collector_skips_when_disabled_or_unconfigured(monkeypatch):
+    monkeypatch.setattr(config, "NOTION_API_KEY", "")
+    assert life_log._collect_notion(date(2026, 11, 22)) == []
+
+    monkeypatch.setattr(config, "NOTION_API_KEY", "secret-test-key")
+    monkeypatch.setenv("PETIT_LIFELOG_NOTION", "0")
+    assert life_log._collect_notion(date(2026, 11, 22)) == []

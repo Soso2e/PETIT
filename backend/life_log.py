@@ -7,6 +7,7 @@ Sources (all read-only):
 - github: commits on default branches and PRs updated that day (needs ``PETIT_GITHUB_TOKEN``).
 - petit: PETIT's own daily index of conversations (``daily_index``).
 - discord: the owner's own posts in the personal Discord archive.
+- notion: daily report pages (``States = 📓``) in the Notion ``Act Schedule`` database.
 
 The brain is DeepSeek, used in three small stages instead of one huge prompt:
 
@@ -47,7 +48,7 @@ FACT_KINDS = ("done", "progress", "idea", "blocker", "next", "life")
 # What a post may show by destination: a DM is private; a server channel can be read by others,
 # so it carries work only (no life / ideas / blockers, no chat or diary sources).
 SHARED_KINDS = {"done", "progress", "next"}
-SHARED_SOURCES = {"github", "inbox"}
+SHARED_SOURCES = {"github", "inbox", "notion"}
 _DATE_IN_NAME = re.compile(r"(20\d{2})[-_.]?(0[1-9]|1[0-2])[-_.]?(0[1-9]|[12]\d|3[01])")
 _run_lock = threading.Lock()
 
@@ -538,10 +539,102 @@ def _collect_discord(day: date) -> list[dict[str, Any]]:
              "title": value["title"], "body": "\n".join(value["lines"])} for cid, value in by_channel.items()]
 
 
+def _notion_act_schedule_db_id() -> str:
+    configured = os.getenv("PETIT_LIFELOG_NOTION_DB_ID", "").strip()
+    if configured:
+        return configured
+    from . import notion_client, notion_search
+    data = notion_client._post(  # noqa: SLF001 - reuse existing Notion client
+        "/search",
+        {"query": "Act Schedule", "filter": {"property": "object", "value": "database"}, "page_size": 10},
+        timeout=15,
+    )
+    fallback_id = ""
+    for item in data.get("results") or []:
+        if not isinstance(item, dict) or item.get("object") != "database":
+            continue
+        if item.get("archived") or item.get("in_trash"):
+            continue
+        db_id = str(item.get("id") or "").strip()
+        if not db_id:
+            continue
+        title = notion_search._plain_text(item.get("title"))  # noqa: SLF001
+        if title.strip().lower() == "act schedule":
+            return db_id
+        if not fallback_id:
+            fallback_id = db_id
+    return fallback_id
+
+
+def _notion_is_daily_report(page: dict[str, Any], state_prop: str, target_state: str) -> bool:
+    if page.get("archived") or page.get("in_trash"):
+        return False
+    props = page.get("properties") or {}
+    hide_prop = props.get("hide")
+    if isinstance(hide_prop, dict) and hide_prop.get("type") == "checkbox" and hide_prop.get("checkbox"):
+        return False
+    from . import notion_search
+    raw_state = props.get(state_prop)
+    if isinstance(raw_state, dict):
+        state_val = notion_search._property_value(raw_state).strip()  # noqa: SLF001
+        if state_val != target_state:
+            return False
+    return True
+
+
+def _collect_notion(day: date) -> list[dict[str, Any]]:
+    if not _flag("PETIT_LIFELOG_NOTION") or not config.NOTION_API_KEY:
+        return []
+    from . import notion_client, notion_search
+    db_id = _notion_act_schedule_db_id()
+    if not db_id:
+        return []
+    date_prop = os.getenv("PETIT_LIFELOG_NOTION_DATE_PROP", "Date").strip() or "Date"
+    state_prop = os.getenv("PETIT_LIFELOG_NOTION_STATE_PROP", "States").strip() or "States"
+    target_state = os.getenv("PETIT_LIFELOG_NOTION_REPORT_STATE", "📓").strip() or "📓"
+    max_chars = max(1000, int(os.getenv("PETIT_LIFELOG_MAX_FILE_CHARS", "20000") or 20000))
+    data = notion_client._post(  # noqa: SLF001 - reuse existing Notion client
+        f"/databases/{db_id}/query",
+        {"filter": {"property": date_prop, "date": {"equals": day.isoformat()}}, "page_size": 20},
+        timeout=20,
+    )
+    items: list[dict[str, Any]] = []
+    for page in data.get("results") or []:
+        if not isinstance(page, dict) or not _notion_is_daily_report(page, state_prop, target_state):
+            continue
+        page_id = str(page.get("id") or "").strip()
+        if not page_id:
+            continue
+        title, prop_values = notion_search._page_properties(page)  # noqa: SLF001
+        meta_lines = [
+            f"{name}: {val}"
+            for name, val in prop_values.items()
+            if name not in {date_prop, state_prop, "hide"} and val and val != title
+        ]
+        body_text = ""
+        try:
+            body_text = notion_search._page_text(page_id, max_chars)  # noqa: SLF001
+        except notion_client.NotionError as exc:
+            log.warning("life log notion page read failed (%s): %s", page_id, type(exc).__name__)
+        body = "\n".join(part for part in ("\n".join(meta_lines), body_text) if part).strip()
+        if not body:
+            continue
+        items.append({
+            "source": "notion",
+            "origin": "notion",
+            "ref": f"{page_id}@{day.isoformat()}",
+            "day": day.isoformat(),
+            "title": title,
+            "body": body[:max_chars],
+        })
+    return items
+
+
 COLLECTORS: dict[str, Callable[[date], list[dict[str, Any]]]] = {
     "github": _collect_github,
     "petit": _collect_petit,
     "discord": _collect_discord,
+    "notion": _collect_notion,
 }
 
 
