@@ -90,3 +90,19 @@ test('flat shaded mascot preserves shadow, cheeks, round eyes, ring mouth and bo
   assert.match(svg, /class="pm-foot pm-foot-l"><path fill="#FFE9B9"/);
   assert.match(svg, /data-slot="mouth" data-variant="soft"><path fill="none" stroke="#F37865"/);
 });
+
+test('ring inertia layer, action lag keyframes, and web spring physics are wired', () => {
+  const svg = M.toStaticSVG({ emotion: 'neutral', colors: { preset: 'pear' } });
+  assert.match(svg, /class="pm-ring pm-ring-back"><g class="pm-ring-inertia">/);
+  assert.match(svg, /class="pm-ring pm-ring-front"><g class="pm-ring-inertia">/);
+  const css = source('mascot/petit-mascot.css');
+  assert.match(css, /\.pm-ring-inertia\s*\{/);
+  for (const name of ['walk', 'run', 'hop', 'jump', 'celebrate', 'dance', 'nod', 'surprise', 'land']) {
+    assert.match(css, new RegExp(`\\[data-action="${name}"\\]\\s+\\.pm-ring`), name);
+  }
+  const js = source('mascot/petit-mascot.js');
+  assert.match(js, /setRingOffset\(/);
+  const web = source('mascot/petit-mascot-web.js');
+  assert.match(web, /stepRing\(/);
+  assert.match(web, /setRingOffset\(/);
+});

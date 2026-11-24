@@ -57,6 +57,7 @@
     x: 0, y: 0, targetX: null, facing: 1, mode: 'idle', run: false, vy: 0,
     petit: 'idle', lastInput: Date.now(), clicks: [], raf: 0, last: 0, timer: 0, bubbleTimer: 0,
     pointer: null, lookQueued: false, drag: null, relayoutTimer: 0, stopLife: null,
+    ring: { x: 0, y: 0, vx: 0, vy: 0, px: null, py: null },
   };
   const size = () => prefs.size;
   const canMove = () => mascot && mascot.motionAllowed();
@@ -105,6 +106,47 @@
   }
 
   // ------------------------------------------------------------ motion (rAF only while moving)
+  const softClamp = (v, max) => max * Math.tanh(v / max);
+  function resetRingPhysics() {
+    st.ring = { x: 0, y: 0, vx: 0, vy: 0, px: st.x, py: st.y };
+    mascot?.setRingOffset(null);
+  }
+  function stepRing(dt) {
+    if (!mascot || !canMove() || document.documentElement.dataset.petitPerformance === 'lite') {
+      if (st.ring.x || st.ring.y || st.ring.vx || st.ring.vy) resetRingPhysics();
+      else { st.ring.px = st.x; st.ring.py = st.y; }
+      return false;
+    }
+    if (st.ring.px == null) { st.ring.px = st.x; st.ring.py = st.y; }
+    const dx = st.x - st.ring.px, dy = st.y - st.ring.py;
+    st.ring.px = st.x; st.ring.py = st.y;
+    st.ring.x -= dx; st.ring.y -= dy;
+    if (
+      st.mode === 'idle' && dx === 0 && dy === 0 &&
+      Math.abs(st.ring.x) < 0.25 && Math.abs(st.ring.y) < 0.25 &&
+      Math.abs(st.ring.vx) < 2 && Math.abs(st.ring.vy) < 2
+    ) {
+      resetRingPhysics();
+      return false;
+    }
+    const steps = Math.max(1, Math.min(4, Math.ceil(dt / 0.016)));
+    const h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      // 横は少し遅れて追従、縦は柔らかく上下に大きく外れるばね定数にする。
+      const ax = -170 * st.ring.x - 16 * st.ring.vx;
+      const ay = -70 * st.ring.y - 7 * st.ring.vy;
+      st.ring.vx += ax * h;
+      st.ring.vy += ay * h;
+      st.ring.x += st.ring.vx * h;
+      st.ring.y += st.ring.vy * h;
+    }
+    const svgScale = 512 / size();
+    const svgX = softClamp(st.ring.x * svgScale * st.facing, 52);
+    const svgY = softClamp(st.ring.y * svgScale, 110);
+    const rot = softClamp(svgX * 0.22, 14);
+    mascot.setRingOffset(svgX, svgY, rot);
+    return true;
+  }
   function startLoop() {
     if (st.raf) return;
     st.last = performance.now();
@@ -115,6 +157,7 @@
     st.raf = 0;
     const dt = Math.min(0.1, (now - st.last) / 1000);
     st.last = now;
+    let keepAlive = false;
     if (st.mode === 'walking') {
       const speed = size() * (st.run ? 2.3 : 1.05);
       const dx = st.targetX - st.x;
@@ -122,15 +165,19 @@
       st.x += step;
       st.y = topFor(floor());
       place();
-      if (Math.abs(st.targetX - st.x) < 0.5) { arrive(); return; }
+      if (Math.abs(st.targetX - st.x) < 0.5) arrive();
+      else keepAlive = true;
     } else if (st.mode === 'falling') {
       const f = floor(), ground = topFor(f);
       st.vy = Math.min(2400, st.vy + 2600 * dt);
       st.y += st.vy * dt;
-      if (st.y >= ground) { st.y = ground; place(); land(); return; }
-      place();
-    } else return;
-    st.raf = requestAnimationFrame(tick);
+      if (st.y >= ground) { st.y = ground; place(); land(); }
+      else { place(); keepAlive = true; }
+    } else if (st.mode === 'dragging') {
+      keepAlive = true;
+    }
+    const ringActive = stepRing(dt);
+    if (keepAlive || ringActive) st.raf = requestAnimationFrame(tick);
   }
   function walkTo(x, { run = false } = {}) {
     const f = floor();
@@ -146,21 +193,21 @@
     return true;
   }
   function arrive() {
-    st.mode = 'idle'; st.targetX = null; stopLoop();
+    st.mode = 'idle'; st.targetX = null;
     mascot.look(null);
     mascot.setState(st.petit);
     schedule();
   }
   function stopWalking() {
     if (st.mode !== 'walking') return;
-    st.mode = 'idle'; stopLoop(); mascot.look(null);
+    st.mode = 'idle'; mascot.look(null);
   }
   function fall() {
     st.mode = 'falling'; st.vy = 0;
     startLoop();
   }
   function land() {
-    st.mode = 'idle'; stopLoop();
+    st.mode = 'idle';
     mascot.setState(st.petit);
     mascot.react('joy', 'land', 700);
     const f = floor();
@@ -193,8 +240,8 @@
     if (!mascot || st.mode !== 'idle') return;
     const f = floor(), ground = topFor(f);
     const x = clampX(st.x, f);
-    if (ground > st.y + 4 && canMove()) { st.x = x; fall(); return; }
-    if (Math.abs(ground - st.y) > 0.5 || x !== st.x) { st.x = x; st.y = ground; place(); }
+    if (ground > st.y + 4 && canMove()) { st.x = x; st.ring.px = x; fall(); return; }
+    if (Math.abs(ground - st.y) > 0.5 || x !== st.x) { st.x = x; st.y = ground; place(); st.ring.px = st.x; st.ring.py = st.y; }
   }
 
   function say(text, ms = 2400) {
@@ -267,11 +314,13 @@
     if (!d.active && Math.hypot(event.clientX - d.sx, event.clientY - d.sy) < 6) return;
     if (!d.active) {
       d.active = true;
-      stopWalking(); stopLoop(); clearTimeout(st.timer);
+      stopWalking(); clearTimeout(st.timer);
       st.mode = 'dragging';
+      st.ring.px = st.x; st.ring.py = st.y;
       mascot.clearReaction();
       mascot.setEmotion('surprised'); mascot.setAction('dangle');
       holder.classList.add('pmw-dragging');
+      if (canMove()) startLoop();
     }
     st.x = event.clientX - size() / 2;
     st.y = event.clientY - size() * 0.18;
@@ -286,7 +335,7 @@
     if (!d.active) { onClick(); return; }
     st.x = clampX(st.x, { min: 0, max: window.innerWidth - size() });
     if (canMove()) fall();
-    else { st.y = topFor(floor()); place(); land(); }
+    else { st.y = topFor(floor()); place(); resetRingPhysics(); land(); }
   }
   function onPointerEnter() {
     if (st.mode === 'idle' && idleish() && !st.drag) mascot.react('happy', 'wiggle', 900);
@@ -355,6 +404,7 @@
     if (!(st.x >= f.min)) st.x = f.min;
     mascot.setFacing(-1);
     place();
+    resetRingPhysics();
     on(holder, 'pointerdown', onPointerDown);
     on(holder, 'pointermove', onPointerMove);
     on(holder, 'pointerup', onPointerUp);
@@ -374,13 +424,14 @@
     st.relayoutTimer = setInterval(() => { if (!document.hidden) relayout(); }, 1000);
     // 入場: 画面端からひょっこり歩いてくる。
     if (canMove() && prefs.roam) {
-      st.x = f.max + size(); place();
+      st.x = f.max + size(); place(); resetRingPhysics();
       setTimeout(() => walkTo(f.max - size() * 0.6), 600);
     } else schedule();
   }
   function unmount() {
     while (listeners.length) listeners.pop()();
     stopLoop(); clearTimeout(st.timer); clearTimeout(st.bubbleTimer); clearInterval(st.relayoutTimer);
+    resetRingPhysics();
     mascot?.destroy(); layer?.remove();
     layer = holder = bubble = mascot = null;
     st.mode = 'idle'; st.petit = 'idle';
