@@ -102,6 +102,8 @@ test('ring inertia layer, action lag keyframes, and web spring physics are wired
   }
   const js = source('mascot/petit-mascot.js');
   assert.match(js, /setRingOffset\(/);
+  assert.match(js, /data-ring-physics/);
+  assert.match(css, /\[data-ring-physics\]\[data-action="land"\]\s+\.pm-ring/);
   const web = source('mascot/petit-mascot-web.js');
   assert.match(web, /stepRing\(/);
   assert.match(web, /setRingOffset\(/);
