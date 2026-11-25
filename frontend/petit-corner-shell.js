@@ -242,6 +242,20 @@
       };
     };
 
+    const syncChatBottomOffset = (target) => {
+      if (!document.body.classList.contains("petit-chat-screen") || !target || target === docScroller()) {
+        nav.style.removeProperty("--petit-scroll-jump-chat-bottom");
+        return;
+      }
+      const rect = target.getBoundingClientRect();
+      if (rect.height > 0 && rect.bottom > 0 && rect.bottom <= window.innerHeight) {
+        const bottom = Math.max(0, Math.ceil(window.innerHeight - rect.bottom + 12));
+        nav.style.setProperty("--petit-scroll-jump-chat-bottom", `${bottom}px`);
+      } else {
+        nav.style.removeProperty("--petit-scroll-jump-chat-bottom");
+      }
+    };
+
     let rafId = 0;
     const sync = () => {
       rafId = 0;
@@ -249,7 +263,11 @@
       const { top, max } = scrollMetrics(target);
       const scrollable = Boolean(target) && max >= 160;
       nav.hidden = !scrollable;
-      if (!scrollable) return;
+      if (!scrollable) {
+        nav.style.removeProperty("--petit-scroll-jump-chat-bottom");
+        return;
+      }
+      syncChatBottomOffset(target);
       if (topBtn) topBtn.disabled = top <= 16;
       if (bottomBtn) bottomBtn.disabled = top >= max - 16;
     };
@@ -287,8 +305,10 @@
     if (typeof ResizeObserver === "function") {
       const ro = new ResizeObserver(scheduleSync);
       const main = document.querySelector(".universe-main");
+      const chatForm = document.getElementById("chat-form");
       if (main) ro.observe(main);
       if (messages) ro.observe(messages);
+      if (chatForm) ro.observe(chatForm);
     }
 
     scheduleSync();

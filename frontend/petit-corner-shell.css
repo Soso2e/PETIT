@@ -631,6 +631,9 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
 .petit-scroll-jump[hidden] {
   display: none !important;
 }
+body.petit-chat-screen .petit-scroll-jump {
+  bottom: var(--petit-scroll-jump-chat-bottom, calc(var(--petit-bottom-nav-height, 84px) + 128px));
+}
 html[data-petit-theme="light"] .petit-scroll-jump,
 html[data-theme="light"] .petit-scroll-jump {
   background: color-mix(in srgb, var(--ui-surface-solid, #ffffff) 90%, transparent);
