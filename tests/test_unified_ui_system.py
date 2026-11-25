@@ -139,6 +139,9 @@ class UnifiedUiSystemTests(unittest.TestCase):
         self.assertIn(".petit-scroll-jump", shell_css)
         self.assertIn(".petit-scroll-jump__btn", shell_css)
         self.assertIn("right: max(12px, env(safe-area-inset-right));", shell_css)
+        self.assertIn("body.petit-chat-screen .petit-scroll-jump", shell_css)
+        self.assertIn("--petit-scroll-jump-chat-bottom", shell_css)
+        self.assertIn("--petit-scroll-jump-chat-bottom", shell_js)
 
 
 if __name__ == "__main__":
