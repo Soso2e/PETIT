@@ -107,20 +107,55 @@ class CoreClient:
             headers={"Authorization": "Bearer " + token},
         )
 
-    async def _call(self, method: str, path: str, **kwargs) -> dict | None:
+    @staticmethod
+    def _http_error_reply(response: httpx.Response) -> str:
+        detail = None
+        try:
+            payload = response.json()
+            if isinstance(payload, dict) and isinstance(payload.get("detail"), str) and payload["detail"].strip():
+                detail = payload["detail"].strip()
+        except ValueError:
+            detail = None
+        if detail:
+            return detail
+        code = response.status_code
+        if code == 401:
+            return "PETIT 本体の認証に失敗しました（PETIT_DISCORD_SERVICE_TOKEN の設定を確認してください）。"
+        if code == 422:
+            return "コマンドの引数が正しくありませんでした。"
+        if code == 503:
+            return "PETIT 本体の Discord 連携設定が有効になっていません。"
+        if code >= 500:
+            return f"PETIT 本体でエラーが発生しました（HTTP {code}）。"
+        return f"この操作はできませんでした（HTTP {code}）。"
+
+    async def _call(self, method: str, path: str, *, return_error: bool = False, **kwargs) -> dict | None:
         try:
             response = await self._client.request(method, path, **kwargs)
             if response.status_code in {400, 403, 404, 409, 429}:
-                detail = response.json().get("detail")
+                detail = None
+                try:
+                    detail = response.json().get("detail")
+                except ValueError:
+                    detail = None
                 return {"reply": detail if isinstance(detail, str) else "この操作はできませんでした。", "approvals": []}
-            response.raise_for_status()
+            if response.status_code >= 400:
+                log.warning("core %s %s failed: HTTP %s", method, path, response.status_code)
+                if return_error:
+                    return {"reply": self._http_error_reply(response), "approvals": []}
+                return None
             return response.json()
+        except httpx.TimeoutException as exc:
+            log.warning("core %s %s timed out: %s", method, path, type(exc).__name__)
+            if return_error:
+                return {"reply": "PETIT 本体の処理がタイムアウトしました。少し時間をおいてから再度お試しください。", "approvals": []}
+            return None
         except (httpx.HTTPError, ValueError) as exc:
             log.warning("core %s %s failed: %s", method, path, type(exc).__name__)
             return None
 
     async def relay(self, body: dict) -> dict:
-        return await self._call("POST", "/api/channels/discord/events", json=body) or {"reply": UNAVAILABLE, "approvals": []}
+        return await self._call("POST", "/api/channels/discord/events", return_error=True, json=body) or {"reply": UNAVAILABLE, "approvals": []}
 
     async def fetch_attachment(self, attachment_id: str) -> bytes | None:
         try:
@@ -132,10 +167,10 @@ class CoreClient:
             return None
 
     async def decide(self, body: dict) -> dict:
-        return await self._call("POST", "/api/channels/discord/approvals", json=body) or {"reply": UNAVAILABLE, "approvals": []}
+        return await self._call("POST", "/api/channels/discord/approvals", return_error=True, json=body) or {"reply": UNAVAILABLE, "approvals": []}
 
     async def guild_command(self, subcommand: str, body: dict) -> dict:
-        return await self._call("POST", f"/api/guild/{subcommand}", json=body) or {"reply": UNAVAILABLE, "approvals": []}
+        return await self._call("POST", f"/api/guild/{subcommand}", return_error=True, json=body) or {"reply": UNAVAILABLE, "approvals": []}
 
     async def claim_notifications(self) -> dict:
         return await self._call("GET", "/api/channels/discord/notifications") or {"notifications": []}
@@ -178,7 +213,7 @@ class CoreClient:
         return await self._call("POST", "/api/channels/discord/archive/sync-config", json=body) or {}
 
     async def digest_command(self, body: dict) -> dict:
-        return await self._call("POST", "/api/channels/discord/digests/command", json=body) or {"reply": UNAVAILABLE}
+        return await self._call("POST", "/api/channels/discord/digests/command", return_error=True, json=body) or {"reply": UNAVAILABLE}
 
     async def claim_digests(self) -> dict:
         return await self._call("GET", "/api/channels/discord/digests") or {"posts": []}
@@ -203,7 +238,7 @@ class CoreClient:
         await self._call("POST", f"/api/channels/discord/reminders/{scope}/{reminder_id}", json=body)
 
     async def admin_command(self, body: dict) -> dict:
-        return await self._call("POST", "/api/channels/discord/admins", json=body) or {"reply": UNAVAILABLE}
+        return await self._call("POST", "/api/channels/discord/admins", return_error=True, json=body) or {"reply": UNAVAILABLE}
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -1220,22 +1255,28 @@ def build_client(core: CoreClient):
             manage_guild = bool(getattr(perms, "manage_guild", False))
             perm_value = getattr(perms, "value", None)
             await interaction.response.defer(ephemeral=True)
-            reply = await dispatch_slash_interaction(
-                core,
-                interaction_id=str(interaction.id),
-                guild_id=str(interaction.guild_id) if interaction.guild_id else None,
-                author_id=str(interaction.user.id),
-                display_name=getattr(interaction.user, "display_name", "") or "",
-                manage_guild=manage_guild,
-                permissions=perm_value if isinstance(perm_value, int) else None,
-                data=interaction.data,
-                channel_id=str(interaction.channel_id) if interaction.channel_id else None,
-                guild=getattr(interaction, "guild", None),
-                schedule_sync=client.schedule_guild_sync,
-            )
+            try:
+                reply = await dispatch_slash_interaction(
+                    core,
+                    interaction_id=str(interaction.id),
+                    guild_id=str(interaction.guild_id) if interaction.guild_id else None,
+                    author_id=str(interaction.user.id),
+                    display_name=getattr(interaction.user, "display_name", "") or "",
+                    manage_guild=manage_guild,
+                    permissions=perm_value if isinstance(perm_value, int) else None,
+                    data=interaction.data,
+                    channel_id=str(interaction.channel_id) if interaction.channel_id else None,
+                    guild=getattr(interaction, "guild", None),
+                    schedule_sync=client.schedule_guild_sync,
+                )
+            except Exception as exc:
+                log.exception("slash command failed")
+                reply = f"⚠️ コマンドの実行中にエラーが発生しました（{type(exc).__name__}）。"
             if reply:
                 for chunk in split(reply):
                     await interaction.followup.send(chunk, ephemeral=True)
+            else:
+                await interaction.followup.send("⚠️ コマンドの応答が空でした。", ephemeral=True)
             return
 
         if interaction.type != discord.InteractionType.component:

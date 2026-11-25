@@ -638,18 +638,28 @@ COLLECTORS: dict[str, Callable[[date], list[dict[str, Any]]]] = {
 }
 
 
-def gather(day: date) -> list[dict[str, Any]]:
-    """Refresh every source for ``day`` and return that day's entries."""
+def _error_label(exc: Exception) -> str:
+    msg = " ".join(str(exc).splitlines()).strip()
+    if msg and len(msg) <= 80 and "http" not in msg.lower() and "bearer" not in msg.lower():
+        return f"{type(exc).__name__}: {msg}"
+    return type(exc).__name__
+
+
+def _gather_detailed(day: date) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Refresh every source for ``day`` and return (entries, source_errors)."""
     ensure_schema()
+    source_errors: dict[str, str] = {}
     try:
         scan_inbox()
     except Exception as exc:  # noqa: BLE001
         log.warning("life log inbox scan failed: %s", type(exc).__name__)
+        source_errors["inbox"] = _error_label(exc)
     for name, collector in COLLECTORS.items():
         try:
             fresh = collector(day)
         except Exception as exc:  # noqa: BLE001 - a missing source must not stop the digest
             log.warning("life log source %s failed: %s", name, type(exc).__name__)
+            source_errors[name] = _error_label(exc)
             continue
         with db.get_connection() as conn:
             for item in fresh:
@@ -657,7 +667,13 @@ def gather(day: date) -> list[dict[str, Any]]:
     with db.get_connection() as conn:
         rows = conn.execute("SELECT source,origin,ref,day,title,body,content_hash FROM lifelog_entries "
                             "WHERE day=? ORDER BY source, origin, ref", (day.isoformat(),)).fetchall()
-    return [dict(row) for row in rows]
+    return [dict(row) for row in rows], source_errors
+
+
+def gather(day: date) -> list[dict[str, Any]]:
+    """Refresh every source for ``day`` and return that day's entries."""
+    entries, _ = _gather_detailed(day)
+    return entries
 
 
 # ---------------------------------------------------------------- DeepSeek stages
@@ -761,7 +777,9 @@ def _normalize_facts(value: Any, valid_src: set[int]) -> list[dict[str, Any]]:
     return facts
 
 
-def extract_facts(entries: list[dict[str, Any]], *, use_llm: bool) -> tuple[list[dict[str, Any]], str]:
+def extract_facts(
+    entries: list[dict[str, Any]], *, use_llm: bool, errors: dict[str, str] | None = None
+) -> tuple[list[dict[str, Any]], str]:
     """Stage 1. Returns facts and a status: ok / cached / partial / fallback."""
     facts: list[dict[str, Any]] = []
     statuses: set[str] = set()
@@ -779,8 +797,12 @@ def extract_facts(entries: list[dict[str, Any]], *, use_llm: bool) -> tuple[list
         if use_llm:
             try:
                 parsed = _json(_llm(_profile("extract"), _EXTRACT_SYSTEM, text, 1500))
+                if parsed is None and errors is not None and "extract" not in errors:
+                    errors["extract"] = "invalid_response"
             except Exception as exc:  # noqa: BLE001
                 log.warning("life log extract failed: %s", type(exc).__name__)
+                if errors is not None and "extract" not in errors:
+                    errors["extract"] = _error_label(exc)
         batch_facts = _normalize_facts((parsed or {}).get("facts"), {n for n, _, _ in batch}) if parsed else []
         if parsed is not None:
             with db.get_connection() as conn:
@@ -834,7 +856,9 @@ def _normalize_day(value: dict[str, Any]) -> dict[str, Any]:
             "blockers": _list(value.get("blockers"), 6), "next": _list(value.get("next"), 3)}
 
 
-def merge_facts(facts: list[dict[str, Any]], entries: list[dict[str, Any]], *, use_llm: bool) -> tuple[dict[str, Any], str]:
+def merge_facts(
+    facts: list[dict[str, Any]], entries: list[dict[str, Any]], *, use_llm: bool, errors: dict[str, str] | None = None
+) -> tuple[dict[str, Any], str]:
     """Stage 2."""
     if use_llm and facts:
         sources = {n: f"{e['source']}/{e['origin']}" for n, e in enumerate(entries, start=1)}
@@ -843,8 +867,12 @@ def merge_facts(facts: list[dict[str, Any]], entries: list[dict[str, Any]], *, u
             parsed = _json(_llm(_profile("merge"), _MERGE_SYSTEM, "\n".join(lines), 1800))
             if parsed:
                 return _normalize_day(parsed), "ok"
+            if errors is not None:
+                errors["merge"] = "invalid_response"
         except Exception as exc:  # noqa: BLE001
             log.warning("life log merge failed: %s", type(exc).__name__)
+            if errors is not None:
+                errors["merge"] = _error_label(exc)
     return _fallback_merge(facts), "fallback"
 
 
@@ -874,7 +902,9 @@ def render(day: date, structured: dict[str, Any]) -> str:
     return text if len(text) <= POST_LIMIT else text[:POST_LIMIT - 1].rstrip() + "…"
 
 
-def compose(day: date, structured: dict[str, Any], *, use_llm: bool) -> tuple[str, str]:
+def compose(
+    day: date, structured: dict[str, Any], *, use_llm: bool, errors: dict[str, str] | None = None
+) -> tuple[str, str]:
     """Stage 3."""
     if use_llm:
         try:
@@ -885,8 +915,12 @@ def compose(day: date, structured: dict[str, Any], *, use_llm: bool) -> tuple[st
                 header = f"**{_day_label(day)}の進捗**"
                 first_line = body.splitlines()[0]
                 return (body if _day_label(day) in first_line else header + "\n" + body), "ok"
+            if errors is not None:
+                errors["compose"] = "empty_or_too_long" if body else "empty_response"
         except Exception as exc:  # noqa: BLE001
             log.warning("life log compose failed: %s", type(exc).__name__)
+            if errors is not None:
+                errors["compose"] = _error_label(exc)
     return render(day, structured), "fallback"
 
 
@@ -928,6 +962,14 @@ def _has_content(structured: dict[str, Any]) -> bool:
                 or structured.get("blockers") or structured.get("next"))
 
 
+def _source_counts(entries: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for entry in entries:
+        label = entry["origin"] if entry["source"] == "inbox" else entry["source"]
+        counts[label] = counts.get(label, 0) + 1
+    return counts
+
+
 def generate(day: str | date | None = None, *, force: bool = False, audience: str = "private") -> dict[str, Any]:
     """Build (or reuse) the digest for one local day.
 
@@ -939,29 +981,44 @@ def generate(day: str | date | None = None, *, force: bool = False, audience: st
     target = resolve_day(day)
     shared = audience == "shared"
     with _run_lock:
-        entries = gather(target)
-        if shared:
-            entries = [e for e in entries if e["source"] in SHARED_SOURCES]
+        raw_entries, source_errors = _gather_detailed(target)
+        raw_sources = _source_counts(raw_entries)
+        entries = [e for e in raw_entries if e["source"] in SHARED_SOURCES] if shared else raw_entries
+        dropped_by_shared = max(0, len(raw_entries) - len(entries))
         fingerprint = _hash(PIPELINE_VERSION, audience, *sorted(e["content_hash"] for e in entries))
         saved = get_digest(target)
         if saved and not force and saved["fingerprint"] == fingerprint and saved["status"] == "ok":
-            return {**saved, "cached": True, "warnings": inbox_warnings()}
-        sources: dict[str, int] = {}
-        for entry in entries:
-            label = entry["origin"] if entry["source"] == "inbox" else entry["source"]
-            sources[label] = sources.get(label, 0) + 1
+            return {
+                **saved,
+                "cached": True,
+                "warnings": inbox_warnings(),
+                "diagnostics": {
+                    "audience": audience,
+                    "raw_sources": raw_sources,
+                    "dropped_by_shared": dropped_by_shared,
+                    "facts_dropped_by_shared": 0,
+                    "source_errors": source_errors,
+                    "llm_configured": deepseek_configured(),
+                    "llm_errors": {},
+                },
+            }
+        sources = _source_counts(entries)
         structured: dict[str, Any] = {}
         stages: dict[str, Any] = {}
+        llm_errors: dict[str, str] = {}
+        facts_dropped_by_shared = 0
+        use_llm = deepseek_configured()
         text = ""
         if entries:
-            use_llm = deepseek_configured()
-            facts, s1 = extract_facts(entries, use_llm=use_llm)
+            facts, s1 = extract_facts(entries, use_llm=use_llm, errors=llm_errors)
             if shared:
-                facts = [f for f in facts if f["kind"] in SHARED_KINDS]
-            structured, s2 = merge_facts(facts, entries, use_llm=use_llm)
+                kept_facts = [f for f in facts if f["kind"] in SHARED_KINDS]
+                facts_dropped_by_shared = max(0, len(facts) - len(kept_facts))
+                facts = kept_facts
+            structured, s2 = merge_facts(facts, entries, use_llm=use_llm, errors=llm_errors)
             stages = {"extract": s1, "merge": s2, "compose": "", "facts": len(facts), "llm": use_llm}
             if _has_content(structured):
-                text, stages["compose"] = compose(target, structured, use_llm=use_llm)
+                text, stages["compose"] = compose(target, structured, use_llm=use_llm, errors=llm_errors)
                 status = "ok" if {s1, s2, stages["compose"]} <= {"ok", "cached"} else "degraded"
             else:
                 status = "empty"
@@ -980,7 +1037,20 @@ def generate(day: str | date | None = None, *, force: bool = False, audience: st
                  json.dumps(sources, ensure_ascii=False), json.dumps(stages), record["generated_at"]))
         if status == "ok" and not shared:
             _write_markdown(target, text, sources)
-        return {**record, "cached": False, "warnings": inbox_warnings()}
+        return {
+            **record,
+            "cached": False,
+            "warnings": inbox_warnings(),
+            "diagnostics": {
+                "audience": audience,
+                "raw_sources": raw_sources,
+                "dropped_by_shared": dropped_by_shared,
+                "facts_dropped_by_shared": facts_dropped_by_shared,
+                "source_errors": source_errors,
+                "llm_configured": use_llm,
+                "llm_errors": llm_errors,
+            },
+        }
 
 
 def entries_for(day: str | date, limit: int = 50) -> list[dict[str, Any]]:

@@ -644,3 +644,52 @@ def test_notion_collector_skips_when_disabled_or_unconfigured(monkeypatch):
     monkeypatch.setattr(config, "NOTION_API_KEY", "secret-test-key")
     monkeypatch.setenv("PETIT_LIFELOG_NOTION", "0")
     assert life_log._collect_notion(date(2026, 11, 22)) == []
+
+
+def test_preview_diagnostics_explain_shared_filter_and_source_errors(api, env, monkeypatch):
+    def broken_notion(day):
+        raise RuntimeError("notion_boom")
+
+    monkeypatch.setattr(life_log, "COLLECTORS", {
+        "discord": lambda day: [{
+            "source": "discord",
+            "origin": "dm",
+            "ref": "m1",
+            "day": day.isoformat(),
+            "title": "chat",
+            "body": "雑談した",
+        }],
+        "notion": broken_notion,
+    })
+    res = command(api, action="review", day="yesterday")
+    assert res.status_code == 200
+    reply = res.json()["reply"]
+    assert "定時投稿されません" in reply
+    assert "discord=1件" in reply
+    assert "除外されました" in reply
+    assert "notion: RuntimeError: notion_boom" in reply
+
+
+def test_preview_diagnostics_explain_llm_error_and_exception(api, env, monkeypatch):
+    monkeypatch.setattr(life_log, "deepseek_configured", lambda: True)
+    monkeypatch.setattr(life_log, "_llm", lambda *a, **k: (_ for _ in ()).throw(TimeoutError("llm_slow")))
+    monkeypatch.setattr(life_log, "COLLECTORS", {
+        "github": lambda day: [{
+            "source": "github",
+            "origin": "github",
+            "ref": "r1",
+            "day": day.isoformat(),
+            "title": "PETIT",
+            "body": "- 修正した",
+        }],
+    })
+    res = command(api, action="preview", day="yesterday")
+    assert res.status_code == 200
+    reply = res.json()["reply"]
+    assert "要約ステップのエラー" in reply
+    assert "TimeoutError" in reply
+
+    monkeypatch.setattr(life_log, "generate", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("unexpected")))
+    res_err = command(api, action="preview", day="yesterday")
+    assert res_err.status_code == 200
+    assert "RuntimeError" in res_err.json()["reply"]

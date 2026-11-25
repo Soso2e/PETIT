@@ -682,3 +682,29 @@ def test_discord_event_passes_channel_context_to_brain_without_polluting_history
         {"role": "user", "content": "ぷて"},
         {"role": "assistant", "content": "管理者の追加は /petit admin add でできます！"},
     ]
+
+
+def test_core_client_surfaces_http_status_and_timeout_errors():
+    async def run(transport):
+        core = bot.CoreClient("http://core", TOKEN, transport=transport)
+        try:
+            return await core.digest_command({"action": "preview", "author_id": OWNER})
+        finally:
+            await core.close()
+
+    res_401 = asyncio.run(run(httpx.MockTransport(lambda req: httpx.Response(401, json={"detail": "認証できませんでした。"}))))
+    assert res_401["reply"] == "認証できませんでした。"
+
+    res_500 = asyncio.run(run(httpx.MockTransport(lambda req: httpx.Response(500, text="Internal Error"))))
+    assert "HTTP 500" in res_500["reply"]
+
+    res_503 = asyncio.run(run(httpx.MockTransport(lambda req: httpx.Response(503, json={}))))
+    assert "Discord 連携設定" in res_503["reply"]
+
+    timeout = httpx.MockTransport(lambda req: (_ for _ in ()).throw(httpx.ReadTimeout("slow")))
+    res_timeout = asyncio.run(run(timeout))
+    assert "タイムアウト" in res_timeout["reply"]
+
+    down = httpx.MockTransport(lambda req: (_ for _ in ()).throw(httpx.ConnectError("down")))
+    res_down = asyncio.run(run(down))
+    assert res_down["reply"] == bot.UNAVAILABLE
