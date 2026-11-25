@@ -54,7 +54,7 @@
   // ------------------------------------------------------------ walker state
   let layer = null, holder = null, bubble = null, mascot = null;
   const st = {
-    x: 0, y: 0, targetX: null, facing: 1, mode: 'idle', run: false, vy: 0,
+    x: 0, y: 0, targetX: null, facing: 1, mode: 'idle', run: false, vx: 0, vy: 0,
     petit: 'idle', lastInput: Date.now(), clicks: [], raf: 0, last: 0, timer: 0, bubbleTimer: 0,
     pointer: null, lookQueued: false, drag: null, relayoutTimer: 0, stopLife: null,
     ring: { x: 0, y: 0, vx: 0, vy: 0, px: null, py: null },
@@ -173,15 +173,53 @@
       else keepAlive = true;
     } else if (st.mode === 'falling') {
       const f = floor(), ground = topFor(f);
+      const minX = 0, maxX = Math.max(0, window.innerWidth - size());
+      st.vx *= Math.exp(-0.55 * dt);
       st.vy = Math.min(2400, st.vy + 2600 * dt);
+      st.x += st.vx * dt;
       st.y += st.vy * dt;
-      if (st.y >= ground) {
+      if (st.x < minX) {
+        const impactVx = Math.abs(st.vx);
+        st.x = minX;
+        st.vx = impactVx * 0.62;
+        st.ring.vx -= Math.min(750, impactVx) * 0.45;
+        if (st.vx > 80) { st.facing = 1; mascot.setFacing(1); }
+      } else if (st.x > maxX) {
+        const impactVx = Math.abs(st.vx);
+        st.x = maxX;
+        st.vx = -impactVx * 0.62;
+        st.ring.vx += Math.min(750, impactVx) * 0.45;
+        if (st.vx < -80) { st.facing = -1; mascot.setFacing(-1); }
+      }
+      if (st.y < 0) {
+        const impactVy = Math.abs(st.vy);
+        st.y = 0;
+        if (st.vy < 0) {
+          st.vy = impactVy * 0.45;
+          st.ring.vy -= Math.min(750, impactVy) * 0.4;
+        }
+      }
+      if (st.y >= ground && st.vy >= 0) {
         st.y = ground;
-        place();
         const impactVy = st.vy;
-        land();
-        // 着地で体が急停止した分の落下運動量を輪っかへ渡し、上から下へ突き抜けてバウンドさせる。
-        st.ring.vy += Math.min(950, impactVy) * 0.55;
+        const impactVx = st.vx;
+        if (Math.abs(impactVx) > 180 && impactVy > 220) {
+          st.vy = -Math.min(700, impactVy * 0.36);
+          st.vx = impactVx * 0.72;
+          place();
+          st.ring.vy += Math.min(950, impactVy) * 0.45;
+          keepAlive = true;
+        } else {
+          st.vx = 0;
+          st.vy = 0;
+          place();
+          land();
+          // 着地で体が急停止した分の運動量を輪っかへ渡し、上から下・進行方向へバウンドさせる。
+          st.ring.vy += Math.min(950, impactVy) * 0.55;
+          if (Math.abs(impactVx) > 40) {
+            st.ring.vx += Math.max(-700, Math.min(700, impactVx * 0.45));
+          }
+        }
       } else { place(); keepAlive = true; }
     } else if (st.mode === 'dragging') {
       keepAlive = true;
@@ -212,8 +250,14 @@
     if (st.mode !== 'walking') return;
     st.mode = 'idle'; mascot.look(null);
   }
-  function fall() {
-    st.mode = 'falling'; st.vy = 0;
+  function fall(vx = 0, vy = 0) {
+    st.mode = 'falling';
+    st.vx = vx;
+    st.vy = vy;
+    if (Math.abs(vx) > 80) {
+      st.facing = vx > 0 ? 1 : -1;
+      mascot.setFacing(st.facing);
+    }
     startLoop();
   }
   function land() {
@@ -313,19 +357,51 @@
     if (r.text && Math.random() < 0.6) say(r.text, 1600);
     schedule();
   }
+  const THROW_WINDOW_MS = 90;
+  const THROW_MIN_SPEED = 120;
+  const THROW_MAX_SPEED = 2400;
+  function recordDragSample(d, x, y, now) {
+    d.samples.push({ x, y, t: now });
+    while (d.samples.length > 2 && now - d.samples[0].t > THROW_WINDOW_MS) d.samples.shift();
+  }
+  function computeThrowVelocity(d, now) {
+    const samples = d?.samples;
+    if (!samples || samples.length < 2) return { vx: 0, vy: 0 };
+    const last = samples[samples.length - 1];
+    if (now - last.t > THROW_WINDOW_MS) return { vx: 0, vy: 0 };
+    let first = samples[0];
+    for (let i = samples.length - 2; i >= 0; i--) {
+      first = samples[i];
+      if (last.t - first.t >= 20) break;
+    }
+    const dt = (last.t - first.t) / 1000;
+    if (dt < 0.008) return { vx: 0, vy: 0 };
+    let vx = (last.x - first.x) / dt;
+    let vy = (last.y - first.y) / dt;
+    const speed = Math.hypot(vx, vy);
+    if (speed < THROW_MIN_SPEED) return { vx: 0, vy: 0 };
+    if (speed > THROW_MAX_SPEED) {
+      const scale = THROW_MAX_SPEED / speed;
+      vx *= scale;
+      vy *= scale;
+    }
+    return { vx, vy };
+  }
   function onPointerDown(event) {
     if (event.button !== 0) return;
     holder.setPointerCapture(event.pointerId);
-    st.drag = { id: event.pointerId, sx: event.clientX, sy: event.clientY, active: false };
+    st.drag = { id: event.pointerId, sx: event.clientX, sy: event.clientY, active: false, samples: [] };
   }
   function onPointerMove(event) {
     const d = st.drag;
     if (!d || d.id !== event.pointerId) return;
     if (!d.active && Math.hypot(event.clientX - d.sx, event.clientY - d.sy) < 6) return;
+    const now = performance.now();
     if (!d.active) {
       d.active = true;
       stopWalking(); clearTimeout(st.timer);
       st.mode = 'dragging';
+      st.vx = 0; st.vy = 0;
       st.ring.px = st.x; st.ring.py = st.y;
       mascot.clearReaction();
       mascot.setEmotion('surprised'); mascot.setAction('dangle');
@@ -334,6 +410,7 @@
     }
     st.x = event.clientX - size() / 2;
     st.y = event.clientY - size() * 0.18;
+    recordDragSample(d, st.x, st.y, now);
     place();
   }
   function onPointerUp(event) {
@@ -343,9 +420,15 @@
     holder.classList.remove('pmw-dragging');
     st.lastInput = Date.now();
     if (!d.active) { onClick(); return; }
-    st.x = clampX(st.x, { min: 0, max: window.innerWidth - size() });
-    if (canMove()) fall();
-    else { st.y = topFor(floor()); place(); resetRingPhysics(); land(); }
+    const { vx, vy } = event.type === 'pointercancel' ? { vx: 0, vy: 0 } : computeThrowVelocity(d, performance.now());
+    st.x = clampX(st.x, { min: 0, max: Math.max(0, window.innerWidth - size()) });
+    st.y = Math.max(0, st.y);
+    let launchVy = vy;
+    if (st.y >= topFor(floor()) - 2 && launchVy >= 0 && Math.abs(vx) > 180) {
+      launchVy = -Math.min(420, Math.abs(vx) * 0.32);
+    }
+    if (canMove()) fall(vx, launchVy);
+    else { st.vx = 0; st.vy = 0; st.y = topFor(floor()); place(); resetRingPhysics(); land(); }
   }
   function onPointerEnter() {
     if (st.mode === 'idle' && idleish() && !st.drag) mascot.react('happy', 'wiggle', 900);

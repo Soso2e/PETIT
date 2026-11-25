@@ -108,3 +108,186 @@ test('ring inertia layer, action lag keyframes, and web spring physics are wired
   assert.match(web, /stepRing\(/);
   assert.match(web, /setRingOffset\(/);
 });
+
+test('dragging and releasing with momentum throws the web mascot with wall bounce and landing', () => {
+  const vm = require('node:vm');
+  const webSource = source('mascot/petit-mascot-web.js');
+
+  function makeEl(tag) {
+    const listeners = new Map();
+    const classes = new Set();
+    const styles = new Map();
+    return {
+      tagName: tag.toUpperCase(),
+      className: '',
+      title: '',
+      textContent: '',
+      dataset: {},
+      children: [],
+      classList: {
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+        toggle: (c, f) => (f ? classes.add(c) : classes.delete(c)),
+        contains: (c) => classes.has(c),
+      },
+      style: {
+        transform: '',
+        setProperty: (k, v) => styles.set(k, v),
+        removeProperty: (k) => styles.delete(k),
+        getPropertyValue: (k) => styles.get(k) || '',
+      },
+      setAttribute() {},
+      removeAttribute() {},
+      toggleAttribute() {},
+      setPointerCapture() {},
+      append(...nodes) { this.children.push(...nodes); },
+      remove() {},
+      contains(node) { return node === this || this.children.some((c) => c.contains?.(node)); },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      addEventListener(type, fn) {
+        if (!listeners.has(type)) listeners.set(type, []);
+        listeners.get(type).push(fn);
+      },
+      removeEventListener(type, fn) {
+        const list = listeners.get(type);
+        if (list) listeners.set(type, list.filter((f) => f !== fn));
+      },
+      dispatch(type, event) {
+        for (const fn of (listeners.get(type) || [])) fn({ type, ...event });
+      },
+    };
+  }
+
+  let nowMs = 1000;
+  let rafId = 0;
+  const rafQueue = new Map();
+  const body = makeEl('body');
+  const docEl = makeEl('html');
+  const mascotState = { facing: 1, reactions: [], ringOffsets: [] };
+
+  const sandbox = {
+    Math, Date, Number, String, Object, Array, Map, Set, JSON, Error,
+    parseFloat, parseInt, isFinite,
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    setInterval: () => 1,
+    clearInterval: () => {},
+    queueMicrotask: (fn) => fn(),
+    performance: { now: () => nowMs },
+    requestAnimationFrame: (cb) => { const id = ++rafId; rafQueue.set(id, cb); return id; },
+    cancelAnimationFrame: (id) => rafQueue.delete(id),
+    CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init?.detail; } },
+    Element: class Element {},
+    localStorage: { getItem: () => null, setItem: () => {} },
+    getComputedStyle: () => ({ getPropertyValue: () => '0' }),
+    document: {
+      readyState: 'complete',
+      hidden: false,
+      body,
+      documentElement: docEl,
+      activeElement: null,
+      createElement: (tag) => makeEl(tag),
+      getElementById: () => null,
+      querySelector: () => null,
+      elementsFromPoint: () => [],
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent() {},
+    },
+    window: null,
+  };
+  sandbox.window = {
+    innerWidth: 800,
+    innerHeight: 600,
+    matchMedia: () => ({ matches: false }),
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent() {},
+    PetitMascot: {
+      PRESETS: M.PRESETS,
+      STATES: M.STATES,
+      IDLE_LIFE: M.IDLE_LIFE,
+      MOTION_MODES: M.MOTION_MODES,
+      isHex: M.isHex,
+      resolveColors: M.resolveColors,
+      pickWeighted: M.pickWeighted,
+      create() {
+        return {
+          motionAllowed: () => true,
+          setFacing: (d) => { mascotState.facing = d; },
+          setState() {},
+          setEmotion() {},
+          setAction() {},
+          setColors() {},
+          setSize() {},
+          setMotion() {},
+          setLite() {},
+          look() {},
+          clearReaction() {},
+          react: (e, a) => { mascotState.reactions.push({ e, a }); },
+          setRingOffset: (x, y, r) => { mascotState.ringOffsets.push({ x, y, r }); },
+          pause() {},
+          destroy() {},
+        };
+      },
+    },
+  };
+  sandbox.globalThis = sandbox;
+  vm.runInNewContext(webSource, sandbox);
+
+  const layer = body.children[0];
+  const holder = layer.children[0];
+  const pos = () => {
+    const m = /translate3d\((-?\d+)px,\s*(-?\d+)px/.exec(holder.style.transform);
+    assert.ok(m, `expected translate3d transform, got ${holder.style.transform}`);
+    return { x: Number(m[1]), y: Number(m[2]) };
+  };
+  const stepFrames = (count, stepMs = 16) => {
+    for (let i = 0; i < count; i++) {
+      nowMs += stepMs;
+      const pending = Array.from(rafQueue.entries());
+      rafQueue.clear();
+      for (const [, cb] of pending) cb(nowMs);
+    }
+  };
+
+  // 1) 右斜め上に勢いよく投げる → 右へ飛んで壁で跳ね返り、最終的に床へ着地する
+  mascotState.reactions.length = 0;
+  holder.dispatch('pointerdown', { button: 0, pointerId: 1, clientX: 200, clientY: 300 });
+  nowMs += 16; holder.dispatch('pointermove', { pointerId: 1, clientX: 230, clientY: 280 });
+  nowMs += 16; holder.dispatch('pointermove', { pointerId: 1, clientX: 280, clientY: 245 });
+  nowMs += 16; holder.dispatch('pointermove', { pointerId: 1, clientX: 330, clientY: 210 });
+  const releasePos = pos();
+  nowMs += 8; holder.dispatch('pointerup', { pointerId: 1, clientX: 330, clientY: 210 });
+
+  let maxX = releasePos.x;
+  let minY = releasePos.y;
+  let bouncedLeft = false;
+  let prevX = releasePos.x;
+  for (let i = 0; i < 180; i++) {
+    stepFrames(1, 16);
+    const p = pos();
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (maxX >= 720 && p.x < prevX) bouncedLeft = true;
+    prevX = p.x;
+  }
+  assert.ok(maxX > releasePos.x + 200, `expected horizontal flight beyond release x=${releasePos.x}, got maxX=${maxX}`);
+  assert.ok(minY < releasePos.y - 20, `expected upward arc above release y=${releasePos.y}, got minY=${minY}`);
+  assert.ok(bouncedLeft, 'expected bounce off right viewport wall');
+  assert.ok(mascotState.reactions.some((r) => r.a === 'land'), 'expected mascot to land after throw');
+
+  // 2) 持ち上げて静止してから離す → 横へ飛ばず真下に落下する
+  mascotState.reactions.length = 0;
+  holder.dispatch('pointerdown', { button: 0, pointerId: 2, clientX: 300, clientY: 200 });
+  nowMs += 16; holder.dispatch('pointermove', { pointerId: 2, clientX: 320, clientY: 200 });
+  nowMs += 200; // 静止待ち
+  const stillPos = pos();
+  holder.dispatch('pointerup', { pointerId: 2, clientX: 320, clientY: 200 });
+  stepFrames(60, 16);
+  const droppedPos = pos();
+  assert.equal(droppedPos.x, stillPos.x, 'stationary release should drop straight down');
+  assert.ok(droppedPos.y > stillPos.y + 100, 'stationary release should fall to the floor');
+  assert.ok(mascotState.reactions.some((r) => r.a === 'land'), 'expected mascot to land after straight drop');
+});
