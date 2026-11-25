@@ -197,7 +197,7 @@
     return `<defs><clipPath id="${clip}"><rect x="0" y="327" width="512" height="185"/></clipPath></defs>` +
       `<path class="pm-shadow" ${paint('ink')} opacity=".14" d="${ell(256, 462, 112, 12)}"/>` +
       `<g class="pm-char">` +
-        `<g class="pm-ring pm-ring-back"><g transform="rotate(-12 256 327)">${ring}</g></g>` +
+        `<g class="pm-ring pm-ring-back"><g class="pm-ring-inertia"><g transform="rotate(-12 256 327)">${ring}</g></g></g>` +
         `<g class="pm-foot pm-foot-l"><path ${paint('body')} transform="rotate(-13 202 423)" d="${ell(202, 423, 24, 34)}"/></g>` +
         `<g class="pm-foot pm-foot-r"><path ${paint('body')} transform="rotate(13 318 423)" d="${ell(318, 423, 24, 34)}"/></g>` +
         `<g class="pm-body">` +
@@ -215,7 +215,7 @@
           `<g class="pm-leaf"><path ${paint('leaf')} d="M262 103C267 65 316 49 357 48C355 90 310 120 262 103Z"/>` +
           `<path ${paint('vein', 6)} d="M277 91Q306 73 336 65"/></g>` +
         `</g>` +
-        `<g class="pm-ring pm-ring-front"><g transform="rotate(-12 256 327)"><g clip-path="url(#${clip})">${ring}</g></g></g>` +
+        `<g class="pm-ring pm-ring-front"><g class="pm-ring-inertia"><g transform="rotate(-12 256 327)"><g clip-path="url(#${clip})">${ring}</g></g></g></g>` +
       `</g>` +
       `<g class="pm-fx">${partsMarkup('fx', paint, filter)}</g>`;
   }
@@ -318,6 +318,18 @@
       look(x, y) {
         pointerLook = x == null ? null : [Math.max(-1, Math.min(1, x)), Math.max(-1, Math.min(1, y || 0))];
         render();
+      },
+      /** 輪っかの慣性オフセット (SVGユーザー単位 px, deg)。null でリセット。 */
+      setRingOffset(x, y = 0, r = 0) {
+        if (x == null) {
+          el.style.removeProperty('--pm-ring-x');
+          el.style.removeProperty('--pm-ring-y');
+          el.style.removeProperty('--pm-ring-r');
+          return;
+        }
+        el.style.setProperty('--pm-ring-x', `${Number(x).toFixed(2)}px`);
+        el.style.setProperty('--pm-ring-y', `${Number(y).toFixed(2)}px`);
+        el.style.setProperty('--pm-ring-r', `${Number(r).toFixed(2)}deg`);
       },
       setFacing(dir) { el.dataset.facing = dir < 0 ? 'left' : 'right'; },
       setColors, setSize,
