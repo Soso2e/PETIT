@@ -91,13 +91,58 @@ def audience_for(guild_id: str | None) -> str:
 
 def _failure_reason(digest: dict) -> str:
     status = digest.get("status")
+    diag = digest.get("diagnostics") or {}
     if status == "empty":
+        if diag.get("audience") == "shared" and (
+            diag.get("dropped_by_shared") or diag.get("facts_dropped_by_shared")
+        ):
+            return "情報不足（サーバーチャンネル用の公開フィルタにより個人記録が除外された）"
         return "情報不足（載せられる記録がない）"
     if status == "degraded":
         stages = digest.get("stages") or {}
         failed = [name for name in ("extract", "merge", "compose") if stages.get(name) == "fallback"]
+        if diag and not diag.get("llm_configured", True):
+            return "要約に失敗: DeepSeek API が未設定"
         return "要約に失敗: " + ("/".join(failed) or "不明")
     return "生成に失敗: " + str(digest.get("error") or status)
+
+
+def _preview_diagnostics(digest: dict) -> list[str]:
+    diag = digest.get("diagnostics") or {}
+    if not diag:
+        return []
+    notes: list[str] = []
+    raw_sources = diag.get("raw_sources") or {}
+    if raw_sources:
+        summary = ", ".join(f"{k}={v}件" for k, v in sorted(raw_sources.items()))
+        notes.append(f"取得できた記録: {summary}")
+    else:
+        notes.append("取得できた記録: 0件（どのソースからも対象日の記録が見つかりませんでした）")
+    if diag.get("audience") == "shared":
+        dropped_entries = int(diag.get("dropped_by_shared") or 0)
+        dropped_facts = int(diag.get("facts_dropped_by_shared") or 0)
+        if dropped_entries:
+            notes.append(
+                f"サーバーチャンネルでは公開可能なソース（GitHub / Inbox / Notion）のみ対象のため、"
+                f"個人チャット等の記録 {dropped_entries}件 が除外されました（全記録は DM で確認できます）。"
+            )
+        elif dropped_facts:
+            notes.append(
+                f"サーバーチャンネルでは公開可能な項目（完了・進行・次の予定）のみ対象のため、"
+                f"抽出した項目 {dropped_facts}件 が除外されました。"
+            )
+    source_errors = diag.get("source_errors") or {}
+    if source_errors:
+        err_text = ", ".join(f"{k}: {v}" for k, v in sorted(source_errors.items()))
+        notes.append(f"取得に失敗したソース: {err_text}")
+    if digest.get("status") == "degraded":
+        if not diag.get("llm_configured", True):
+            notes.append("DeepSeek API キーが未設定のため要約を実行できませんでした。")
+        llm_errors = diag.get("llm_errors") or {}
+        if llm_errors:
+            err_text = ", ".join(f"{k}: {v}" for k, v in sorted(llm_errors.items()))
+            notes.append(f"要約ステップのエラー: {err_text}")
+    return notes
 
 
 def _describe(row) -> str:
@@ -205,7 +250,7 @@ def get_scheduler() -> DigestScheduler:
 
 
 class DigestCommand(BaseModel):
-    action: str = Field(pattern=r"^(here|register|off|unregister|list|preview)$")
+    action: str = Field(pattern=r"^(here|register|off|unregister|list|preview|review)$")
     author_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")
     guild_id: str | None = Field(default=None, max_length=40, pattern=r"^[0-9]+$")
     channel_id: str | None = Field(default=None, max_length=40, pattern=r"^[0-9]+$")
@@ -233,11 +278,22 @@ def command(body: DigestCommand, authorization: str | None = Header(default=None
                 if bad:
                     lines.append(f"  直近の失敗: {bad['day']}（{bad['error'] or '不明'}）")
         return {"reply": "進捗投稿の登録:\n" + "\n".join(lines)}
-    if body.action == "preview":
-        digest = life_log.generate(body.day, audience=audience_for(body.guild_id))
+    if body.action in {"preview", "review"}:
+        try:
+            digest = life_log.generate(body.day, audience=audience_for(body.guild_id))
+        except Exception as exc:  # noqa: BLE001
+            log.exception("digest preview failed")
+            return {
+                "reply": f"⚠️ プレビューの生成中にエラーが発生しました（{type(exc).__name__}）。",
+                "status": "failed",
+                "warnings": [],
+            }
         reply = digest["text"]
         if digest["status"] != "ok":
             reply += f"\n\n⚠️ この内容は定時投稿されません（{_failure_reason(digest)}）。"
+            diag_notes = _preview_diagnostics(digest)
+            if diag_notes:
+                reply += "\n\n**診断情報**\n" + "\n".join("- " + note for note in diag_notes)
         warnings = digest.get("warnings") or []
         if warnings:
             # Preview is ephemeral, so file names can be shown; scheduled posts never include them.
