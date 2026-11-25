@@ -141,6 +141,10 @@
       st.ring.y += st.ring.vy * h;
     }
     const svgScale = 512 / size();
+    // 高い所からの落下でも着地時に張り付かずすぐバウンドできるよう物理変位を緩く抑える。
+    const maxPhysY = 135 / svgScale;
+    if (st.ring.y < -maxPhysY) { st.ring.y = -maxPhysY; if (st.ring.vy < 0) st.ring.vy *= 0.5; }
+    else if (st.ring.y > maxPhysY) { st.ring.y = maxPhysY; if (st.ring.vy > 0) st.ring.vy *= 0.5; }
     const svgX = softClamp(st.ring.x * svgScale * st.facing, 52);
     const svgY = softClamp(st.ring.y * svgScale, 110);
     const rot = softClamp(svgX * 0.22, 14);
@@ -171,8 +175,14 @@
       const f = floor(), ground = topFor(f);
       st.vy = Math.min(2400, st.vy + 2600 * dt);
       st.y += st.vy * dt;
-      if (st.y >= ground) { st.y = ground; place(); land(); }
-      else { place(); keepAlive = true; }
+      if (st.y >= ground) {
+        st.y = ground;
+        place();
+        const impactVy = st.vy;
+        land();
+        // 着地で体が急停止した分の落下運動量を輪っかへ渡し、上から下へ突き抜けてバウンドさせる。
+        st.ring.vy += Math.min(950, impactVy) * 0.55;
+      } else { place(); keepAlive = true; }
     } else if (st.mode === 'dragging') {
       keepAlive = true;
     }

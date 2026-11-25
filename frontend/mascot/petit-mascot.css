@@ -125,7 +125,8 @@
 .pm-root[data-action="dangle"] .pm-foot-r { animation: pm-kick .4s ease-in-out -.2s infinite; }
 .pm-root[data-action="dangle"] .pm-shadow { opacity: 0; }
 .pm-root[data-action="land"] .pm-char { animation: pm-land .52s cubic-bezier(.3,1.4,.5,1) 1; }
-.pm-root[data-action="land"] .pm-ring { animation: pm-ring-land .52s ease-out 1; }
+.pm-root[data-action="land"] .pm-ring { animation: pm-ring-land .52s ease-in-out 1; }
+.pm-root[data-ring-physics][data-action="land"] .pm-ring { animation: none; }
 
 /* ---- 軽量表示・一時停止・動きを減らす */
 .pm-root[data-lite] .pm-ring,
@@ -212,9 +213,9 @@
   75% { transform: translateY(-4px) rotate(0); }
 }
 @keyframes pm-ring-land {
-  0% { transform: translateY(-22px) rotate(0); }
-  28% { transform: translateY(26px) rotate(-2.5deg); }
-  65% { transform: translateY(-10px) rotate(1.5deg); }
+  0% { transform: translateY(-10px) rotate(0); }
+  26% { transform: translateY(24px) rotate(-2.5deg); }
+  62% { transform: translateY(-9px) rotate(1.5deg); }
   100% { transform: translateY(0) rotate(0); }
 }
 @keyframes pm-leaf { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(5deg); } }

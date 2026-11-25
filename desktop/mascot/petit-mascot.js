@@ -322,11 +322,13 @@
       /** 輪っかの慣性オフセット (SVGユーザー単位 px, deg)。null でリセット。 */
       setRingOffset(x, y = 0, r = 0) {
         if (x == null) {
+          el.removeAttribute('data-ring-physics');
           el.style.removeProperty('--pm-ring-x');
           el.style.removeProperty('--pm-ring-y');
           el.style.removeProperty('--pm-ring-r');
           return;
         }
+        el.setAttribute('data-ring-physics', '');
         el.style.setProperty('--pm-ring-x', `${Number(x).toFixed(2)}px`);
         el.style.setProperty('--pm-ring-y', `${Number(y).toFixed(2)}px`);
         el.style.setProperty('--pm-ring-r', `${Number(r).toFixed(2)}deg`);
