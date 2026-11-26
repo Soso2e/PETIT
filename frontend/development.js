@@ -896,11 +896,13 @@
         triageBadge.dataset.triage = triage;
       }
       if (isRunning) {
-        const activeBadge = append(badges, "span", statusLabel(status));
+        const icon = status === "running" ? "▶ " : "… ";
+        const activeBadge = append(badges, "span", icon + statusLabel(status));
         activeBadge.className = "development-active-badge";
         activeBadge.dataset.status = status;
       } else if (needsAttention) {
-        const badge = append(badges, "span", statusLabel(status));
+        const icon = status === "ready_for_review" ? "✓ " : "⚠ ";
+        const badge = append(badges, "span", icon + statusLabel(status));
         badge.className = "development-attention-badge";
         badge.dataset.status = status;
       }

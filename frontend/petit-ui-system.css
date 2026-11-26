@@ -4,49 +4,55 @@
 
 :root {
   color-scheme: dark;
-  --ui-bg:#0b0c0e; --ui-bg-2:#101113; --ui-surface:rgba(20,21,23,.94);
-  --ui-surface-solid:#151618; --ui-soft:rgba(255,255,255,.032);
-  --ui-line:rgba(255,255,255,.075); --ui-line-strong:rgba(255,255,255,.145);
-  --ui-text:#f0f0ed; --ui-muted:#a3a3a0; --ui-dim:#696966;
-  --ui-accent:#d3d3ce; --ui-accent-soft:rgba(226,226,220,.085); --ui-focus:#d9d9d3;
-  --ui-ok:#82ad94; --ui-warn:#b99a68; --ui-danger:#c77b7f;
+  --ui-bg:#11100f; --ui-bg-2:#1a1816; --ui-surface:rgba(34,32,29,.96);
+  --ui-surface-solid:#22201d; --ui-soft:rgba(242,238,230,.055);
+  --ui-line:rgba(242,238,230,.13); --ui-line-strong:rgba(242,238,230,.25);
+  --ui-text:#f1ede4; --ui-muted:#b5afa4; --ui-dim:#989287;
+  --ui-accent:#d8d2c7; --ui-accent-soft:rgba(241,237,228,.085); --ui-focus:#e8dfd1;
+  --ui-primary:#b04f3e; --ui-primary-hover:#c05a48; --ui-primary-text:#fdfcf9; --ui-primary-soft:rgba(176,79,62,.16);
+  --ui-data-1:#1c2b26; --ui-data-2:#2c493f; --ui-data-3:#4a7a68; --ui-data-4:#79b49d;
+  --ui-data-1-text:#d7dfd9; --ui-data-2-text:#e6ede9; --ui-data-3-text:#fdfcf9; --ui-data-4-text:#11100f;
+  --ui-ok:#78b896; --ui-warn:#d4a359; --ui-danger:#e07a80;
   --ui-r-xs:5px; --ui-r-sm:8px; --ui-r-md:12px; --ui-r-lg:15px;
-  --ui-shadow:0 8px 24px rgba(0,0,0,.18); --ui-shadow-lg:0 20px 54px rgba(0,0,0,.30);
-  --ui-focus-ring:0 0 0 3px rgba(230,230,222,.12);
+  --ui-shadow:0 4px 16px rgba(0,0,0,.22); --ui-shadow-lg:0 16px 40px rgba(0,0,0,.34);
+  --ui-focus-ring:0 0 0 3px rgba(232,223,209,.18);
   --ui-fast:140ms; --ui-normal:220ms; --ui-slow:360ms;
   --ui-ease:cubic-bezier(.2,.8,.2,1); --ui-header:66px; --ui-mobile-nav:70px;
   --bg:var(--ui-bg); --bg-mid:var(--ui-bg-2); --bg-surface:var(--ui-surface-solid);
-  --line:var(--ui-line); --line-mid:rgba(255,255,255,.11); --line-strong:var(--ui-line-strong);
+  --line:var(--ui-line); --line-mid:rgba(242,238,230,.18); --line-strong:var(--ui-line-strong);
   --text:var(--ui-text); --text-sub:var(--ui-muted); --text-dim:var(--ui-dim);
-  --accent:var(--ui-accent); --ok:var(--ui-ok); --warn:var(--ui-warn); --danger:var(--ui-danger);
-  --shadow-sm:var(--ui-shadow); --shadow-md:var(--ui-shadow-lg); --shadow-lg:0 28px 80px rgba(0,0,0,.42);
+  --accent:var(--ui-primary); --ok:var(--ui-ok); --warn:var(--ui-warn); --danger:var(--ui-danger);
+  --shadow-sm:var(--ui-shadow); --shadow-md:var(--ui-shadow-lg); --shadow-lg:0 24px 64px rgba(0,0,0,.42);
 }
 
 html[data-petit-theme="light"] {
   color-scheme: light;
-  --ui-bg:#f4f3f0; --ui-bg-2:#ebeae6; --ui-surface:rgba(255,255,253,.94);
-  --ui-surface-solid:#fff; --ui-soft:rgba(26,26,24,.035);
-  --ui-line:rgba(28,28,25,.09); --ui-line-strong:rgba(28,28,25,.17);
-  --ui-text:#1b1b19; --ui-muted:#64645f; --ui-dim:#8a8982;
-  --ui-accent:#252522; --ui-accent-soft:rgba(37,37,34,.07); --ui-focus:#383834;
-  --ui-ok:#3d7659; --ui-warn:#846632; --ui-danger:#9b4f54;
-  --ui-shadow:0 8px 24px rgba(31,31,28,.06); --ui-shadow-lg:0 18px 50px rgba(31,31,28,.10);
-  --ui-focus-ring:0 0 0 3px rgba(40,40,36,.10);
+  --ui-bg:#f5f2eb; --ui-bg-2:#ebe7de; --ui-surface:rgba(253,252,249,.97);
+  --ui-surface-solid:#fdfcf9; --ui-soft:rgba(34,31,27,.045);
+  --ui-line:rgba(34,31,27,.14); --ui-line-strong:rgba(34,31,27,.26);
+  --ui-text:#1d1b18; --ui-muted:#57534a; --ui-dim:#686359;
+  --ui-accent:#2e2b26; --ui-accent-soft:rgba(34,31,27,.075); --ui-focus:#3a352e;
+  --ui-primary:#9e4737; --ui-primary-hover:#873b2d; --ui-primary-text:#fdfcf9; --ui-primary-soft:rgba(158,71,55,.11);
+  --ui-data-1:#e2ebe6; --ui-data-2:#b7cfc3; --ui-data-3:#6a9987; --ui-data-4:#356856;
+  --ui-data-1-text:#1d1b18; --ui-data-2-text:#1d1b18; --ui-data-3-text:#1d1b18; --ui-data-4-text:#fdfcf9;
+  --ui-ok:#2f6e52; --ui-warn:#8a5a19; --ui-danger:#a6343c;
+  --ui-shadow:0 4px 16px rgba(34,31,27,.06); --ui-shadow-lg:0 14px 36px rgba(34,31,27,.10);
+  --ui-focus-ring:0 0 0 3px rgba(58,53,46,.16);
   --bg:var(--ui-bg); --bg-mid:var(--ui-bg-2); --bg-surface:var(--ui-surface-solid);
-  --line:var(--ui-line); --line-mid:rgba(28,28,25,.13); --line-strong:var(--ui-line-strong);
+  --line:var(--ui-line); --line-mid:rgba(34,31,27,.19); --line-strong:var(--ui-line-strong);
   --text:var(--ui-text); --text-sub:var(--ui-muted); --text-dim:var(--ui-dim);
-  --accent:var(--ui-accent); --ok:var(--ui-ok); --warn:var(--ui-warn); --danger:var(--ui-danger);
-  --shadow-sm:var(--ui-shadow); --shadow-md:var(--ui-shadow-lg); --shadow-lg:0 28px 80px rgba(39,49,65,.16);
+  --accent:var(--ui-primary); --ok:var(--ui-ok); --warn:var(--ui-warn); --danger:var(--ui-danger);
+  --shadow-sm:var(--ui-shadow); --shadow-md:var(--ui-shadow-lg); --shadow-lg:0 22px 56px rgba(34,31,27,.14);
 }
 
 html { background:var(--ui-bg); text-rendering:optimizeLegibility; }
 body {
-  background:linear-gradient(145deg,rgba(255,255,255,.018),transparent 32rem),var(--ui-bg);
+  background:var(--ui-bg);
   color:var(--ui-text);
   font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
 html[data-petit-theme="light"] body {
-  background:linear-gradient(145deg,rgba(255,255,255,.66),transparent 32rem),var(--ui-bg);
+  background:var(--ui-bg);
 }
 * { scrollbar-width:thin; scrollbar-color:var(--ui-line-strong) transparent; }
 ::selection { color:var(--ui-text); background:rgba(190,190,184,.22); }
@@ -59,7 +65,7 @@ button:disabled,[aria-disabled="true"] { cursor:not-allowed!important; }
 .space::before,.space::after { opacity:.22; animation-duration:220s; }
 .space__nebula { opacity:.045; filter:blur(150px); }
 html[data-petit-theme="light"] .space::before,html[data-petit-theme="light"] .space::after { filter:invert(1); opacity:.08; }
-body:not(.petit-univ-active) .space { opacity:.14; filter:grayscale(1); }
+body:not(.petit-univ-active) .space { display:none; }
 body:not(.petit-univ-active) .space__nebula { display:none; }
 
 .universe-shell { min-height:100dvh; }
@@ -190,15 +196,23 @@ html[data-petit-theme="light"] .orbit::after { background:radial-gradient(ellips
 .reminder-filter.is-active { color:var(--ui-text); background:var(--ui-surface-solid); }
 
 .chat-layout { gap:16px; grid-template-columns:minmax(0,1fr) minmax(250px,300px); }
-.chat-panel { overflow:clip; }
-.chat-context { position:sticky; top:calc(var(--ui-header) + 76px); }
-.messages { gap:10px; padding:18px 20px; scroll-behavior:smooth; }
-.message { max-width:min(82%,680px); border-radius:12px; border-color:var(--ui-line); background:var(--ui-soft); box-shadow:none; }
-.message--user { border-color:var(--ui-line-strong); background:var(--ui-accent-soft); }
-.chat-composer { position:sticky; bottom:0; gap:10px; padding:12px; border-top-color:var(--ui-line); background:color-mix(in srgb,var(--ui-bg-2) 88%,transparent); backdrop-filter:blur(18px); }
-.chat-composer textarea { min-height:44px; padding:10px 12px; border-radius:11px; border-color:var(--ui-line); background:var(--ui-surface-solid); font-size:16px; }
+.chat-panel { overflow:clip; background:var(--ui-surface-solid); border-color:var(--ui-line-strong); }
+.chat-context { position:sticky; top:calc(var(--ui-header) + 76px); background:var(--ui-bg-2); }
+.messages { gap:12px; padding:18px 20px; scroll-behavior:smooth; background:var(--ui-surface-solid); }
+.message { max-width:min(82%,680px); border-radius:12px; border:1px solid var(--ui-line); background:var(--ui-bg); color:var(--ui-text); box-shadow:none; }
+.message--assistant { border-color:var(--ui-line); background:var(--ui-bg); }
+.message--user { border-color:var(--ui-line-strong); background:var(--ui-bg-2); }
+.chat-composer { position:sticky; bottom:0; gap:10px; padding:12px; border-top:1px solid var(--ui-line-strong); background:var(--ui-bg-2); backdrop-filter:none; }
+.chat-composer textarea { min-height:44px; padding:10px 12px; border-radius:11px; border:1px solid var(--ui-line-strong); background:var(--ui-surface-solid); color:var(--ui-text); font-size:16px; }
 .chat-composer textarea:focus { border-color:var(--ui-focus); box-shadow:var(--ui-focus-ring); }
-.chat-composer button[type="submit"] { min-width:72px; min-height:44px; border-radius:11px; border-color:var(--ui-line-strong); background:var(--ui-accent-soft); }
+.chat-composer button[type="submit"],.chat-composer .chat-send {
+  min-width:72px; min-height:44px; border-radius:11px;
+  border:1px solid var(--ui-primary); background:var(--ui-primary); color:var(--ui-primary-text);
+  font-weight:600;
+}
+.chat-composer button[type="submit"]:hover:not(:disabled),.chat-composer .chat-send:hover:not(:disabled) {
+  background:var(--ui-primary-hover); border-color:var(--ui-primary-hover);
+}
 
 .settings-grid {
   display:grid;

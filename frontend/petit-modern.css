@@ -201,9 +201,9 @@ body .chat-composer .mic:hover,
 body .chat-composer .chat-composer__attach:hover { background: var(--ui-soft); color: var(--ui-text); }
 body .chat-composer .mic.mic--listening { background: color-mix(in srgb, #ef6b73 18%, transparent); border-color: #ef6b73; color: #ef6b73; }
 body .chat-composer button[type="submit"] {
-  grid-area: send; border: 0; background: var(--ui-text); color: var(--ui-bg); font-weight: 600;
+  grid-area: send; border: 1px solid var(--ui-primary); background: var(--ui-primary); color: var(--ui-primary-text); font-weight: 600;
 }
-body .chat-composer button[type="submit"]:hover { opacity: .88; }
+body .chat-composer button[type="submit"]:hover:not(:disabled) { background: var(--ui-primary-hover); border-color: var(--ui-primary-hover); opacity: 1; }
 body .chat-composer button[type="submit"]:disabled { opacity: .35; cursor: default; }
 body .chat-composer svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 body .chat-composer .mic .mic-icon--stop { display: none; fill: currentColor; stroke: none; }
@@ -279,14 +279,14 @@ body .development-submit-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px;
 }
 body .development-submit-row label { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--ui-muted); }
-body .development-submit-row input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--ui-accent); }
+body .development-submit-row input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--ui-primary); }
 body .development-submit-row button[type="submit"],
 body #development-request button[type="submit"] {
-  min-height: 38px; padding: 0 18px; border: 0; border-radius: 999px;
-  background: var(--ui-text); color: var(--ui-bg); font: inherit; font-size: 14px; font-weight: 600;
+  min-height: 38px; padding: 0 18px; border: 1px solid var(--ui-primary); border-radius: 999px;
+  background: var(--ui-primary); color: var(--ui-primary-text); font: inherit; font-size: 14px; font-weight: 600;
   cursor: pointer; box-shadow: none;
 }
-body #development-request button[type="submit"]:hover { opacity: .88; }
+body #development-request button[type="submit"]:hover:not(:disabled) { background: var(--ui-primary-hover); border-color: var(--ui-primary-hover); opacity: 1; }
 body #development-request button[type="submit"]:disabled { opacity: .4; cursor: wait; }
 body #development-request .development-muted { margin: 10px 4px 0; font-size: 12px; color: var(--ui-dim); }
 

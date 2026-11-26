@@ -77,6 +77,14 @@
       spacer.setAttribute("aria-hidden", "true");
       grid.append(spacer);
     }
+    const syncSelected = () => {
+      const selected = dateInput.value || today;
+      grid.querySelectorAll("button.dashboard-day").forEach((btn) => {
+        const isSelected = btn.dataset.date === selected;
+        btn.classList.toggle("is-selected", isSelected);
+        btn.setAttribute("aria-pressed", String(isSelected));
+      });
+    };
     const today = summary.daily[summary.daily.length - 1].date;
     for (const row of summary.daily) {
       const cell = build("button", "dashboard-day", String(Number(row.date.slice(-2))));
@@ -90,9 +98,15 @@
       cell.addEventListener("click", () => {
         if (dateInput.disabled) return;
         dateInput.value = row.date;
+        syncSelected();
         dateInput.dispatchEvent(new Event("change", { bubbles: true }));
       });
       grid.append(cell);
+    }
+    syncSelected();
+    if (!dateInput.dataset.dashboardSyncBound) {
+      dateInput.dataset.dashboardSyncBound = "true";
+      dateInput.addEventListener("change", syncSelected);
     }
     state.textContent = `${summary.daily[0].date}〜${today} · 日本時間（JST）`;
   };

@@ -27,7 +27,7 @@
 
   const syncMetaThemeColor = () => {
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = state.theme === "light" ? "#f4f6fb" : "#050711";
+    if (meta) meta.content = state.theme === "light" ? "#f5f2eb" : "#11100f";
   };
 
   const apply = () => {
