@@ -67,14 +67,13 @@ body.petit-univ-screen .petit-context-bar {
   min-height: clamp(680px, calc(100dvh - 112px), 980px);
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid rgba(157, 180, 255, .14);
+  border: 1px solid var(--petit-univ-border, rgba(180, 194, 224, .18));
   border-radius: 30px;
-  background:
-    radial-gradient(circle at 50% 48%, rgba(96, 123, 255, .16), transparent 20%),
-    radial-gradient(circle at 18% 20%, rgba(82, 227, 205, .07), transparent 28%),
-    radial-gradient(circle at 84% 76%, rgba(190, 102, 255, .08), transparent 30%),
-    linear-gradient(160deg, #070a1a 0%, #02040d 72%, #010208 100%);
-  box-shadow: 0 28px 90px rgba(0, 0, 0, .38), inset 0 0 120px rgba(80, 105, 220, .06);
+  background: var(--petit-univ-bg,
+    radial-gradient(circle at 50% 48%, rgba(114, 146, 210, .14), transparent 24%),
+    radial-gradient(circle at 20% 24%, rgba(92, 168, 158, .07), transparent 30%),
+    linear-gradient(160deg, #090c14 0%, #05070d 72%, #030408 100%));
+  box-shadow: 0 24px 72px rgba(0, 0, 0, .34);
   perspective: 1400px;
   perspective-origin: 50% 48%;
   touch-action: none;
@@ -613,10 +612,11 @@ body.petit-univ-screen .univ-hud__help {
 .univ-hud__brand,
 .univ-hud__selection,
 .univ-hud__controls {
-  border: 1px solid rgba(199, 213, 255, .14);
-  background: rgba(7, 11, 29, .68);
-  box-shadow: 0 16px 46px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255,255,255,.05);
-  backdrop-filter: blur(22px) saturate(1.15);
+  border: 1px solid var(--ui-line-strong, rgba(242, 238, 230, .25));
+  background: var(--ui-surface-solid, #22201d);
+  color: var(--ui-text, #f1ede4);
+  box-shadow: var(--ui-shadow, 0 8px 24px rgba(0, 0, 0, .22));
+  backdrop-filter: none;
 }
 
 .univ-hud__brand {
@@ -687,10 +687,10 @@ body.petit-univ-screen .univ-hud__help {
 .univ-hud button {
   min-height: 38px;
   padding: 0 13px;
-  border: 1px solid rgba(206, 219, 255, .16);
+  border: 1px solid var(--ui-line-strong, rgba(242, 238, 230, .25));
   border-radius: 12px;
-  background: rgba(255,255,255,.055);
-  color: inherit;
+  background: var(--ui-bg-2, #1a1816);
+  color: var(--ui-text, #f1ede4);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -700,8 +700,8 @@ body.petit-univ-screen .univ-hud__help {
 .univ-hud button:hover,
 .univ-hud button:focus-visible {
   outline: none;
-  border-color: rgba(222, 231, 255, .5);
-  background: rgba(255,255,255,.12);
+  border-color: var(--ui-focus, #e8dfd1);
+  background: var(--ui-soft, rgba(242, 238, 230, .08));
 }
 
 .univ-hud button:disabled { opacity: .38; cursor: default; }
@@ -743,11 +743,12 @@ body.petit-univ-screen .univ-hud__help {
   width: min(430px, calc(100vw - 48px));
   max-height: calc(100dvh - 110px);
   overflow: auto;
-  border: 1px solid rgba(211, 223, 255, .18);
+  border: 1px solid var(--ui-line-strong, rgba(242, 238, 230, .25));
   border-radius: 24px;
-  background: rgba(8, 12, 30, .94);
-  box-shadow: -24px 30px 90px rgba(0, 0, 0, .46), inset 0 1px 0 rgba(255,255,255,.06);
-  backdrop-filter: blur(26px) saturate(1.12);
+  background: var(--ui-surface-solid, #22201d);
+  color: var(--ui-text, #f1ede4);
+  box-shadow: var(--ui-shadow-lg, 0 20px 54px rgba(0, 0, 0, .38));
+  backdrop-filter: none;
   transform: translateX(calc(100% + 48px));
   opacity: 0;
   pointer-events: none;
@@ -772,10 +773,10 @@ body.petit-univ-screen .univ-hud__help {
   display: none;
   min-height: 34px;
   padding: 0 11px;
-  border: 1px solid rgba(214, 225, 255, .2);
+  border: 1px solid var(--ui-line-strong, rgba(242, 238, 230, .25));
   border-radius: 999px;
-  background: rgba(10, 15, 36, .9);
-  color: inherit;
+  background: var(--ui-bg-2, #1a1816);
+  color: var(--ui-text, #f1ede4);
   font: inherit;
   font-size: 11px;
   cursor: pointer;

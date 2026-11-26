@@ -31,8 +31,16 @@ class UiThemeConsistencyTests(unittest.TestCase):
         js = (FRONTEND / "petit-ui-preferences.js").read_text(encoding="utf-8")
         self.assertIn("syncMetaThemeColor", js)
         self.assertIn("root.dataset.petitTheme = state.theme", js)
-        self.assertIn('"#f4f6fb"', js)
-        self.assertIn('"#050711"', js)
+        self.assertIn('"#f5f2eb"', js)
+        self.assertIn('"#11100f"', js)
+
+    def test_human_palette_defines_primary_and_data_tokens(self) -> None:
+        css = (FRONTEND / "petit-ui-system.css").read_text(encoding="utf-8")
+        self.assertIn("--ui-primary:#b04f3e", css)
+        self.assertIn("--ui-primary:#9e4737", css)
+        self.assertIn("--ui-data-1:", css)
+        self.assertIn("--ui-data-4:", css)
+        self.assertNotIn("rgba(190, 102, 255", (FRONTEND / "petit-ui-preferences.css").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -48,11 +48,11 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   padding: 10px 13px;
-  border: 1px solid var(--ui-line, rgb(255 255 255 / 10%));
+  border: 1px solid var(--ui-line-strong, rgb(255 255 255 / 14%));
   border-radius: 17px;
-  background: color-mix(in srgb, var(--ui-bg-2, #101113) 82%, transparent);
-  box-shadow: 0 16px 44px rgb(0 0 0 / 22%), inset 0 1px 0 rgb(255 255 255 / 5%);
-  backdrop-filter: blur(22px) saturate(1.15);
+  background: var(--ui-bg-2, #1a1816);
+  box-shadow: var(--ui-shadow, 0 8px 24px rgb(0 0 0 / 22%));
+  backdrop-filter: none;
   pointer-events: auto;
 }
 
@@ -117,11 +117,11 @@
   grid-template-columns: none;
   gap: 6px;
   padding: 5px;
-  border: 1px solid var(--ui-line, rgb(255 255 255 / 10%));
+  border: 1px solid var(--ui-line-strong, rgb(255 255 255 / 14%));
   border-radius: 18px;
-  background: color-mix(in srgb, var(--ui-bg-2, #101113) 84%, transparent);
-  box-shadow: 0 16px 44px rgb(0 0 0 / 22%), inset 0 1px 0 rgb(255 255 255 / 5%);
-  backdrop-filter: blur(22px) saturate(1.15);
+  background: var(--ui-bg-2, #1a1816);
+  box-shadow: var(--ui-shadow, 0 8px 24px rgb(0 0 0 / 22%));
+  backdrop-filter: none;
   pointer-events: auto;
 }
 
@@ -146,15 +146,15 @@
 .universe-topbar .view-tab.petit-corner-nav__item:hover,
 .universe-topbar .view-tab.petit-corner-nav__item:focus-visible {
   outline: none;
-  color: #fff;
-  background: rgb(255 255 255 / 7%);
+  color: var(--ui-text, #f1ede4);
+  background: var(--ui-soft, rgb(255 255 255 / 7%));
 }
 
 .universe-topbar .view-tab.petit-corner-nav__item.is-active {
   border-color: var(--ui-line-strong, rgb(255 255 255 / 16%));
-  background: var(--ui-accent-soft, rgb(255 255 255 / 8%));
-  color: #fff;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 20%), inset 0 1px 0 rgb(255 255 255 / 8%);
+  background: var(--ui-surface-solid, #22201d);
+  color: var(--ui-text, #f1ede4);
+  box-shadow: var(--ui-shadow, 0 4px 16px rgb(0 0 0 / 16%));
 }
 
 .universe-topbar .view-tab.petit-corner-nav__item:active {
@@ -215,19 +215,19 @@ body:not(.petit-univ-active) .notification-panel {
 }
 
 body:not(.petit-univ-active) .message--assistant {
-  border-color: var(--ui-line, rgb(255 255 255 / 8%));
-  background: var(--ui-soft, rgb(255 255 255 / 3%));
+  border-color: var(--ui-line);
+  background: var(--ui-bg);
 }
 
 body:not(.petit-univ-active) .message--user {
-  border-color: var(--ui-line-strong, rgb(255 255 255 / 15%));
-  background: var(--ui-accent-soft, rgb(255 255 255 / 8%));
+  border-color: var(--ui-line-strong);
+  background: var(--ui-bg-2);
 }
 
 body:not(.petit-univ-active) .chat-composer {
-  border-color: var(--ui-line-strong, rgb(255 255 255 / 15%));
+  border-color: var(--ui-line-strong);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--ui-surface-solid, #151618) 94%, transparent);
+  background: var(--ui-bg-2);
 }
 
 body:not(.petit-univ-active) .task-table tbody tr,
@@ -280,9 +280,9 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
 .petit-utility-dock__button:focus-visible,
 .petit-utility-dock__button[aria-expanded="true"] {
   outline: none;
-  border-color: var(--ui-line-strong, rgb(255 255 255 / 20%));
-  background: rgb(255 255 255 / 10%);
-  color: #fff;
+  border-color: var(--ui-line-strong);
+  background: var(--ui-surface-solid);
+  color: var(--ui-text);
 }
 
 .petit-utility-dock__button > span:last-child {
@@ -297,12 +297,12 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
   display: grid;
   gap: 7px;
   padding: 10px;
-  border: 1px solid var(--ui-line-strong, rgb(255 255 255 / 16%));
+  border: 1px solid var(--ui-line-strong);
   border-radius: 21px;
-  background: color-mix(in srgb, var(--ui-surface-solid, #151618) 96%, transparent);
-  color: #f4f7ff;
-  box-shadow: 0 24px 80px rgb(0 0 0 / 45%), inset 0 1px 0 rgb(255 255 255 / 6%);
-  backdrop-filter: blur(28px) saturate(1.15);
+  background: var(--ui-surface-solid);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-lg);
+  backdrop-filter: none;
   pointer-events: auto;
   transform-origin: left bottom;
   animation: petitUtilityIn .18s ease-out both;
@@ -318,7 +318,7 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
   align-items: center;
   justify-content: space-between;
   padding: 2px 4px 8px 7px;
-  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  border-bottom: 1px solid var(--ui-line);
 }
 
 .petit-utility-menu header div {
@@ -327,7 +327,7 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
 }
 
 .petit-utility-menu header span {
-  color: rgb(174 193 249 / 58%);
+  color: var(--ui-dim);
   font-family: "DM Mono", monospace;
   font-size: 8px;
   letter-spacing: .15em;
@@ -342,7 +342,7 @@ body:not(.petit-univ-active) .task-table tbody tr.is-selected {
   height: 36px;
   display: grid;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 9%);
+  border: 1px solid var(--ui-line);
   border-radius: 11px;
   background: transparent;
   color: inherit;

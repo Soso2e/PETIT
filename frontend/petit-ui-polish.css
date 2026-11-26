@@ -1,36 +1,44 @@
 /* Shared finishing layer. Loaded after the legacy shell; spatial rendering stays
    in the Universe styles. Every surface uses the active preference's tokens. */
 :root {
-  --ui-bg: #101218;
-  --ui-bg-2: #151820;
-  --ui-surface: #1a1e27;
-  --ui-surface-solid: #1a1e27;
-  --ui-soft: rgba(184, 192, 215, .055);
-  --ui-line: rgba(184, 192, 215, .11);
-  --ui-line-strong: rgba(184, 192, 215, .23);
-  --ui-text: #eef0f6;
-  --ui-muted: #abb2c3;
-  --ui-dim: #8b94a8;
-  --ui-accent: #c3bbef;
-  --ui-accent-soft: rgba(195, 187, 239, .10);
-  --ui-focus: #c3bbef;
-  --ui-shadow: 0 8px 28px rgba(0, 0, 0, .12);
-  --ui-shadow-lg: 0 20px 60px rgba(0, 0, 0, .24);
+  --ui-bg: #11100f;
+  --ui-bg-2: #1a1816;
+  --ui-surface: #22201d;
+  --ui-surface-solid: #22201d;
+  --ui-soft: rgba(242, 238, 230, .055);
+  --ui-line: rgba(242, 238, 230, .13);
+  --ui-line-strong: rgba(242, 238, 230, .25);
+  --ui-text: #f1ede4;
+  --ui-muted: #b5afa4;
+  --ui-dim: #989287;
+  --ui-accent: #d8d2c7;
+  --ui-accent-soft: rgba(241, 237, 228, .085);
+  --ui-focus: #e8dfd1;
+  --ui-primary: #b04f3e;
+  --ui-primary-hover: #c05a48;
+  --ui-primary-text: #fdfcf9;
+  --ui-primary-soft: rgba(176, 79, 62, .16);
+  --ui-shadow: 0 4px 16px rgba(0, 0, 0, .22);
+  --ui-shadow-lg: 0 16px 40px rgba(0, 0, 0, .34);
 }
 html[data-petit-theme="light"] {
-  --ui-bg: #f5f5f8;
-  --ui-bg-2: #eeeef3;
-  --ui-surface: #fff;
-  --ui-surface-solid: #fff;
-  --ui-soft: rgba(58, 48, 90, .035);
-  --ui-line: rgba(58, 48, 90, .10);
-  --ui-line-strong: rgba(58, 48, 90, .22);
-  --ui-text: #242532;
-  --ui-muted: #626579;
-  --ui-dim: #73778a;
-  --ui-accent: #6857a7;
-  --ui-accent-soft: rgba(104, 87, 167, .08);
-  --ui-focus: #6857a7;
+  --ui-bg: #f5f2eb;
+  --ui-bg-2: #ebe7de;
+  --ui-surface: #fdfcf9;
+  --ui-surface-solid: #fdfcf9;
+  --ui-soft: rgba(34, 31, 27, .045);
+  --ui-line: rgba(34, 31, 27, .14);
+  --ui-line-strong: rgba(34, 31, 27, .26);
+  --ui-text: #1d1b18;
+  --ui-muted: #57534a;
+  --ui-dim: #686359;
+  --ui-accent: #2e2b26;
+  --ui-accent-soft: rgba(34, 31, 27, .075);
+  --ui-focus: #3a352e;
+  --ui-primary: #9e4737;
+  --ui-primary-hover: #873b2d;
+  --ui-primary-text: #fdfcf9;
+  --ui-primary-soft: rgba(158, 71, 55, .11);
 }
 html:root {
   --bg: var(--ui-bg); --bg-mid: var(--ui-bg-2); --bg-surface: var(--ui-surface-solid);
@@ -107,16 +115,16 @@ body .chat-panel { display: flex; flex-direction: column; min-height: min(740px,
 body .chat-panel .section-head { padding: 24px 28px 0; margin-bottom: 0; }
 body .chat-panel h1 { font-size: 24px; }
 body .messages { flex: 1; min-height: 220px; padding: 28px; gap: 20px; }
-body .message { padding: 16px 20px; font-size: 14px; line-height: 1.85; border-radius: 14px; background: var(--ui-soft); box-shadow: none; color: var(--ui-text); }
-body .message--user { background: var(--ui-accent-soft); }
+body .message { padding: 16px 20px; font-size: 14px; line-height: 1.85; border-radius: 14px; border: 1px solid var(--ui-line); background: var(--ui-bg); box-shadow: none; color: var(--ui-text); }
+body .message--user { border-color: var(--ui-line-strong); background: var(--ui-bg-2); }
 body .chat-context { padding: 24px; align-self: start; top: 24px; }
 body .chat-context h2 { font-size: 18px; margin-block: 12px; }
 body .chat-context p { font-size: 13px; line-height: 1.8; color: var(--ui-muted); }
 body .quick-prompts { gap: 8px; margin-top: 24px; }
 body .quick-prompts button { padding: 12px 14px; min-height: 44px; border: 1px solid var(--ui-line); border-radius: 10px; background: var(--ui-soft); color: var(--ui-text); font-size: 12px; box-shadow: none; }
-body .chat-composer { position: sticky; bottom: 0; padding: 16px; gap: 10px; background: var(--ui-surface); border-top: 1px solid var(--ui-line); backdrop-filter: none; }
-body .chat-composer textarea { background: var(--ui-bg-2); border-color: var(--ui-line); color: var(--ui-text); border-radius: 12px; }
-body .chat-composer button[type="submit"] { background: var(--ui-accent); color: var(--ui-bg); border: 0; font-weight: 600; box-shadow: none; }
+body .chat-composer { position: sticky; bottom: 0; padding: 16px; gap: 10px; background: var(--ui-bg-2); border-top: 1px solid var(--ui-line-strong); backdrop-filter: none; }
+body .chat-composer textarea { background: var(--ui-surface-solid); border-color: var(--ui-line-strong); color: var(--ui-text); border-radius: 12px; }
+body .chat-composer button[type="submit"] { background: var(--ui-primary); color: var(--ui-primary-text); border: 1px solid var(--ui-primary); font-weight: 600; box-shadow: none; }
 body .universe-topbar .petit-corner-status,
 body .universe-topbar .view-tabs.petit-corner-nav { background: var(--ui-bg-2); border-color: var(--ui-line); box-shadow: none; border-radius: 14px; }
 body .universe-topbar .view-tab.petit-corner-nav__item { border-radius: 10px; border-color: transparent; color: var(--ui-muted); box-shadow: none; }
@@ -177,7 +185,7 @@ body.petit-desktop-ui #status { font-size: 11px; color: var(--ui-muted); }
 body.petit-desktop-ui .msg { font-size: 14px; line-height: 1.8; margin-bottom: 16px; }
 body.petit-desktop-ui .msg--assistant .bubble { color: var(--ui-text); }
 body.petit-desktop-ui #chat-form { background: var(--ui-surface); border-color: var(--ui-line-strong); padding: 9px; box-shadow: none; }
-body.petit-desktop-ui #send { background: var(--ui-accent); color: var(--ui-bg); }
+body.petit-desktop-ui #send { background: var(--ui-primary); color: var(--ui-primary-text); }
 body.petit-desktop-ui #mic, body.petit-desktop-ui #send { min-height: 38px; font-size: 11px; }
 body.petit-desktop-ui #voice-state, body.petit-desktop-ui #voice-toggle { font-size: 11px; }
 /* Voice UI is inserted by the shared controller; keep its controls aligned. */
