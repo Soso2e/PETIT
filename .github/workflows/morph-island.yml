@@ -6,14 +6,11 @@ on:
       - 'frontend/components/morph-island.css'
       - 'tests/test_morph_island.cjs'
       - '.github/workflows/morph-island.yml'
-  push:
-    branches:
-      - feat/shared-morph-island
-    paths:
-      - 'frontend/components/morph-island.js'
-      - 'frontend/components/morph-island.css'
-      - 'tests/test_morph_island.cjs'
-      - '.github/workflows/morph-island.yml'
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   component-tests:
     runs-on: ubuntu-latest

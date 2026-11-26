@@ -1,8 +1,7 @@
 name: GitHub evidence tests
 
 on:
-  push:
-    branches: [feat/github-evidence, feat/github-daily-review]
+  workflow_dispatch:
   pull_request:
     paths:
       - "backend/config.py"
