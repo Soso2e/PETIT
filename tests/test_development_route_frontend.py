@@ -124,3 +124,13 @@ def test_active_developing_threads_stay_visible_and_highlighted_in_thread_lists(
     assert ".development-active-badge" in css
     assert '.development-thread-card[data-active="true"]' in css
     assert '.development-active-badge[data-status="running"]::before' in css
+
+
+def test_develop_goal_submits_on_enter_with_ime_guard():
+    script = read("development.js")
+    assert 'form.elements.goal.addEventListener("compositionstart"' in script
+    assert 'form.elements.goal.addEventListener("compositionend"' in script
+    assert 'form.elements.goal.addEventListener("keydown"' in script
+    assert "event.isComposing || event.keyCode === 229" in script
+    assert "if (event.key !== \"Enter\" || event.shiftKey) return;" in script
+    assert "form.requestSubmit();" in script

@@ -1401,6 +1401,29 @@
     catch (error) { report(error.message); }
   }
 
+  if (form.elements.goal) {
+    let composing = false;
+    let composeTimer = null;
+    form.elements.goal.addEventListener("compositionstart", () => {
+      composing = true;
+      if (composeTimer) clearTimeout(composeTimer);
+    });
+    form.elements.goal.addEventListener("compositionend", () => {
+      composing = true;
+      if (composeTimer) clearTimeout(composeTimer);
+      composeTimer = setTimeout(() => {
+        composing = false;
+      }, 50);
+    });
+    form.elements.goal.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      if (composing || event.isComposing || event.keyCode === 229) return;
+      event.preventDefault();
+      if (event.repeat || form.querySelector('[type="submit"]')?.disabled || devPromptBox?.isBusy?.()) return;
+      form.requestSubmit();
+    });
+  }
+
   form.addEventListener("input", () => { requestId = undefined; });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
