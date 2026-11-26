@@ -877,7 +877,6 @@ body.petit-univ-screen .univ-hud__help {
   .univ-hud__selection > strong { max-width: 54vw; font-size: 13px; }
   .univ-hud__selection > div button:first-child { display: none; }
   .univ-hud__controls { grid-column: 1 / -1; justify-self: center; }
-  .univ-hud__controls button:last-child { display: none; }
   .univ-space .life-map__core.univ-core-planet { width: 116px; height: 116px; }
   .univ-space .univ-task-system { width: 198px; height: 198px; }
   .univ-space .univ-task-planet { width: 96px; height: 96px; }

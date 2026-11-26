@@ -136,7 +136,6 @@
           <button type="button" data-univ-action="overview" title="全体へ戻る">全体</button>
           <button type="button" data-univ-action="zoom-out" aria-label="縮小">−</button>
           <button type="button" data-univ-action="zoom-in" aria-label="拡大">＋</button>
-          <button type="button" data-univ-action="reset" title="視点をリセット">リセット</button>
         </div>
         <p class="univ-hud__help">左ドラッグ: 回転 · ミドル: 移動 · ホイール: 拡大縮小 · 惑星: 選択</p>
       `;
@@ -296,7 +295,6 @@
 
   const handleAction = (action) => {
     if (action === "overview") resetCamera();
-    if (action === "reset") resetCamera({ keepSelection: true });
     if (action === "focus") focusCurrent();
     if (action === "manage") openManagement();
     if (action === "zoom-in") {
