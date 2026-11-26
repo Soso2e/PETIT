@@ -273,6 +273,26 @@ def report_notification(event_id: int, body: DeliveryReport, authorization: str 
     return {"event_id": event_id, "status": body.status}
 
 
+@router.get("/api/channels/discord/coding-notices")
+def claim_coding_notices(limit: int = Query(default=10, ge=1, le=20),
+                         authorization: str | None = Header(default=None)) -> dict:
+    """Claim pending Discord coding job completion notices."""
+    _authorize(authorization)
+    from . import coding_jobs
+    notices = coding_jobs.claim_discord_notices(limit=limit)
+    return {"notices": notices}
+
+
+@router.post("/api/channels/discord/coding-notices/{notice_id}")
+def report_coding_notice(notice_id: int, body: DeliveryReport,
+                         authorization: str | None = Header(default=None)) -> dict:
+    _authorize(authorization)
+    from . import coding_jobs
+    if not coding_jobs.report_discord_notice(notice_id, body.status, body.error):
+        raise HTTPException(404, "確保済みの開発通知がありません。")
+    return {"notice_id": notice_id, "status": body.status}
+
+
 class AdminCommandRequest(BaseModel):
     action: str = Field(pattern=r"^(add|remove|list)$")
     actor_id: str = Field(min_length=1, max_length=40, pattern=r"^[0-9]+$")

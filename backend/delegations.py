@@ -27,22 +27,25 @@ TOOLS = {"delegate_to_agent", "get_delegation_status", "cancel_delegation"}
 # First-call schemas for the Front Brain. Approval Tools stay behind discover_tools.
 FRONT_DIRECT = {"get_work_status", "start_work_session", "update_work_session", "record_past_work", "delete_work_session",
                 "create_task", "complete_task", "create_reminder", "search_memory",
-                "delegate_to_agent", "get_delegation_status", "list_coding_repositories", "add_coding_repository", "propose_development_job"}
+                "delegate_to_agent", "get_delegation_status", "list_coding_repositories", "add_coding_repository",
+                "propose_development_job", "get_coding_task_status", "list_development_threads"}
 # Mail bodies stay away from the Front Brain; a delegated CLI can still read them.
 # Repository and Home-file work is delegated (FRONT_HINT), so its Tools stay out of the Front index too.
 FRONT_HIDDEN = {"gmail_get_message",
                 "open_worktree", "list_worktrees", "get_worktree_status", "run_worktree_check", "commit_worktree",
                 "push_worktree", "create_worktree_pull_request", "close_worktree",
-                "delegate_coding_task", "get_coding_task_status", "cancel_coding_task",
+                "delegate_coding_task",
                 "write_home_file", "edit_home_file"}
 _HANDOFF_SKILL = (Path(__file__).parent / "skills" / "compact-cli-handoff" / "SKILL.md")
 FRONT_HINT = ("\n開発・コード修正・リポジトリ調査・PCファイル作業・CLIでの調査や修正依頼（「CLIにお願いして」等）は "
-              "利用者の依頼を原文のまま goal に入れて propose_development_job で開発タブへ提案する。対象の登録名が現在状況に無い・曖昧な場合だけ先に list_coding_repositories で確認する。利用者の開始確認を待つ。"
+              "利用者の依頼を原文のまま goal に入れて propose_development_job で開発タブへ登録する。対象の登録名が現在状況に無い・曖昧な場合だけ先に list_coding_repositories で確認する。"
+              "Discordでは即座にバックグラウンド実行に入り、返答に開発スレッドID（dev_thread_id）を添えて会話を続ける（完了したら通知すると伝える）。Webでは利用者の開始確認を待つ。"
+              "同じ開発の続き・追加依頼は会話履歴や list_development_threads から該当の dev_thread_id を特定して propose_development_job の dev_thread_id に渡し、同じ開発スレッド・CLIセッションを引き継ぐ。別件なら dev_thread_id を省略して新規スレッドにする。"
               "PETIT Toolだけで完結する裏作業（PETIT Home内の作業、メール本文の確認）は delegate_to_agentでCLIに任せる"
               "（開発タブには追加されず、CLIの直接ファイル/コマンド操作も使えない）。"
               "「できない」と答える前に、利用可能なPETIT Toolや propose_development_job で対応できないか確かめる。"
               "雑談・予定・タスク・作業記録は任せず自分で処理する。Web調査は委譲しない。"
-              "任せた作業を完了と言わない。進み具合はget_delegation_statusで確認する。\n"
+              "任せた作業を完了と言わない。進み具合はget_delegation_statusやget_coding_task_statusで確認する。\n"
               + _HANDOFF_SKILL.read_text(encoding="utf-8").split("---", 2)[2].strip())
 REPORTABLE = ("waiting_approval", "completed", "failed", "cancelled", "interrupted")
 ACTIVE = ("queued", "running")

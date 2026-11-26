@@ -12,7 +12,7 @@ from .petit_prompt import voice_turn_instructions
 # A reviewed public catalog, never the registry's internal approval executors.
 # Optional integrations simply disappear when their Tools are not registered.
 PUBLIC_TOOLS = {
-    "list_coding_repositories", "add_coding_repository", "propose_development_job", "get_coding_task_status", "cancel_coding_task",
+    "list_coding_repositories", "add_coding_repository", "propose_development_job", "get_coding_task_status", "list_development_threads", "cancel_coding_task",
     "get_current_time", "get_tasks", "get_schedule", "save_memory", "search_memory",
     "get_work_status", "get_work_report", "start_work_session", "update_work_session", "record_past_work", "delete_work_session",
     "create_task", "update_task", "complete_task", "set_task_parent", "get_task_sync_status",
@@ -310,10 +310,12 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         if calls:
             turn_stream.reset_text(request_id)
         if not calls:
+            from . import coding_jobs
             reply = str(response.get("content") or "").strip()
             if not reply:
                 raise lmstudio_client.LMStudioError("モデルから返答を取得できませんでした。")
             reply += delegations.turn_notice(request_id)
+            reply += coding_jobs.turn_development_notice(request_id, reply)
             return store.finish(request_id, {"reply": reply, "used_tools": used,
                 "model_route": _model_route(target, used, _round + 1)})
         if len(used) + len(calls) > MAX_CALLS:
@@ -323,7 +325,6 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
         assistant["role"] = "assistant"
         messages.append(assistant)
         waiting = False
-        direct_job_id = None
         for index, call in enumerate(calls):
             name = call.get("function", {}).get("name", "")
             call_id = call.get("id")
@@ -351,13 +352,6 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
                     raw = store.encode({"status": "awaiting_user_approval"})
                 else:
                     raw = execute(request_id, call, arguments)
-                    if name == "propose_development_job" and not failed(raw):
-                        try:
-                            parsed = json.loads(raw)
-                        except ValueError:
-                            parsed = {}
-                        if isinstance(parsed, dict) and parsed.get("direct") and parsed.get("job_id"):
-                            direct_job_id = str(parsed["job_id"])
                 used.append({"name": name, "arguments": store.encode(arguments)})
             except (ValueError, TypeError) as exc:
                 raw = store.encode({"error": str(exc)})
@@ -370,19 +364,6 @@ def _run(request_id: str, *, messages: list[dict] | None = None, used_tools: lis
             # Approval is a structured state; no action-specific reply template.
             return store.finish(request_id, {"reply": str(response.get("content") or ""),
                                             "used_tools": used}, status="waiting_approval")
-        if direct_job_id:
-            from . import coding_jobs
-            turn_stream.phase(request_id, "tool", tool="propose_development_job")
-            try:
-                job = coding_jobs.wait_for_job(
-                    direct_job_id,
-                    should_cancel=lambda: bool(store.load_turn(request_id)["cancel_requested"]),
-                )
-            except InterruptedError as exc:
-                raise TurnCancelled(str(exc)) from None
-            reply = _format_direct_job_reply(job)
-            return store.finish(request_id, {"reply": reply, "used_tools": used,
-                "model_route": _model_route(target, used, _round + 1)})
     raise lmstudio_client.LMStudioError("会話処理の上限に達しました。実行結果は保存されています。")
 
 

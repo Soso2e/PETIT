@@ -204,7 +204,7 @@ flowchart TD
     Native -->|テキスト| Reply[回答・確認質問]
     Native -->|PETIT Tool| Gate[既存の検証・risk・承認・receipt]
     Gate --> Native
-    Native -->|propose_development_job| DevJob[開発ジョブの proposed へ / Discord は direct で即実行し結果をそのまま返す]
+    Native -->|propose_development_job| DevJob[開発ジョブへ / Webは proposed・Discordは新規または指定 dev_thread_id で即 queued し非同期で返す]
     Native -->|delegate_to_agent| Create[同じ transaction で receipt・作業用Thread・queued Turn・delegations]
     Create --> Notice[返答末尾に Core が「…に任せました」を追記]
     Create -.->|2秒ごと| Worker[委譲 Worker / 同時1件 / 会話用Workerを使わない]
@@ -277,6 +277,9 @@ flowchart TD
     RemPoll[Bot 15秒ごと] --> RemClaim[GET /api/channels/discord/reminders<br/>Owner DB + Guild DB から期限到来を claimed]
     RemClaim --> RemSend[対象チャンネルへ送信<br/>@everyone または user メンションのみ許可]
     RemSend --> RemReport[POST /api/channels/discord/reminders/scope/id<br/>sent / failed を報告]
+    DevPoll[Bot 10秒ごと] --> DevClaim[GET /api/channels/discord/coding-notices<br/>Discord発の開発ジョブ完了・確認待ちを claimed]
+    DevClaim --> DevSend[依頼元チャンネルへメンション付きで結果と dev_thread_id を送信]
+    DevSend --> DevReport[POST /api/channels/discord/coding-notices/id<br/>sent / failed を報告]
 ```
 
 ### 毎日の進捗投稿（v0.68.0開発版・#504）
