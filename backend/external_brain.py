@@ -77,7 +77,8 @@ def context(request_id: str, messages=None, *, include_history=True, record_metr
     instructions = (voice_turn_instructions() +
                     "\n実際に呼べるTool名はpetit_read_toolだけ。下のカタログ名を直接Toolとして呼んではいけない。"
                     "petit_read_toolのname引数にカタログ名、arguments_json引数にその引数のJSON文字列を渡す。"
-                    "\n承認待ちToolが返されたら直ちに回答を終了し、実行済みと説明しない。" +
+                    "\n承認待ちToolが返されたら直ちに回答を終了し、実行済みと説明しない。"
+                    "\nTimeTreeのラベル work / my plan は別枠（にこの予定）であり、聞かれるまで取得・回答しない。にこの予定を聞かれた場合のみ get_schedule(scope='nico') で確認する。" +
                     "\n運用アラートはCoreが末尾に表示するので本文に重ねて書かない。未解決の事実: " + service_sync.warning() +
                     "\nCapability一覧（必要な詳細schemaはpetit_read_toolのname=discover_tools、arguments_json={\"names\":[\"Tool名\"]}で取得。場所不明は質問、タイムゾーンから推定しない）:\n" + Catalog().index())
     # Approval resume has consumed input_json; the original request remains in conversations.

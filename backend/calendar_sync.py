@@ -16,8 +16,26 @@ from . import google_calendar_push
 
 log = logging.getLogger(__name__)
 TOKYO = timezone(timedelta(hours=9), name="Asia/Tokyo")
+NICO_TIMETREE_LABELS = frozenset({"work", "my plan"})
 _last_sync_monotonic: float | None = None
 _last_result: dict[str, Any] | None = None
+
+
+def is_nico_timetree_label(label_name: str | None) -> bool:
+    """Return True when a TimeTree label belongs to Nico's separate schedule."""
+    return str(label_name or "").strip().casefold() in NICO_TIMETREE_LABELS
+
+
+def nico_schedule_predicate(table_alias: str = "calendar_events_cache") -> str:
+    """SQL predicate matching TimeTree events labeled as Nico's schedule."""
+    labels = ", ".join(f"'{label}'" for label in sorted(NICO_TIMETREE_LABELS))
+    return (
+        f"({table_alias}.source = 'timetree' AND EXISTS ("
+        f"SELECT 1 FROM calendar_event_metadata m "
+        f"WHERE m.source_key = {table_alias}.source_key "
+        f"AND m.external_id = {table_alias}.external_id "
+        f"AND LOWER(TRIM(COALESCE(m.label_name, ''))) IN ({labels})))"
+    )
 
 
 def configured() -> bool:
