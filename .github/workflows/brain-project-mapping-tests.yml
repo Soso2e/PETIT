@@ -1,8 +1,7 @@
 name: BRAIN project mapping tests
 
 on:
-  push:
-    branches: [feat/brain-project-mapping]
+  workflow_dispatch:
   pull_request:
     paths:
       - "backend/brain*.py"

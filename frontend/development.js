@@ -1404,6 +1404,8 @@
   if (form.elements.goal) {
     let composing = false;
     let composeTimer = null;
+    const isCoarsePointer = () =>
+      typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
     form.elements.goal.addEventListener("compositionstart", () => {
       composing = true;
       if (composeTimer) clearTimeout(composeTimer);
@@ -1416,6 +1418,8 @@
       }, 50);
     });
     form.elements.goal.addEventListener("keydown", (event) => {
+      // On touch/mobile devices (coarse pointer), Enter should insert a newline instead of submitting.
+      if (isCoarsePointer()) return;
       if (event.key !== "Enter" || event.shiftKey) return;
       if (composing || event.isComposing || event.keyCode === 229) return;
       event.preventDefault();

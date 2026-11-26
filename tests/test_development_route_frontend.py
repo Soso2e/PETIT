@@ -131,6 +131,8 @@ def test_develop_goal_submits_on_enter_with_ime_guard():
     assert 'form.elements.goal.addEventListener("compositionstart"' in script
     assert 'form.elements.goal.addEventListener("compositionend"' in script
     assert 'form.elements.goal.addEventListener("keydown"' in script
+    assert 'window.matchMedia("(pointer: coarse)")' in script
+    assert "if (isCoarsePointer()) return;" in script
     assert "event.isComposing || event.keyCode === 229" in script
     assert "if (event.key !== \"Enter\" || event.shiftKey) return;" in script
     assert "form.requestSubmit();" in script
