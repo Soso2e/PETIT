@@ -6,14 +6,11 @@ on:
       - 'frontend/components/toggle-switch.css'
       - 'tests/test_toggle_switch.cjs'
       - '.github/workflows/toggle-switch.yml'
-  push:
-    branches:
-      - claude/elegant-carson-vyx7gj
-    paths:
-      - 'frontend/components/toggle-switch.js'
-      - 'frontend/components/toggle-switch.css'
-      - 'tests/test_toggle_switch.cjs'
-      - '.github/workflows/toggle-switch.yml'
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   component-tests:
     runs-on: ubuntu-latest

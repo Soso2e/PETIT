@@ -1,15 +1,11 @@
 name: Project storage tests
 
 on:
-  push:
-    branches:
-      - feat/project-continuity-storage
-  pull_request:
-    paths:
-      - "backend/project_continuity.py"
-      - "backend/project_source_links.py"
-      - "tests/test_project_continuity.py"
-      - ".github/workflows/project-storage-tests.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

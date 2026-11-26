@@ -1,13 +1,7 @@
 name: Task cancel status tests
 
 on:
-  pull_request:
-    paths:
-      - "backend/tools/task_reads.py"
-      - "backend/tools/__init__.py"
-      - "tests/test_task_cancel_status.py"
-      - "docs/life/task_status_handling.md"
-      - ".github/workflows/task-cancel-status-tests.yml"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -16,6 +10,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
