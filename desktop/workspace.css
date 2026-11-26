@@ -1,11 +1,3 @@
-html { scroll-padding-top: 44px; }
-body { padding-top: 44px; }
-#petit-desktop-toolbar { position: fixed; inset: 0 0 auto; height: 44px; z-index: 10000; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 6px 16px; background: var(--ui-bg, #101218); border-bottom: 1px solid var(--ui-line, #ffffff20); }
-#petit-desktop-toolbar button { font: inherit; font-size: 12px; min-height: 30px; padding: 4px 12px; color: var(--ui-text, #eef0f6); background: var(--ui-surface, #1a1e27); border: 1px solid var(--ui-line, #ffffff20); border-radius: 8px; cursor: pointer; }
-#petit-desktop-toolbar button:focus-visible { outline: 2px solid var(--ui-focus, #c3bbef); outline-offset: 2px; }
-body .petit-area-rail { top: 44px; height: calc(100dvh - 44px); }
-body .petit-corner-nav, body .petit-corner-status { margin-top: 44px; }
-body.petit-univ-active .univ-viewport { top: 44px; height: calc(100dvh - 44px); }
 /* Existing compact rail rules hide labels below 1180px while the finishing
    layer reserves 232px. The desktop workspace uses that width for readable labels. */
 @media (min-width: 960px) {
