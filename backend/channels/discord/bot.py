@@ -29,6 +29,7 @@ from .relay import (
     Incoming,
     approval_text,
     button_id,
+    coding_notice_text,
     extract,
     format_channel_context,
     notification_text,
@@ -240,6 +241,12 @@ class CoreClient:
     async def admin_command(self, body: dict) -> dict:
         return await self._call("POST", "/api/channels/discord/admins", return_error=True, json=body) or {"reply": UNAVAILABLE}
 
+    async def claim_coding_notices(self) -> dict:
+        return await self._call("GET", "/api/channels/discord/coding-notices") or {"notices": []}
+
+    async def report_coding_notice(self, notice_id: int, status: str, error: str | None = None) -> None:
+        await self._call("POST", f"/api/channels/discord/coding-notices/{notice_id}", json={"status": status, "error": error})
+
     async def close(self) -> None:
         await self._client.aclose()
 
@@ -450,6 +457,28 @@ async def deliver_reminders(core: CoreClient, get_channel, *, allowed_mentions_f
             await core.report_reminder(scope, reminder_id, "failed", type(exc).__name__, guild_id=guild_id)
         else:
             await core.report_reminder(scope, reminder_id, "sent", guild_id=guild_id)
+            sent += 1
+    return sent
+
+
+async def deliver_coding_notices(core: CoreClient, get_channel, *, allowed_mentions_for=None) -> int:
+    """One poll: send each claimed Discord coding job completion notice to its origin channel."""
+    data = await core.claim_coding_notices()
+    sent = 0
+    for item in data.get("notices") or []:
+        notice_id = int(item["notice_id"])
+        try:
+            channel = await get_channel(int(item["channel_id"]))
+            text = coding_notice_text(item)
+            send_kwargs: dict[str, Any] = {}
+            if allowed_mentions_for is not None:
+                send_kwargs["allowed_mentions"] = allowed_mentions_for(item)
+            for chunk in split(text) or [text]:
+                await channel.send(chunk, **send_kwargs)
+        except Exception as exc:  # noqa: BLE001 - report every failure to Core
+            await core.report_coding_notice(notice_id, "failed", type(exc).__name__)
+        else:
+            await core.report_coding_notice(notice_id, "sent")
             sent += 1
     return sent
 
@@ -1043,6 +1072,7 @@ def build_client(core: CoreClient):
             self.loop.create_task(self.notification_loop())
             self.loop.create_task(self.digest_loop())
             self.loop.create_task(self.reminder_loop())
+            self.loop.create_task(self.coding_notice_loop())
             self.loop.create_task(self.archive_sync_loop())
 
         async def close(self):
@@ -1089,6 +1119,23 @@ def build_client(core: CoreClient):
                     await deliver_reminders(core, self.resolve_channel, allowed_mentions_for=_allowed_mentions)
                 except Exception as exc:  # noqa: BLE001 - keep polling
                     log.warning("reminder poll failed: %s", type(exc).__name__)
+                await asyncio.sleep(interval)
+
+        async def coding_notice_loop(self):
+            await self.wait_until_ready()
+            interval = max(5, int(os.environ.get("PETIT_DISCORD_CODING_POLL_SECONDS", "10") or 10))
+
+            def _allowed_mentions(item: dict) -> discord.AllowedMentions:
+                author_id = str(item.get("author_id") or "")
+                if author_id.isdigit():
+                    return discord.AllowedMentions(users=[discord.Object(id=int(author_id))])
+                return discord.AllowedMentions.none()
+
+            while not self.is_closed():
+                try:
+                    await deliver_coding_notices(core, self.resolve_channel, allowed_mentions_for=_allowed_mentions)
+                except Exception as exc:  # noqa: BLE001 - keep polling
+                    log.warning("coding notice poll failed: %s", type(exc).__name__)
                 await asyncio.sleep(interval)
 
         async def archive_sync_loop(self):

@@ -54,6 +54,32 @@ CREATE TABLE IF NOT EXISTS coding_job_routes (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS coding_job_routes_turn ON coding_job_routes(turn_id) WHERE turn_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS coding_job_routes_thread ON coding_job_routes(thread_id);
+CREATE TABLE IF NOT EXISTS coding_job_discord_targets (
+ job_id TEXT PRIMARY KEY REFERENCES coding_jobs(id),
+ dev_thread_id TEXT NOT NULL,
+ channel_id TEXT NOT NULL,
+ guild_id TEXT,
+ author_id TEXT NOT NULL,
+ conversation_thread_id TEXT NOT NULL,
+ created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS coding_job_discord_notices (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ job_id TEXT NOT NULL REFERENCES coding_jobs(id),
+ dev_thread_id TEXT NOT NULL,
+ channel_id TEXT NOT NULL,
+ guild_id TEXT,
+ author_id TEXT NOT NULL,
+ conversation_thread_id TEXT NOT NULL,
+ job_status TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'pending',
+ error TEXT,
+ created_at TEXT NOT NULL,
+ claimed_at TEXT,
+ sent_at TEXT,
+ UNIQUE(job_id, job_status)
+);
+CREATE INDEX IF NOT EXISTS idx_coding_job_discord_notices_pending ON coding_job_discord_notices(status, id);
 """
 # The CLI's own session ID for a job. It is only meaningful together with that job's workspace.
 SESSION_SCHEMA = """
@@ -249,6 +275,8 @@ def get(job_id):
         route = connection.execute("SELECT * FROM coding_job_routes WHERE job_id=?", (job_id,)).fetchone()
         if route:
             result.update(mode=route["mode"], selection=json.loads(route["selection_json"]))
+            if route["thread_id"]:
+                result["thread_id"] = route["thread_id"]
             if route["mode"] == "pc":
                 result["actions"] = development_pc.actions(connection, job_id)
     result["tests"] = result["checks"].get("tests", "not_run")
@@ -327,7 +355,7 @@ def create(request_id, repository, goal, provider, *, approved=False, task_id=No
 
 
 def create_development(request_id, repository, goal, model_key="auto", effort="medium", lightweight=False,
-                       *, direct=False, thread_id=None, turn_id=None):
+                       *, direct=False, thread_id=None, turn_id=None, discord_target: dict | None = None):
     ensure_schema()
     goal = goal.strip()
     if not goal or len(goal) > 8000:
@@ -365,6 +393,21 @@ def create_development(request_id, repository, goal, model_key="auto", effort="m
             (job_id, request_id, digest, None, str(root) if root else "", head, provider, model, goal, status, now, now))
         connection.execute("INSERT INTO coding_job_routes VALUES(?,?,?,?,?)",
                            (job_id, thread_id, turn_id, mode, json.dumps(selection, ensure_ascii=False)))
+        if discord_target and discord_target.get("channel_id"):
+            connection.execute(
+                "INSERT OR IGNORE INTO coding_job_discord_targets"
+                "(job_id,dev_thread_id,channel_id,guild_id,author_id,conversation_thread_id,created_at)"
+                " VALUES(?,?,?,?,?,?,?)",
+                (
+                    job_id,
+                    str(thread_id or ""),
+                    str(discord_target["channel_id"]),
+                    str(discord_target["guild_id"]) if discord_target.get("guild_id") else None,
+                    str(discord_target.get("author_id") or ""),
+                    str(discord_target.get("conversation_thread_id") or ""),
+                    now,
+                ),
+            )
         event(job_id, status)
     if thread_id:
         from . import development_threads
@@ -443,8 +486,106 @@ def finish(job_id, status, *, summary="", checks=None, error=None):
     notify(job_id, status)
 
 
+DISCORD_NOTICES = set(NOTICES) | {"cancelled"}
+
+
+def _enqueue_discord_notice(job_id: str, status: str) -> None:
+    if status not in DISCORD_NOTICES:
+        return
+    try:
+        with db.write_transaction() as connection:
+            if not connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coding_job_discord_targets'"
+            ).fetchone():
+                return
+            target = connection.execute(
+                "SELECT dev_thread_id,channel_id,guild_id,author_id,conversation_thread_id "
+                "FROM coding_job_discord_targets WHERE job_id=?",
+                (job_id,),
+            ).fetchone()
+            if not target:
+                return
+            connection.execute(
+                "INSERT OR IGNORE INTO coding_job_discord_notices"
+                "(job_id,dev_thread_id,channel_id,guild_id,author_id,conversation_thread_id,job_status,status,created_at)"
+                " VALUES(?,?,?,?,?,?,?,'pending',?)",
+                (
+                    job_id,
+                    target["dev_thread_id"],
+                    target["channel_id"],
+                    target["guild_id"],
+                    target["author_id"],
+                    target["conversation_thread_id"],
+                    status,
+                    db.now_iso(),
+                ),
+            )
+    except Exception:  # noqa: BLE001 - a missing notice never changes the job's state
+        log.exception("discord coding notice enqueue failed job=%s", job_id)
+
+
+def claim_discord_notices(limit: int = 10) -> list[dict]:
+    """Claim pending Discord coding job completion notices (claim-before-send)."""
+    ensure_schema()
+    bounded = max(1, min(int(limit), 20))
+    now = db.now_iso()
+    claimed: list[dict] = []
+    with db.write_transaction() as connection:
+        rows = connection.execute(
+            "SELECT n.id AS notice_id, n.job_id, n.dev_thread_id, n.channel_id, n.guild_id, n.author_id, "
+            "n.conversation_thread_id, n.job_status, j.repository, j.goal, j.summary, j.error, j.provider, j.model "
+            "FROM coding_job_discord_notices n "
+            "JOIN coding_jobs j ON j.id=n.job_id "
+            "WHERE n.status='pending' ORDER BY n.id ASC LIMIT ?",
+            (bounded,),
+        ).fetchall()
+        for row in rows:
+            updated = connection.execute(
+                "UPDATE coding_job_discord_notices SET status='claimed', claimed_at=? WHERE id=? AND status='pending'",
+                (now, row["notice_id"]),
+            ).rowcount
+            if updated:
+                claimed.append(dict(row))
+    return claimed
+
+
+def report_discord_notice(notice_id: int, status: str, error: str | None = None) -> bool:
+    ensure_schema()
+    now = db.now_iso()
+    with db.write_transaction() as connection:
+        updated = connection.execute(
+            "UPDATE coding_job_discord_notices SET status=?, error=?, sent_at=? WHERE id=? AND status='claimed'",
+            (status, error[:500] if error else None, now if status == "sent" else None, int(notice_id)),
+        ).rowcount
+    return bool(updated)
+
+
+def turn_development_notice(request_id: str, reply: str) -> str:
+    """Append dev_thread_id / job_id footer when a Discord turn queued a coding job and omitted the ID."""
+    with db.get_connection() as connection:
+        if not connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='coding_job_discord_targets'"
+        ).fetchone():
+            return ""
+        row = connection.execute(
+            "SELECT r.job_id, r.thread_id "
+            "FROM coding_job_routes r "
+            "JOIN coding_job_discord_targets t ON t.job_id=r.job_id "
+            "WHERE r.turn_id=?",
+            (request_id,),
+        ).fetchone()
+    if not row:
+        return ""
+    dev_thread_id = str(row["thread_id"] or "")
+    job_id = str(row["job_id"] or "")
+    if dev_thread_id and dev_thread_id in reply:
+        return ""
+    return f"\n\n（開発スレッド: `{dev_thread_id}` / ジョブ: `{job_id}` — 完了したらお知らせします）"
+
+
 def notify(job_id, status):
     """Announce a job that needs the owner. The text carries no goal, path or CLI output."""
+    _enqueue_discord_notice(job_id, status)
     if status not in NOTICES:
         return
     try:

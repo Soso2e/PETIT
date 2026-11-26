@@ -187,6 +187,38 @@ def reminder_text(item: dict) -> str:
     return body[:LIMIT]
 
 
+_CODING_STATUS_LABELS = {
+    "ready_for_review": "完了（レビュー待ち）",
+    "checks_failed": "完了（チェック失敗）",
+    "waiting_approval": "承認待ち",
+    "failed": "失敗",
+    "interrupted": "中断",
+    "cancelled": "取消",
+}
+
+
+def coding_notice_text(item: dict) -> str:
+    author_id = str(item.get("author_id") or "").strip()
+    mention = f"<@{author_id}>\n" if author_id.isdigit() else ""
+    status = str(item.get("job_status") or "")
+    label = _CODING_STATUS_LABELS.get(status, status or "終了")
+    dev_thread_id = str(item.get("dev_thread_id") or "")
+    job_id = str(item.get("job_id") or "")
+    repo = str(item.get("repository") or "").strip()
+    repo_name = repo.replace("\\", "/").rstrip("/").split("/")[-1] if repo else "PC"
+    header = f"{mention}🛠️ **開発ジョブ {label}**（対象: {repo_name}）\n開発スレッド: `{dev_thread_id}` / ジョブ: `{job_id}`"
+    detail = str(item.get("error") or item.get("summary") or "").strip()
+    if not detail:
+        if status == "waiting_approval":
+            detail = "承認が必要な操作があります。PETITのDevelopタブで確認してください。"
+        else:
+            detail = "結果の詳細はPETITのDevelopタブまたは会話で確認できます。"
+    room = max(100, LIMIT - len(header) - 2)
+    if len(detail) > room:
+        detail = detail[: max(0, room - 12)] + "…（省略）"
+    return f"{header}\n\n{detail}"[:LIMIT]
+
+
 SLASH_SUBCOMMANDS = {"setup", "reset", "me", "forget-me", "archive", "digest", "admin"}
 
 
