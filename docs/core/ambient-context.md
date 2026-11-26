@@ -13,7 +13,7 @@ Brainは毎Turn、作業状況・予定・タスクを何も知らない状態�
 | 節 | 中身 | 取得元 |
 | --- | --- | --- |
 | 作業 | 計測中または休憩中の作業、経過分、task_id | `work_sessions.active_session()` |
-| 予定 | 今日・明日の予定（1日最大6件、総数つき） | `calendar_events_cache`（`get_schedule` と同じ同期元の絞り込み） |
+| 予定 | 今日・明日の予定（1日最大6件、総数つき。TimeTreeラベル `work` / `my plan` の「にこ」の予定は別枠のため除外） | `calendar_events_cache`（`get_schedule` と同じ同期元の絞り込み） |
 | タスク | 優先度Highの未完了（最大5件、総数つき）、期限が3日以内または超過したもの（最大4件）、タスク同期の未解決件数 | `get_tasks` の既定と同じ関数、`tasks_cache` |
 | 開発対象 | 登録済みの開発フォルダの名前とGitかどうか（最大12件）。パス・ブランチ・変更状況は含めない。開発の依頼で `list_coding_repositories` の1往復を省くため（#491） | 設定の `coding_roots` と環境設定 |
 

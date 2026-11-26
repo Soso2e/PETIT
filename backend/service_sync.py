@@ -168,34 +168,52 @@ def sync(service: str | None = None, *, manual=False, now: datetime | None = Non
         events, cursor, full, identity = _fetch(service, data, state)
         key, changed = source_key(data), 0
         with db.write_transaction() as c:
+            from . import calendar_sync
+            calendar_sync._ensure_label_metadata_table(c)
             live = settings.load()
             owner = c.execute("SELECT lease,lease_until FROM service_sync_state WHERE service=?", (service,)).fetchone()
             if owner["lease"] != lease or owner["lease_until"] < time.time() or live["calendar"] != service or source_key(live) != key:
                 raise google_services.ServiceError("sync_configuration_changed")
             seen = set()
+            now_iso = db.now_iso()
             for event in events:
                 external = event.get("external_id") or hashlib.sha256(json.dumps(event, sort_keys=True).encode()).hexdigest()
                 seen.add(external)
                 if event.get("deleted"):
                     changed += c.execute("DELETE FROM calendar_events_cache WHERE source_key=? AND external_id=?", (key, external)).rowcount
+                    c.execute("DELETE FROM calendar_event_metadata WHERE source_key=? AND external_id=?", (key, external))
                     c.execute("DELETE FROM service_event_versions WHERE source_key=? AND external_id=?", (key, external))
                     continue
+                has_label = bool(event.get("label_name") or event.get("label_color") or event.get("label_id"))
                 fingerprint = hashlib.sha256(json.dumps(event, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
                 old = c.execute("SELECT fingerprint FROM service_event_versions WHERE source_key=? AND external_id=?", (key, external)).fetchone()
                 if old and old[0] == fingerprint:
+                    if has_label and not c.execute("SELECT 1 FROM calendar_event_metadata WHERE source_key=? AND external_id=?", (key, external)).fetchone():
+                        c.execute(
+                            "INSERT OR REPLACE INTO calendar_event_metadata (source_key, external_id, label_name, label_color, label_id, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                            (key, external, event.get("label_name"), event.get("label_color"), event.get("label_id"), now_iso),
+                        )
                     continue
-                values = (event["title"], event["start_time"], event.get("end_time"), event.get("location"), event.get("description"), db.now_iso())
+                values = (event["title"], event["start_time"], event.get("end_time"), event.get("location"), event.get("description"), now_iso)
                 updated = c.execute("UPDATE calendar_events_cache SET title=?,start_time=?,end_time=?,location=?,description=?,updated_at=? "
                                     "WHERE source_key=? AND external_id=?", (*values, key, external)).rowcount
                 if not updated:
                     c.execute("INSERT INTO calendar_events_cache(title,start_time,end_time,location,description,updated_at,source,source_key,external_id) "
                               "VALUES(?,?,?,?,?,?,?,?,?)", (*values, service, key, external))
+                if has_label:
+                    c.execute(
+                        "INSERT OR REPLACE INTO calendar_event_metadata (source_key, external_id, label_name, label_color, label_id, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (key, external, event.get("label_name"), event.get("label_color"), event.get("label_id"), now_iso),
+                    )
+                else:
+                    c.execute("DELETE FROM calendar_event_metadata WHERE source_key=? AND external_id=?", (key, external))
                 c.execute("INSERT OR REPLACE INTO service_event_versions VALUES(?,?,?,?)", (key, external, fingerprint, event.get("remote_updated")))
                 changed += 1
             if full:
                 for old in list(c.execute("SELECT external_id FROM calendar_events_cache WHERE source_key=?", (key,))):
                     if old[0] not in seen:
                         changed += c.execute("DELETE FROM calendar_events_cache WHERE source_key=? AND external_id=?", (key, old[0])).rowcount
+                        c.execute("DELETE FROM calendar_event_metadata WHERE source_key=? AND external_id=?", (key, old[0]))
                         c.execute("DELETE FROM service_event_versions WHERE source_key=? AND external_id=?", (key, old[0]))
             c.execute("UPDATE service_sync_state SET slot=?,cursor=?,identity=?,last_success=?,error=NULL,"
                       "updated_count=?,lease=NULL,lease_until=0,next_attempt=0 WHERE service=? AND lease=?",

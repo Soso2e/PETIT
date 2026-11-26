@@ -178,6 +178,16 @@ CREATE TABLE IF NOT EXISTS calendar_events_cache (
     updated_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS calendar_event_metadata (
+    source_key  TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    label_name  TEXT,
+    label_color TEXT,
+    label_id    TEXT,
+    updated_at  TEXT NOT NULL,
+    PRIMARY KEY(source_key, external_id)
+);
+
 CREATE TABLE IF NOT EXISTS sync_state (
     source              TEXT PRIMARY KEY,
     last_success_at     TEXT,

@@ -66,7 +66,7 @@ def build_context_block(user_message: str) -> str:
         ).fetchall()]
         events = [dict(row) for row in conn.execute(
             "SELECT title, start_time, end_time, location, source FROM calendar_events_cache "
-            "WHERE start_time >= ? AND start_time < ?" + (" AND " + criterion if criterion else "") + " ORDER BY start_time ASC LIMIT 10",
+            "WHERE start_time >= ? AND start_time < ? AND NOT " + calendar_sync.nico_schedule_predicate() + (" AND " + criterion if criterion else "") + " ORDER BY start_time ASC LIMIT 10",
             (today.isoformat(), horizon, *parameters),
         ).fetchall()]
 

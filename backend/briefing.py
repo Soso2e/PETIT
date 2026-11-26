@@ -82,10 +82,11 @@ def create_daily_briefing(target_date: str | None = None) -> dict[str, Any]:
 def _events_for(day: str) -> list[dict[str, Any]]:
     from . import service_sync
     criterion, parameters = service_sync.cache_filter()
+    nico_filter = f"NOT {calendar_sync.nico_schedule_predicate()}"
     with db.get_connection() as conn:
         rows = conn.execute(
             "SELECT id, source, title, start_time, end_time, location "
-            "FROM calendar_events_cache WHERE start_time LIKE ?" + (" AND " + criterion if criterion else "") + " ORDER BY start_time ASC",
+            "FROM calendar_events_cache WHERE start_time LIKE ? AND " + nico_filter + (" AND " + criterion if criterion else "") + " ORDER BY start_time ASC",
             (f"{day}%", *parameters),
         ).fetchall()
     return [dict(r) for r in rows]

@@ -106,13 +106,14 @@ def _work(_now) -> tuple[list[str], int]:
 
 
 def _schedule(now) -> tuple[list[str], int]:
-    from . import service_sync
+    from . import calendar_sync, service_sync
     criterion, parameters = service_sync.cache_filter()
+    nico_filter = f"NOT {calendar_sync.nico_schedule_predicate()}"
     lines: list[str] = []
     total = 0
     with db.get_connection() as connection:
         for label, day in (("今日", now.date()), ("明日", now.date() + timedelta(days=1))):
-            where = "start_time LIKE ?" + (" AND " + criterion if criterion else "")
+            where = "start_time LIKE ? AND " + nico_filter + (" AND " + criterion if criterion else "")
             values = (day.isoformat() + "%", *parameters)
             count = int(connection.execute(
                 "SELECT COUNT(*) FROM calendar_events_cache WHERE " + where, values).fetchone()[0])
@@ -123,7 +124,7 @@ def _schedule(now) -> tuple[list[str], int]:
                 " ORDER BY start_time ASC LIMIT ?", (*values, MAX_EVENTS_PER_DAY)).fetchall()
             total += count
             lines.append(f"[予定 {label} {day.month}/{day.day}({_WEEKDAYS[day.weekday()]}) {count}件"
-                         + ("・一部" if count > len(rows) else "") + "]")
+                         + ("・一部" if count > len(rows) else "") + "・にこの予定は別枠のため除外]")
             for row in rows:
                 start, end = str(row["start_time"] or ""), str(row["end_time"] or "")
                 clock = start[11:16] or "終日"
