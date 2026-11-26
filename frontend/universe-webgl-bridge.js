@@ -101,11 +101,11 @@
     if (!button || !viewport()?.contains(button)) return;
 
     const action = button.dataset.univAction;
-    if (!["overview", "reset", "focus", "manage", "zoom-in", "zoom-out"].includes(action)) return;
+    if (!["overview", "focus", "manage", "zoom-in", "zoom-out"].includes(action)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    if (action === "overview" || action === "reset") {
+    if (action === "overview") {
       window.PetitUnivSpace?.reset?.();
       webgl().reset?.();
     }
