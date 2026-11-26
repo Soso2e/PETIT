@@ -260,6 +260,26 @@ function refreshTray() {
   ]));
   publishPetState();
 }
+function desktopMenu() {
+  const mac = process.platform === 'darwin';
+  const actions = [
+    { id: 'desktop-chat', label: '小型会話', click: () => showOverlay() },
+    { id: 'desktop-settings', label: 'Desktop設定', click: () => showSettings() },
+  ];
+  return Menu.buildFromTemplate([
+    { label: 'PETIT', submenu: mac ? [
+      { role: 'about' }, { type: 'separator' },
+      ...actions, { type: 'separator' },
+      { role: 'services' }, { type: 'separator' },
+      { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' },
+      { type: 'separator' }, { role: 'quit' },
+    ] : actions },
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ]);
+}
 function closeNudge() {
   clearTimeout(nudgeTimer);
   if (nudgeWindow && !nudgeWindow.isDestroyed()) nudgeWindow.destroy();
@@ -512,9 +532,7 @@ function installIpc() {
   on('desktop:hide', 'overlay', () => hideOverlay());
   on('desktop:open-web', 'overlay', () => shell.openExternal(config.serverUrl));
   on('desktop:workspace', 'overlay', () => showWorkspace());
-  on('workspace:chat', 'workspace', () => showOverlay());
   on('workspace:voice', 'workspace', () => showOverlay(true));
-  on('workspace:settings', 'workspace', () => showSettings());
   on('workspace:ready', 'workspace', () => { workspace.petitReady = true; });
   on('recovery:read', 'recovery', () => recoveryState);
   on('recovery:settings', 'recovery', () => { recoveryWindow.close(); showSettings(); });
@@ -607,6 +625,7 @@ else {
   app.on('before-quit', () => { quitting = true; closeNudge(); cancelWakeSetup(); stopWake(); cancelStt(); globalShortcut.unregisterAll(); });
   app.whenReady().then(() => {
     configFile = path.join(app.getPath('userData'), 'desktop.json'); config = readConfig();
+    Menu.setApplicationMenu(desktopMenu());
     if (process.platform === 'win32') app.setAppUserModelId('jp.soso2e.petit');
     cursorFile = path.join(app.getPath('userData'), 'notification-cursors.json');
     try { cursors = JSON.parse(fs.readFileSync(cursorFile, 'utf8')); if (!cursors || typeof cursors !== 'object' || Array.isArray(cursors)) cursors = {}; } catch { cursors = {}; }

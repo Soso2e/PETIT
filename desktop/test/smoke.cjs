@@ -162,7 +162,7 @@ const server = http.createServer(async (request, response) => {
       await page.locator('#open-workspace').click();
       const workspace = await workspaceOpened;
       await workspace.waitForURL(`${origin}/static/universe.html`);
-      await workspace.locator('#petit-desktop-toolbar').waitFor();
+      await workspace.waitForFunction(() => window.PetitAppShell);
       await workspace.evaluate(() => window.PetitAppShell.activateView('settings'));
       await workspace.locator('#notification-enable').click();
       await workspace.locator('#notification-disable').waitFor({ state: 'visible' });
@@ -346,17 +346,36 @@ const server = http.createServer(async (request, response) => {
     const workspace = await workspaceOpened;
 
     await workspace.waitForURL(`${origin}/static/universe.html`);
-    await workspace.locator('#petit-desktop-toolbar').waitFor();
+    await workspace.locator('.petit-corner-status').waitFor();
+    assert.equal(await workspace.locator('#petit-desktop-toolbar').count(), 0);
+    assert.equal(await workspace.locator('body').evaluate(el => getComputedStyle(el).paddingTop), '0px');
+    assert.equal(await workspace.locator('.petit-corner-status').evaluate(el => getComputedStyle(el).marginTop), '0px');
     assert.equal(await workspace.evaluate(() => typeof require), 'undefined');
     assert.equal(await workspace.evaluate(() => typeof window.petitDesktop), 'undefined');
     assert.equal(await workspace.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length), 0);
-    assert.equal(await instance.evaluate(async ({ ipcMain, BrowserWindow }) => {
-      const web = BrowserWindow.getAllWindows().find(win => win.webContents.getURL().endsWith('/static/universe.html'));
+    const workspaceWindow = await instance.browserWindow(workspace);
+    assert.equal(await instance.evaluate(async ({ ipcMain }, web) => {
       try { await ipcMain._invokeHandlers.get('desktop:transcribe')({ sender: web.webContents, senderFrame: web.webContents.mainFrame }); return false; }
       catch { return true; }
-    }), true);
-    await workspace.getByRole('button', { name: '小型会話', exact: true }).click();
-    await workspace.waitForTimeout(1000);
+    }, workspaceWindow), true);
+    const clickDesktopMenu = (id, label) => instance.evaluate(({ Menu }, { win, id, label }) => {
+      const menu = Menu.getApplicationMenu();
+      if (process.platform !== 'darwin' && !win.isMenuBarVisible()) throw new Error('Workspace menu bar is hidden');
+      const item = menu.items[0].submenu.getMenuItemById(id);
+      if (item?.label !== label) throw new Error(`Missing desktop menu item: ${label}`);
+      item.click({}, win, win.webContents);
+    }, { win: workspaceWindow, id, label });
+    const [desktopSettings] = await Promise.all([
+      instance.waitForEvent('window'),
+      clickDesktopMenu('desktop-settings', 'Desktop設定'),
+    ]);
+    await desktopSettings.waitForURL(/setup.html$/);
+    await desktopSettings.locator('#serverUrl').waitFor();
+    const settingsWindow = await instance.browserWindow(desktopSettings);
+    await settingsWindow.evaluate(win => win.close());
+    await clickDesktopMenu('desktop-chat', '小型会話');
+    const chatWindow = await instance.browserWindow(voicePage);
+    assert.equal(await chatWindow.evaluate(win => win.isVisible()), true);
     // Old v0.27 UI probes are retained for explicit investigation.
     // Regular Desktop smoke validates the current Chat/Univ/Develop/Dashboard UI.
     if (process.env.PETIT_SMOKE_SCOPE === 'legacy-universe') {
