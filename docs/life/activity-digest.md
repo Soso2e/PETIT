@@ -9,7 +9,7 @@
 
 PETIT が「自分が何をしていたか」を全部知っている状態を作り、それを毎日 Discord に投稿する。
 
-1. **取り込み**: ChatGPT / Claude の日次ログ（Google Drive の `BRAIN/inbox` など）、GitHub の commit・PR、PETIT との会話（日次索引）、Discord の本人投稿を、日ごとの記録（`lifelog_entries`）に集める。
+1. **取り込み**: Notion の `Act Schedule` 日報（主ソース）、GitHub の commit・PR、PETIT との会話（日次索引）、Discord の本人投稿を、日ごとの記録（`lifelog_entries`）に集める。Google Drive の `BRAIN/inbox` などのローカルフォルダ取り込み（`inbox`）は既定で無効（`PETIT_LIFELOG_INBOX=1` で有効化可能）。
 2. **まとめ**: DeepSeek を3段で使い、その日のまとめを作る（§3）。
 3. **投稿**: `/petit digest` で登録した Discord のチャンネル・フォーラム・スレッドへ、毎日決まった時刻に投稿する（例: 10:00 に前日分）。
 4. **会話**: 「昨日なにしてた？」には Tool `get_activity_digest`（読み取り専用）で同じまとめを返す。
@@ -17,10 +17,11 @@ PETIT が「自分が何をしていたか」を全部知っている状態を�
 ```mermaid
 flowchart LR
     subgraph Sources[出典]
-        Inbox[BRAIN/00_Inbox・70_Outputs<br/>ChatGPT・Claude の日次ログ<br/>.gdoc は Drive API export で本文取得]
+        Notion[Notion Act Schedule<br/>日報 States=📓]
         GH[GitHub<br/>commit・PR]
         Petit[PETIT 日次索引]
         DA[Discord アーカイブ<br/>本人の投稿]
+        Inbox[任意・既定OFF: inbox<br/>PETIT_LIFELOG_INBOX=1 時のみ]
     end
     Sources --> Entries[(lifelog_entries<br/>日ごと・内容ハッシュ)]
     Entries --> S1[① extract<br/>DeepSeek Flash<br/>バッチごと・キャッシュ]
@@ -38,13 +39,13 @@ flowchart LR
 
 | 出典 | 設定 | 日付の決め方 |
 | --- | --- | --- |
-| inbox（`.md` `.markdown` `.txt`、Googleドキュメントの `.gdoc` `.gsheet` `.gslides`） | `PETIT_LIFELOG_INBOX_DIRS`（複数可。Windows は `;` 区切り） | front matter の `covers:` → `date:` → ファイル名の `YYYY-MM-DD` / `YYYYMMDD` → 更新日時。`covers:` 以外には `PETIT_LIFELOG_DAY_SHIFT` を適用 |
+| Notion 日報 | `NOTION_API_KEY`（既存）。`Act Schedule` DB（`PETIT_LIFELOG_NOTION_DB_ID` で上書き可）の `States = 📓` かつ `hide = false`。止めるなら `PETIT_LIFELOG_NOTION=0` | `Date` プロパティ |
 | GitHub | `PETIT_GITHUB_TOKEN`（既存）。止めるなら `PETIT_LIFELOG_GITHUB=0` | 既定ブランチの commit と、その日に更新された PR |
 | PETIT の会話 | 既存の日次索引（[daily_life_index.md](daily_life_index.md)） | 索引の日付 |
 | Discord の本人投稿 | 既存のアーカイブ（`storage/archive/personal.sqlite`）と `PETIT_DISCORD_OWNER_ID`。止めるなら `PETIT_LIFELOG_DISCORD=0` | 投稿日時 |
-| Notion 日報 | `NOTION_API_KEY`（既存）。`Act Schedule` DB（`PETIT_LIFELOG_NOTION_DB_ID` で上書き可）の `States = 📓` かつ `hide = false`。止めるなら `PETIT_LIFELOG_NOTION=0` | `Date` プロパティ |
+| inbox（任意・既定無効。`.md` `.markdown` `.txt`、Googleドキュメントの `.gdoc` `.gsheet` `.gslides`） | `PETIT_LIFELOG_INBOX=1` で有効化し、`PETIT_LIFELOG_INBOX_DIRS` を指定（複数可。Windows は `;` 区切り） | front matter の `covers:` → `date:` → ファイル名の `YYYY-MM-DD` / `YYYYMMDD` → 更新日時。`covers:` 以外には `PETIT_LIFELOG_DAY_SHIFT` を適用 |
 
-- inbox はローカルフォルダとして読む。Google Drive は **Google Drive for desktop** で PC に同期したフォルダ（例 `G:\マイドライブ\BRAIN\00_Inbox`）を指定する。普通のファイルは Drive API を使わない。
+- inbox は既定で無効（`PETIT_LIFELOG_INBOX=0`）。有効化した場合のみローカルフォルダとして読む。Google Drive は **Google Drive for desktop** で PC に同期したフォルダ（例 `G:\マイドライブ\BRAIN\00_Inbox`）を指定する。普通のファイルは Drive API を使わない。
 - **Googleドキュメント（`.gdoc` など）**: PC 上は本文のないショートカット（中身はファイルIDの JSON）なので、設定画面の **Google Drive（Step 4、`drive.readonly`）** を接続すると、そのIDで Drive API の export（ドキュメント・スライドは text/plain、スプレッドシートは CSV）から本文を読む。読み取りだけで、Drive へは書かない。
   - 結果は `lifelog_gdoc_cache` に保存し、ショートカットの更新日時とサイズが変わったときだけ取り直す。1回の取り込みで取り出すのは最大60件（初回に過去分が多くても、次回以降に続きを読む）。
   - ドキュメントに Markdown を打ち込んだときに付く `\---` `\#` などのエスケープは外してから読む。
@@ -53,7 +54,7 @@ flowchart LR
 - 出典名（`origin`）は front matter の `source:`、なければ取り込み先直下のフォルダ名（`chatgpt/` `claude/` など）、直下のファイルなら取り込み先のフォルダ名。
 - 隠しファイル・シンボリックリンク・1MB を超えるファイルは読まない。1ファイルは `PETIT_LIFELOG_MAX_FILE_CHARS`（既定 20000 文字）まで。
 - 取り込んだ内容は `storage/app.db` の `lifelog_entries` に残る（内容ハッシュが同じなら更新しない）。
-- **読めなかったファイルの警告**: 取り込みのたびに、使えなかったファイルを記録し、`/petit digest action:preview`（自分にだけ見える）と Tool `get_activity_digest` の `inbox_warnings` に出す。定時投稿には出さない（ファイル名がチャンネルに出ないように）。
+- **読めなかったファイルの警告**: `PETIT_LIFELOG_INBOX=1` のときのみ、使えなかったファイルを記録し Tool `get_activity_digest` の `inbox_warnings` に返す。`/petit digest action:preview` および定時投稿には「取り込みの注意」欄を表示しない。
 
   | 警告 | 原因 | 対処 |
   | --- | --- | --- |

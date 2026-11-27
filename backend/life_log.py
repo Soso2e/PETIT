@@ -138,6 +138,10 @@ def inbox_dirs() -> list[Path]:
     return [Path(p).expanduser() for p in parts if p]
 
 
+def inbox_enabled() -> bool:
+    return _flag("PETIT_LIFELOG_INBOX", "0")
+
+
 def _flag(name: str, default: str = "1") -> bool:
     return os.getenv(name, default).strip().lower() not in {"0", "false", "off", "no", ""}
 
@@ -649,11 +653,15 @@ def _gather_detailed(day: date) -> tuple[list[dict[str, Any]], dict[str, str]]:
     """Refresh every source for ``day`` and return (entries, source_errors)."""
     ensure_schema()
     source_errors: dict[str, str] = {}
-    try:
-        scan_inbox()
-    except Exception as exc:  # noqa: BLE001
-        log.warning("life log inbox scan failed: %s", type(exc).__name__)
-        source_errors["inbox"] = _error_label(exc)
+    use_inbox = inbox_enabled()
+    if use_inbox:
+        try:
+            scan_inbox()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("life log inbox scan failed: %s", type(exc).__name__)
+            source_errors["inbox"] = _error_label(exc)
+    else:
+        _last_scan.clear()
     for name, collector in COLLECTORS.items():
         try:
             fresh = collector(day)
@@ -667,7 +675,10 @@ def _gather_detailed(day: date) -> tuple[list[dict[str, Any]], dict[str, str]]:
     with db.get_connection() as conn:
         rows = conn.execute("SELECT source,origin,ref,day,title,body,content_hash FROM lifelog_entries "
                             "WHERE day=? ORDER BY source, origin, ref", (day.isoformat(),)).fetchall()
-    return [dict(row) for row in rows], source_errors
+    entries = [dict(row) for row in rows]
+    if not use_inbox:
+        entries = [e for e in entries if e["source"] != "inbox"]
+    return entries, source_errors
 
 
 def gather(day: date) -> list[dict[str, Any]]:
@@ -991,7 +1002,7 @@ def generate(day: str | date | None = None, *, force: bool = False, audience: st
             return {
                 **saved,
                 "cached": True,
-                "warnings": inbox_warnings(),
+                "warnings": inbox_warnings() if inbox_enabled() else [],
                 "diagnostics": {
                     "audience": audience,
                     "raw_sources": raw_sources,
@@ -1025,7 +1036,7 @@ def generate(day: str | date | None = None, *, force: bool = False, audience: st
         else:
             status = "empty"
         if status == "empty":
-            text = f"**{_day_label(target)}の進捗**\n載せられる記録が見つかりませんでした。取り込み先のフォルダやGitHubの設定を確認してください。"
+            text = f"**{_day_label(target)}の進捗**\n載せられる記録が見つかりませんでした。Notion の日報や設定を確認してください。"
         record = {"day": target.isoformat(), "status": status, "fingerprint": fingerprint,
                   "payload": structured, "text": text, "sources": sources, "stages": stages,
                   "generated_at": db.now_iso()}
@@ -1040,7 +1051,7 @@ def generate(day: str | date | None = None, *, force: bool = False, audience: st
         return {
             **record,
             "cached": False,
-            "warnings": inbox_warnings(),
+            "warnings": inbox_warnings() if inbox_enabled() else [],
             "diagnostics": {
                 "audience": audience,
                 "raw_sources": raw_sources,
