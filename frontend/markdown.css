@@ -259,3 +259,81 @@
 .petit-markdown .petit-md-link:hover {
   color: #bfdbfe;
 }
+
+/* --- 回答コピーボタン（通常チャット / 開発チャット / Desktop共通） --- */
+.message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.message.is-loading .message-footer,
+.message.is-streaming .message-footer,
+.message.is-loading .petit-reply-copy,
+.message.is-streaming .petit-reply-copy {
+  display: none;
+}
+
+.petit-reply-copy {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-line, rgba(255, 255, 255, 0.14));
+  background: var(--ui-soft, rgba(255, 255, 255, 0.05));
+  color: var(--ui-muted, #a8b2c4);
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.petit-reply-copy svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.petit-reply-copy:hover {
+  background: var(--ui-accent-soft, rgba(255, 255, 255, 0.12));
+  border-color: var(--ui-line-strong, rgba(255, 255, 255, 0.28));
+  color: var(--ui-text, #f5f7ff);
+}
+
+.petit-reply-copy:focus-visible {
+  outline: 2px solid var(--ui-focus, #b7d5ff);
+  outline-offset: 2px;
+}
+
+.petit-reply-copy.is-copied {
+  background: rgba(72, 187, 120, 0.16);
+  border-color: rgba(72, 187, 120, 0.45);
+  color: #68d391;
+}
+
+.petit-reply-copy.is-failed {
+  border-color: rgba(255, 90, 95, 0.45);
+  color: var(--ui-danger, #ff5a5f);
+}
+
+html[data-petit-theme="light"] .petit-reply-copy.is-copied {
+  background: rgba(22, 163, 74, 0.1);
+  border-color: rgba(22, 163, 74, 0.35);
+  color: #15803d;
+}
+
+.development-thread-reply-meta .development-reply-copy {
+  margin-left: auto;
+}

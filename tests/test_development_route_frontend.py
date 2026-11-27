@@ -79,6 +79,12 @@ def test_develop_thread_long_press_context_menu_and_motion():
     assert 'mutateThread(data.thread_id, "DELETE")' in script
     assert "innerHTML" not in script
 
+
+def test_develop_reply_exposes_copy_button():
+    script = read("development.js")
+    assert "PetitMarkdown?.createCopyButton" in script
+    assert "development-reply-copy" in script
+
     css = read("development.css")
     assert ".development-context-menu" in css
     assert "devMenuSpringIn" in css
