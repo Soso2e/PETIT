@@ -84,6 +84,7 @@ def test_develop_reply_exposes_copy_button():
     script = read("development.js")
     assert "PetitMarkdown?.createCopyButton" in script
     assert "development-reply-copy" in script
+    assert "streamHost.after(footer)" in script
 
     css = read("development.css")
     assert ".development-context-menu" in css

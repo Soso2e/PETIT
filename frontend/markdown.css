@@ -334,6 +334,6 @@ html[data-petit-theme="light"] .petit-reply-copy.is-copied {
   color: #15803d;
 }
 
-.development-thread-reply-meta .development-reply-copy {
-  margin-left: auto;
+.development-reply-footer {
+  margin-top: 2px;
 }

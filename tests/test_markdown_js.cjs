@@ -184,5 +184,5 @@ test("Markdown: copyText copies via navigator.clipboard and chat UIs wire create
 
   const css = fs.readFileSync(path.join(__dirname, "..", "frontend", "markdown.css"), "utf8");
   assert.ok(css.includes(".petit-reply-copy"), "markdown.css must style .petit-reply-copy");
-  assert.ok(css.includes(".development-reply-copy"), "markdown.css must style .development-reply-copy");
+  assert.ok(css.includes(".development-reply-footer"), "markdown.css must style .development-reply-footer");
 });
