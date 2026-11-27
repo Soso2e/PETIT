@@ -1,6 +1,7 @@
 name: Task conversation flow tests
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "backend/tools/__init__.py"
@@ -11,6 +12,8 @@ on:
       - "tests/test_task_conversation_flow.py"
       - "tests/test_task_cancel_status.py"
       - "docs/life/task_conversation_flow.md"
+      - "docs/life/task_status_handling.md"
+      - ".github/workflows/task-cancel-status-tests.yml"
       - ".github/workflows/task-conversation-flow-tests.yml"
 
 concurrency:
@@ -20,6 +23,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

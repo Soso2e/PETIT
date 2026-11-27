@@ -1,13 +1,17 @@
 name: Project source refresh tests
 
 on:
-  push:
-    branches:
-      - feat/project-source-refresh
+  workflow_dispatch:
   pull_request:
     paths:
       - "backend/notion_project_sync.py"
+      - "tests/test_removed_integrations.py"
+      - "tests/test_notion_adapter_v2.py"
       - ".github/workflows/project-source-refresh-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

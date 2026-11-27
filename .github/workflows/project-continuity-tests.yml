@@ -1,15 +1,12 @@
 name: Project continuity tests
 
 on:
-  push:
-    branches:
-      - feat/project-continuity-routing
-      - feat/project-completion-checkpoint
-      - feat/project-resume-context
-      - feat/project-registration
+  workflow_dispatch:
   pull_request:
     paths:
       - "backend/project_continuity.py"
+      - "backend/project_source_links.py"
+      - ".github/workflows/project-storage-tests.yml"
       - "backend/project_completion.py"
       - "backend/project_registration.py"
       - "backend/tools/project_completion.py"
@@ -19,6 +16,10 @@ on:
       - "tests/test_project_completion.py"
       - "tests/test_project_registration.py"
       - ".github/workflows/project-continuity-tests.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

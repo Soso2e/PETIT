@@ -1,15 +1,21 @@
 name: Voice task interaction tests
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "frontend/voice.js"
       - "tests/test_voice_task_interaction.py"
       - ".github/workflows/voice-task-interaction-tests.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
