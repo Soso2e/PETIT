@@ -147,3 +147,42 @@ test("Markdown: universe-app.js and app.js use PetitMarkdown for assistant messa
   assert.ok(appJs.includes("window.PetitMarkdown.render"), "app.js must render markdown for assistant");
   assert.ok(appJs.includes("petit-markdown"), "app.js must add petit-markdown class");
 });
+
+test("Markdown: copyText copies via navigator.clipboard and chat UIs wire createCopyButton", async () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+
+  assert.equal(await PetitMarkdown.copyText(""), false);
+
+  let copiedValue = null;
+  const origDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", {
+    value: {
+      clipboard: {
+        writeText: async (text) => { copiedValue = text; },
+      },
+    },
+    configurable: true,
+    writable: true,
+  });
+  try {
+    const ok = await PetitMarkdown.copyText("**hello**\n```js\n1\n```");
+    assert.equal(ok, true);
+    assert.equal(copiedValue, "**hello**\n```js\n1\n```");
+  } finally {
+    if (origDescriptor) {
+      Object.defineProperty(globalThis, "navigator", origDescriptor);
+    } else {
+      delete globalThis.navigator;
+    }
+  }
+
+  for (const file of ["universe-app.js", "app.js", "development.js"]) {
+    const src = fs.readFileSync(path.join(__dirname, "..", "frontend", file), "utf8");
+    assert.ok(src.includes("PetitMarkdown?.createCopyButton"), `${file} must wire createCopyButton`);
+  }
+
+  const css = fs.readFileSync(path.join(__dirname, "..", "frontend", "markdown.css"), "utf8");
+  assert.ok(css.includes(".petit-reply-copy"), "markdown.css must style .petit-reply-copy");
+  assert.ok(css.includes(".development-reply-footer"), "markdown.css must style .development-reply-footer");
+});

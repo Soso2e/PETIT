@@ -343,19 +343,19 @@
         if (!codeEl) return;
 
         var codeText = codeEl.textContent || "";
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(codeText).then(function () {
-            var origText = button.textContent;
+        copyText(codeText).then(function (ok) {
+          var origText = button.textContent;
+          if (ok) {
             button.textContent = "コピー完了！";
             button.classList.add("is-copied");
             setTimeout(function () {
               button.textContent = origText;
               button.classList.remove("is-copied");
             }, 1800);
-          }).catch(function () {
+          } else {
             button.textContent = "失敗";
-          });
-        }
+          }
+        });
       });
     };
 
@@ -364,6 +364,82 @@
     } else {
       initCopyListener();
     }
+  }
+
+  function copyText(text) {
+    var value = text == null ? "" : String(text);
+    if (!value) return Promise.resolve(false);
+    if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      return navigator.clipboard.writeText(value).then(function () {
+        return true;
+      }).catch(function () {
+        return fallbackCopyText(value);
+      });
+    }
+    return Promise.resolve(fallbackCopyText(value));
+  }
+
+  function fallbackCopyText(value) {
+    if (typeof document === "undefined" || !document.body) return false;
+    var textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    textarea.style.pointerEvents = "none";
+    document.body.appendChild(textarea);
+    textarea.select();
+    var copied = false;
+    try {
+      copied = Boolean(document.execCommand && document.execCommand("copy"));
+    } catch (_error) {
+      copied = false;
+    }
+    textarea.remove();
+    return copied;
+  }
+
+  var COPY_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8" height="9" rx="1.5"></rect><path d="M3.5 11H3a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 3 1h6.5A1.5 1.5 0 0 1 11 2.5V3"></path></svg>';
+  var CHECK_ICON_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5 6.5 11.5 12.5 4.5"></path></svg>';
+
+  function createCopyButton(getText, options) {
+    if (typeof document === "undefined") return null;
+    var opts = options || {};
+    var label = opts.label || "コピー";
+    var copiedLabel = opts.copiedLabel || "コピー済み";
+    var failedLabel = opts.failedLabel || "失敗";
+    var ariaLabel = opts.ariaLabel || "回答をコピー";
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "petit-reply-copy" + (opts.className ? " " + opts.className : "");
+    button.setAttribute("aria-label", ariaLabel);
+    button.title = opts.title || ariaLabel;
+
+    var setVisual = function (state) {
+      var icon = state === "copied" ? CHECK_ICON_SVG : COPY_ICON_SVG;
+      var text = state === "copied" ? copiedLabel : state === "failed" ? failedLabel : label;
+      button.innerHTML = icon + "<span>" + escapeHtml(text) + "</span>";
+      button.classList.toggle("is-copied", state === "copied");
+      button.classList.toggle("is-failed", state === "failed");
+    };
+    setVisual("idle");
+
+    var resetTimer = null;
+    button.addEventListener("click", function (event) {
+      event.stopPropagation();
+      var text = typeof getText === "function" ? getText() : String(getText || "");
+      if (!String(text || "").trim()) return;
+      copyText(text).then(function (ok) {
+        if (resetTimer) clearTimeout(resetTimer);
+        setVisual(ok ? "copied" : "failed");
+        resetTimer = setTimeout(function () {
+          setVisual("idle");
+          resetTimer = null;
+        }, 1800);
+      });
+    });
+
+    return button;
   }
 
   function renderTo(element, text) {
@@ -377,6 +453,8 @@
     renderTo: renderTo,
     escapeHtml: escapeHtml,
     sanitizeUrl: sanitizeUrl,
+    copyText: copyText,
+    createCopyButton: createCopyButton,
   };
 
   if (typeof module !== "undefined" && module.exports) {
