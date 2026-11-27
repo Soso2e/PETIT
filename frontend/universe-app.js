@@ -1257,15 +1257,29 @@
   const appendMessage = (role, message, actions = [], developmentJobId = null) => {
     const item = document.createElement("div");
     item.className = `message message--${role}`;
+    const rawText = String(message ?? "");
+    item.dataset.rawMessage = rawText;
     const copy = document.createElement("div");
     copy.className = "message-body";
-    if (role === "assistant" && window.PetitMarkdown && message) {
+    if (role === "assistant" && window.PetitMarkdown && rawText) {
       copy.classList.add("petit-markdown");
-      copy.innerHTML = window.PetitMarkdown.render(message);
+      copy.innerHTML = window.PetitMarkdown.render(rawText);
     } else {
-      copy.textContent = message;
+      copy.textContent = rawText;
     }
     item.appendChild(copy);
+
+    if (role === "assistant" && rawText.trim() && window.PetitMarkdown?.createCopyButton) {
+      const footer = document.createElement("div");
+      footer.className = "message-footer";
+      const copyBtn = window.PetitMarkdown.createCopyButton(() => item.dataset.rawMessage || copy.textContent || "", {
+        ariaLabel: "回答をコピー",
+      });
+      if (copyBtn) {
+        footer.appendChild(copyBtn);
+        item.appendChild(footer);
+      }
+    }
 
     for (const action of actions) {
       if (document.querySelector('[data-approval-id="' + action.approval_id + '"]')) continue;

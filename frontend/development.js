@@ -1113,6 +1113,19 @@
       watchProgress(message, job, refreshThread, { replyBox: streamHost, trace, streamReply: true, onStatus });
     } else {
       renderReplyBody(message, job);
+      const replyCopyText = job.summary ? String(job.summary) : (job.error ? "エラー: " + job.error : "");
+      if (replyCopyText.trim() && window.PetitMarkdown?.createCopyButton) {
+        const footer = document.createElement("div");
+        footer.className = "message-footer development-reply-footer";
+        const copyBtn = window.PetitMarkdown.createCopyButton(() => replyCopyText, {
+          className: "development-reply-copy",
+          ariaLabel: "開発チャットの回答をコピー",
+        });
+        if (copyBtn) {
+          footer.append(copyBtn);
+          streamHost.after(footer);
+        }
+      }
       const traces = (job.events || []).filter((ev) => ev.detail && ev.kind !== "cli_failure");
       if (traces.length) {
         const traceDetails = append(reply, "details", "");

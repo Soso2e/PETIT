@@ -65,6 +65,17 @@ function addMessage(role, text, { tools, error, actions, modelRoute, development
     bubble.textContent = text;
   }
   wrap.appendChild(bubble);
+  if (role === "assistant" && !error && String(text || "").trim() && window.PetitMarkdown?.createCopyButton) {
+    const footer = document.createElement("div");
+    footer.className = "message-footer";
+    const copyBtn = window.PetitMarkdown.createCopyButton(() => String(text), {
+      ariaLabel: "回答をコピー",
+    });
+    if (copyBtn) {
+      footer.appendChild(copyBtn);
+      bubble.appendChild(footer);
+    }
+  }
   if (developmentJobId) window.PetitDevelopment?.attachProposal(bubble, developmentJobId);
 
   if (tools && tools.length) {
