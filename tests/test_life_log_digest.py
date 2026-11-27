@@ -21,6 +21,7 @@ def env(tmp_path, monkeypatch):
     inbox = tmp_path / "BRAIN" / "inbox"
     (inbox / "chatgpt").mkdir(parents=True)
     (inbox / "claude").mkdir(parents=True)
+    monkeypatch.setenv("PETIT_LIFELOG_INBOX", "1")
     monkeypatch.setenv("PETIT_LIFELOG_INBOX_DIRS", str(inbox))
     monkeypatch.setenv("PETIT_LIFELOG_TIMEZONE", "Asia/Tokyo")
     monkeypatch.setenv("PETIT_LIFELOG_GITHUB", "0")
@@ -340,17 +341,42 @@ def test_clean_inbox_has_no_warnings(env):
     assert life_log.inbox_warnings(life_log.scan_inbox()) == []
 
 
-def test_preview_shows_warnings_but_scheduled_post_does_not(api, env, llm):
+def test_preview_and_scheduled_post_omit_inbox_warnings_section(api, env, llm):
     write(env, "chatgpt/2026-11-19.md", "- 進めた")
     write(env, "chatgpt/メモ.gdoc", "{}")
     preview = command(api, action="preview", day="yesterday").json()
-    assert "取り込みの注意" in preview["reply"] and "メモ.gdoc" in preview["reply"]
+    assert "取り込みの注意" not in preview["reply"] and "メモ.gdoc" not in preview["reply"]
 
     command(api, time="10:00")
     _set_created("2026-11-18T00:00:00+00:00")
     discord_digest.run_due(datetime(2026, 11, 20, 1, 0, tzinfo=timezone.utc))
     posts = api.get("/api/channels/discord/digests", headers=HEADERS).json()["posts"]
     assert posts and "gdoc" not in posts[0]["body"] and "取り込みの注意" not in posts[0]["body"]
+
+
+def test_inbox_is_disabled_by_default_and_ignored_in_digest(env, llm, monkeypatch):
+    write(env, "chatgpt/2026-11-22.md", "- BRAIN側の古いログ")
+    write(env, "chatgpt/メモ.gdoc", '{"doc_id": "abc"}')
+    life_log.scan_inbox()
+    assert life_log.entries_for("2026-11-22")
+
+    monkeypatch.delenv("PETIT_LIFELOG_INBOX", raising=False)
+    assert life_log.inbox_enabled() is False
+    monkeypatch.setattr(life_log, "COLLECTORS", {
+        "notion": lambda day: [{
+            "source": "notion",
+            "origin": "notion",
+            "ref": f"page-1@{day.isoformat()}",
+            "day": day.isoformat(),
+            "title": "日報",
+            "body": "- Notion の日報だけを使う",
+        }]
+    })
+    digest = life_log.generate("2026-11-22", audience="shared")
+    assert digest["status"] == "ok"
+    assert digest["sources"] == {"notion": 1}
+    assert digest["warnings"] == []
+    assert digest["diagnostics"]["raw_sources"] == {"notion": 1}
 
 
 

@@ -1,4 +1,4 @@
-"""Read the owner's day across ChatGPT / Claude logs, GitHub, PETIT and Discord (#504)."""
+"""Read the owner's day across Notion daily reports, GitHub, PETIT and Discord (#504)."""
 from __future__ import annotations
 
 from .. import life_log
@@ -8,8 +8,8 @@ from .registry import tool
 @tool(
     name="get_activity_digest",
     description=(
-        "本人が指定日に何をしていたかのまとめを返す（読み取り専用）。ChatGPT・Claudeの日次ログ"
-        "（BRAIN/inboxなど）、GitHubのcommit・PR、PETITとの会話、Discordの本人投稿を横断する。"
+        "本人が指定日に何をしていたかのまとめを返す（読み取り専用）。Notionの日報（Act Schedule）、"
+        "GitHubのcommit・PR、PETITとの会話、Discordの本人投稿を横断する。"
         "「昨日なにしてた？」「11/18の進捗」などに使う。"
     ),
     parameters={

@@ -122,8 +122,9 @@ def _preview_diagnostics(digest: dict) -> list[str]:
         dropped_entries = int(diag.get("dropped_by_shared") or 0)
         dropped_facts = int(diag.get("facts_dropped_by_shared") or 0)
         if dropped_entries:
+            shared_label = "Notion / GitHub / Inbox" if life_log.inbox_enabled() else "Notion / GitHub"
             notes.append(
-                f"サーバーチャンネルでは公開可能なソース（GitHub / Inbox / Notion）のみ対象のため、"
+                f"サーバーチャンネルでは公開可能なソース（{shared_label}）のみ対象のため、"
                 f"個人チャット等の記録 {dropped_entries}件 が除外されました（全記録は DM で確認できます）。"
             )
         elif dropped_facts:
@@ -295,9 +296,6 @@ def command(body: DigestCommand, authorization: str | None = Header(default=None
             if diag_notes:
                 reply += "\n\n**診断情報**\n" + "\n".join("- " + note for note in diag_notes)
         warnings = digest.get("warnings") or []
-        if warnings:
-            # Preview is ephemeral, so file names can be shown; scheduled posts never include them.
-            reply += "\n\n⚠️ **取り込みの注意**\n" + "\n".join("- " + note for note in warnings)
         return {"reply": reply, "status": digest["status"], "warnings": warnings}
     if not body.channel_id:
         raise HTTPException(400, "投稿先のチャンネルが分かりませんでした。")
